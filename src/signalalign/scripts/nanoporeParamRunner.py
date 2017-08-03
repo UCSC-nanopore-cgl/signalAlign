@@ -5,9 +5,9 @@ import sys
 import os
 import subprocess
 from random import shuffle
+from signalalign.utils.fileHandlers import FolderHandler
 from signalalign.scripts.signalAlignLib import get_npRead_2dseq_and_models, exonerated_bwa, prepareOneD
 from argparse import ArgumentParser
-from signalalign.utils.fileHandlers import FolderHandler
 
 
 def parse_args():
