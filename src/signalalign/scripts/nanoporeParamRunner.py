@@ -5,7 +5,7 @@ import sys
 import os
 import subprocess
 from random import shuffle
-from signalAlignLib import get_npRead_2dseq_and_models, exonerated_bwa, prepareOneD
+from signalalign.scripts.signalAlignLib import get_npRead_2dseq_and_models, exonerated_bwa, prepareOneD
 from argparse import ArgumentParser
 from signalalign.utils.fileHandlers import FolderHandler
 
@@ -117,7 +117,7 @@ def estimate_params(fast5, working_folder, twoD=False):
     print("Shift {}, scale {}, var {}".format(params[1], params[3], params[5]))
     working_folder.remove_file(npRead_path)
     working_folder.remove_file(npRead_fasta)
-    return
+    return params
 
 
 def main(args):

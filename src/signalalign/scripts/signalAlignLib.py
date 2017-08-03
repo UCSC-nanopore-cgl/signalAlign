@@ -10,7 +10,7 @@ import re
 import numpy as np
 from itertools import islice, izip
 from random import shuffle
-from motif import getMotif
+from signalalign.scripts.motif import getMotif
 from signalalign.utils.sequenceTools import reverse_complement
 from signalalign.utils.parsers import read_fasta
 from signalalign.utils.fileHandlers import FolderHandler
