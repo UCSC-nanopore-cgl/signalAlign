@@ -3,10 +3,11 @@
 from __future__ import print_function
 import sys
 import os
+import subprocess
 from random import shuffle
 from signalAlignLib import get_npRead_2dseq_and_models, exonerated_bwa, prepareOneD
 from argparse import ArgumentParser
-from serviceCourse.file_handlers import FolderHandler
+from signalalign.utils.fileHandlers import FolderHandler
 
 
 def parse_args():
@@ -15,25 +16,25 @@ def parse_args():
     parser.add_argument('--file_directory', '-d', action='store',
                         dest='files_dir', required=True, type=str, default=None,
                         help="directory with MinION files to estimate parameters from")
-    #parser.add_argument('--ref', '-r', action='store',
+    # parser.add_argument('--ref', '-r', action='store',
     #                    dest='ref', required=True, type=str,
     #                    help="reference sequence to align to, in FASTA")
-    #parser.add_argument('--in_template_hmm', '-T', action='store', dest='in_T_Hmm',
+    # parser.add_argument('--in_template_hmm', '-T', action='store', dest='in_T_Hmm',
     #                    required=False, type=str, default=None,
     #                    help="input HMM for template events, if you don't want the default")
-    #parser.add_argument('--in_complement_hmm', '-C', action='store', dest='in_C_Hmm',
+    # parser.add_argument('--in_complement_hmm', '-C', action='store', dest='in_C_Hmm',
     #                    required=False, type=str, default=None,
     #                    help="input HMM for complement events, if you don't want the default")
 
-    #parser.add_argument('--threshold', '-t', action='store', dest='threshold', type=float, required=False,
+    # parser.add_argument('--threshold', '-t', action='store', dest='threshold', type=float, required=False,
     #                    default=0.01, help="posterior match probability threshold, Default: 0.01")
 
-    #parser.add_argument('--constraintTrim', '-m', action='store', dest='trim', type=int,
+    # parser.add_argument('--constraintTrim', '-m', action='store', dest='trim', type=int,
     #                    required=False, default=14, help='amount to remove from an anchor constraint')
 
-    #parser.add_argument('--jobs', '-j', action='store', dest='nb_jobs', required=False,
+    # parser.add_argument('--jobs', '-j', action='store', dest='nb_jobs', required=False,
     #                    default=4, type=int, help="number of jobs to run concurrently")
-    parser.add_argument('--nb_files', '-n', action='store', dest='nb_files', required=False,
+    parser.add_argument('--nb_files', '-n', action='store', dest='nb_files',
                         default=500, type=int, help="maximum number of reads to align")
 
     parser.add_argument('--output_location', '-o', action='store', dest='out',
@@ -110,7 +111,10 @@ def estimate_params(fast5, working_folder, twoD=False):
 
     print("running command {command}".format(command=command), file=sys.stderr)
 
-    os.system(command)
+    # os.system(command)
+    result = subprocess.check_output(command, shell=True, stderr=subprocess.STDOUT)
+    params = result.split()
+    print("Shift {}, scale {}, var {}".format(params[1], params[3], params[5]))
     working_folder.remove_file(npRead_path)
     working_folder.remove_file(npRead_fasta)
     return
@@ -129,13 +133,17 @@ def main(args):
         shuffle(fast5s)
         fast5s = fast5s[:args.nb_files]
     for fast5 in fast5s:
-        #estimate_params(fast5=args.files_dir + fast5, working_folder=temp_folder, bwa_index=bwa_ref_index,
+        print(fast5)
+        # estimate_params(fast5=args.files_dir + fast5, working_folder=temp_folder, bwa_index=bwa_ref_index,
         #                forward_reference_path=plus_strand_sequence, backward_reference_path=minus_strand_sequence,
         #                threshold=args.threshold)
-        estimate_params(fast5=args.files_dir + fast5, working_folder=temp_folder)
-
+        try:
+            estimate_params(fast5=args.files_dir + fast5, working_folder=temp_folder)
+        except Exception as e:
+            print(e)
     temp_folder.remove_folder()
     return
+
 
 if __name__ == "__main__":
     sys.exit(main(sys.argv))

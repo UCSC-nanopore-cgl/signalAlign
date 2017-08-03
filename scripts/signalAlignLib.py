@@ -11,9 +11,9 @@ import numpy as np
 from itertools import islice, izip
 from random import shuffle
 from motif import getMotif
-from serviceCourse.sequenceTools import reverse_complement
-from serviceCourse.parsers import read_fasta
-from serviceCourse.file_handlers import FolderHandler
+from signalalign.utils.sequenceTools import reverse_complement
+from signalalign.utils.parsers import read_fasta
+from signalalign.utils.fileHandlers import FolderHandler
 
 # Globals
 NORM_DIST_PARAMS = 2

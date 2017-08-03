@@ -2,6 +2,7 @@
 
 import string
 from collections import Counter
+from sonLib.bioio import fastaRead
 
 def reverse_complement(dna, reverse=True, complement=True):
     """ 
@@ -41,3 +42,12 @@ def count_kmers(dna, k):
         if len(kmer) == k:
             kmer_count[kmer] += 1
     return kmer_count
+
+def getFastaDictionary(fastaFile):
+    """Returns a dictionary of the first words of fasta headers to their corresponding
+    fasta sequence
+    """
+    namesAndSequences = map(lambda x : (x[0].split()[0], x[1]), fastaRead(open(fastaFile, 'r')))
+    names = map(lambda x : x[0], namesAndSequences)
+    assert len(names) == len(set(names)) #Check all the names are unique
+    return dict(namesAndSequences) #Hash of names to sequences
