@@ -13,7 +13,7 @@ all : sL bD ${libPath}/signalAlignLib.a ${signalAlignBin}/signalAlignLibTests ${
 	  ${signalAlignBin}/signalAlignLib.py ${signalAlignBin}/variantCallingLib.py ${signalAlignBin}/alignmentAnalysisLib.py \
       ${signalAlignBin}/buildHdpUtil ${signalAlignBin}/trainModels ${signalAlignBin}/hdp_pipeline ${signalAlignBin}/testSignalAlign \
 	  externals
-      #nanoporeParams
+      nanoporeParams
       #${signalAlignBin}/zayante ${signalAlignBin}/bonnyDoon \
       #${signalAlignBin}/empire ${signalAlignBin}/jamison \
 
