@@ -8,6 +8,7 @@
 #endif
 
 
+
 typedef struct _nanoporeReadAdjustmentParameters {
     double scale;
     double shift;
@@ -56,6 +57,8 @@ typedef struct _eventKmerTuple {
     double deltaTime;
     int64_t kmerIndex;
 } EventKmerTuple;
+
+void printNanoporeReadAdjustmentParameters(NanoporeReadAdjustmentParameters *npParams);
 
 
 // loads a nanopore read (.npRead) from a file

@@ -5,6 +5,17 @@
 #include "pairwiseAligner.h"
 
 
+void printNanoporeReadAdjustmentParameters(NanoporeReadAdjustmentParameters *npRead) {
+    printf("scale %lf\n", npRead->scale);
+    printf("shift %lf\n", npRead->shift);
+    printf("var %lf\n", npRead->var);
+    printf("scale_sd %lf\n", npRead->scale_sd);
+    printf("shift_sd %lf\n", npRead->shift_sd);
+    printf("var_sd %lf\n", npRead->var_sd);
+    printf("drift %lf\n", npRead->drift);
+}
+
+
 static NanoporeRead *nanopore_NanoporeReadConstruct(int64_t readLength,
                                                     int64_t nbTemplateEvents,
                                                     int64_t nbComplementEvents,

@@ -211,6 +211,8 @@ void signalUtils_estimateNanoporeParams(StateMachine *sM, NanoporeRead *npRead,
     sM->shift = params->shift;
     sM->var = params->var;
 
+//    printNanoporeReadAdjustmentParameters(params);
+
     if ((sM->scale != params->scale) || (sM->shift != params->shift) || (sM->var != params->var)) {
         st_errAbort("ERROR - Problem updating stateMachine\n");
     }
