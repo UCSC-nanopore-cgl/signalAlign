@@ -9,13 +9,13 @@ signalAlignDependencies =  ${basicLibsDependencies}
 signalAlignLib = ${basicLibs}
 
 all : sL bD ${libPath}/signalAlignLib.a ${signalAlignBin}/signalAlignLibTests ${signalAlignBin}/compareDistributions \
-      ${signalAlignBin}/signalMachine ${signalAlignBin}/runSignalAlign \
+	  ${signalAlignBin}/signalMachine ${signalAlignBin}/runSignalAlign \
 	  ${signalAlignBin}/signalAlignLib.py ${signalAlignBin}/variantCallingLib.py ${signalAlignBin}/alignmentAnalysisLib.py \
-      ${signalAlignBin}/buildHdpUtil ${signalAlignBin}/trainModels ${signalAlignBin}/hdp_pipeline ${signalAlignBin}/testSignalAlign \
+	  ${signalAlignBin}/buildHdpUtil ${signalAlignBin}/trainModels ${signalAlignBin}/hdp_pipeline ${signalAlignBin}/testSignalAlign \
 	  externals
-      nanoporeParams
-      #${signalAlignBin}/zayante ${signalAlignBin}/bonnyDoon \
-      #${signalAlignBin}/empire ${signalAlignBin}/jamison \
+	  nanoporeParams
+	  #${signalAlignBin}/zayante ${signalAlignBin}/bonnyDoon \
+	  #${signalAlignBin}/empire ${signalAlignBin}/jamison \
 
 core : sL bD ${libPath}/signalAlignLib.a ${signalAlignBin}/signalAlignLibTests ${signalAlignBin}/signalMachine
 
