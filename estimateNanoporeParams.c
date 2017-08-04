@@ -224,16 +224,18 @@ int main(int argc, char *argv[]) {
     //signalUtils_estimateNanoporeParams(sMc, npRead, &npRead->complementParams, ASSIGNMENT_THRESHOLD,
     //                                   signalUtils_complementOneDAssignmentsFromRead, nanopore_dontAdjustEvents);
 
-    st_uglyf("shift %f scale %f var %f\n",
-             npRead->templateParams.shift, npRead->templateParams.scale, npRead->templateParams.var);
+    printNanoporeReadAdjustmentParameters(&npRead->templateParams);
+
+//    st_uglyf("shift %f scale %f var %f\n",
+//             npRead->templateParams.shift, npRead->templateParams.scale, npRead->templateParams.var);
     //st_uglyf("SENTINEL - After: shift_sd: %f scale_sd: %f var_sd: %f [template]\n",
     //         npRead->complementParams.shift_sd, npRead->complementParams.scale_sd, npRead->complementParams.var_sd);
-    stList *templateKmers = lineTokensFromFile(npReadFile, 10);
+//    stList *templateKmers = lineTokensFromFile(npReadFile, 10);
     //stList *complementKmers = lineTokensFromFile(npReadFile, 12);
     //printEventNoisesAndParams(npRead, templateKmers, complementKmers);
 //    printEventMeansAndParams(npRead, templateKmers, NULL);
 
-    stList_destruct(templateKmers);
+//    stList_destruct(templateKmers);
     //stList_destruct(complementKmers);
     stList_destruct(templateMap);
     //stList_destruct(complementMap);

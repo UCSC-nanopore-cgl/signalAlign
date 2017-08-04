@@ -83,41 +83,46 @@ def estimate_params_with_anchors(fast5, working_folder, bwa_index, forward_refer
     os.system(command)
 
 
-def estimate_params(fast5, working_folder, twoD=False):
-    assert (isinstance(working_folder, FolderHandler))
+def estimate_params(fast5, binary_path="./estimateNanoporeParams",
+                    template_lookup_table="../models/testModelR9p4_acegt_template.model",
+                    complement_lookup_table="../models/testModelR9_complement_pop2.model",
+                    twoD=False, verbose=False):
+    temp_folder = FolderHandler()
+    temp_folder.open_folder("npParamEstimation")
 
     read_name = fast5.split("/")[-1][:-6]  # get the name without the '.fast5'
 
-    npRead_path = working_folder.add_file_path(read_name + ".npRead")
-    npRead_fasta = working_folder.add_file_path(read_name + ".seq.fasta")
+    npRead_path = temp_folder.add_file_path(read_name + ".npRead")
+    npRead_fasta = temp_folder.add_file_path(read_name + ".seq.fasta")
 
     if twoD:
-        success, def_template_model, def_complement_model = get_npRead_2dseq_and_models(fast5=fast5,
-                                                                                        npRead_path=npRead_path,
-                                                                                        twod_read_path=npRead_fasta)
+        success, version, complement = get_npRead_2dseq_and_models(fast5=fast5,
+                                                                   npRead_path=npRead_path,
+                                                                   twod_read_path=npRead_fasta)
+        # print(version, complement)
     else:
-        success = prepareOneD(fast5=fast5, npRead_path=npRead_path, oneD_read_path=npRead_fasta)
+        success, version, complement = prepareOneD(fast5=fast5, npRead_path=npRead_path, oneD_read_path=npRead_fasta)
+        # print(version, complement)
+
     if success is False:
         return False
 
-    # input (match) models
-    template_lookup_table = "../models/testModelR9p4_acegt_template.model"
-    complement_lookup_table = "../models/testModelR9_complement_pop2.model"
-
-    binary = "./estimateNanoporeParams"
-
     command = "{bin} -T {tLuT} -C {cLuT} -q {npRead}" \
-              "".format(bin=binary, tLuT=template_lookup_table, cLuT=complement_lookup_table, npRead=npRead_path)
+              "".format(bin=binary_path, tLuT=template_lookup_table, cLuT=complement_lookup_table, npRead=npRead_path)
 
-    print("running command {command}".format(command=command), file=sys.stderr)
+    if verbose:
+        print("running command {command}".format(command=command), file=sys.stderr)
 
     # os.system(command)
     result = subprocess.check_output(command, shell=True, stderr=subprocess.STDOUT)
     params = result.split()
-    print("Shift {}, scale {}, var {}".format(params[1], params[3], params[5]))
-    working_folder.remove_file(npRead_path)
-    working_folder.remove_file(npRead_fasta)
-    return params
+    param_dict = dict(zip(params[::2], [float(x) for x in params[1::2]]))
+    # print(type(param_dict["scale"]))
+    # clean up temp folder
+    temp_folder.remove_file(npRead_path)
+    temp_folder.remove_file(npRead_fasta)
+    temp_folder.remove_folder()
+    return param_dict
 
 
 def main(args):
@@ -138,11 +143,12 @@ def main(args):
         #                forward_reference_path=plus_strand_sequence, backward_reference_path=minus_strand_sequence,
         #                threshold=args.threshold)
         try:
-            estimate_params(fast5=args.files_dir + fast5, working_folder=temp_folder)
+            params = estimate_params(fast5=args.files_dir + fast5, twoD=True)
+            print(params)
         except Exception as e:
             print(e)
     temp_folder.remove_folder()
-    return
+    return True
 
 
 if __name__ == "__main__":
