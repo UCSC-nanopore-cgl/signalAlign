@@ -6,4 +6,5 @@
 	url = https://github.com/ArtRand/serviceCourse.git
 [submodule "marginAlign"]
 	path = marginAlign
-	url = https://github.com/ArtRand/marginAlign
+	url = https://github.com/UCSC-nanopore-cgl/marginAlign.git
+    branch = bailey_dev
