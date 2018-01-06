@@ -1,8 +1,9 @@
-#!/usr/bin/env python2.7
+#!/usr/bin/env python3
 
 import string
 from collections import Counter
 from sonLib.bioio import fastaRead
+
 
 def reverse_complement(dna, reverse=True, complement=True):
     """ 
@@ -34,6 +35,7 @@ def reverse_complement(dna, reverse=True, complement=True):
     if not complement and not reverse:
         return dna
 
+
 def count_kmers(dna, k):
     """count the kmers of length k in a string"""
     kmer_count = Counter()
@@ -42,6 +44,7 @@ def count_kmers(dna, k):
         if len(kmer) == k:
             kmer_count[kmer] += 1
     return kmer_count
+
 
 def getFastaDictionary(fastaFile):
     """Returns a dictionary of the first words of fasta headers to their corresponding

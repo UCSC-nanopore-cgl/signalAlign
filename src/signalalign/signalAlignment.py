@@ -2,6 +2,8 @@ from __future__ import print_function
 
 import os
 import sys
+import csv
+import numpy as np
 
 from sonLib.bioio import fastaWrite
 from signalalign import defaultModelFromVersion
@@ -27,7 +29,8 @@ class SignalAlignment(object):
                  degenerate,
                  twoD_chemistry,
                  target_regions=None,
-                 output_format="full"):
+                 output_format="full",
+                 rna_table=False):
         self.in_fast5           = in_fast5            # fast5 file to align
         self.reference_map      = reference_map       # map with paths to reference sequences
         self.destination        = destination         # place where the alignments go, should already exist
@@ -43,6 +46,7 @@ class SignalAlignment(object):
         self.read_name          = self.in_fast5.split("/")[-1][:-6]  # get the name without the '.fast5'
         self.target_regions     = target_regions
         self.output_formats     = {"full": 0, "variantCaller": 1, "assignments": 2}
+        self.rna_table          = rna_table
 
         if (in_templateHmm is not None) and os.path.isfile(in_templateHmm):
             self.in_templateHmm = in_templateHmm
@@ -75,7 +79,7 @@ class SignalAlignment(object):
 
         self.openTempFolder("tempFiles_%s" % self.read_name)
         npRead_ = self.addTempFilePath("temp_%s.npRead" % self.read_name)
-        npRead  = NanoporeRead(fast_five_file=self.in_fast5, twoD=self.twoD_chemistry)
+        npRead  = NanoporeRead(fast_five_file=self.in_fast5, rna_table=self.rna_table, twoD=self.twoD_chemistry)
         fH      = open(npRead_, "w")
         ok      = npRead.Write(parent_job=None, out_file=fH, initialize=True)
         fH.close()
@@ -170,7 +174,7 @@ class SignalAlignment(object):
         # reference sequences
         assert self.reference_map[guide_alignment.reference_name]["forward"] is not None
         assert self.reference_map[guide_alignment.reference_name]["backward"] is not None
-        forward_reference  = self.reference_map[guide_alignment.reference_name]["forward"]
+        forward_reference = self.reference_map[guide_alignment.reference_name]["forward"]
         backward_reference = self.reference_map[guide_alignment.reference_name]["backward"]
         assert os.path.isfile(forward_reference)
         assert os.path.isfile(backward_reference)
@@ -251,6 +255,12 @@ class SignalAlignment(object):
         # run
         print("signalAlign - running command: ", command, end="\n", file=sys.stderr)
         os.system(command)
+        if self.rna_table:
+            read_tsv = posteriors_file_path
+            data = self.read_in_signal_align_tsv(posteriors_file_path)
+            location = "Analyses/SignalAlign_000/Events"
+            npRead = NanoporeRead(fast_five_file=self.in_fast5, rna_table=self.rna_table, twoD=self.twoD_chemistry)
+            npRead.write_numpy_table(data, location)
         self.temp_folder.remove_folder()
         return True
 
@@ -262,7 +272,7 @@ class SignalAlignment(object):
                        seq=nanopore_read.template_read)
             version = nanopore_read.version
             read_file.close()
-            nanopore_read.close()
+
             return True, version, False
         except Exception:
             return False, None, False
@@ -296,3 +306,27 @@ class SignalAlignment(object):
         if nanopore_read is not None:
             nanopore_read.close()
         print(message, file=sys.stderr)
+
+
+    def read_in_signal_align_tsv(self, tsv_path):
+        """Read in tsv file"""
+        with open(tsv_path,'r') as tsvin:
+            dtype = [('contig', 'S10'), ('reference_index', int),
+                                              ('reference_kmer', 'S5'), ('read_file', 'S57'),
+                                              ('strand', 'S1'), ('event_index', int),
+                                              ('event_mean', float), ('event_noise', float),
+                                              ('event_duration', float), ('aligned_kmer', 'S5'),
+                                              ('scaled_mean_current', float), ('scaled_noise', float),
+                                              ('posterior_probability', float), ('descaled_event_mean', float),
+                                              ('ont_model_mean', float), ('path_kmer', 'S5')]
+            event_table = np.loadtxt(tsvin, dtype=dtype)
+
+            def remove_field_name(a, name):
+                names = list(a.dtype.names)
+                if name in names:
+                    names.remove(name)
+                b = a[names]
+                return b
+            event_table = remove_field_name(event_table, "read_file")
+
+        return event_table

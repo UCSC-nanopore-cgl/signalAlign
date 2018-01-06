@@ -174,7 +174,7 @@ class DegenerateEnum(object):
         return self.degenerate_type[degnerate_key]
 
     def check(self, degenerate_key):
-        return degenerate_key in self.degenerate_type.keys()
+        return degenerate_key in list(self.degenerate_type.keys())
 
 
 # getters
@@ -193,7 +193,7 @@ def getDegenerateEnum(degenerate_key):
     ok   = enum.check(degenerate_key)
     if not ok:
         raise RuntimeError("[getDegenerateEnum]Degenerate key %s not allowed, options are"
-                           "%s " % (degenerate_key, enum.keys()))
+                           "%s " % (degenerate_key, list(enum.keys())))
     else:
         return enum.get(degenerate_key)
 

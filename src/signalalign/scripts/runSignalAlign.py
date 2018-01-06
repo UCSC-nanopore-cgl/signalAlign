@@ -85,6 +85,7 @@ def parse_args():
     parser.add_argument('--output_format', '-f', action='store', default="full", dest='outFmt',
                         help="output format: full, variantCaller, or assignments. Default: full")
     parser.add_argument('--debug', action='store_true', dest="DEBUG", default=False)
+    parser.add_argument('--rna_table', action='store_true', dest="rna_table", default=False)
 
     args = parser.parse_args()
     return args
@@ -95,7 +96,7 @@ def aligner(work_queue, done_queue):
         for f in iter(work_queue.get, 'STOP'):
             alignment = SignalAlignment(**f)
             alignment.run()
-    except Exception, e:
+    except Exception as e:
         done_queue.put("%s failed with %s" % (current_process().name, e.message))
 
 
@@ -209,6 +210,7 @@ def main(args):
             "degenerate": getDegenerateEnum(args.degenerate),
             "twoD_chemistry": args.twoD,
             "target_regions": args.target_regions,
+            "rna_table": args.rna_table
         }
         if args.DEBUG:
             alignment = SignalAlignment(**alignment_args)

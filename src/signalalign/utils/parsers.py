@@ -110,7 +110,7 @@ def read_fasta(fasta_file, ignore_case=True):
         comment = ''
         if len(lgroup) > 1:
             comment = lgroup[1]
-        seq = "".join(s.strip() for s in fasta_iter.next())
+        seq = "".join(s.strip() for s in next(fasta_iter))
         seq = seq.replace(" ", "")
         if ignore_case:
             seq = seq.upper()
@@ -153,7 +153,7 @@ def read_fasta_with_quality(fasta_file, qual_file):
         group = group.next()[1:].strip()
         group = group.split(' ', 1)
         qual_title = group[0]
-        q = " ".join(s.strip() for s in qual_iter.next())
+        q = " ".join(s.strip() for s in next(qual_iter))
         q = [int(s) for s in q.split()]
         quals[qual_title] = q
 
@@ -234,10 +234,10 @@ def read_fastq(fastq_file, offset=33, solexa=False): #add arguments
                 line = next(lines)
                 m = quality_re.match(line)
                 if not m:
-                    print >> sys.stderr,  "No quality characters"
+                    print("No quality characters", file=sys.stderr)
                 n -= len(m.group(0))
                 if n < 0:
-                    print >> sys.stderr, "quality longer than sequence"
+                    print("quality longer than sequence", file=sys.stderr)
                 quality.append(m.group(0))
             qlist = list(''.join(quality))
             o = int(offset)
@@ -257,7 +257,7 @@ def read_fastq(fastq_file, offset=33, solexa=False): #add arguments
             yield fsq
             
         except StopIteration:
-            print "End of input"
+            print("End of input")
 
 def make_fasta(input_fcn, outfasta=sys.stdout):
     """
@@ -288,7 +288,7 @@ def make_fasta(input_fcn, outfasta=sys.stdout):
     
     # For each tuple yielded by the input_fcn, write a FASTA-formatted string
     for title, comment, seq, qual in input_fcn:
-        print >> outfasta, ">%s %s\n%s" % (title, comment, seq)
+        print(">%s %s\n%s" % (title, comment, seq), file=outfasta)
 
 def make_fasta_and_qual(input_fcn, outfasta=sys.stdout, outqual=sys.stdout):
     """
@@ -324,10 +324,10 @@ def make_fasta_and_qual(input_fcn, outfasta=sys.stdout, outqual=sys.stdout):
     # For each tuple yielded by the input_fcn, write a FASTA-formatted string
     # and a FASTA-formatted .qual file
     for title, comment, seq, qual in input_fcn:
-        print >> outfasta, ">%s %s\n%s" % (title, comment, seq)
-        print >> outqual, ">%s %s\n%s" % (title, comment,
+        print(">%s %s\n%s" % (title, comment, seq), file=outfasta)
+        print(">%s %s\n%s" % (title, comment,
                                           str(qual).strip('[]').
-                                          replace(',', '  '))
+                                          replace(',', '  ')), file=outqual)
 
 def make_fastq(input_fcn, outfastq=sys.stdout, offset=33):
     """
@@ -359,7 +359,7 @@ def make_fastq(input_fcn, outfastq=sys.stdout, offset=33):
     # For each tuple yielded by the input_fcn, write a FASTQ-formatted string
     for title, comment, seq, qual in input_fcn:
         qual = [chr(i+offset) for i in qual]
-        print >> outfastq, "@%s %s\n%s\n+%s\n%s" % (title, comment, seq, 
+        print("@%s %s\n%s\n+%s\n%s" % (title, comment, seq, 
                                                     title,
-                                                  ''.join(qual))
+                                                  ''.join(qual)), file=outfastq)
 
