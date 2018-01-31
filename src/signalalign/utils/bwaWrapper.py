@@ -1,4 +1,4 @@
-from __future__ import print_function
+
 
 import sys
 import os
@@ -71,7 +71,8 @@ class Bwa(object):
             outerr = open(outerr, 'w')
         try:
             with open(output_sam_path, 'w') as fH:
-                fH.write(subprocess.check_output(cmd.split(), stderr=outerr))
+                # print(bytes.decode(subprocess.check_output(cmd.split(), stderr=outerr)))
+                fH.write(bytes.decode(subprocess.check_output(cmd.split(), stderr=outerr)))
             outerr.close()
             return True
         except subprocess.CalledProcessError:
@@ -152,7 +153,7 @@ def generateGuideAlignment(bwa_index, query, temp_sam_path, target_regions=None)
 
     try:
         query_start, query_end, reference_start, reference_end, cigar_string = _parseCigar(sam_cigar, reference_pos)
-    except AssertionError, e:
+    except AssertionError as e:
         print("[generateGuideAlignment]ERROR %s" % e)
         return GuideAlignment()
 

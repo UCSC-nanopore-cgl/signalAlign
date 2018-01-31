@@ -3,7 +3,7 @@ import uuid
 import shutil
 import gzip
 import tarfile
-import cPickle
+import pickle
 
 from itertools import chain
 
@@ -40,7 +40,7 @@ def prepareFast5Tarfile(job, split_tars_bigger_than_this, batchsize, download_sl
     _handle.extractall(path=workdir)
 
     if rs_sample.size >= split_tars_bigger_than_this:
-        _iter    = [paths[i:i + batchsize] for i in xrange(0, len(paths), batchsize)]
+        _iter    = [paths[i:i + batchsize] for i in range(0, len(paths), batchsize)]
         tar_fids = [archiveBatchAndUploadToFileStore(job, b, workdir) for b in _iter]
         _handle.close()
         job.fileStore.logToMaster("[prepareFast5Tarfile]Split %s into %s smaller tars"
@@ -65,13 +65,13 @@ def makeLedgerJobFunction(job, config, tar_fids):
 
 def deliverLedgerJobFunction(job, config, ledger_fids):
     fHs    = [open(job.fileStore.readGlobalFile(f), "r") for f in ledger_fids]
-    ls     = [cPickle.load(f) for f in fHs]
+    ls     = [pickle.load(f) for f in fHs]
     ledger = ls[0]
     [ledger.update(d) for d in ls[1:]]
 
     fn = LocalFile(workdir=job.fileStore.getLocalTempDir(), filename="%s_ledger.pkl" % config["ledger_name"])
     _h = open(fn.fullpathGetter(), "w")
-    cPickle.dump(ledger, _h)
+    pickle.dump(ledger, _h)
     _h.close()
     deliverOutput(job, fn, config["readstore_ledger_dir"])
 
@@ -96,7 +96,7 @@ def makeNanoporeReadLedgerJobFunction(job, tar_fid, batchsize, readstore_dir):
             % (len(member_paths), batchsize))
 
     member_iter   = [member_paths[i:i + batchsize]
-                     for i in xrange(0, len(member_paths), batchsize)]
+                     for i in range(0, len(member_paths), batchsize)]
     tar_fids      = [archiveBatchAndUploadToFileStore(job, b, workdir) for b in member_iter]
     ledger_shards = [job.addChildJobFn(makeNanoporeReadsJobFunction, fid, readstore_dir, cores=0.5).rv()
                      for fid in tar_fids]
@@ -144,7 +144,7 @@ def makeNanoporeReadsJobFunction(job, tar_fid, readstore_dir):
     members    = [os.path.join(workdir, m.name) for m in members]
     tar_handle.extractall(path=workdir)
     [require(os.path.exists(m), "[makeNanoporeReadsJobFunction]Missing member %s" % m) for m in members]
-    ledger_lines = map(makeNanoporeRead, members)
+    ledger_lines = list(map(makeNanoporeRead, members))
     tar_handle.close()
 
     ledger_shard = job.fileStore.getLocalTempFile()
@@ -164,7 +164,7 @@ def consolidateLedgerShardsJobFunction(job, ledger_shards):
     def parse_ledger_shard(fid):
         flat_file = job.fileStore.readGlobalFile(fid)
         _handle   = open(flat_file, "r")
-        pairs     = map(parse_line, [x for x in _handle if not x.isspace()])
+        pairs     = list(map(parse_line, [x for x in _handle if not x.isspace()]))
         return dict(pairs)
 
     ledger = parse_ledger_shard(ledger_shards[0])
@@ -172,6 +172,6 @@ def consolidateLedgerShardsJobFunction(job, ledger_shards):
 
     fn = job.fileStore.getLocalTempFile()
     _h = open(fn, "w")
-    cPickle.dump(ledger, _h, protocol=cPickle.HIGHEST_PROTOCOL)
+    pickle.dump(ledger, _h, protocol=pickle.HIGHEST_PROTOCOL)
     _h.close()
     return job.fileStore.writeGlobalFile(fn)

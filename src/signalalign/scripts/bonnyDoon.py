@@ -1,12 +1,12 @@
 #!/usr/bin/env python
 """Run signal-to-reference alignments
 """
-from __future__ import print_function
+
 import pandas as pd
 
-from signalAlignLib import *
-from alignmentAnalysisLib import CallMethylation, get_first_sequence
-from variantCallingLib import scan_for_proposals
+from .signalAlignLib import *
+from .alignmentAnalysisLib import CallMethylation, get_first_sequence
+from .variantCallingLib import scan_for_proposals
 from multiprocessing import Process, Queue, current_process, Manager
 from serviceCourse.file_handlers import FolderHandler
 from argparse import ArgumentParser
@@ -105,7 +105,7 @@ def make_degenerate_reference(input_fasta, start, forward_sequence_path, backwar
     t_seq = list(input_sequence)
     c_seq = list(complement_sequence)
 
-    positions = xrange(start, len(input_sequence), step)
+    positions = range(start, len(input_sequence), step)
     for position in positions:
         t_seq[position] = "X"
         c_seq[position] = "X"
@@ -128,7 +128,7 @@ def aligner(work_queue, done_queue):
         for f in iter(work_queue.get, 'STOP'):
             alignment = SignalAlignment(**f)
             alignment.run()
-    except Exception, e:
+    except Exception as e:
         done_queue.put("%s failed with %s" % (current_process().name, e.message))
 
 
@@ -137,7 +137,7 @@ def run_methyl_caller(work_queue, done_queue):
         for f in iter(work_queue.get, 'STOP'):
             c = CallMethylation(**f)
             c.write()
-    except Exception, e:
+    except Exception as e:
         done_queue.put("%s failed with %s" % (current_process().name, e.message))
 
 

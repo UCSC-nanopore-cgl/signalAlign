@@ -1,12 +1,12 @@
 #!/usr/bin/env python
 """Run signal-to-reference alignments
 """
-from __future__ import print_function
+
 import pandas as pd
 import glob
-from signalAlignLib import *
-from alignmentAnalysisLib import CallMethylation
-from variantCallingLib import get_alignments_labels_and_mask
+from .signalAlignLib import *
+from .alignmentAnalysisLib import CallMethylation
+from .variantCallingLib import get_alignments_labels_and_mask
 from multiprocessing import Process, Queue, current_process, Manager
 from serviceCourse.file_handlers import FolderHandler
 from argparse import ArgumentParser
@@ -85,7 +85,7 @@ def make_degenerate_reference(input_fasta, start, forward_sequence_path, backwar
     t_seq = list(input_sequence)
     c_seq = list(complement_sequence)
 
-    positions = xrange(start, len(input_sequence), step)
+    positions = range(start, len(input_sequence), step)
     for position in positions:
         t_seq[position] = "X"
         c_seq[position] = "X"
@@ -108,7 +108,7 @@ def aligner(work_queue, done_queue):
         for f in iter(work_queue.get, 'STOP'):
             alignment = SignalAlignment(**f)
             alignment.run()
-    except Exception, e:
+    except Exception as e:
         done_queue.put("%s failed with %s" % (current_process().name, e.message))
 
 
@@ -117,7 +117,7 @@ def run_methyl_caller(work_queue, done_queue):
         for f in iter(work_queue.get, 'STOP'):
             c = CallMethylation(**f)
             c.write()
-    except Exception, e:
+    except Exception as e:
         done_queue.put("%s failed with %s" % (current_process().name, e.message))
 
 
@@ -284,7 +284,7 @@ def main(args):
                 #alignment.run()
                 work_queue.put(alignment_args)
 
-            for w in xrange(workers):
+            for w in range(workers):
                 p = Process(target=aligner, args=(work_queue, done_queue))
                 p.start()
                 jobs.append(p)
@@ -305,8 +305,8 @@ def main(args):
             alns, forward_mask = get_alignments_labels_and_mask(temp_dir_path + "*.tsv", args.nb_files)
 
             degenerate_positions = {
-                'forward': range(it, reference_sequence_length, STEP),
-                'backward': range(it, reference_sequence_length, STEP) }
+                'forward': list(range(it, reference_sequence_length, STEP)),
+                'backward': list(range(it, reference_sequence_length, STEP)) }
 
             variant_call_file = temp_folder.add_file_path("variants.{cycle}.{iter}.calls".format(cycle=cycle, iter=it))
 
@@ -323,7 +323,7 @@ def main(args):
                 #c.write()
                 work_queue.put(call_methyl_args)
 
-            for w in xrange(workers):
+            for w in range(workers):
                 p = Process(target=run_methyl_caller, args=(work_queue, done_queue))
                 p.start()
                 jobs.append(p)

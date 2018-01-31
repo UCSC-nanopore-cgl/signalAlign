@@ -1,12 +1,12 @@
 #!/usr/bin/env python
 """Run signal-to-reference alignments
 """
-from __future__ import print_function
+
 import pandas as pd
 import glob
-from signalAlignLib import *
-from variantCallingLib import get_alignments_labels_and_mask
-from alignmentAnalysisLib import CallMethylation
+from .signalAlignLib import *
+from .variantCallingLib import get_alignments_labels_and_mask
+from .alignmentAnalysisLib import CallMethylation
 from multiprocessing import Process, Queue, current_process, Manager
 from serviceCourse.file_handlers import FolderHandler
 from argparse import ArgumentParser
@@ -79,8 +79,8 @@ def make_degenerate_reference_iterator(input_sequence, step, block_size=1):
     """
     complement_sequence = reverse_complement(dna=input_sequence, reverse=False, complement=True)
 
-    for s in xrange(0, step):
-        positions = xrange(s, len(input_sequence), step)
+    for s in range(0, step):
+        positions = range(s, len(input_sequence), step)
         t_seq = list(input_sequence)
         c_seq = list(complement_sequence)
         for position in positions:
@@ -112,7 +112,7 @@ def aligner(work_queue, done_queue):
         for f in iter(work_queue.get, 'STOP'):
             alignment = SignalAlignment(**f)
             alignment.run()
-    except Exception, e:
+    except Exception as e:
         done_queue.put("%s failed with %s" % (current_process().name, e.message))
 
 
@@ -121,7 +121,7 @@ def run_methyl_caller(work_queue, done_queue):
         for f in iter(work_queue.get, 'STOP'):
             c = CallMethylation(**f)
             c.write()
-    except Exception, e:
+    except Exception as e:
         done_queue.put("%s failed with %s" % (current_process().name, e.message))
 
 
@@ -275,7 +275,7 @@ def main(args):
             #alignment.run()
             work_queue.put(alignment_args)
 
-        for w in xrange(workers):
+        for w in range(workers):
             p = Process(target=aligner, args=(work_queue, done_queue))
             p.start()
             jobs.append(p)
@@ -305,8 +305,8 @@ def main(args):
                 suffix=".{}".format(register)
             )
             # this is the list of positions that we're going to look at, based on this register
-            degenerate_positions = {'forward': range(register, reference_sequence_length, STEP),
-                                    'backward': range(register, reference_sequence_length, STEP)
+            degenerate_positions = {'forward': list(range(register, reference_sequence_length, STEP)),
+                                    'backward': list(range(register, reference_sequence_length, STEP))
                                     }
 
             # place to put the marginal probs
@@ -326,7 +326,7 @@ def main(args):
                 #c.write()
                 work_queue.put(call_methyl_args)
 
-            for w in xrange(workers):
+            for w in range(workers):
                 p = Process(target=run_methyl_caller, args=(work_queue, done_queue))
                 p.start()
                 jobs.append(p)

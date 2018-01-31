@@ -2,9 +2,9 @@
 
 import os
 import sys
-from alignmentAnalysisLib import KmerHistogram
+from .alignmentAnalysisLib import KmerHistogram
 from serviceCourse.parsers import read_fasta
-from signalAlignLib import kmer_iterator, parse_substitution_file
+from .signalAlignLib import kmer_iterator, parse_substitution_file
 from argparse import ArgumentParser
 from multiprocessing import Process, current_process, Manager
 
@@ -38,7 +38,7 @@ def get_sequence(path_to_fasta):
 
     assert len(seqs) > 0, "ERROR parsing sequence {}".format(len(seqs))
     if len(seqs) > 1:
-        print "Taking first sequence of {}".format(len(seqs))
+        print("Taking first sequence of {}".format(len(seqs)))
 
     return seqs[0]
 
@@ -46,7 +46,7 @@ def get_sequence(path_to_fasta):
 def check_for_destination_directory(working_directory_path, new_directory):
     try:
         if os.path.isdir(working_directory_path + new_directory):
-            print "WARNING: destination for {} histograms already exists".format(new_directory)
+            print("WARNING: destination for {} histograms already exists".format(new_directory))
         else:
             os.mkdir(working_directory_path + new_directory)
         return working_directory_path + new_directory
@@ -59,7 +59,7 @@ def histogram_runner(work_queue, done_queue):
         for f in iter(work_queue.get, 'STOP'):
             k = KmerHistogram(**f)
             k.run()
-    except Exception, e:
+    except Exception as e:
         done_queue.put("%s failed with %s" % (current_process().name, e.message))
 
 
@@ -73,7 +73,7 @@ def main(args):
     # Ignoring events aligned to positions in {ignore}
     """.format(alns=args.alns, maxNb=args.max_assignments, thresh=args.threshold, ignore=args.ignore)
 
-    print start_message
+    print(start_message)
 
     kmers_of_interest = set()
 
@@ -88,7 +88,7 @@ def main(args):
     template_directory = check_for_destination_directory(args.out, "template_hist/")
     complement_directory = check_for_destination_directory(args.out, "complement_hist/")
     if template_directory is None or complement_directory is None:
-        print >> sys.stderr, "problem making destination directories"
+        print("problem making destination directories", file=sys.stderr)
         sys.exit(1)
 
     if args.ignore is not None:
@@ -112,7 +112,7 @@ def main(args):
             #k.run()
             work_queue.put(hist_args)
 
-    for w in xrange(workers):
+    for w in range(workers):
         p = Process(target=histogram_runner, args=(work_queue, done_queue))
         p.start()
         jobs.append(p)
@@ -123,7 +123,7 @@ def main(args):
 
     done_queue.put('STOP')
 
-    print "\t# Finished Generating Kmer Histograms #"
+    print("\t# Finished Generating Kmer Histograms #")
 
 if __name__ == "__main__":
     sys.exit(main(sys.argv))

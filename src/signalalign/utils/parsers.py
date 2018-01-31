@@ -104,7 +104,7 @@ def read_fasta(fasta_file, ignore_case=True):
     # variable 'seq'. 'title', 'comment', and 'seq' are yielded as a tuple in
     # that order. 
     for lgroup in fasta_iter:
-        lgroup = lgroup.next()[1:].strip()
+        lgroup = lgroup.__next__()[1:].strip()
         lgroup = lgroup.split(' ', 1)
         title = lgroup[0]
         comment = ''

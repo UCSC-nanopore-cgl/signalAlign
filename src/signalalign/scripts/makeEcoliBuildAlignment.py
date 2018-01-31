@@ -3,8 +3,8 @@
 """
 import sys
 import pandas as pd
-from alignmentAnalysisLib import parse_alignment_file, cull_list_of_alignment_files
-from signalAlignLib import parse_substitution_file
+from .alignmentAnalysisLib import parse_alignment_file, cull_list_of_alignment_files
+from .signalAlignLib import parse_substitution_file
 from argparse import ArgumentParser
 
 
@@ -51,11 +51,11 @@ def get_reverse_complement_positions(positions):
 
 
 def get_hit_range(hit, kmer_length=6):
-    return range(hit - (kmer_length - 1), hit + 1)[::-1]
+    return list(range(hit - (kmer_length - 1), hit + 1))[::-1]
 
 
 def get_reverse_complement_hit_range(hit, kmer_length=6):
-    return range(hit, hit + kmer_length)
+    return list(range(hit, hit + kmer_length))
 
 
 def get_assignments(data, hit_range, strand, substitution, threshold):
@@ -127,7 +127,7 @@ def get_labeled_assignments(alignments, max_labels, positions, threshold, label,
         assignments = [x for x in assignments if not x.empty]
 
         new_assignment_total = sum([x.shape[0] for x in assignments])
-        print "Got {assignments} for {file}".format(assignments=new_assignment_total, file=alignment)
+        print(("Got {assignments} for {file}".format(assignments=new_assignment_total, file=alignment)))
 
         total += sum([x.shape[0] for x in assignments])
 
@@ -136,8 +136,8 @@ def get_labeled_assignments(alignments, max_labels, positions, threshold, label,
             break
 
     if total < max_labels:
-        print "Didn't get enough labels only got {notEnough} was aiming for {wanted} for label {label}" \
-              "".format(notEnough=total, wanted=max_labels, label=label)
+        print(("Didn't get enough labels only got {notEnough} was aiming for {wanted} for label {label}" \
+              "".format(notEnough=total, wanted=max_labels, label=label)))
         return None
 
     return labeled_assignments
@@ -164,7 +164,7 @@ def collect_assignments(alignments, threshold, max_assignments, positions):
                                                  "posterior_prob": selected_rows['posterior_prob']})
                 add_to_assignments(assignment_table)
             except:
-                print("ERROR: problem with alignment {}".format(alignment))
+                print(("ERROR: problem with alignment {}".format(alignment)))
                 continue
             if total >= max_assignments:
                 break
@@ -186,15 +186,15 @@ def main(args):
 
     # randomly collect some alignments, and remove the events that correspond to positions we're going to label
     alignments = cull_list_of_alignment_files(args.alns)
-    print "Getting canonical assignments"
+    print("Getting canonical assignments")
     canonical_assignments = collect_assignments(alignments=alignments,
                                                 threshold=args.threshold,
                                                 max_assignments=args.max_assignments,
                                                 positions=(forward_positive_sites + forward_null_sites))
 
-    print "Got {} canonical assignments".format(canonical_assignments.shape[0])
+    print(("Got {} canonical assignments".format(canonical_assignments.shape[0])))
 
-    print "Getting labeled assignments"
+    print("Getting labeled assignments")
     # get the list of alignments we're going to label
     positive_alignments = cull_list_of_alignment_files(args.positive)
     positive_assignments = get_labeled_assignments(alignments=positive_alignments, max_labels=args.max_labels,
@@ -204,7 +204,7 @@ def main(args):
         sys.exit(1)
 
     if args.null is not None:
-        print "Getting null assignments"
+        print("Getting null assignments")
         null_alignments = cull_list_of_alignment_files(args.null)
         null_assignments = get_labeled_assignments(alignments=null_alignments, max_labels=args.max_labels,
                                                    positions=forward_null_sites, threshold=args.threshold,
@@ -214,14 +214,14 @@ def main(args):
 
         total_labeled = sum([x.shape[0] for x in positive_assignments])
         total_null = sum([x.shape[0] for x in null_assignments])
-        print "Got {labeled} labeled assignments and {null} null assignments".format(labeled=total_labeled,
-                                                                                     null=total_null)
+        print(("Got {labeled} labeled assignments and {null} null assignments".format(labeled=total_labeled,
+                                                                                     null=total_null)))
     else:
         null_assignments = None
 
     entry_line = "blank\t0\tblank\tblank\t{strand}\t0\t0.0\t0.0\t0.0\t{kmer}\t0.0\t0.0\t0.0\t{event}\t0.0\n"
 
-    print "Writing to file {}".format(args.out_file)
+    print(("Writing to file {}".format(args.out_file)))
 
     with open(args.out_file, 'w') as f:
         for row in canonical_assignments.itertuples():
@@ -235,7 +235,7 @@ def main(args):
                 for row in dataframe.itertuples():
                     f.write(entry_line.format(strand=row[6], kmer=row[3], event=row[2]))
 
-    print "DONE"
+    print("DONE")
 
 if __name__ == "__main__":
     sys.exit(main(sys.argv))

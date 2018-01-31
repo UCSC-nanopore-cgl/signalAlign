@@ -1,4 +1,4 @@
-from __future__ import print_function, division
+
 import sys
 import glob
 import os
@@ -153,7 +153,7 @@ class CallMethylation(object):
         return [i for i, letter in enumerate(self.sequence) if letter == ch]
 
     def get_range(self, position):
-        return range(position - (self.kmer_length - 1), position + 1)
+        return list(range(position - (self.kmer_length - 1), position + 1))
 
     def call_methyls(self, positions=None, threshold=0.0):
         if positions is None:

@@ -1,11 +1,11 @@
 #!/usr/bin/env python
 """Train HMMs for alignment of signal data from the MinION
 """
-from __future__ import print_function, division
+
 
 import sys
 import os
-import urlparse
+import urllib.parse
 import textwrap
 import yaml
 import h5py
@@ -177,7 +177,7 @@ def get_expectations(work_queue, done_queue):
         for f in iter(work_queue.get, 'STOP'):
             alignment = SignalAlignment(**f)
             alignment.run(get_expectations=True)
-    except Exception, e:
+    except Exception as e:
         done_queue.put("%s failed with %s" % (current_process().name, e.message))
 
 
@@ -255,7 +255,7 @@ def validateConfig(config):
         raise RuntimeError("Need to provide a directory of Fast5 files or a file of filenames (fofn)")
 
     # check for valid paths (if local)
-    ref_url = urlparse.urlparse(config["reference_url"])
+    ref_url = urllib.parse.urlparse(config["reference_url"])
     if ref_url.scheme == "file":
         if not os.path.exists(ref_url.path):
             raise RuntimeError("Cannot find file: %s" % config["reference_url"])
@@ -404,7 +404,7 @@ def trainModelTransitions(config):
             else:
                 work_queue.put(alignment_args)
 
-        for w in xrange(workers):
+        for w in range(workers):
             p = Process(target=get_expectations, args=(work_queue, done_queue))
             p.start()
             jobs.append(p)
@@ -480,7 +480,7 @@ def main():
             print("{config} not found run generate-config".format(config=args.config))
             exit(1)
         # Parse config
-        config = {x.replace('-', '_'): y for x, y in yaml.load(open(args.config).read()).iteritems()}
+        config = {x.replace('-', '_'): y for x, y in yaml.load(open(args.config).read()).items()}
         trainModelTransitions(config)
 
 

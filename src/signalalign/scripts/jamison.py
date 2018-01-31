@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 """Run signal-to-reference alignments
 """
-from __future__ import print_function
-from signalAlignLib import *
-from variantCallingLib import scan_for_proposals, update_reference_with_marginal_probs
+
+from .signalAlignLib import *
+from .variantCallingLib import scan_for_proposals, update_reference_with_marginal_probs
 from serviceCourse.file_handlers import FolderHandler
 from argparse import ArgumentParser
 from random import shuffle

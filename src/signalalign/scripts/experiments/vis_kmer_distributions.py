@@ -116,21 +116,21 @@ def plot_hmm_distribution(kmer, hmm, x_vals):
         fH = open(hmm, 'r')
 
         # line 0, type, stateNumber, etc
-        line = map(float, fH.readline().split())
+        line = list(map(float, fH.readline().split()))
         assert len(line) == 4, "Bad header line"
 
         # line 1, transitions
-        line = map(float, fH.readline().split())
+        line = list(map(float, fH.readline().split()))
         assert len(line) == 10, "Bad transitions line"
 
         # line 2, model
-        line = map(float, fH.readline().split())
+        line = list(map(float, fH.readline().split()))
         assert len(line) == 6**6 * 2  # number of kmers * normal distribution parameters
         return line
 
     model = get_model_from_hmm(hmm)
     kmer_index = getKmerIndex(kmer)
     table_index = kmer_index * 2
-    print model[table_index], model[table_index + 1]
+    print((model[table_index], model[table_index + 1]))
     return norm.pdf(x_vals, model[table_index], model[table_index + 1])
 

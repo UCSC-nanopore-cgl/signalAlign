@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """ Make build alignments for starting a new HDP
 """
-from __future__ import print_function
+
 import glob
 import os
 import sys

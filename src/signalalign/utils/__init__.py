@@ -1,6 +1,5 @@
 import os
 
-import string
 from collections import Counter
 
 import numpy as np
@@ -34,11 +33,10 @@ def reverse_complement(dna, reverse=True, complement=True):
     """
 
     # Make translation table
-    trans_table = string.maketrans('ACGTMKRYBVDHNacgtmkrybvdhn',
+    trans_table = str.maketrans('ACGTMKRYBVDHNacgtmkrybvdhn',
                                    "TGCAKMYRVBHDNtgcakmyrvbhdn")
     # Make complement to DNA
     comp_dna = dna.translate(trans_table)
-
     # Output all as strings
     if reverse and complement:
         return comp_dna[::-1]

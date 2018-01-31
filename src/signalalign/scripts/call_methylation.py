@@ -1,12 +1,12 @@
 #!/usr/bin/env python
 """Takes alignments from signalAlign and calls methylation status"""
-from __future__ import print_function, division
+
 import sys
 sys.path.append("../")
 from argparse import ArgumentParser
-from alignmentAnalysisLib import CallMethylation
-from signalAlignLib import parse_substitution_file, degenerate_enum
-from variantCallingLib import get_alignments_labels_and_mask, get_reference_sequence
+from .alignmentAnalysisLib import CallMethylation
+from .signalAlignLib import parse_substitution_file, degenerate_enum
+from .variantCallingLib import get_alignments_labels_and_mask, get_reference_sequence
 from multiprocessing import Process, current_process, Manager
 
 
@@ -42,7 +42,7 @@ def run_methyl_caller(work_queue, done_queue):
         for f in iter(work_queue.get, 'STOP'):
             c = CallMethylation(**f)
             c.write()
-    except Exception, e:
+    except Exception as e:
         done_queue.put("%s failed with %s" % (current_process().name, e.message))
 
 
@@ -86,7 +86,7 @@ def main(args):
         #c.write()
         work_queue.put(call_methyl_args)
 
-    for w in xrange(workers):
+    for w in range(workers):
         p = Process(target=run_methyl_caller, args=(work_queue, done_queue))
         p.start()
         jobs.append(p)

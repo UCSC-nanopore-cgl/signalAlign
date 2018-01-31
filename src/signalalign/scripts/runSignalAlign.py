@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """Main driver script for running an ionic current-to-sequence alignment on a single machine.
 """
-from __future__ import print_function
+
 
 import sys
 import os
@@ -218,7 +218,7 @@ def main(args):
         else:
             work_queue.put(alignment_args)
 
-    for w in xrange(workers):
+    for w in range(workers):
         p = Process(target=aligner, args=(work_queue, done_queue))
         p.start()
         jobs.append(p)

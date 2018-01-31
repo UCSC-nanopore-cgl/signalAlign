@@ -1,9 +1,3 @@
-[submodule "sonLib"]
-	path = sonLib
-	url = https://github.com/ArtRand/sonLib.git
 [submodule "serviceCourse"]
 	path = serviceCourse
 	url = https://github.com/ArtRand/serviceCourse.git
-[submodule "marginAlign"]
-	path = marginAlign
-	url = https://github.com/benedictpaten/marginAlign

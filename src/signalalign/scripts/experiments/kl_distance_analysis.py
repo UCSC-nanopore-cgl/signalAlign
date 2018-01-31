@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """Write out the KL distance between two kmer models
 """
-from __future__ import print_function
+
 import os, sys
 import numpy as np
 from vis_kmer_distributions import *

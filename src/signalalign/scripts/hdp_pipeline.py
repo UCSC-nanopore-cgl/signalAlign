@@ -102,13 +102,13 @@ def get_hdp_type(requested_type):
             "multisetPriorEcoli": 12,
             "singleLevelPriorEcoli": 13
         }
-        assert (requested_type in hdp_types.keys()), "Requested HDP type is invalid, got {}".format(requested_type)
+        assert (requested_type in list(hdp_types.keys())), "Requested HDP type is invalid, got {}".format(requested_type)
         return hdp_types[requested_type]
 
 
 def count_lines_in_build_alignment(build_alignment_path):
     count = 0
-    for line in open(build_alignment_path, 'r').xreadlines():
+    for line in open(build_alignment_path, 'r'):
         count += 1
     return count
 

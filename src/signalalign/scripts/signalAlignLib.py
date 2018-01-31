@@ -1,6 +1,6 @@
 """Small library for working with MinION data
 """
-from __future__ import print_function, division
+
 import sys
 import os
 import pysam
@@ -8,7 +8,7 @@ import h5py
 import subprocess
 import re
 import numpy as np
-from itertools import islice, izip
+from itertools import islice
 from random import shuffle
 from signalalign.scripts.motif import getMotif
 from signalalign.utils.sequenceTools import reverse_complement
@@ -30,7 +30,7 @@ def parse_fofn(fofn_file):
 
 
 def kmer_iterator(dna, k):
-    for i in xrange(len(dna)):
+    for i in range(len(dna)):
         kmer = dna[i:(i + k)]
         if len(kmer) == k:
             yield kmer
@@ -124,10 +124,10 @@ def parse_substitution_file(substitution_file):
     fH = open(substitution_file, 'r')
     line = fH.readline().split()
     forward_sub = line[0]
-    forward_pos = map(np.int64, line[1:])
+    forward_pos = list(map(np.int64, line[1:]))
     line = fH.readline().split()
     backward_sub = line[0]
-    backward_pos = map(np.int64, line[1:])
+    backward_pos = list(map(np.int64, line[1:]))
     return (forward_sub, forward_pos), (backward_sub, backward_pos)
 
 
@@ -142,11 +142,11 @@ def parse_substitution_file2(substitution_file):
             line = line.split()
             this_header = line[0]
             if header != this_header:  # we're at a new entry
-                positions[this_header] = {"forward": map(np.int64, line[1:])}
+                positions[this_header] = {"forward": list(map(np.int64, line[1:]))}
                 header = this_header
                 continue
             if header == this_header:  # we're at the backward positions
-                positions[header]["backward"] = map(np.int64, line[1:])
+                positions[header]["backward"] = list(map(np.int64, line[1:]))
                 continue
     return positions
 
@@ -446,7 +446,7 @@ def degenerate_enum(degenerate_request_string):
         "adenosine": 2,
         "variant": 3,
     }
-    assert (degenerate_request_string in degenerate_type.keys()), "Requested degenerate nucleotide set not recognized."
+    assert (degenerate_request_string in list(degenerate_type.keys())), "Requested degenerate nucleotide set not recognized."
     return degenerate_type[degenerate_request_string]
 
 
@@ -680,7 +680,7 @@ class NanoporeRead(object):
             k_j: another kmer
             returns: The number of positions not matching
             """
-            for i in xrange(1, len(k_i)):
+            for i in range(1, len(k_i)):
                 sk_i = k_i[i:]
                 sk_j = k_j[:-i]
                 if sk_i == sk_j:
@@ -721,7 +721,7 @@ class NanoporeRead(object):
                 if move == 1:
                     event_map.append(i)
                 if move > 1:
-                    for skip in xrange(move - 1):
+                    for skip in range(move - 1):
                         event_map.append(i - 1)
                     event_map.append(i)
                 if move == 0:
@@ -826,7 +826,7 @@ class NanoporeRead(object):
                 continue
 
         # fill in the final events for the partial last kmer
-        for _ in xrange(self.kmer_length - 1):
+        for _ in range(self.kmer_length - 1):
             self.template_event_map += [previous_template_event] * (nb_template_gaps + 1)
             self.complement_event_map.append(previous_complement_event)
             nb_template_gaps = 0
@@ -1211,13 +1211,13 @@ class SignalAlignment(object):
         cig_handle = open(cigar_file, "w")
         cig_handle.write(cigar_string + "\n")
         cig_handle.close()
-        if mapped_refernce not in self.reference_map.keys():
+        if mapped_refernce not in list(self.reference_map.keys()):
             if mapped_refernce is False:
                 print("[SignalAlignment::run]Read {read} didn't map"
                       "".format(read=read_label), file=sys.stderr)
             else:
                 print("[SignalAlignment::run]Reference {ref} not found in contigs"
-                      "{keys}".format(ref=mapped_refernce, keys=self.reference_map.keys()),
+                      "{keys}".format(ref=mapped_refernce, keys=list(self.reference_map.keys())),
                       file=sys.stderr)
             temp_folder.remove_folder()
             return False
@@ -1319,7 +1319,7 @@ class SignalAlignment(object):
 
         # output format
         fmts = {"full": 0, "variantCaller": 1, "assignments": 2}
-        if self.output_format not in fmts.keys():
+        if self.output_format not in list(fmts.keys()):
             temp_folder.remove_folder()
             return False
         out_fmt = "-s {fmt} ".format(fmt=fmts[self.output_format])
@@ -1394,10 +1394,10 @@ class SignalHmm(object):
 
     def normalize_transitions_expectations(self):
         # normalize transitions
-        for from_state in xrange(self.state_number):
+        for from_state in range(self.state_number):
             i = self.state_number * from_state
             j = sum(self.transitions_expectations[i:i+self.state_number])
-            for to_state in xrange(self.state_number):
+            for to_state in range(self.state_number):
                 self.transitions_expectations[i + to_state] = self.transitions_expectations[i + to_state] / j
 
     def set_default_transitions(self):
@@ -1465,12 +1465,12 @@ class SignalHmm(object):
         assert self.symbol_set_size <= 6**6, "signalHmm.load_model - Got more than 6^6 for symbol_set_size got {}" \
                                              "".format(self.symbol_set_size)
 
-        line = map(float, fH.readline().split())
+        line = list(map(float, fH.readline().split()))
         assert len(line) == len(self.transitions) + 1, "signalHmm.load_model incorrect transitions line"
         self.transitions = line[:-1]
         self.likelihood = line[-1]
 
-        line = map(float, fH.readline().split())
+        line = list(map(float, fH.readline().split()))
         assert len(line) == self.symbol_set_size * NB_MODEL_PARAMS, \
             "signalHmm.load_model incorrect event model line"
         self.event_model["means"] = line[::NB_MODEL_PARAMS]
@@ -1502,13 +1502,13 @@ class SignalHmm(object):
                 "".format(stateNumber=self.state_number, alphabetSize=self.alphabet_size,
                           alphabet=self.alphabet, kmerLength=self.kmer_length))
         # line 1 transitions
-        for i in xrange(self.state_number * self.state_number):
+        for i in range(self.state_number * self.state_number):
             f.write("{transition}\t".format(transition=str(self.transitions[i])))
         # likelihood
         f.write("{}\n".format(str(self.likelihood)))
 
         # line 2 Event Model
-        for k in xrange(self.symbol_set_size):
+        for k in range(self.symbol_set_size):
             f.write("{level_mean}\t{level_sd}\t{noise_mean}\t{noise_sd}\t{noise_lambda}\t"
                     "".format(level_mean=self.event_model["means"][k], level_sd=self.event_model["SDs"][k],
                               noise_mean=self.event_model["noise_means"][k], noise_sd=self.event_model["noise_SDs"][k],
@@ -1556,7 +1556,7 @@ class ContinuousPairHmm(SignalHmm):
             return False
 
         # line 1: transitions, likelihood
-        line = map(float, fH.readline().split())
+        line = list(map(float, fH.readline().split()))
         # check if valid
         if len(line) != (len(self.transitions) + 1):
             print("cpHMM: check_file - bad file (transitions expectations): {}".format(expectations_file),
@@ -1565,35 +1565,35 @@ class ContinuousPairHmm(SignalHmm):
             return False
 
         self.likelihood += line[-1]
-        self.transitions_expectations = map(lambda x: sum(x), zip(self.transitions_expectations, line[0:-1]))
+        self.transitions_expectations = [sum(x) for x in zip(self.transitions_expectations, line[0:-1])]
 
         # line 2: event model
-        line = map(float, fH.readline().split())
+        line = list(map(float, fH.readline().split()))
         if len(line) != self.symbol_set_size * NB_MODEL_PARAMS:
             print("cpHMM: check_file - bad file (event model): {}".format(expectations_file), file=sys.stderr)
             fH.close()
             return False
 
         # line 3 event expectations [E_mean, E_sd]
-        line = map(float, fH.readline().split())
+        line = list(map(float, fH.readline().split()))
         if len(line) != self.symbol_set_size * NORM_DIST_PARAMS:
             print("cpHMM: check_file - bad file (event expectations): {}".format(expectations_file), file=sys.stderr)
             fH.close()
             return False
 
-        self.mean_expectations = [i + j for i, j in izip(self.mean_expectations, line[::NORM_DIST_PARAMS])]
-        self.sd_expectations = [i + j for i, j in izip(self.sd_expectations, line[1::NORM_DIST_PARAMS])]
+        self.mean_expectations = [i + j for i, j in zip(self.mean_expectations, line[::NORM_DIST_PARAMS])]
+        self.sd_expectations = [i + j for i, j in zip(self.sd_expectations, line[1::NORM_DIST_PARAMS])]
 
         # line 4, posteriors
-        line = map(float, fH.readline().split())
+        line = list(map(float, fH.readline().split()))
         if len(line) != self.symbol_set_size:
             print("cpHMM: check_file - bad file (posteriors): {}".format(expectations_file), file=sys.stderr)
             fH.close()
             return False
 
-        self.posteriors = map(lambda x: sum(x), zip(self.posteriors, line))
+        self.posteriors = [sum(x) for x in zip(self.posteriors, line)]
 
-        line = map(bool, fH.readline().split())
+        line = list(map(bool, fH.readline().split()))
         if len(line) != self.symbol_set_size:
             print("cpHMM: check_file - bad file (observations): {}".format(expectations_file), file=sys.stderr)
             fH.close()
@@ -1610,12 +1610,12 @@ class ContinuousPairHmm(SignalHmm):
 
         # update
         if update_transitions is True:
-            for i in xrange(self.state_number**2):
+            for i in range(self.state_number**2):
                 self.transitions[i] = self.transitions_expectations[i]
 
         # calculate the new expected mean and standard deviation for the kmer normal distributions
         if update_emissions:
-            for k in xrange(self.symbol_set_size):  # TODO implement learning rate
+            for k in range(self.symbol_set_size):  # TODO implement learning rate
                 if self.observed[k] is True:
                     u_k = self.mean_expectations[k] / self.posteriors[k]
                     o_k = np.sqrt(self.sd_expectations[k] / self.posteriors[k])
@@ -1659,7 +1659,7 @@ class HdpSignalHmm(SignalHmm):
             return False
 
         # line 1: transitions, likelihood
-        line = map(float, fH.readline().split())
+        line = list(map(float, fH.readline().split()))
         if len(line) != (len(self.transitions) + 1):
             print("hdpHmm.add_expectations_file - problem with file {f} transitions line {l}, incorrect length"
                   "".format(f=expectations_file, l=''.join(line)), file=sys.stdout)
@@ -1667,10 +1667,10 @@ class HdpSignalHmm(SignalHmm):
             return False
 
         self.likelihood += line[-1]
-        self.transitions_expectations = map(lambda x: sum(x), zip(self.transitions_expectations, line[0:-1]))
+        self.transitions_expectations = [sum(x) for x in zip(self.transitions_expectations, line[0:-1])]
 
         # line 2: event model
-        line = map(float, fH.readline().split())
+        line = list(map(float, fH.readline().split()))
         if len(line) != self.symbol_set_size * NB_MODEL_PARAMS:
             print("hdpHmm.add_expectations_file - problem with event model in file {}"
                   "".format(expectations_file), file=sys.stderr)
@@ -1678,11 +1678,11 @@ class HdpSignalHmm(SignalHmm):
             return False
 
         # line 3: event assignments
-        line = map(float, fH.readline().split())
+        line = list(map(float, fH.readline().split()))
         self.event_assignments += line
 
         # line 4: kmer assignments
-        line = map(str, fH.readline().split())
+        line = list(map(str, fH.readline().split()))
         self.kmer_assignments += line
 
         fH.close()
@@ -1696,6 +1696,6 @@ class HdpSignalHmm(SignalHmm):
     def normalize(self, update_transitions, update_emissions=None):
         self.normalize_transitions_expectations()
         if update_transitions is True:
-            for i in xrange(self.state_number**2):
+            for i in range(self.state_number**2):
                 self.transitions[i] = self.transitions_expectations[i]
         self.normalized = True

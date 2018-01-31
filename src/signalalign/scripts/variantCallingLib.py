@@ -1,15 +1,15 @@
 #!/usr/bin/env python
 """Library for calling variants
 """
-from __future__ import print_function
+
 import sys
 import os
 import glob
 import pandas as pd
 import numpy as np
 from random import shuffle
-from signalAlignLib import SignalAlignment
-from alignmentAnalysisLib import CallMethylation
+from .signalAlignLib import SignalAlignment
+from .alignmentAnalysisLib import CallMethylation
 from multiprocessing import Process, Queue, current_process, Manager
 from serviceCourse.parsers import read_fasta
 from serviceCourse.sequenceTools import reverse_complement
@@ -18,7 +18,7 @@ from serviceCourse.sequenceTools import reverse_complement
 def randomly_select_alignments(path_to_alignments, max_alignments_to_use):
     alignments = [x for x in glob.glob(path_to_alignments) if os.stat(x).st_size != 0]
     if len(alignments) == 0:
-        print("[error] Didn't find any alignment files here {}".format(path_to_alignments))
+        print(("[error] Didn't find any alignment files here {}".format(path_to_alignments)))
         sys.exit(1)
     shuffle(alignments)
 
@@ -147,13 +147,13 @@ def call_sites_with_marginal_probs(data, reference_sequence_string, min_depth=0,
 
         if called_base != reference_sequence_list[site]:
             if get_sites is False:
-                print("Changing {orig} to {new} at {site} depth {depth}"
-                      "".format(orig=reference_sequence_list[site], new=called_base, site=site, depth=len(x['read'])))
+                print(("Changing {orig} to {new} at {site} depth {depth}"
+                      "".format(orig=reference_sequence_list[site], new=called_base, site=site, depth=len(x['read']))))
                 reference_sequence_list[site] = called_base
             else:
-                print("Proposing edit at {site} from {orig} to {new}, \n{probs}"
+                print(("Proposing edit at {site} from {orig} to {new}, \n{probs}"
                       "".format(orig=reference_sequence_list[site], new=called_base, site=site,
-                                probs=normed_marginal_probs))
+                                probs=normed_marginal_probs)))
                 difference = normed_marginal_probs.max() - normed_marginal_probs["p" + reference_sequence_list[site]]
                 print(difference)
                 add_to_candidates((site, difference))
@@ -169,7 +169,7 @@ def aligner(work_queue, done_queue):
         for f in iter(work_queue.get, 'STOP'):
             alignment = SignalAlignment(**f)
             alignment.run()
-    except Exception, e:
+    except Exception as e:
         done_queue.put("%s failed with %s" % (current_process().name, e.message))
 
 
@@ -178,7 +178,7 @@ def variant_caller(work_queue, done_queue):
         for f in iter(work_queue.get, 'STOP'):
             c = CallMethylation(**f)
             c.write()
-    except Exception, e:
+    except Exception as e:
         done_queue.put("%s failed with %s" % (current_process().name, e.message))
 
 
@@ -193,7 +193,7 @@ def run_service(service, service_iterable, service_arguments, workers, iterable_
                     **service_arguments)
         work_queue.put(args)
 
-    for w in xrange(workers):
+    for w in range(workers):
         p = Process(target=service, args=(work_queue, done_queue))
         p.start()
         jobs.append(p)
@@ -230,8 +230,8 @@ def scan_for_proposals(working_folder, step, reference_sequence_string, list_of_
     # proposals will contain the sites that we're going to change to N
     proposals = []
 
-    for s in xrange(step):
-        scan_positions = range(s, reference_sequence_length, step)
+    for s in range(step):
+        scan_positions = list(range(s, reference_sequence_length, step))
         check = make_reference_files_and_alignment_args(working_folder, reference_sequence_string,
                                                         alignment_args, n_positions=scan_positions)
         assert check, "Problem making degenerate reference for step {step}".format(step=s)
@@ -242,7 +242,7 @@ def scan_for_proposals(working_folder, step, reference_sequence_string, list_of_
         alignments = [x for x in glob.glob(working_folder.path + "*.tsv") if os.stat(x).st_size != 0]
 
         if len(alignments) == 0:
-            print("[error] Didn't find any alignment files here {}".format(working_folder.path))
+            print(("[error] Didn't find any alignment files here {}".format(working_folder.path)))
             sys.exit(1)
 
         marginal_probability_file = working_folder.add_file_path("marginals.{step}.calls".format(step=s))

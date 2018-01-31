@@ -85,7 +85,7 @@ def consolidateMethylationCallsJobFunction(job, config, methylation_prob_fids):
                         filename="%s_%s.tsv" % (config["sample_label"], config["degenerate"]))
     _handle = open(outfile.fullpathGetter(), "w")
     files   = fileinput.input([job.fileStore.readGlobalFile(fid) for fid in methylation_prob_fids])
-    map(lambda l: _handle.write(l), files)
+    list([_handle.write(l) for l in files])
     files.close()
     _handle.close()
     deliverOutput(job, outfile, config["output_dir"])
@@ -223,9 +223,9 @@ def calculateMethylationProbabilityJobFunction(job, config, cPecan_config, ignor
     degenerate_enum = getVariantCallFunctions(config["degenerate"]).enum()
 
     # do the signal alignment, and get the posterior probabilities
-    map(lambda (l, c, n): _SignalMachine(l.strip(), c, n), zip(cPecan_config["query_labels"],
+    list([_SignalMachine(l_c_n[0].strip(), l_c_n[1], l_c_n[2]) for l_c_n in list(zip(cPecan_config["query_labels"],
                                                                cPecan_config["exonerate_cigars"],
-                                                               npReads))
+                                                               npReads))])
 
     # the reads may not produce any posteriors, if, for example, they don't align to a region where
     # there are any ambiguity characters the posteriors file will be empty and we just return

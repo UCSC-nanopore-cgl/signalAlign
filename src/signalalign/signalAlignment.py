@@ -1,15 +1,16 @@
-from __future__ import print_function
+#!/usr/bin/env python3
 
 import os
 import sys
 import csv
 import numpy as np
 
-from sonLib.bioio import fastaWrite
+# from sonLib.bioio import fastaWrite
 from signalalign import defaultModelFromVersion
 from signalalign.nanoporeRead import NanoporeRead
 from signalalign.utils.bwaWrapper import generateGuideAlignment
 from signalalign.utils.fileHandlers import FolderHandler
+from signalalign.utils.sequenceTools import fastaWrite
 
 
 class SignalAlignment(object):
@@ -114,7 +115,7 @@ class SignalAlignment(object):
 
         guide_alignment = generateGuideAlignment(bwa_index=self.bwa_index, query=read_fasta_, temp_sam_path=temp_samfile_,
                                                  target_regions=self.target_regions)
-        ok = guide_alignment.validate(self.reference_map.keys())
+        ok = guide_alignment.validate(list(self.reference_map.keys()))
         if not ok:
             self.failStop("[SignalAlignment.run]ERROR getting guide alignment", npRead)
             return False
@@ -208,7 +209,7 @@ class SignalAlignment(object):
             trim_flag = ""
 
         # output format
-        if self.output_format not in self.output_formats.keys():
+        if self.output_format not in list(self.output_formats.keys()):
             self.failStop("[SignalAlignment.run]ERROR illegal outpur format selected %s" % self.output_format)
             return False
         out_fmt = "-s {fmt} ".format(fmt=self.output_formats[self.output_format])
@@ -256,12 +257,11 @@ class SignalAlignment(object):
         print("signalAlign - running command: ", command, end="\n", file=sys.stderr)
         os.system(command)
         if self.rna_table:
-            read_tsv = posteriors_file_path
             data = self.read_in_signal_align_tsv(posteriors_file_path)
             location = "Analyses/SignalAlign_000/Events"
             npRead = NanoporeRead(fast_five_file=self.in_fast5, rna_table=self.rna_table, twoD=self.twoD_chemistry)
             npRead.write_numpy_table(data, location)
-        self.temp_folder.remove_folder()
+        # self.temp_folder.remove_folder()
         return True
 
     def prepare_oned(self, nanopore_read, oned_read_path):
@@ -310,6 +310,7 @@ class SignalAlignment(object):
 
     def read_in_signal_align_tsv(self, tsv_path):
         """Read in tsv file"""
+        # TODO this only works for full file outputs, not other options from signalalign
         with open(tsv_path,'r') as tsvin:
             dtype = [('contig', 'S10'), ('reference_index', int),
                                               ('reference_kmer', 'S5'), ('read_file', 'S57'),
