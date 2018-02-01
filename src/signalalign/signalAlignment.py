@@ -97,7 +97,7 @@ class SignalAlignment(object):
         else:
             ok, version, _ = self.prepare_oned(nanopore_read=npRead, oned_read_path=read_fasta_)
             pop1_complement = None
-
+        print("OK?", ok)
         # add an indicator for the model being used
         if self.stateMachineType == "threeState":
             model_label = ".sm"
@@ -274,7 +274,7 @@ class SignalAlignment(object):
             read_file.close()
 
             return True, version, False
-        except Exception:
+        except Exception as e:
             return False, None, False
 
     def prepare_twod(self, nanopore_read, twod_read_path):

@@ -47,7 +47,8 @@ class NanoporeRead(object):
         self.complement_var_sd = 1             #
         self.twoD = twoD                       # 2D read flag, necessary right now, and the client should know
         self.rna_table = rna_table
-        assert self.twoD != self.rna_table, "Cannot perform 2D analysis when using RNA data"
+        if self.rna_table:
+            assert self.twoD is False, "Cannot perform 2D analysis when using RNA data"
 
     def open(self):
         try:
@@ -122,8 +123,8 @@ class NanoporeRead(object):
             self.close()
             return False
 
-        self.template_read        = self.fastFive[fastq_sequence_address][()].split()[2]
-        self.read_label           = self.fastFive[fastq_sequence_address][()].split()[0][1:]
+        self.template_read        = bytes.decode(self.fastFive[fastq_sequence_address][()].split()[2])
+        self.read_label           = bytes.decode(self.fastFive[fastq_sequence_address][()].split()[0][1:])
         self.kmer_length          = len(self.fastFive[self.template_event_table_address][0][4])
         self.template_read_length = len(self.template_read)
         if self.template_read_length <= 0 or not self.read_label or self.kmer_length <= 0:
@@ -345,7 +346,7 @@ class NanoporeRead(object):
             # right now we just use the first alignment
             while current_alignment_kmer == prev_alignment_kmer:
                 alignment_row += 1
-                current_alignment_kmer = self.twoD_alignment_table[alignment_row][2]
+                current_alignment_kmer = bytes.decode(self.twoD_alignment_table[alignment_row][2])
             # a match
             if seq_kmer == current_alignment_kmer:
                 template_event = self.twoD_alignment_table[alignment_row][0]

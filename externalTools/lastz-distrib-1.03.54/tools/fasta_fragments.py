@@ -82,13 +82,13 @@ def main():
 		if (headLimit != None) and (fragNum > headLimit): break
 
 		seq = seq.upper()
-		for ix in xrange(0,len(seq)-fragmentLength,stepLength):
+		for ix in range(0,len(seq)-fragmentLength,stepLength):
 			frag = seq[ix:ix+fragmentLength]
 			if (frag == allN): continue
 
 			fragNum += 1
 			if (headLimit != None) and (fragNum > headLimit):
-				print >>stderr, "limit of %d emitted fragments reached" % headLimit
+				print("limit of %d emitted fragments reached" % headLimit, file=stderr)
 				break
 
 			if (origin == "zero"): header = ">%s_%d" % (name,ix)
@@ -96,14 +96,14 @@ def main():
 			if (shuffleEm):
 				fragments += [(header,frag)]
 			else:
-				print header
-				print frag
+				print(header)
+				print(frag)
 
 	if (shuffleEm):
 		shuffle(fragments)
 		for (header,frag) in fragments:
-			print header
-			print frag
+			print(header)
+			print(frag)
 
 
 # fasta_sequences--

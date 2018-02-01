@@ -130,12 +130,12 @@ def main():
 			prevEnd = end
 		if (prevEnd < len(seq)):   newSeq += [seq[prevEnd:]]
 
-		print ">%s" % chrom
+		print(">%s" % chrom)
 		newSeq = "".join(newSeq)
 		assert (len(newSeq) == len(seq)), "internal error"
 
 		for i in range(0,len(newSeq),wrapLength):
-			print "".join(newSeq[i:i+wrapLength])
+			print("".join(newSeq[i:i+wrapLength]))
 
 	# make sure all sequences were given
 

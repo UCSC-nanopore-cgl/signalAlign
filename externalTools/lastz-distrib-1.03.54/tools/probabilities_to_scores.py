@@ -263,16 +263,16 @@ def main():
 	##########
 
 	if ("debug" in debug):
-		print "  ".join([" %s:%.5f" % (nuc,prob[nuc]) for nuc in bases])
+		print("  ".join([" %s:%.5f" % (nuc,prob[nuc]) for nuc in bases]))
 
 		for x in bases:
-			print "  ".join(["%s:%.5f" % (x+y,prob[x+y]) for y in bases])
+			print("  ".join(["%s:%.5f" % (x+y,prob[x+y]) for y in bases]))
 
-		print
+		print()
 		for sym in symbols:
 			p = symProb[sym]
-			print "%s -> %s" \
-			    % (sym,"  ".join([" %s:%.5f" % (nuc,p[nuc]) for nuc in bases]))
+			print("%s -> %s" \
+			    % (sym,"  ".join([" %s:%.5f" % (nuc,p[nuc]) for nuc in bases])))
 
 	##########
 	# write quantum code file
@@ -282,8 +282,8 @@ def main():
 		codeF = file(codeName,"wt")
 		for sym in symbols:
 			p = symProb[sym]
-			print >>codeF, "%s\t%s" \
-			             % (sym,"\t".join(["%.6f" % p[nuc] for nuc in bases]))
+			print("%s\t%s" \
+			             % (sym,"\t".join(["%.6f" % p[nuc] for nuc in bases])), file=codeF)
 		codeF.close()
 
 	##########
@@ -317,14 +317,14 @@ def main():
 	##########
 
 	if (creator != None):
-		print "# created by %s" % creator
-		print
+		print("# created by %s" % creator)
+		print()
 
 	if (settings != []):
 		sLen = max([len(s) for (s,val) in settings])
 		for (s,val) in settings:
-			print "%-*s = %s" % (sLen,s,val)
-		print
+			print("%-*s = %s" % (sLen,s,val))
+		print()
 
 	##########
 	# print the substitution matrix
@@ -336,17 +336,17 @@ def main():
 			for col in colSymbols:
 				wSub = max(wSub,len("%d" % sub[row][col]))
 
-		print "%s %s" \
-		    % ("#","  ".join(["%*s" % (wSub,non_single(symGroup[col])) for col in colSymbols]))
+		print("%s %s" \
+		    % ("#","  ".join(["%*s" % (wSub,non_single(symGroup[col])) for col in colSymbols])))
 
-		print "%s %s" \
-		    % (" ","  ".join(["%*s" % (wSub,col) for col in colSymbols]))
+		print("%s %s" \
+		    % (" ","  ".join(["%*s" % (wSub,col) for col in colSymbols])))
 
 		for row in rowSymbols:
-			print "%s %s%s" \
+			print("%s %s%s" \
 			    % (row,
 			       "  ".join(["%*d" % (wSub,sub[row][col]) for col in colSymbols]),
-			       non_single_comment(symGroup[row]))
+			       non_single_comment(symGroup[row])))
 
 	else:
 		wSub = 4
@@ -354,17 +354,17 @@ def main():
 			for col in colSymbols:
 				wSub = max(wSub,len("%.6f" % sub[row][col]))
 
-		print "%s %s" \
-		    % ("#","  ".join(["%*s" % (wSub,non_single(symGroup[col])) for col in colSymbols]))
+		print("%s %s" \
+		    % ("#","  ".join(["%*s" % (wSub,non_single(symGroup[col])) for col in colSymbols])))
 
-		print "%s %s" \
-		    % (" ","  ".join(["%*s" % (wSub,col) for col in colSymbols]))
+		print("%s %s" \
+		    % (" ","  ".join(["%*s" % (wSub,col) for col in colSymbols])))
 
 		for row in rowSymbols:
-			print "%s %s%s" \
+			print("%s %s%s" \
 			    % (row,
 			       "  ".join(["%*.6f" % (wSub,sub[row][col]) for col in colSymbols]),
-			       non_single_comment(symGroup[row]))
+			       non_single_comment(symGroup[row])))
 
 
 def dna_event(s):
