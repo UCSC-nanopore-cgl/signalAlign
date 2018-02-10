@@ -2,7 +2,6 @@
 
 import string
 from collections import Counter
-# from sonLib.bioio import fastaRead
 import array
 
 
@@ -113,3 +112,13 @@ def fastaWrite(fileHandleOrFile, name, seq, mode="w"):
         fileHandle.write("%s\n" % seq[i:i+chunkSize])
     if isinstance(fileHandleOrFile, "".__class__):
         fileHandle.close()
+
+
+def getFastaDictionary(fastaFile):
+    """Returns a dictionary of the first words of fasta headers to their corresponding
+    fasta sequence
+    """
+    namesAndSequences = map(lambda x : (x[0].split()[0], x[1]), fastaRead(open(fastaFile, 'r')))
+    names = map(lambda x : x[0], namesAndSequences)
+    assert len(names) == len(set(names)) #Check all the names are unique
+    return dict(namesAndSequences) #Hash of names to sequences

@@ -9,7 +9,7 @@ import pandas as pd
 import numpy as np
 from subprocess import call
 
-from margin.utils import getFastaDictionary
+from signalalign.utils.sequenceTools import getFastaDictionary
 
 SIGNALALIGN_ROOT = "../"
 ZYMO_C_READS = SIGNALALIGN_ROOT + "tests/minion_test_reads/C/"
