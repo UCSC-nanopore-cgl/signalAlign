@@ -31,7 +31,8 @@ class SignalAlignment(object):
                  twoD_chemistry,
                  target_regions=None,
                  output_format="full",
-                 rna_table=False):
+                 embed=False,
+                 event_table=False):
         self.in_fast5           = in_fast5            # fast5 file to align
         self.reference_map      = reference_map       # map with paths to reference sequences
         self.destination        = destination         # place where the alignments go, should already exist
@@ -47,7 +48,11 @@ class SignalAlignment(object):
         self.read_name          = self.in_fast5.split("/")[-1][:-6]  # get the name without the '.fast5'
         self.target_regions     = target_regions
         self.output_formats     = {"full": 0, "variantCaller": 1, "assignments": 2}
-        self.rna_table          = rna_table
+        self.embed              = embed
+        self.event_table        = event_table
+
+        if self.embed:
+            assert self.output_format == "full", "Cannot embed file unless output format is set to full'"
 
         if (in_templateHmm is not None) and os.path.isfile(in_templateHmm):
             self.in_templateHmm = in_templateHmm
@@ -80,7 +85,7 @@ class SignalAlignment(object):
 
         self.openTempFolder("tempFiles_%s" % self.read_name)
         npRead_ = self.addTempFilePath("temp_%s.npRead" % self.read_name)
-        npRead  = NanoporeRead(fast_five_file=self.in_fast5, rna_table=self.rna_table, twoD=self.twoD_chemistry)
+        npRead  = NanoporeRead(fast_five_file=self.in_fast5, twoD=self.twoD_chemistry, event_table=self.event_table)
         fH      = open(npRead_, "w")
         ok      = npRead.Write(parent_job=None, out_file=fH, initialize=True)
         fH.close()
@@ -97,7 +102,6 @@ class SignalAlignment(object):
         else:
             ok, version, _ = self.prepare_oned(nanopore_read=npRead, oned_read_path=read_fasta_)
             pop1_complement = None
-        print("OK?", ok)
         # add an indicator for the model being used
         if self.stateMachineType == "threeState":
             model_label = ".sm"
@@ -256,11 +260,12 @@ class SignalAlignment(object):
         # run
         print("signalAlign - running command: ", command, end="\n", file=sys.stderr)
         os.system(command)
-        if self.rna_table:
-            data = self.read_in_signal_align_tsv(posteriors_file_path)
-            location = "Analyses/SignalAlign_000/Events"
-            npRead = NanoporeRead(fast_five_file=self.in_fast5, rna_table=self.rna_table, twoD=self.twoD_chemistry)
-            npRead.write_numpy_table(data, location)
+        if self.embed:
+            if self.output_format == "full":
+                data = self.read_in_signal_align_tsv(posteriors_file_path)
+                location = "Analyses/SignalAlign_000/Events"
+                npRead = NanoporeRead(fast_five_file=self.in_fast5, twoD=self.twoD_chemistry)
+                npRead.write_numpy_table(data, location)
         # self.temp_folder.remove_folder()
         return True
 
@@ -306,7 +311,6 @@ class SignalAlignment(object):
         if nanopore_read is not None:
             nanopore_read.close()
         print(message, file=sys.stderr)
-
 
     def read_in_signal_align_tsv(self, tsv_path):
         """Read in tsv file"""

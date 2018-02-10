@@ -50,6 +50,7 @@ def collect_assignments(alignments, strand, threshold, max_assignments, transtab
         assert len(alignments) > 0, "Didn't find any alignments"
         for alignment in alignments:
             try:
+
                 data = pd.read_table(alignment, usecols=(4, 9, 12, 13),
                                      dtype={'strand': np.str,
                                             'kmer': np.str,
@@ -73,9 +74,9 @@ def collect_assignments(alignments, strand, threshold, max_assignments, transtab
 
 def make_build_alignment(c_alns, mc_alns, hmc_alns, strand, threshold, max_assignments):
     # translation tables for methylation
-    C_trans_table = string.maketrans("C", "C")
-    mC_trans_table = string.maketrans("C", "E")
-    hmC_trans_table = string.maketrans("C", "O")
+    C_trans_table = str.maketrans("C", "C")
+    mC_trans_table = str.maketrans("C", "E")
+    hmC_trans_table = str.maketrans("C", "O")
 
     C_table = collect_assignments(c_alns, strand, threshold, max_assignments, C_trans_table)
     mC_table = collect_assignments(mc_alns, strand, threshold, max_assignments, mC_trans_table)

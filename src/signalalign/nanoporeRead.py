@@ -7,16 +7,17 @@ import re
 from itertools import islice
 
 
-TEMPLATE_BASECALL_KEY_0 = "/Analyses/Basecall_1D_000"
+TEMPLATE_BASECALL_KEY = "/Analyses/Basecall_1D_00{}"
+RESEGMENT_KEY           = "/Analyses/ReSegmentBasecall_00{}"
 TWOD_BASECALL_KEY_0     = "/Analyses/Basecall_2D_000"
-VERSION_KEY             = "dragonet version"
-SUPPORTED_1D_VERSIONS   = ("1.23.0", "1.22.4")
-VERSION_KEY             = ("version", "dragonet version")
-SUPPORTED_1D_VERSIONS   = ("1.0.1", "1.2.1", "1.2.4", "1.23.0", "1.22.4", "2.1.0")
+# VERSION_KEY             = "dragonet version"
+# SUPPORTED_1D_VERSIONS   = ("1.23.0", "1.22.4")
+VERSION_KEY             = ("version", "dragonet version", "nanotensor version")
+SUPPORTED_1D_VERSIONS   = ("1.0.1", "1.2.1", "1.2.4", "1.23.0", "1.22.4", "2.1.0", "0.2.0")
 
 
 class NanoporeRead(object):
-    def __init__(self, fast_five_file, rna_table, twoD=False):
+    def __init__(self, fast_five_file, twoD=False, event_table=False):
         # load the fast5
         self.filename = fast_five_file         # fast5 file path
         self.is_open = self.open()             # bool, is the member .fast5 open?
@@ -46,8 +47,10 @@ class NanoporeRead(object):
         self.complement_scale_sd = 1           #
         self.complement_var_sd = 1             #
         self.twoD = twoD                       # 2D read flag, necessary right now, and the client should know
-        self.rna_table = rna_table
-        if self.rna_table:
+        self.event_table = event_table         # if we look for alternative events table
+        self.rna = False
+        if self.is_read_rna():
+            self.rna = True
             assert self.twoD is False, "Cannot perform 2D analysis when using RNA data"
 
     def open(self):
@@ -85,46 +88,55 @@ class NanoporeRead(object):
         """Routine setup 1D NanoporeReads, returns false if basecalled with upsupported
         version or is not base-called
         """
-        if not any(x in self.fastFive for x in TEMPLATE_BASECALL_KEY_0):
-            self.logError("[NanoporeRead:_initialize]ERROR %s not basecalled" % self.filename, parent_job)
+        # if not any(x in self.fastFive for x in TEMPLATE_BASECALL_KEY_0):
+        #     self.logError("[NanoporeRead:_initialize]ERROR %s not basecalled" % self.filename, parent_job)
+        #     self.close()
+        #     return False
+
+        # make sure that this version is supported
+
+        # get oneD directory and check if the table location exists in the fast5file
+        if self.event_table:
+            oned_root_address = self.get_latest_basecall_edition(self.event_table)
+        elif self.rna:
+            oned_root_address = self.get_latest_basecall_edition(RESEGMENT_KEY)
+        else:
+            oned_root_address = self.get_latest_basecall_edition(TEMPLATE_BASECALL_KEY)
+        assert oned_root_address in self.fastFive, "{} is not in fast5file".format(oned_root_address)
+
+        if not any(x in self.fastFive[oned_root_address].attrs.keys() for x in VERSION_KEY):
+            # print(self.is_read_rna())
+            self.logError("[NanoporeRead:_initialize]ERROR %s missing version" % self.filename, parent_job)
             self.close()
             return False
 
-        oneD_root_address = self.get_latest_basecall_edition("/Analyses/Basecall_1D_00{}")
-        if self.is_read_rna():
-            self.rna_table = True
+        if "version" in self.fastFive[oned_root_address].attrs.keys():
+            self.version = bytes.decode(self.fastFive[oned_root_address].attrs["version"])
+        elif "dragonet version" in self.fastFive[oned_root_address].attrs.keys():
+            self.version = bytes.decode(self.fastFive[oned_root_address].attrs["dragonet version"])
         else:
-            if not any(x in self.fastFive[oneD_root_address].attrs.keys() for x in VERSION_KEY):
-                # print(self.is_read_rna())
-                self.logError("[NanoporeRead:_initialize]ERROR %s missing version" % self.filename, parent_job)
-                self.close()
-                return False
+            self.version = self.fastFive[oned_root_address].attrs["nanotensor version"]
 
-            if "version" in self.fastFive[oneD_root_address].attrs.keys():
-                self.version = bytes.decode(self.fastFive[oneD_root_address].attrs["version"])
-            else:
-                self.version = bytes.decode(self.fastFive[oneD_root_address].attrs["dragonet version"])
+        # print(bytes.decode(self.version))
+        # print(type(bytes.decode(self.version)))
+        if self.version not in SUPPORTED_1D_VERSIONS:
+            self.logError("[NanoporeRead:_initialize]ERROR %s unsupported version %s " % (self.filename, self.version),
+                          parent_job)
+            self.close()
+            return False
 
-            # print(bytes.decode(self.version))
-            # print(type(bytes.decode(self.version)))
-            if self.version not in SUPPORTED_1D_VERSIONS:
-                self.logError("[NanoporeRead:_initialize]ERROR %s unsupported version %s " % (self.filename, self.version),
-                              parent_job)
-                self.close()
-                return False
-
-        self.template_event_table_address = "%s/BaseCalled_template/Events" % oneD_root_address
-        self.template_model_address       = "%s/BaseCalled_template/Model" % oneD_root_address
+        self.template_event_table_address = "%s/BaseCalled_template/Events" % oned_root_address
+        self.template_model_address       = "%s/BaseCalled_template/Model" % oned_root_address
         self.template_model_id            = None
 
-        fastq_sequence_address = "%s/BaseCalled_template/Fastq" % oneD_root_address
+        fastq_sequence_address = "%s/BaseCalled_template/Fastq" % oned_root_address
         if fastq_sequence_address not in self.fastFive:
             self.logError("[NanoporeRead:_initialize]ERROR %s missing fastq" % self.filename, parent_job)
             self.close()
             return False
 
-        self.template_read        = bytes.decode(self.fastFive[fastq_sequence_address][()].split()[2])
-        self.read_label           = bytes.decode(self.fastFive[fastq_sequence_address][()].split()[0][1:])
+        self.template_read        = self.bytes_to_string(self.fastFive[fastq_sequence_address][()].split()[2])
+        self.read_label           = self.bytes_to_string(self.fastFive[fastq_sequence_address][()].split()[0][1:])
         self.kmer_length          = len(self.fastFive[self.template_event_table_address][0][4])
         self.template_read_length = len(self.template_read)
         if self.template_read_length <= 0 or not self.read_label or self.kmer_length <= 0:
@@ -135,6 +147,19 @@ class NanoporeRead(object):
             return False
 
         return True
+
+    @staticmethod
+    def bytes_to_string(string):
+        """Check string. If bytes, convert to string and return string
+
+        :param string: string or bytes
+        """
+        if type(string) == str:
+            return string
+        elif type(string) == bytes:
+            return bytes.decode(string)
+        else:
+            raise AssertionError("String needs to be bytes or string ")
 
     def _initialize_twoD(self, parent_job=None):
         self.has2D = False
@@ -285,7 +310,7 @@ class NanoporeRead(object):
 
         self.template_strand_event_map = make_map(self.template_events)
 
-        if self.rna_table:
+        if self.rna:
             self.template_read = self.sequence_from_events(self.template_events)
         assert len(self.template_strand_event_map) == len(self.template_read), \
             "Read and event map lengths do not match {} != {}".format(len(self.template_read),
@@ -310,6 +335,9 @@ class NanoporeRead(object):
                                  (event['model_state'][-event['move']:]))
         sequence = ''.join(bases)
         return sequence
+
+    def _join_path(self, *args):
+        return '/'.join(args)
 
     def get_twoD_event_map(self):
         """Maps the kmers in the alignment table sequence read to events in the template and complement strand reads
@@ -410,10 +438,10 @@ class NanoporeRead(object):
         return True
 
     def get_template_events(self):
-        if self.rna_table:
+        if self.rna:
             if '/Analyses/ReSegmentBasecall_000/Events' in self.fastFive:
-                self.template_events = self.fastFive['/Analyses/ReSegmentBasecall_000/Events']
-                # print("self.template_events get_template_Events", self.template_events)
+                resegment_address = self.get_latest_basecall_edition('/Analyses/ReSegmentBasecall_00{}')
+                self.template_events = self.fastFive[resegment_address+'/Events']
                 return True
             else:
                 return False

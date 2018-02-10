@@ -85,7 +85,8 @@ def parse_args():
     parser.add_argument('--output_format', '-f', action='store', default="full", dest='outFmt',
                         help="output format: full, variantCaller, or assignments. Default: full")
     parser.add_argument('--debug', action='store_true', dest="DEBUG", default=False)
-    parser.add_argument('--rna_table', action='store_true', dest="rna_table", default=False)
+    parser.add_argument('--embed', action='store_true', dest="embed", default=False)
+    parser.add_argument('--event_table', action='store', dest="event_table", default=False)
 
     args = parser.parse_args()
     return args
@@ -210,7 +211,8 @@ def main(args):
             "degenerate": getDegenerateEnum(args.degenerate),
             "twoD_chemistry": args.twoD,
             "target_regions": args.target_regions,
-            "rna_table": args.rna_table
+            "embed": args.embed,
+            "event_table": args.event_table
         }
         if args.DEBUG:
             alignment = SignalAlignment(**alignment_args)

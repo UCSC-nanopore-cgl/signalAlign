@@ -211,7 +211,6 @@ class ContinuousPairHmm(SignalHmm):
 
         self.likelihood += line[-1]
         self.transitions_expectations = [sum(x) for x in zip(self.transitions_expectations, line[0:-1])]
-
         # line 2: event model
         line = list(map(float, fH.readline().split()))
         if len(line) != self.symbol_set_size * NB_MODEL_PARAMS:
@@ -237,7 +236,6 @@ class ContinuousPairHmm(SignalHmm):
             return False
 
         self.posteriors = [sum(x) for x in zip(self.posteriors, line)]
-
         line = list(map(bool, fH.readline().split()))
         if len(line) != self.symbol_set_size:
             print("cpHMM: check_file - bad file (observations): {}".format(expectations_file), file=sys.stderr)

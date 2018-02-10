@@ -182,11 +182,11 @@ assert os.path.isdir(working_directory), "ERROR: the working directory you speci
 pipeline_log = open(working_directory + "pipeline.log", 'a')
 command_line = " ".join(sys.argv[:])
 pipeline_log.write("[pipeline] Command Line: {}\n".format(command_line))
-signalAlign_directory = "../../signalAlign/"
+signalAlign_directory = "../../../../signalAlign/"
 build_alignment_location = working_directory + "buildAlignment.tsv"
 if args.build_alignment is None:
     # build alignment
-    build_alignment_command = "{sA}scripts/makeBuildAlignments.py -o={bA} -t={threshold} -n={nbAssignments} " \
+    build_alignment_command = "./makeBuildAlignments.py -o={bA} -t={threshold} -n={nbAssignments} " \
                               "".format(sA=signalAlign_directory, C=args.C_alns, mC=args.mC_alns,
                                         threshold=args.threshold, hmC=args.hmC_alns, bA=build_alignment_location,
                                         nbAssignments=args.max_assignments)

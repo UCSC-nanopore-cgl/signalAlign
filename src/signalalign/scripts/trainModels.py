@@ -184,8 +184,8 @@ def get_expectations(work_queue, done_queue):
 def get_model(model_type, model_file):
     assert (model_type in ["threeState", "threeStateHdp"]), "Unsupported StateMachine type"
     # todo clean this up
+    assert model_file is not None, "Need to have starting lookup table for {} HMM".format(model_type)
     if model_type == "threeState":
-        assert model_file is not None, "Need to have starting lookup table for {} HMM".format(type)
         model = ContinuousPairHmm(model_type=model_type)
         model.load_model(model_file=model_file)
         return model
@@ -325,7 +325,6 @@ def trainModelTransitions(config):
     working_folder = FolderHandler()
     working_folder_path = working_folder.open_folder(config["output_dir"] + "temp_trainModels")
     samples = [process_sample(s) for s in config["samples"]]
-
     if config["bwt"] is not None:
         print("[trainModels]Using provided BWT")
         bwa_ref_index = config["bwt"]
