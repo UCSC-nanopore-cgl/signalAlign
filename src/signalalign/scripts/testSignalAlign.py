@@ -56,7 +56,11 @@ class SignalAlignAlignmentTest(unittest.TestCase):
     def check_alignments(self, true_alignments, reads, reference, kmer_length, contig_name, extra_args=None):
 
         def get_kmer(start):
-            return referece_sequence[start:start + kmer_length]
+            kmer = referece_sequence[start:start + kmer_length]
+            if type(kmer) is str:
+                return kmer
+            else:
+                return bytes.decode(kmer)
 
         assert len(glob.glob(reads + "*.fast5")) > 0, "Didn't find zymo test MinION reads"
         assert os.path.isfile(reference), "Didn't find zymo reference sequence"

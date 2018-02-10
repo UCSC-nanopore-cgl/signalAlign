@@ -71,7 +71,7 @@ def fastaRead(fileHandleOrFile):
             while line != '' and line[0] != '>':
                 line = line.translate(str.maketrans('', '', chars_to_remove))
                 if len(line) > 0 and line[0] != '#':
-                    seq.extend(map(ord, line))
+                    seq.extend(list(map(ord, line)))
                 line = fileHandle.readline()
             try:
                 assert all(chr(x) in valid_chars for x in seq)
@@ -118,7 +118,7 @@ def getFastaDictionary(fastaFile):
     """Returns a dictionary of the first words of fasta headers to their corresponding
     fasta sequence
     """
-    namesAndSequences = map(lambda x : (x[0].split()[0], x[1]), fastaRead(open(fastaFile, 'r')))
-    names = map(lambda x : x[0], namesAndSequences)
+    namesAndSequences = [(x[0].split()[0], x[1]) for x in fastaRead(open(fastaFile, 'r'))]
+    names = [x[0] for x in namesAndSequences]
     assert len(names) == len(set(names)) #Check all the names are unique
     return dict(namesAndSequences) #Hash of names to sequences

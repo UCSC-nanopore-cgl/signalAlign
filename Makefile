@@ -12,7 +12,7 @@ all : sL bD ${libPath}/signalAlignLib.a ${signalAlignBin}/signalAlignLibTests ${
 	  ${signalAlignBin}/signalMachine ${signalAlignBin}/runSignalAlign \
 	  ${signalAlignBin}/signalAlignLib.py ${signalAlignBin}/variantCallingLib.py ${signalAlignBin}/alignmentAnalysisLib.py \
 	  ${signalAlignBin}/buildHdpUtil ${signalAlignBin}/trainModels ${signalAlignBin}/hdp_pipeline ${signalAlignBin}/testSignalAlign \
-	  externals nanoporeParams
+	  externals nanoporeParams python_setup \
 	  #${signalAlignBin}/zayante ${signalAlignBin}/bonnyDoon \
 	  #${signalAlignBin}/empire ${signalAlignBin}/jamison \
 
@@ -30,7 +30,10 @@ clean :
 	rm -f ${libPath}/signalAlignLib.a
 	cd externalTools && make clean
 
-pip_install:
+python_setup :
+	python setup.py install
+
+pip_install :
 	pip install -e .
 
 signalAlignLib : ${libPath}/signalAlignLib.a
