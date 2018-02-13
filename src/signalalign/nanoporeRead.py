@@ -5,6 +5,7 @@ import h5py
 import re
 
 from itertools import islice
+from nanotensor.event_detection import resegment_reads
 
 
 TEMPLATE_BASECALL_KEY = "/Analyses/Basecall_1D_00{}"
@@ -62,14 +63,41 @@ class NanoporeRead(object):
             print("Error opening file {filename}, {e}".format(filename=self.filename, e=e), file=sys.stderr)
             return False
 
-    def get_latest_basecall_edition(self, address):
+    def get_latest_basecall_edition(self, address, new=False):
+        """Check if path exists, if it does increment numbering
+
+        :param address: path to fast5 object. Needs to have a field where string.format can work!
+        :param new: get one more than most recent address
+        """
+
         highest = 0
         while(highest < 10):
             if address.format(highest) in self.fastFive:
                 highest += 1
                 continue
             else:
-                return address.format(highest - 1)  # the last base-called version we saw
+                if new:
+                    return address.format(max(0, highest))  # the last base-called version we saw
+                else:
+                    return address.format(max(0, highest - 1))  # the last base-called version we saw
+
+
+    def check_path(self, path, latest=False):
+        """Check if path exists, if it does increment numbering
+
+        :param path: path to fast5 object. Needs to have a field where string.format can work! """
+        highest = 0
+        while highest < 10:
+            if path.format(highest) in self:
+                highest += 1
+                continue
+            else:
+                if latest and highest > 0:
+                    return path.format(highest-1)  # the last base-called version we saw
+                else:
+                    return path.format(highest)  # the new base-called version
+
+
 
     def Initialize(self, parent_job):
         if not self.is_open:
@@ -102,6 +130,11 @@ class NanoporeRead(object):
             oned_root_address = self.get_latest_basecall_edition(RESEGMENT_KEY)
         else:
             oned_root_address = self.get_latest_basecall_edition(TEMPLATE_BASECALL_KEY)
+        if oned_root_address.endswith("-1"):
+            print("[SignalAlignment.run] Resegmenting")
+            MINKNOW = dict(window_lengths=(5, 10), thresholds=(2.0, 1.1), peak_height=1.2)
+            SPEEDY = dict(min_width=5, max_width=80, min_gain_per_sample=0.008, window_width=800)
+            resegment_reads(self.filename, SPEEDY, speedy=True, overwrite=True)
         assert oned_root_address in self.fastFive, "{} is not in fast5file".format(oned_root_address)
 
         if not any(x in self.fastFive[oned_root_address].attrs.keys() for x in VERSION_KEY):
@@ -497,7 +530,7 @@ class NanoporeRead(object):
         else:
             return None
 
-    def write_numpy_table(self, data, location):
+    def write_data(self, data, location):
         """Write numpy data to fast5 file"""
         try:
             del self.fastFive[location]

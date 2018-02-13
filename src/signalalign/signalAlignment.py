@@ -11,7 +11,7 @@ from signalalign.nanoporeRead import NanoporeRead
 from signalalign.utils.bwaWrapper import generateGuideAlignment
 from signalalign.utils.fileHandlers import FolderHandler
 from signalalign.utils.sequenceTools import fastaWrite
-
+from nanotensor.mea_algorithm import get_mea_alignment_path
 
 class SignalAlignment(object):
     def __init__(self,
@@ -51,8 +51,8 @@ class SignalAlignment(object):
         self.embed              = embed
         self.event_table        = event_table
 
-        if self.embed:
-            assert self.output_format == "full", "Cannot embed file unless output format is set to full'"
+        # if self.embed:
+        #     assert self.output_format == "full", "Cannot embed file unless output format is set to full'"
 
         if (in_templateHmm is not None) and os.path.isfile(in_templateHmm):
             self.in_templateHmm = in_templateHmm
@@ -245,7 +245,6 @@ class SignalAlignment(object):
                         c_model=complement_model_flag, thresh=threshold_flag, expansion=diag_expansion_flag,
                         trim=trim_flag, degen=degenerate_flag, sparse=out_fmt)
         else:
-            print("read_label", read_label)
             command = \
                 "{vA} {td} {degen}{sparse}{model}{f_ref}{b_ref} -q {npRead} " \
                 "{t_model}{c_model}{thresh}{expansion}{trim} -p {cigarFile} " \
@@ -261,12 +260,19 @@ class SignalAlignment(object):
         print("signalAlign - running command: ", command, end="\n", file=sys.stderr)
         os.system(command)
         if self.embed:
+            print("posteriors_file_path", posteriors_file_path)
+            data = self.read_in_signal_align_tsv(posteriors_file_path, file_type=self.output_format)
+            npRead = NanoporeRead(fast_five_file=self.in_fast5, twoD=self.twoD_chemistry)
+            signal_align_path = npRead.get_latest_basecall_edition("/Analyses/SignalAlign_00{}", new=True)
+            output_path = npRead._join_path(signal_align_path, self.output_format)
+            npRead.write_data(data, output_path)
+
             if self.output_format == "full":
-                data = self.read_in_signal_align_tsv(posteriors_file_path)
-                location = "Analyses/SignalAlign_000/Events"
-                npRead = NanoporeRead(fast_five_file=self.in_fast5, twoD=self.twoD_chemistry)
-                npRead.write_numpy_table(data, location)
-        # self.temp_folder.remove_folder()
+                alignment = get_mea_alignment_path(None, events=data)
+                mae_path = npRead._join_path(signal_align_path, "MEA_alignment")
+                npRead.write_data(alignment, mae_path)
+
+        self.temp_folder.remove_folder()
         return True
 
     def prepare_oned(self, nanopore_read, oned_read_path):
@@ -312,11 +318,12 @@ class SignalAlignment(object):
             nanopore_read.close()
         print(message, file=sys.stderr)
 
-    def read_in_signal_align_tsv(self, tsv_path):
+    def read_in_signal_align_tsv(self, tsv_path, file_type):
         """Read in tsv file"""
-        # TODO this only works for full file outputs, not other options from signalalign
+        assert file_type in ("full", "assignments", "variantCaller")
         with open(tsv_path,'r') as tsvin:
-            dtype = [('contig', 'S10'), ('reference_index', int),
+            if file_type == "full":
+                dtype = [('contig', 'S10'), ('reference_index', int),
                                               ('reference_kmer', 'S5'), ('read_file', 'S57'),
                                               ('strand', 'S1'), ('event_index', int),
                                               ('event_mean', float), ('event_noise', float),
@@ -324,6 +331,15 @@ class SignalAlignment(object):
                                               ('scaled_mean_current', float), ('scaled_noise', float),
                                               ('posterior_probability', float), ('descaled_event_mean', float),
                                               ('ont_model_mean', float), ('path_kmer', 'S5')]
+            elif file_type == "assignments":
+                dtype = [('k-mer', 'S10'), ('read_file', 'S57'),
+                         ('descaled_event_mean', float), ('posterior_probability', float)]
+
+            else:
+                dtype = [('event_index', int), ('reference_position', int),
+                         ('base', 'S6'), ('posterior_probability', float), ('strand', 'S1'),
+                         ('forward_mapped', int), ('read_file', 'S57')]
+
             event_table = np.loadtxt(tsvin, dtype=dtype)
 
             def remove_field_name(a, name):

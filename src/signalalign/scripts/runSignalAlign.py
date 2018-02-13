@@ -84,9 +84,12 @@ def parse_args():
                         help="")
     parser.add_argument('--output_format', '-f', action='store', default="full", dest='outFmt',
                         help="output format: full, variantCaller, or assignments. Default: full")
-    parser.add_argument('--debug', action='store_true', dest="DEBUG", default=False)
-    parser.add_argument('--embed', action='store_true', dest="embed", default=False)
-    parser.add_argument('--event_table', action='store', dest="event_table", default=False)
+    parser.add_argument('--debug', action='store_true', dest="DEBUG", default=False,
+                        help="Disable multiprocessing to gather error messages")
+    parser.add_argument('--embed', action='store_true', dest="embed", default=False,
+                        help="Embed full output into fast5 file")
+    parser.add_argument('--event_table', action='store', dest="event_table", default=False,
+                        help="Specify event table")
 
     args = parser.parse_args()
     return args
