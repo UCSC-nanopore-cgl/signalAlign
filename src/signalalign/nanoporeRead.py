@@ -77,10 +77,13 @@ class NanoporeRead(object):
                 continue
             else:
                 if new:
-                    return address.format(max(0, highest))  # the last base-called version we saw
+                    return address.format(highest)  # the last base-called version we saw
                 else:
-                    return address.format(max(0, highest - 1))  # the last base-called version we saw
-
+                    if highest >= 0:
+                        return address.format(max(0, highest - 1))  # the last base-called version we saw
+                    else:
+                        return False  # didn't find the version
+        return False
 
     def check_path(self, path, latest=False):
         """Check if path exists, if it does increment numbering
@@ -126,15 +129,20 @@ class NanoporeRead(object):
         # get oneD directory and check if the table location exists in the fast5file
         if self.event_table:
             oned_root_address = self.get_latest_basecall_edition(self.event_table)
+            assert oned_root_address, "{} is not in fast5file".format(self.event_table)
         elif self.rna:
             oned_root_address = self.get_latest_basecall_edition(RESEGMENT_KEY)
+            if oned_root_address:
+                print("[SignalAlignment.run] Resegmenting read", file=sys.stderr)
+                MINKNOW = dict(window_lengths=(5, 10), thresholds=(2.0, 1.1), peak_height=1.2)
+                SPEEDY = dict(min_width=5, max_width=80, min_gain_per_sample=0.008, window_width=800)
+                resegment_reads(self.filename, MINKNOW, speedy=False, overwrite=True)
+                oned_root_address = self.get_latest_basecall_edition(RESEGMENT_KEY)
+                assert oned_root_address, "{} is not in fast5file".format(RESEGMENT_KEY)
         else:
             oned_root_address = self.get_latest_basecall_edition(TEMPLATE_BASECALL_KEY)
-        if oned_root_address.endswith("-1"):
-            print("[SignalAlignment.run] Resegmenting")
-            MINKNOW = dict(window_lengths=(5, 10), thresholds=(2.0, 1.1), peak_height=1.2)
-            SPEEDY = dict(min_width=5, max_width=80, min_gain_per_sample=0.008, window_width=800)
-            resegment_reads(self.filename, SPEEDY, speedy=True, overwrite=True)
+            assert oned_root_address, "{} is not in fast5file".format(TEMPLATE_BASECALL_KEY)
+
         assert oned_root_address in self.fastFive, "{} is not in fast5file".format(oned_root_address)
 
         if not any(x in self.fastFive[oned_root_address].attrs.keys() for x in VERSION_KEY):
@@ -169,6 +177,9 @@ class NanoporeRead(object):
             return False
 
         self.template_read        = self.bytes_to_string(self.fastFive[fastq_sequence_address][()].split()[2])
+        if self.rna:
+            self.template_read = self.template_read.replace("U", "T")
+
         self.read_label           = self.bytes_to_string(self.fastFive[fastq_sequence_address][()].split()[0][1:])
         self.kmer_length          = len(self.fastFive[self.template_event_table_address][0][4])
         self.template_read_length = len(self.template_read)
@@ -342,9 +353,6 @@ class NanoporeRead(object):
             return event_map
 
         self.template_strand_event_map = make_map(self.template_events)
-
-        if self.rna:
-            self.template_read = self.sequence_from_events(self.template_events)
         assert len(self.template_strand_event_map) == len(self.template_read), \
             "Read and event map lengths do not match {} != {}".format(len(self.template_read),
                                                                       len(self.template_strand_event_map))
@@ -471,17 +479,9 @@ class NanoporeRead(object):
         return True
 
     def get_template_events(self):
-        if self.rna:
-            if '/Analyses/ReSegmentBasecall_000/Events' in self.fastFive:
-                resegment_address = self.get_latest_basecall_edition('/Analyses/ReSegmentBasecall_00{}')
-                self.template_events = self.fastFive[resegment_address+'/Events']
-                return True
-            else:
-                return False
-        else:
-            if self.template_event_table_address in self.fastFive:
-                self.template_events = self.fastFive[self.template_event_table_address]
-                return True
+        if self.template_event_table_address in self.fastFive:
+            self.template_events = self.fastFive[self.template_event_table_address]
+            return True
 
         if self.template_event_table_address not in self.fastFive:
             return False

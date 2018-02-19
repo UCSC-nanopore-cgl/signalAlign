@@ -11,7 +11,8 @@ from signalalign.nanoporeRead import NanoporeRead
 from signalalign.utils.bwaWrapper import generateGuideAlignment
 from signalalign.utils.fileHandlers import FolderHandler
 from signalalign.utils.sequenceTools import fastaWrite
-from nanotensor.mea_algorithm import get_mea_alignment_path
+from nanotensor.mea_algorithm import mea_alignment_from_signal_align
+
 
 class SignalAlignment(object):
     def __init__(self,
@@ -33,23 +34,23 @@ class SignalAlignment(object):
                  output_format="full",
                  embed=False,
                  event_table=False):
-        self.in_fast5           = in_fast5            # fast5 file to align
-        self.reference_map      = reference_map       # map with paths to reference sequences
-        self.destination        = destination         # place where the alignments go, should already exist
-        self.stateMachineType   = stateMachineType    # flag for signalMachine
-        self.bwa_index          = bwa_index           # index of reference sequence
-        self.threshold          = threshold           # min posterior probability to keep
+        self.in_fast5 = in_fast5  # fast5 file to align
+        self.reference_map = reference_map  # map with paths to reference sequences
+        self.destination = destination  # place where the alignments go, should already exist
+        self.stateMachineType = stateMachineType  # flag for signalMachine
+        self.bwa_index = bwa_index  # index of reference sequence
+        self.threshold = threshold  # min posterior probability to keep
         self.diagonal_expansion = diagonal_expansion  # alignment algorithm param
-        self.constraint_trim    = constraint_trim     # alignment algorithm param
-        self.output_format      = output_format       # smaller output files
-        self.degenerate         = degenerate          # set of nucleotides for degenerate characters
-        self.twoD_chemistry     = twoD_chemistry      # flag for 2D sequencing runs
-        self.temp_folder        = FolderHandler()     # object for holding temporary files (non-toil)
-        self.read_name          = self.in_fast5.split("/")[-1][:-6]  # get the name without the '.fast5'
-        self.target_regions     = target_regions
-        self.output_formats     = {"full": 0, "variantCaller": 1, "assignments": 2}
-        self.embed              = embed
-        self.event_table        = event_table
+        self.constraint_trim = constraint_trim  # alignment algorithm param
+        self.output_format = output_format  # smaller output files
+        self.degenerate = degenerate  # set of nucleotides for degenerate characters
+        self.twoD_chemistry = twoD_chemistry  # flag for 2D sequencing runs
+        self.temp_folder = FolderHandler()  # object for holding temporary files (non-toil)
+        self.read_name = self.in_fast5.split("/")[-1][:-6]  # get the name without the '.fast5'
+        self.target_regions = target_regions
+        self.output_formats = {"full": 0, "variantCaller": 1, "assignments": 2}
+        self.embed = embed
+        self.event_table = event_table
 
         # if self.embed:
         #     assert self.output_format == "full", "Cannot embed file unless output format is set to full'"
@@ -76,7 +77,7 @@ class SignalAlignment(object):
     def run(self, get_expectations=False):
         print("[SignalAlignment.run]INFO: Starting on {read}".format(read=self.in_fast5), file=sys.stderr)
         if get_expectations:
-            assert self.in_templateHmm is not None and self.in_complementHmm is not None,\
+            assert self.in_templateHmm is not None and self.in_complementHmm is not None, \
                 "Need HMM files for model training"
         # file checks
         if os.path.isfile(self.in_fast5) is False:
@@ -85,18 +86,18 @@ class SignalAlignment(object):
 
         self.openTempFolder("tempFiles_%s" % self.read_name)
         npRead_ = self.addTempFilePath("temp_%s.npRead" % self.read_name)
-        npRead  = NanoporeRead(fast_five_file=self.in_fast5, twoD=self.twoD_chemistry, event_table=self.event_table)
-        fH      = open(npRead_, "w")
-        ok      = npRead.Write(parent_job=None, out_file=fH, initialize=True)
+        npRead = NanoporeRead(fast_five_file=self.in_fast5, twoD=self.twoD_chemistry, event_table=self.event_table)
+        fH = open(npRead_, "w")
+        ok = npRead.Write(parent_job=None, out_file=fH, initialize=True)
         fH.close()
         if not ok:
             self.failStop("[SignalAlignment.run]File: %s did not pass initial checks" % self.read_name, npRead)
             return False
 
-        read_label    = npRead.read_label  # use this to identify the read throughout
-        read_fasta_   = self.addTempFilePath("temp_seq_%s.fa" % read_label)
+        read_label = npRead.read_label  # use this to identify the read throughout
+        read_fasta_ = self.addTempFilePath("temp_seq_%s.fa" % read_label)
         temp_samfile_ = self.addTempFilePath("temp_sam_file_%s.sam" % read_label)
-        cigar_file_   = self.addTempFilePath("temp_cigar_%s.txt" % read_label)
+        cigar_file_ = self.addTempFilePath("temp_cigar_%s.txt" % read_label)
         if self.twoD_chemistry:
             ok, version, pop1_complement = self.prepare_twod(nanopore_read=npRead, twod_read_path=read_fasta_)
         else:
@@ -117,7 +118,8 @@ class SignalAlignment(object):
             model_label = ".sm"
             stateMachineType_flag = ""
 
-        guide_alignment = generateGuideAlignment(bwa_index=self.bwa_index, query=read_fasta_, temp_sam_path=temp_samfile_,
+        guide_alignment = generateGuideAlignment(bwa_index=self.bwa_index, query=read_fasta_,
+                                                 temp_sam_path=temp_samfile_,
                                                  target_regions=self.target_regions)
         ok = guide_alignment.validate(list(self.reference_map.keys()))
         if not ok:
@@ -183,7 +185,7 @@ class SignalAlignment(object):
         backward_reference = self.reference_map[guide_alignment.reference_name]["backward"]
         assert os.path.isfile(forward_reference)
         assert os.path.isfile(backward_reference)
-        forward_ref_flag  = "-f {f_ref} ".format(f_ref=forward_reference)
+        forward_ref_flag = "-f {f_ref} ".format(f_ref=forward_reference)
         backward_ref_flag = "-b {b_ref} ".format(b_ref=backward_reference)
 
         # input HDPs
@@ -230,45 +232,45 @@ class SignalAlignment(object):
             twoD_flag = ""
         # commands
         if get_expectations:
-            template_expectations_file_path   = self.destination + read_label + ".template.expectations"
+            template_expectations_file_path = self.destination + read_label + ".template.expectations"
             complement_expectations_file_path = self.destination + read_label + ".complement.expectations"
 
             command = \
                 "{vA} {td} {degen}{sparse}{model}{f_ref}{b_ref} -q {npRead} " \
                 "{t_model}{c_model}{thresh}{expansion}{trim} {hdp}-L {readLabel} -p {cigarFile} " \
-                "-t {templateExpectations} -c {complementExpectations}"\
-                .format(vA=path_to_signalAlign, model=stateMachineType_flag,
-                        f_ref=forward_ref_flag, b_ref=backward_ref_flag, cigarFile=cigar_file_,
-                        npRead=npRead_, readLabel=read_label, td=twoD_flag,
-                        templateExpectations=template_expectations_file_path, hdp=hdp_flags,
-                        complementExpectations=complement_expectations_file_path, t_model=template_model_flag,
-                        c_model=complement_model_flag, thresh=threshold_flag, expansion=diag_expansion_flag,
-                        trim=trim_flag, degen=degenerate_flag, sparse=out_fmt)
+                "-t {templateExpectations} -c {complementExpectations}" \
+                    .format(vA=path_to_signalAlign, model=stateMachineType_flag,
+                            f_ref=forward_ref_flag, b_ref=backward_ref_flag, cigarFile=cigar_file_,
+                            npRead=npRead_, readLabel=read_label, td=twoD_flag,
+                            templateExpectations=template_expectations_file_path, hdp=hdp_flags,
+                            complementExpectations=complement_expectations_file_path, t_model=template_model_flag,
+                            c_model=complement_model_flag, thresh=threshold_flag, expansion=diag_expansion_flag,
+                            trim=trim_flag, degen=degenerate_flag, sparse=out_fmt)
         else:
             command = \
                 "{vA} {td} {degen}{sparse}{model}{f_ref}{b_ref} -q {npRead} " \
                 "{t_model}{c_model}{thresh}{expansion}{trim} -p {cigarFile} " \
-                "-u {posteriors} {hdp}-L {readLabel}"\
-                .format(vA=path_to_signalAlign, model=stateMachineType_flag, sparse=out_fmt,
-                        f_ref=forward_ref_flag, b_ref=backward_ref_flag, cigarFile=cigar_file_,
-                        readLabel=read_label, npRead=npRead_, td=twoD_flag,
-                        t_model=template_model_flag, c_model=complement_model_flag,
-                        posteriors=posteriors_file_path, thresh=threshold_flag, expansion=diag_expansion_flag,
-                        trim=trim_flag, hdp=hdp_flags, degen=degenerate_flag)
+                "-u {posteriors} {hdp}-L {readLabel}" \
+                    .format(vA=path_to_signalAlign, model=stateMachineType_flag, sparse=out_fmt,
+                            f_ref=forward_ref_flag, b_ref=backward_ref_flag, cigarFile=cigar_file_,
+                            readLabel=read_label, npRead=npRead_, td=twoD_flag,
+                            t_model=template_model_flag, c_model=complement_model_flag,
+                            posteriors=posteriors_file_path, thresh=threshold_flag, expansion=diag_expansion_flag,
+                            trim=trim_flag, hdp=hdp_flags, degen=degenerate_flag)
 
         # run
         print("signalAlign - running command: ", command, end="\n", file=sys.stderr)
         os.system(command)
         if self.embed:
-            print("posteriors_file_path", posteriors_file_path)
             data = self.read_in_signal_align_tsv(posteriors_file_path, file_type=self.output_format)
             npRead = NanoporeRead(fast_five_file=self.in_fast5, twoD=self.twoD_chemistry)
             signal_align_path = npRead.get_latest_basecall_edition("/Analyses/SignalAlign_00{}", new=True)
+            assert signal_align_path, "There is no path in Fast5 file {}".format("/Analyses/SignalAlign_00{}")
             output_path = npRead._join_path(signal_align_path, self.output_format)
             npRead.write_data(data, output_path)
 
             if self.output_format == "full":
-                alignment = get_mea_alignment_path(None, events=data)
+                alignment = mea_alignment_from_signal_align(None, events=data)
                 mae_path = npRead._join_path(signal_align_path, "MEA_alignment")
                 npRead.write_data(alignment, mae_path)
 
@@ -321,16 +323,16 @@ class SignalAlignment(object):
     def read_in_signal_align_tsv(self, tsv_path, file_type):
         """Read in tsv file"""
         assert file_type in ("full", "assignments", "variantCaller")
-        with open(tsv_path,'r') as tsvin:
+        with open(tsv_path, 'r') as tsvin:
             if file_type == "full":
                 dtype = [('contig', 'S10'), ('reference_index', int),
-                                              ('reference_kmer', 'S5'), ('read_file', 'S57'),
-                                              ('strand', 'S1'), ('event_index', int),
-                                              ('event_mean', float), ('event_noise', float),
-                                              ('event_duration', float), ('aligned_kmer', 'S5'),
-                                              ('scaled_mean_current', float), ('scaled_noise', float),
-                                              ('posterior_probability', float), ('descaled_event_mean', float),
-                                              ('ont_model_mean', float), ('path_kmer', 'S5')]
+                         ('reference_kmer', 'S5'), ('read_file', 'S57'),
+                         ('strand', 'S1'), ('event_index', int),
+                         ('event_mean', float), ('event_noise', float),
+                         ('event_duration', float), ('aligned_kmer', 'S5'),
+                         ('scaled_mean_current', float), ('scaled_noise', float),
+                         ('posterior_probability', float), ('descaled_event_mean', float),
+                         ('ont_model_mean', float), ('path_kmer', 'S5')]
             elif file_type == "assignments":
                 dtype = [('k-mer', 'S10'), ('read_file', 'S57'),
                          ('descaled_event_mean', float), ('posterior_probability', float)]
@@ -348,6 +350,7 @@ class SignalAlignment(object):
                     names.remove(name)
                 b = a[names]
                 return b
+
             event_table = remove_field_name(event_table, "read_file")
 
         return event_table
