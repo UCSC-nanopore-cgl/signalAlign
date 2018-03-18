@@ -71,18 +71,20 @@ class NanoporeRead(object):
         """
 
         highest = 0
-        while(highest < 10):
+        while(highest < 20):
             if address.format(highest) in self.fastFive:
                 highest += 1
                 continue
             else:
                 if new:
+                    print(address.format(highest))
                     return address.format(highest)  # the last base-called version we saw
                 else:
                     if highest >= 0:
                         return address.format(max(0, highest - 1))  # the last base-called version we saw
                     else:
                         return False  # didn't find the version
+        print("highest", highest)
         return False
 
     def check_path(self, path, latest=False):
@@ -128,8 +130,16 @@ class NanoporeRead(object):
 
         # get oneD directory and check if the table location exists in the fast5file
         if self.event_table:
+            print("[SignalAlignment.run] Resegmenting read", file=sys.stderr)
+
             oned_root_address = self.get_latest_basecall_edition(self.event_table)
-            assert oned_root_address, "{} is not in fast5file".format(self.event_table)
+            if oned_root_address:
+
+                MINKNOW = dict(window_lengths=(5, 10), thresholds=(2.0, 1.1), peak_height=1.2)
+                resegment_reads(self.filename, MINKNOW, speedy=False, overwrite=True)
+                oned_root_address = self.get_latest_basecall_edition(self.event_table)
+                assert oned_root_address, "{} is not in fast5file".format(self.event_table)
+
         elif self.rna:
             oned_root_address = self.get_latest_basecall_edition(RESEGMENT_KEY)
             if oned_root_address:
@@ -144,7 +154,7 @@ class NanoporeRead(object):
             assert oned_root_address, "{} is not in fast5file".format(TEMPLATE_BASECALL_KEY)
 
         assert oned_root_address in self.fastFive, "{} is not in fast5file".format(oned_root_address)
-
+        print("oned_root_address", oned_root_address)
         if not any(x in self.fastFive[oned_root_address].attrs.keys() for x in VERSION_KEY):
             # print(self.is_read_rna())
             self.logError("[NanoporeRead:_initialize]ERROR %s missing version" % self.filename, parent_job)
@@ -178,7 +188,8 @@ class NanoporeRead(object):
 
         self.template_read        = self.bytes_to_string(self.fastFive[fastq_sequence_address][()].split()[2])
         if self.rna:
-            self.template_read = self.template_read.replace("U", "T")
+            # reverse and replace "U"
+            self.template_read = self.template_read.replace("U", "T")[::-1]
 
         self.read_label           = self.bytes_to_string(self.fastFive[fastq_sequence_address][()].split()[0][1:])
         self.kmer_length          = len(self.fastFive[self.template_event_table_address][0][4])
@@ -356,7 +367,8 @@ class NanoporeRead(object):
         assert len(self.template_strand_event_map) == len(self.template_read), \
             "Read and event map lengths do not match {} != {}".format(len(self.template_read),
                                                                       len(self.template_strand_event_map))
-
+        # if self.rna:
+        #     self.template_strand_event_map = self.template_strand_event_map[::-1]
         if self.twoD:
             self.complement_strand_event_map = make_map(self.complement_events)
             assert len(self.complement_strand_event_map) == len(self.complement_read)
@@ -530,13 +542,13 @@ class NanoporeRead(object):
         else:
             return None
 
-    def write_data(self, data, location):
+    def write_data(self, data, location, compression=True):
         """Write numpy data to fast5 file"""
         try:
             del self.fastFive[location]
         except KeyError:
             pass
-        self.fastFive.create_dataset(location, data=data, compression=True)
+        self.fastFive.create_dataset(location, data=data, compression=compression)
 
     def Write(self, parent_job, out_file, initialize=True):
         if initialize:

@@ -4,14 +4,14 @@ import os
 import sys
 import csv
 import numpy as np
-
+import pysam
 # from sonLib.bioio import fastaWrite
 from signalalign import defaultModelFromVersion
 from signalalign.nanoporeRead import NanoporeRead
 from signalalign.utils.bwaWrapper import generateGuideAlignment
 from signalalign.utils.fileHandlers import FolderHandler
 from signalalign.utils.sequenceTools import fastaWrite
-from nanotensor.mea_algorithm import mea_alignment_from_signal_align
+from nanotensor.mea_algorithm import mea_alignment_from_signal_align, match_events_with_signalalign
 
 
 class SignalAlignment(object):
@@ -86,6 +86,7 @@ class SignalAlignment(object):
 
         self.openTempFolder("tempFiles_%s" % self.read_name)
         npRead_ = self.addTempFilePath("temp_%s.npRead" % self.read_name)
+        # TODO is this totally fucked for RNA because of 3'-5' mapping?
         npRead = NanoporeRead(fast_five_file=self.in_fast5, twoD=self.twoD_chemistry, event_table=self.event_table)
         fH = open(npRead_, "w")
         ok = npRead.Write(parent_job=None, out_file=fH, initialize=True)
@@ -263,18 +264,35 @@ class SignalAlignment(object):
         os.system(command)
         if self.embed:
             data = self.read_in_signal_align_tsv(posteriors_file_path, file_type=self.output_format)
-            npRead = NanoporeRead(fast_five_file=self.in_fast5, twoD=self.twoD_chemistry)
+            npRead = NanoporeRead(fast_five_file=self.in_fast5, twoD=self.twoD_chemistry, event_table=self.event_table)
+            npRead.Initialize(None)
             signal_align_path = npRead.get_latest_basecall_edition("/Analyses/SignalAlign_00{}", new=True)
             assert signal_align_path, "There is no path in Fast5 file {}".format("/Analyses/SignalAlign_00{}")
             output_path = npRead._join_path(signal_align_path, self.output_format)
             npRead.write_data(data, output_path)
-
+            # Todo add attributes to signalalign output
             if self.output_format == "full":
                 alignment = mea_alignment_from_signal_align(None, events=data)
-                mae_path = npRead._join_path(signal_align_path, "MEA_alignment")
-                npRead.write_data(alignment, mae_path)
-
-        self.temp_folder.remove_folder()
+                mae_path = npRead._join_path(signal_align_path, "MEA_alignment_labels")
+                events = npRead.get_template_events()
+                if events:
+                    if guide_alignment.strand == "-":
+                        minus = True
+                    else:
+                        minus = False
+                    labels = match_events_with_signalalign(sa_events=alignment,
+                                                           event_detections=np.asanyarray(npRead.template_events),
+                                                           minus=minus,
+                                                           rna=npRead.is_read_rna())
+                    npRead.write_data(labels, mae_path)
+                    sam_string = str()
+                    with open(temp_samfile_, 'r') as test:
+                        for line in test:
+                            sam_string += line
+                    sam_path = npRead._join_path(signal_align_path, "sam")
+                    # print(sam_string)
+                    npRead.write_data(data=sam_string, location=sam_path, compression=None)
+        # self.temp_folder.remove_folder()
         return True
 
     def prepare_oned(self, nanopore_read, oned_read_path):
@@ -283,6 +301,7 @@ class SignalAlignment(object):
             fastaWrite(fileHandleOrFile=read_file,
                        name=nanopore_read.read_label,
                        seq=nanopore_read.template_read)
+            print()
             version = nanopore_read.version
             read_file.close()
 
