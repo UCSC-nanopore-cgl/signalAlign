@@ -580,7 +580,7 @@ class NanoporeRead(object):
         # TODO add try/except or something here to check for files that haven't been base-called
         highest_1d_basecall = self.get_latest_basecall_edition("/Analyses/Basecall_1D_00{}")
         oneD_root_address = "/Analyses/Basecall_1D_00{}".format(highest_1d_basecall)
-        self.version = self.fastFive[oneD_root_address].attrs["dragonet version"]
+        self.version = bytes.decode(self.fastFive[oneD_root_address].attrs["dragonet version"])
         # assert(self.version == "1.23.0"), "Unsupported version {}".format(self.version)
         self.template_event_table_address = oneD_root_address + '/BaseCalled_template/Events'
         self.template_model_address = oneD_root_address + "/BaseCalled_template/Model"
@@ -598,7 +598,7 @@ class NanoporeRead(object):
         twoD_address = "/Analyses/Basecall_2D_00{}".format(highest_2d_basecall)
         assert(twoD_address in self.fastFive), "[NanoporeRead::initialize_twoD] Didn't find two D address"
 
-        self.version = self.fastFive[twoD_address].attrs["dragonet version"]
+        self.version = bytes.decode(self.fastFive[twoD_address].attrs["dragonet version"])
 
         supported_versions = ["1.15.0", "1.19.0", "1.20.0", "1.22.2", "1.22.4", "1.23.0"]
         if self.version not in supported_versions:
@@ -1024,10 +1024,10 @@ class NanoporeRead(object):
             print((1 if self.twoD else 0), end='\n', file=out_file)            # has 2D
 
             # line 2 alignment table sequence
-            print(self.alignment_table_sequence, end='\n', file=out_file)
+            print(bytes.decode(self.alignment_table_sequence), end='\n', file=out_file)
 
             # line 3 template read
-            print(self.template_read, end='\n', file=out_file)
+            print(bytes.decode(self.template_read), end='\n', file=out_file)
 
             # line 4 template strand map
             for _ in self.template_strand_event_map:
@@ -1035,7 +1035,7 @@ class NanoporeRead(object):
             print("", end="\n", file=out_file)
 
             # line 5 complement read
-            print(self.complement_read, end='\n', file=out_file)
+            print(bytes.decode(self.complement_read), end='\n', file=out_file)
 
             # line 6 complement strand map
             for _ in self.complement_strand_event_map:

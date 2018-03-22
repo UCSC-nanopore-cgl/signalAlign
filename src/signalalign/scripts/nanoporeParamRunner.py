@@ -116,7 +116,7 @@ def estimate_params(fast5, binary_path="./estimateNanoporeParams",
     # os.system(command)
     result = subprocess.check_output(command, shell=True, stderr=subprocess.STDOUT)
     params = result.split()
-    param_dict = dict(list(zip(params[::2], [float(x) for x in params[1::2]])))
+    param_dict = dict(list(zip([bytes.decode(x) for x in params[::2]], [float(x) for x in params[1::2]])))
     # print(type(param_dict["scale"]))
     # clean up temp folder
     temp_folder.remove_file(npRead_path)
