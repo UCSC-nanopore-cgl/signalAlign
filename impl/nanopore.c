@@ -262,7 +262,6 @@ NanoporeRead *nanopore_loadNanoporeReadFromFile(const char *nanoporeReadFile) {
     }
     free(string);
     stList_destruct(tokens);
-
     // line 5 [complement read] \n
     string = stFile_getLineFromFile(fH);    
     if (npRead->twoD) {

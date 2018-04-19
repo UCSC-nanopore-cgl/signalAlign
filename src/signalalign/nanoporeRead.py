@@ -71,20 +71,20 @@ class NanoporeRead(object):
         """
 
         highest = 0
-        while(highest < 20):
+        while(highest < 30):
             if address.format(highest) in self.fastFive:
                 highest += 1
                 continue
             else:
                 if new:
-                    print(address.format(highest))
+                    # print(address.format(highest))
                     return address.format(highest)  # the last base-called version we saw
                 else:
                     if highest >= 0:
                         return address.format(max(0, highest - 1))  # the last base-called version we saw
                     else:
                         return False  # didn't find the version
-        print("highest", highest)
+        # print("highest", highest)
         return False
 
     def check_path(self, path, latest=False):
@@ -154,7 +154,7 @@ class NanoporeRead(object):
             assert oned_root_address, "{} is not in fast5file".format(TEMPLATE_BASECALL_KEY)
 
         assert oned_root_address in self.fastFive, "{} is not in fast5file".format(oned_root_address)
-        print("oned_root_address", oned_root_address)
+        # print("oned_root_address", oned_root_address)
         if not any(x in self.fastFive[oned_root_address].attrs.keys() for x in VERSION_KEY):
             # print(self.is_read_rna())
             self.logError("[NanoporeRead:_initialize]ERROR %s missing version" % self.filename, parent_job)
@@ -191,6 +191,7 @@ class NanoporeRead(object):
             # reverse and replace "U"
             self.template_read = self.template_read.replace("U", "T")[::-1]
 
+        print(self.template_read)
         self.read_label           = self.bytes_to_string(self.fastFive[fastq_sequence_address][()].split()[0][1:])
         self.kmer_length          = len(self.fastFive[self.template_event_table_address][0][4])
         self.template_read_length = len(self.template_read)

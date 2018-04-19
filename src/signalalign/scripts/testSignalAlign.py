@@ -48,6 +48,8 @@ class signalAlignLibTests(unittest.TestCase):
 
 class SignalAlignAlignmentTest(unittest.TestCase):
     def setUp(self):
+        if os.path.exists("./signalAlign_unittest/"):
+            shutil.rmtree("./signalAlign_unittest/")
         os.makedirs("./signalAlign_unittest/")
 
     def tearDown(self):
@@ -72,6 +74,8 @@ class SignalAlignAlignmentTest(unittest.TestCase):
 
         null_output = open(os.devnull, 'w')
         result = call(alignment_command, shell=True, bufsize=-1, stdout=null_output, stderr=null_output)
+
+        # result = call(alignment_command, shell=True, bufsize=-1)
 
         self.assertTrue(result == 0, "error running signalAlign alignments command was {}"
                                      "".format(alignment_command))
@@ -149,6 +153,8 @@ class SignalAlignAlignmentTest(unittest.TestCase):
 
 class signalAlign_EM_test(unittest.TestCase):
     def setUp(self):
+        if os.path.exists("./signalAlign_unittest/"):
+            shutil.rmtree("./signalAlign_unittest/")
         os.makedirs("./signalAlign_unittest/")
 
     def tearDown(self):

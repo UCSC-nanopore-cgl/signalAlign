@@ -266,8 +266,8 @@ class SignalAlignment(object):
             data = self.read_in_signal_align_tsv(posteriors_file_path, file_type=self.output_format)
             npRead = NanoporeRead(fast_five_file=self.in_fast5, twoD=self.twoD_chemistry, event_table=self.event_table)
             npRead.Initialize(None)
-            signal_align_path = npRead.get_latest_basecall_edition("/Analyses/SignalAlign_00{}", new=True)
-            assert signal_align_path, "There is no path in Fast5 file {}".format("/Analyses/SignalAlign_00{}")
+            signal_align_path = npRead.get_latest_basecall_edition("/Analyses/SignalAlign_00{}", new=False)
+            assert signal_align_path, "There is no path in Fast5 file: {}".format("/Analyses/SignalAlign_00{}")
             output_path = npRead._join_path(signal_align_path, self.output_format)
             npRead.write_data(data, output_path)
             # Todo add attributes to signalalign output
@@ -301,7 +301,7 @@ class SignalAlignment(object):
             fastaWrite(fileHandleOrFile=read_file,
                        name=nanopore_read.read_label,
                        seq=nanopore_read.template_read)
-            print()
+
             version = nanopore_read.version
             read_file.close()
 
