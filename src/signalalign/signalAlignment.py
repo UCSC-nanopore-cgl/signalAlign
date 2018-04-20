@@ -263,6 +263,8 @@ class SignalAlignment(object):
         print("signalAlign - running command: ", command, end="\n", file=sys.stderr)
         os.system(command)
         if self.embed:
+            print("signalAlign - embedding into Fast5 ", file=sys.stderr)
+
             data = self.read_in_signal_align_tsv(posteriors_file_path, file_type=self.output_format)
             npRead = NanoporeRead(fast_five_file=self.in_fast5, twoD=self.twoD_chemistry, event_table=self.event_table)
             npRead.Initialize(None)
@@ -270,8 +272,10 @@ class SignalAlignment(object):
             assert signal_align_path, "There is no path in Fast5 file: {}".format("/Analyses/SignalAlign_00{}")
             output_path = npRead._join_path(signal_align_path, self.output_format)
             npRead.write_data(data, output_path)
+
             # Todo add attributes to signalalign output
             if self.output_format == "full":
+                print("signalAlign - writing maximum expected alignment ", file=sys.stderr)
                 alignment = mea_alignment_from_signal_align(None, events=data)
                 mae_path = npRead._join_path(signal_align_path, "MEA_alignment_labels")
                 events = npRead.get_template_events()
@@ -292,6 +296,7 @@ class SignalAlignment(object):
                     sam_path = npRead._join_path(signal_align_path, "sam")
                     # print(sam_string)
                     npRead.write_data(data=sam_string, location=sam_path, compression=None)
+
         # self.temp_folder.remove_folder()
         return True
 

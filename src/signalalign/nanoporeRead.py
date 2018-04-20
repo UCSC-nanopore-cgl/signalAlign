@@ -18,7 +18,7 @@ SUPPORTED_1D_VERSIONS   = ("1.0.1", "1.2.1", "1.2.4", "1.23.0", "1.22.4", "2.1.0
 
 
 class NanoporeRead(object):
-    def __init__(self, fast_five_file, twoD=False, event_table=False):
+    def __init__(self, fast_five_file, twoD=False, event_table=''):
         # load the fast5
         self.filename = fast_five_file         # fast5 file path
         self.is_open = self.open()             # bool, is the member .fast5 open?
@@ -80,29 +80,27 @@ class NanoporeRead(object):
                     # print(address.format(highest))
                     return address.format(highest)  # the last base-called version we saw
                 else:
-                    if highest >= 0:
+                    if highest > 0:
                         return address.format(max(0, highest - 1))  # the last base-called version we saw
                     else:
                         return False  # didn't find the version
         # print("highest", highest)
         return False
 
-    def check_path(self, path, latest=False):
-        """Check if path exists, if it does increment numbering
-
-        :param path: path to fast5 object. Needs to have a field where string.format can work! """
-        highest = 0
-        while highest < 10:
-            if path.format(highest) in self:
-                highest += 1
-                continue
-            else:
-                if latest and highest > 0:
-                    return path.format(highest-1)  # the last base-called version we saw
-                else:
-                    return path.format(highest)  # the new base-called version
-
-
+    # def check_path(self, path, latest=False):
+    #     """Check if path exists, if it does increment numbering
+    #
+    #     :param path: path to fast5 object. Needs to have a field where string.format can work! """
+    #     highest = 0
+    #     while highest < 10:
+    #         if path.format(highest) in self:
+    #             highest += 1
+    #             continue
+    #         else:
+    #             if latest and highest > 0:
+    #                 return path.format(highest-1)  # the last base-called version we saw
+    #             else:
+    #                 return path.format(highest)  # the new base-called version
 
     def Initialize(self, parent_job):
         if not self.is_open:
@@ -130,11 +128,9 @@ class NanoporeRead(object):
 
         # get oneD directory and check if the table location exists in the fast5file
         if self.event_table:
-            print("[SignalAlignment.run] Resegmenting read", file=sys.stderr)
-
             oned_root_address = self.get_latest_basecall_edition(self.event_table)
-            if oned_root_address:
-
+            if not oned_root_address:
+                print("[SignalAlignment.run] Resegmenting read", file=sys.stderr)
                 MINKNOW = dict(window_lengths=(5, 10), thresholds=(2.0, 1.1), peak_height=1.2)
                 resegment_reads(self.filename, MINKNOW, speedy=False, overwrite=True)
                 oned_root_address = self.get_latest_basecall_edition(self.event_table)
@@ -142,17 +138,18 @@ class NanoporeRead(object):
 
         elif self.rna:
             oned_root_address = self.get_latest_basecall_edition(RESEGMENT_KEY)
-            if oned_root_address:
+            print(oned_root_address)
+            if not oned_root_address:
                 print("[SignalAlignment.run] Resegmenting read", file=sys.stderr)
                 MINKNOW = dict(window_lengths=(5, 10), thresholds=(2.0, 1.1), peak_height=1.2)
-                SPEEDY = dict(min_width=5, max_width=80, min_gain_per_sample=0.008, window_width=800)
+                # SPEEDY = dict(min_width=5, max_width=80, min_gain_per_sample=0.008, window_width=800)
                 resegment_reads(self.filename, MINKNOW, speedy=False, overwrite=True)
                 oned_root_address = self.get_latest_basecall_edition(RESEGMENT_KEY)
                 assert oned_root_address, "{} is not in fast5file".format(RESEGMENT_KEY)
         else:
             oned_root_address = self.get_latest_basecall_edition(TEMPLATE_BASECALL_KEY)
             assert oned_root_address, "{} is not in fast5file".format(TEMPLATE_BASECALL_KEY)
-
+        print("self.rna", self.rna)
         assert oned_root_address in self.fastFive, "{} is not in fast5file".format(oned_root_address)
         # print("oned_root_address", oned_root_address)
         if not any(x in self.fastFive[oned_root_address].attrs.keys() for x in VERSION_KEY):

@@ -78,6 +78,7 @@ externalTools/lastz-distrib-1.03.54/tools/pick_from_fasta_hsx.py.bak
 externalTools/lastz-distrib-1.03.54/tools/probabilities_to_scores.py.bak
 externalTools/lastz-distrib-1.03.54/tools/qcode_to_scores.py.bak
 signalAlign.egg-info/
+build/
 src/signalAlign.egg-info/
 src/signalalign/__init__.pyc
 src/signalalign/__pycache__/

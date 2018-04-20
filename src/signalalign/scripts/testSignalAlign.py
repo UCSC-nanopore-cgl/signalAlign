@@ -52,8 +52,8 @@ class SignalAlignAlignmentTest(unittest.TestCase):
             shutil.rmtree("./signalAlign_unittest/")
         os.makedirs("./signalAlign_unittest/")
 
-    def tearDown(self):
-        shutil.rmtree("./signalAlign_unittest/")
+    # def tearDown(self):
+    #     shutil.rmtree("./signalAlign_unittest/")
 
     def check_alignments(self, true_alignments, reads, reference, kmer_length, contig_name, extra_args=None):
 
@@ -72,10 +72,10 @@ class SignalAlignAlignmentTest(unittest.TestCase):
         if extra_args is not None:
             alignment_command += extra_args
 
-        null_output = open(os.devnull, 'w')
-        result = call(alignment_command, shell=True, bufsize=-1, stdout=null_output, stderr=null_output)
+        # null_output = open(os.devnull, 'w')
+        # result = call(alignment_command, shell=True, bufsize=-1, stdout=null_output, stderr=null_output)
 
-        # result = call(alignment_command, shell=True, bufsize=-1)
+        result = call(alignment_command, shell=True, bufsize=-1)
 
         self.assertTrue(result == 0, "error running signalAlign alignments command was {}"
                                      "".format(alignment_command))
@@ -150,6 +150,17 @@ class SignalAlignAlignmentTest(unittest.TestCase):
                               contig_name="gi_ecoli",
                               extra_args="-T=../models/testModelR9p4_5mer_acegt_template.model ")
 
+    def test_RNA_edge_alignments_reads_5mer(self):
+        edge_case_true_alignments = SIGNALALIGN_ROOT + "tests/test_alignments/RNA_edge_case_tempFiles_alignment/"
+        edge_case_reads = SIGNALALIGN_ROOT + "tests/minion_test_reads/RNA_edge_cases/"
+        edge_case_reference = SIGNALALIGN_ROOT + "tests/test_sequences/fake_rna_reversed.fa"
+        self.check_alignments(true_alignments=edge_case_true_alignments,
+                              reads=edge_case_reads,
+                              reference=edge_case_reference,
+                              kmer_length=5,
+                              contig_name="rna_fake_reversed",
+                              extra_args="-T=../models/testModelR9p4_5mer_acgt_RNA.model ")
+
 
 class signalAlign_EM_test(unittest.TestCase):
     def setUp(self):
@@ -171,12 +182,13 @@ class signalAlign_EM_test(unittest.TestCase):
 
 def main():
     testSuite = unittest.TestSuite()
-    testSuite.addTest(LibTest('test_signalAlign_library'))
-    testSuite.addTest(SignalAlignAlignmentTest('test_zymo_reads'))
-    testSuite.addTest(SignalAlignAlignmentTest('test_pUC_r9_reads_5mer'))
-    testSuite.addTest(SignalAlignAlignmentTest('test_pUC_r9_reads_6mer'))
-    testSuite.addTest(SignalAlignAlignmentTest('test_Ecoli1D_reads_5mer'))
-    testSuite.addTest(signalAlign_EM_test('test_EM'))
+    # testSuite.addTest(LibTest('test_signalAlign_library'))
+    # testSuite.addTest(SignalAlignAlignmentTest('test_zymo_reads'))
+    # testSuite.addTest(SignalAlignAlignmentTest('test_pUC_r9_reads_5mer'))
+    # testSuite.addTest(SignalAlignAlignmentTest('test_pUC_r9_reads_6mer'))
+    # testSuite.addTest(SignalAlignAlignmentTest('test_Ecoli1D_reads_5mer'))
+    testSuite.addTest(SignalAlignAlignmentTest('test_RNA_edge_alignments_reads_5mer'))
+    # testSuite.addTest(signalAlign_EM_test('test_EM'))
 
     testRunner = unittest.TextTestRunner(verbosity=2)
     testRunner.run(testSuite)
