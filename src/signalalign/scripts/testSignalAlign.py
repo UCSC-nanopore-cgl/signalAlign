@@ -52,8 +52,8 @@ class SignalAlignAlignmentTest(unittest.TestCase):
             shutil.rmtree("./signalAlign_unittest/")
         os.makedirs("./signalAlign_unittest/")
 
-    def tearDown(self):
-        shutil.rmtree("./signalAlign_unittest/")
+    # def tearDown(self):
+    #     shutil.rmtree("./signalAlign_unittest/")
 
     def check_alignments(self, true_alignments, reads, reference, kmer_length, contig_name, extra_args=None):
 
@@ -72,10 +72,10 @@ class SignalAlignAlignmentTest(unittest.TestCase):
         if extra_args is not None:
             alignment_command += extra_args
 
-        null_output = open(os.devnull, 'w')
-        result = call(alignment_command, shell=True, bufsize=-1, stdout=null_output, stderr=null_output)
+        # null_output = open(os.devnull, 'w')
+        # result = call(alignment_command, shell=True, bufsize=-1, stdout=null_output, stderr=null_output)
         #
-        # result = call(alignment_command, shell=True, bufsize=-1)
+        result = call(alignment_command, shell=True, bufsize=-1)
 
         self.assertTrue(result == 0, "error running signalAlign alignments command was {}"
                                      "".format(alignment_command))
@@ -113,7 +113,7 @@ class SignalAlignAlignmentTest(unittest.TestCase):
                               reference=ZYMO_REFERENCE,
                               kmer_length=6,
                               contig_name="ZYMO",
-                              extra_args="--2d ")
+                              extra_args="--2d --debug")
 
     def test_pUC_r9_reads_5mer(self):
         pUC_true_alignments = SIGNALALIGN_ROOT + "tests/test_alignments/pUC_5mer_tempFiles_alignment/"
@@ -183,12 +183,12 @@ class signalAlign_EM_test(unittest.TestCase):
 def main():
     testSuite = unittest.TestSuite()
     testSuite.addTest(LibTest('test_signalAlign_library'))
-    testSuite.addTest(SignalAlignAlignmentTest('test_zymo_reads'))
-    testSuite.addTest(SignalAlignAlignmentTest('test_pUC_r9_reads_5mer'))
-    testSuite.addTest(SignalAlignAlignmentTest('test_pUC_r9_reads_6mer'))
-    testSuite.addTest(SignalAlignAlignmentTest('test_Ecoli1D_reads_5mer'))
-    testSuite.addTest(SignalAlignAlignmentTest('test_RNA_edge_alignments_reads_5mer'))
-    testSuite.addTest(signalAlign_EM_test('test_EM'))
+    # testSuite.addTest(SignalAlignAlignmentTest('test_zymo_reads'))
+    # testSuite.addTest(SignalAlignAlignmentTest('test_pUC_r9_reads_5mer'))
+    # testSuite.addTest(SignalAlignAlignmentTest('test_pUC_r9_reads_6mer'))
+    # testSuite.addTest(SignalAlignAlignmentTest('test_Ecoli1D_reads_5mer'))
+    # testSuite.addTest(SignalAlignAlignmentTest('test_RNA_edge_alignments_reads_5mer'))
+    # testSuite.addTest(signalAlign_EM_test('test_EM'))
 
     testRunner = unittest.TextTestRunner(verbosity=2)
     testRunner.run(testSuite)

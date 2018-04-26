@@ -16,16 +16,17 @@ class GuideAlignment(object):
         self.strand = strand
         self.reference_name = reference_name
 
-    def validate(self, reference_names):
+    def validate(self, reference_names=None):
         if self.cigar == "" or self.cigar is False or self.cigar is None:
             print("[GuideAlignment]Illegal cigar %s" % self.cigar)
             return False
         if self.strand not in ("+", "-"):
             print("[GuideAlignment]Illegal strand %s" % self.strand)
             return False
-        if self.reference_name not in reference_names:
-            print("[GuideAlignment]Reference %s not in reference names %s: " % (self.reference_name, reference_names))
-            return False
+        if reference_names is not None:
+            if self.reference_name not in reference_names:
+                print("[GuideAlignment]Reference %s not in reference names %s: " % (self.reference_name, reference_names))
+                return False
         return True
 
 

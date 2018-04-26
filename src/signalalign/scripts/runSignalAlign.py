@@ -17,7 +17,7 @@ from signalalign.utils import processReferenceFasta, parseFofn
 from signalalign.utils.fileHandlers import FolderHandler
 from signalalign.utils.bwaWrapper import getBwaIndex
 from signalalign.motif import getDegenerateEnum
-
+from py3helpers.utils import time_it
 
 def signalAlignSourceDir():
     return "/".join(os.path.abspath(__file__).split("/")[:-1])  # returns path without runSignalAlign
@@ -158,12 +158,18 @@ def main(args):
     # make directory to put temporary files
     temp_folder = FolderHandler()
     temp_dir_path = temp_folder.open_folder(args.out + "/tempFiles_alignment")
-
-    reference_map = processReferenceFasta(fasta=args.ref,
-                                          motif_key=args.motif_key,
-                                          work_folder=temp_folder,
-                                          sub_char=args.ambig_char,
-                                          positions_file=args.ambiguity_positions)
+    #
+    # if args.motif_key is not None or args.ambig_char is not None or args.ambiguity_positions is not None:
+    reference_map, forward_reference, backward_reference = processReferenceFasta(fasta=args.ref,
+                                                                      motif_key=args.motif_key,
+                                                                      work_folder=temp_folder,
+                                                                      sub_char=args.ambig_char,
+                                                                      positions_file=args.ambiguity_positions)
+    # else:
+    #     forward_reference = args.ref
+    #     backward_reference = None
+    # reference_map = time_it(processReferenceFasta, args.ref, temp_folder, args.motif_key, args.ambig_char,
+    #                                       args.ambiguity_positions)
 
     # index the reference for bwa
     if args.bwt is not None:
@@ -215,7 +221,9 @@ def main(args):
             "twoD_chemistry": args.twoD,
             "target_regions": args.target_regions,
             "embed": args.embed,
-            "event_table": args.event_table
+            "event_table": args.event_table,
+            "backward_reference": backward_reference,
+            "forward_reference": forward_reference
         }
         if args.DEBUG:
             alignment = SignalAlignment(**alignment_args)

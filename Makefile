@@ -8,14 +8,23 @@ libTests = tests/*.c
 signalAlignDependencies =  ${basicLibsDependencies}
 signalAlignLib = ${basicLibs}
 
-all : sL bD ${libPath}/signalAlignLib.a ${signalAlignBin}/signalAlignLibTests ${signalAlignBin}/compareDistributions \
+htsLib = -L././htslib -lhts
+
+all : sL bD ${libPath}/signalAlignLib.a ${signalAlignBin}/signalAlignLibTests index_fasta \
+	  ${signalAlignBin}/compareDistributions \
 	  ${signalAlignBin}/signalMachine ${signalAlignBin}/runSignalAlign \
 	  ${signalAlignBin}/signalAlignLib.py ${signalAlignBin}/variantCallingLib.py ${signalAlignBin}/alignmentAnalysisLib.py \
 	  ${signalAlignBin}/buildHdpUtil ${signalAlignBin}/trainModels ${signalAlignBin}/hdp_pipeline ${signalAlignBin}/testSignalAlign \
-	  externals nanoporeParams python_setup \
+	  externals nanoporeParams python_setup  \
 	  #${signalAlignBin}/zayante ${signalAlignBin}/bonnyDoon \
 	  #${signalAlignBin}/empire ${signalAlignBin}/jamison \
 
+
+index_fasta : hs ${libPath}/signalAlignLib.a ${signalAlignDependencies}
+	${cxx} ${cflags} -I inc -I${libPath} -I${htsLibRootPath} -o ${signalAlignBin}/index_fasta index_fasta.c ${libPath}/signalAlignLib.a ${signalAlignLib} ${htsLib}
+
+# -I${htsLibPath}  -I${htsLibRootPath}
+#_curl_easy_init
 core : sL bD ${libPath}/signalAlignLib.a ${signalAlignBin}/signalAlignLibTests ${signalAlignBin}/signalMachine
 
 install: all pip_install
@@ -56,10 +65,10 @@ ${signalAlignBin}/compareDistributions : compareDistributions.c ${libPath}/signa
 	${cxx} ${cflags} -I inc -I${libPath} -o ${signalAlignBin}/compareDistributions compareDistributions.c ${libPath}/signalAlignLib.a ${signalAlignLib}
 
 ${signalAlignBin}/signalAlignLibTests : ${libTests} tests/*.h ${libPath}/signalAlignLib.a ${signalAlignDependencies}
-	${cxx} ${cflags} -I inc -I${libPath} -Wno-error -o ${signalAlignBin}/signalAlignLibTests ${libTests} ${libPath}/signalAlignLib.a ${signalAlignLib}
+	${cxx} ${cflags} -I inc -I${libPath} -Wno-error -o ${signalAlignBin}/signalAlignLibTests ${libTests} ${libPath}/signalAlignLib.a ${signalAlignLib} ${htsLib}
 
 ${signalAlignBin}/signalMachine : signalMachine.c ${libPath}/signalAlignLib.a ${signalAlignDependencies}
-	${cxx} ${cflags} -I inc -I${libPath} -o ${signalAlignBin}/signalMachine signalMachine.c ${libPath}/signalAlignLib.a ${signalAlignLib}
+	${cxx} ${cflags} -I inc -I${libPath} -o ${signalAlignBin}/signalMachine signalMachine.c ${libPath}/signalAlignLib.a ${signalAlignLib}  ${htsLib}
 
 nanoporeParams : estimateNanoporeParams.c ${libPath}/signalAlignLib.a ${signalAlignDependencies}
 	${cxx} ${cflags} -I inc -I${libPath} -o ${signalAlignBin}/estimateNanoporeParams estimateNanoporeParams.c ${libPath}/signalAlignLib.a ${signalAlignLib}
@@ -110,10 +119,15 @@ ${signalAlignBin}/variantCallingLib.py : ${rootPath}src/signalalign/scripts/vari
 ${signalAlignBin}/alignmentAnalysisLib.py : ${rootPath}src/signalalign/scripts/alignmentAnalysisLib.py
 	cp ${rootPath}src/signalalign/scripts/alignmentAnalysisLib.py ${signalAlignBin}/alignmentAnalysisLib.py
 
-${libPath}/signalAlignLib.a : ${libSources} ${libHeaders} ${stBarDependencies}
-	${cxx} ${cflags} -I inc -I ${libPath}/ -c ${libSources}
+${libPath}/signalAlignLib.a : ${libSources} ${libHeaders} ${stBarDependencies} hs
+	${cxx} ${cflags} -I inc -I ${libPath}/ -I${htsLibRootPath} -I${htsLibPath}  ${htsLib} -c ${libSources}
+#	-I${htsLibRootPath}/libhts.a
 	ar rc signalAlignLib.a *.o
 	ranlib signalAlignLib.a
 	rm *.o
 	mv signalAlignLib.a ${libPath}/
 	cp ${libHeaders} ${libPath}/
+
+
+hs :
+	cd htslib && make

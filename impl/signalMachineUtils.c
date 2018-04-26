@@ -37,7 +37,7 @@ static inline void referenceSequence_loadReference(ReferenceSequence *self,
     self->complementOfReference = stFile_getLineFromFile(fopen(backwardReferencePath, "r"));
 }
 
-static inline struct PairwiseAlignment *referenceSequence_copyPairwiseAlignment(struct PairwiseAlignment *pA) {
+struct PairwiseAlignment *referenceSequence_copyPairwiseAlignment(struct PairwiseAlignment *pA) {
     struct PairwiseAlignment *A = constructPairwiseAlignment(pA->contig1, pA->start1, pA->end1, pA->strand1,
                                                               pA->contig2, pA->start2, pA->end2, pA->strand2,
                                                               pA->score, NULL);

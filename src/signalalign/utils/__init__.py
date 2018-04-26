@@ -114,33 +114,43 @@ def processReferenceFasta(fasta, work_folder, motif_key=None, sub_char=None, pos
         positions = CustomAmbiguityPositions(positions_file)
     else:
         positions = None
-
     ref_sequence_map = {}
-    for header, comment, sequence in read_fasta(fasta):
-        # the motif label allows us to make multiple copies of the reference with unique file names
-        motif_lab = "" if motif_key is None else "%s." % motif_key
-        # these are the paths to the flat files that have the references
-        fw_path = work_folder.add_file_path("%s%s.%s.forward.txt" % (motif_lab, header, sub_char))
-        bw_path = work_folder.add_file_path("%s%s.%s.backward.txt" % (motif_lab, header, sub_char))
-        # signalAlign likes uppercase
-        if motif_key is not None:
-            motif, ok = getMotif(motif_key, sequence)
-            if not ok:
-                raise RuntimeError("[processReferenceFasta]Illegal motif key %s" % motif_key)
-            fw_sequence = motif.forwardSubstitutedSequence(sub_char)
-            bw_sequence = motif.complementSubstitutedSequence(sub_char)
-        elif positions is not None:
-            fw_sequence = positions.getForwardSequence(contig=header, raw_sequence=sequence.upper())
-            bw_sequence = positions.getBackwardSequence(contig=header, raw_sequence=sequence.upper())
-        else:
-            fw_sequence = sequence.upper()
-            bw_sequence = reverse_complement(fw_sequence, reverse=False, complement=True)
+    fw_fasta_path = work_folder.add_file_path("forward.{}".format(os.path.basename(fasta)))
+    if motif_key is not None or sub_char is not None or positions_file is not None:
+        bw_fasta_path = None
+    else:
+        bw_fasta_path = work_folder.add_file_path("backward.{}".format(os.path.basename(fasta)))
 
-        with open(fw_path, 'w') as fH:
-            fH.write("%s\n" % fw_sequence)
-        with open(bw_path, 'w') as fH:
-            fH.write("%s\n" % bw_sequence)
+    with open(bw_fasta_path, 'w') as bw_outfasta, open(fw_fasta_path, 'w') as fw_outfasta:
+        for header, comment, sequence in read_fasta(fasta):
+            # the motif label allows us to make multiple copies of the reference with unique file names
+            motif_lab = "" if motif_key is None else "%s." % motif_key
+            # these are the paths to the flat files that have the references
+            fw_path = work_folder.add_file_path("%s%s.%s.forward.txt" % (motif_lab, header, sub_char))
+            bw_path = work_folder.add_file_path("%s%s.%s.backward.txt" % (motif_lab, header, sub_char))
+            # signalAlign likes uppercase
+            if motif_key is not None:
+                motif, ok = getMotif(motif_key, sequence)
+                if not ok:
+                    raise RuntimeError("[processReferenceFasta]Illegal motif key %s" % motif_key)
+                fw_sequence = motif.forwardSubstitutedSequence(sub_char)
+                bw_sequence = motif.complementSubstitutedSequence(sub_char)
+            elif positions is not None:
+                fw_sequence = positions.getForwardSequence(contig=header, raw_sequence=sequence.upper())
+                bw_sequence = positions.getBackwardSequence(contig=header, raw_sequence=sequence.upper())
+            else:
+                fw_sequence = sequence.upper()
+                bw_sequence = reverse_complement(fw_sequence, reverse=False, complement=True)
 
-        ref_sequence_map[header] = {"forward": fw_path, "backward": bw_path}
+            with open(fw_path, 'w') as fH:
+                fH.write("%s\n" % fw_sequence)
 
-    return ref_sequence_map
+            with open(bw_path, 'w') as fH:
+                fH.write("%s\n" % bw_sequence)
+            # # #
+            print(">%s %s\n%s" % (header, "backward", bw_sequence), file=bw_outfasta)
+            print(">%s %s\n%s" % (header, "forward", fw_sequence), file=fw_outfasta)
+
+            ref_sequence_map[header] = {"forward": fw_path, "backward": bw_path}
+    # return fw_fasta_path, bw_fasta_path
+    return ref_sequence_map, fw_fasta_path, bw_fasta_path

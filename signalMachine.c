@@ -2,6 +2,7 @@
 #include <string.h>
 #include "signalMachineUtils.h"
 #include "pairwiseAligner.h"
+#include "fasta_handler.h"
 
 #define ESTIMATE_PARAMS 1
 #define ASSIGNMENT_THRESHOLD 0.1
@@ -453,6 +454,11 @@ int main(int argc, char *argv[]) {
     char *complementExpectationsFile = NULL;
     char *templateHdp = NULL;
     char *complementHdp = NULL;
+    char *forward_reference_path = NULL;
+    char *backward_reference_path = NULL;
+
+    const char *sequence_name = NULL;
+
 
     int key;
     while (1) {
@@ -477,11 +483,14 @@ int main(int argc, char *argv[]) {
                 {"diagonalExpansion",       required_argument,  0,  'x'},
                 {"threshold",               required_argument,  0,  'D'},
                 {"constraintTrim",          required_argument,  0,  'm'},
+                {"forward_reference_path",  required_argument,  0,  'r'},
+                {"backward_reference_path", optional_argument,  0,  'a'},
+                {"sequence_name",           required_argument,  0,  'n'},
                 {0, 0, 0, 0} };
 
         int option_index = 0;
 
-        key = getopt_long(argc, argv, "h:d:e:s:o:a:T:C:L:q:f:b:p:u:v:w:t:c:x:D:m:",
+        key = getopt_long(argc, argv, "h:d:e:s:o:a:T:C:L:q:f:b:p:u:v:w:t:c:x:D:m:r:n:a:",
                           long_options, &option_index);
 
         if (key == -1) {
@@ -559,6 +568,15 @@ int main(int argc, char *argv[]) {
                 assert (constraintTrim >= 0);
                 constraintTrim = (int64_t)constraintTrim;
                 break;
+            case 'r':
+                forward_reference_path = stString_copy(optarg);
+                break;
+            case 'a':
+                backward_reference_path = stString_copy(optarg);
+                break;
+            case 'n':
+                sequence_name = stString_copy(optarg);
+                break;
             default:
                 usage();
                 return 1;
@@ -624,13 +642,16 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    ReferenceSequence *R;
     if ((forwardReference == NULL) || (backwardReference == NULL)) {
         st_errAbort("[signalAlign] - ERROR: did not get reference files %s %s\n",
                     forwardReference, backwardReference);
     }
-    R = signalUtils_ReferenceSequenceConstructFull(forwardReference, backwardReference, pA);
+    ReferenceSequence *R;
+//    ReferenceSequence *R1;
 
+//    R1 = signalUtils_ReferenceSequenceConstructFull(forwardReference, backwardReference, pA);
+//    ReferenceSequence *R1;
+    R = fastaHandler_ReferenceSequenceConstructFull(forward_reference_path, backward_reference_path, pA, sequence_name);
     // Nanopore Read //
     // load nanopore read
     NanoporeRead *npRead = nanopore_loadNanoporeReadFromFile(npReadFile);

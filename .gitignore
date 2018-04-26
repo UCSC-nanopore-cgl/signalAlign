@@ -126,3 +126,6 @@ src/signalalign/utils/parsers.py.bak
 src/signalalign/utils/parsers.pyc
 src/signalalign/utils/sequenceTools.py.bak
 src/signalalign/utils/sequenceTools.pyc
+/tests/test_sequences/zymo_sequence.fasta.fai
+/tests/test_sequences/fake_rna_reversed.fa.fai
+/tests/test_sequences/pUC19_SspI_Zymo.fa.fai

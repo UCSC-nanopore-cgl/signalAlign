@@ -18,6 +18,7 @@ class SignalAlignment(object):
     def __init__(self,
                  in_fast5,
                  reference_map,
+                 forward_reference,
                  destination,
                  stateMachineType,
                  bwa_index,
@@ -30,6 +31,7 @@ class SignalAlignment(object):
                  constraint_trim,
                  degenerate,
                  twoD_chemistry,
+                 backward_reference=None,
                  target_regions=None,
                  output_format="full",
                  embed=False,
@@ -49,10 +51,13 @@ class SignalAlignment(object):
         self.read_name = self.in_fast5.split("/")[-1][:-6]  # get the name without the '.fast5'
         self.target_regions = target_regions
         self.output_formats = {"full": 0, "variantCaller": 1, "assignments": 2}
-        self.embed = embed
-        self.event_table = event_table
+        self.embed = embed  # embed the output into the fast5 file
+        self.event_table = event_table  # specify which event table to use to generate alignments
+        self.backward_reference = backward_reference  # fasta path to backward reference if modified bases are used
+        self.forward_reference = forward_reference  # fasta path to forward reference
 
-        # if self.embed:
+
+    # if self.embed:
         #     assert self.output_format == "full", "Cannot embed file unless output format is set to full'"
 
         if (in_templateHmm is not None) and os.path.isfile(in_templateHmm):
@@ -122,7 +127,9 @@ class SignalAlignment(object):
         guide_alignment = generateGuideAlignment(bwa_index=self.bwa_index, query=read_fasta_,
                                                  temp_sam_path=temp_samfile_,
                                                  target_regions=self.target_regions)
-        ok = guide_alignment.validate(list(self.reference_map.keys()))
+        # ok = guide_alignment.validate(list(self.reference_map.keys()))
+        ok = guide_alignment.validate()
+
         if not ok:
             self.failStop("[SignalAlignment.run]ERROR getting guide alignment", npRead)
             return False
@@ -179,15 +186,23 @@ class SignalAlignment(object):
         print("[SignalALignment.run]NOTICE: template model {t} complement model {c}"
               "".format(t=self.in_templateHmm, c=self.in_complementHmm), file=sys.stderr)
 
-        # reference sequences
+        # # reference sequences
         assert self.reference_map[guide_alignment.reference_name]["forward"] is not None
         assert self.reference_map[guide_alignment.reference_name]["backward"] is not None
-        forward_reference = self.reference_map[guide_alignment.reference_name]["forward"]
-        backward_reference = self.reference_map[guide_alignment.reference_name]["backward"]
-        assert os.path.isfile(forward_reference)
-        assert os.path.isfile(backward_reference)
-        forward_ref_flag = "-f {f_ref} ".format(f_ref=forward_reference)
-        backward_ref_flag = "-b {b_ref} ".format(b_ref=backward_reference)
+        forward_ref = self.reference_map[guide_alignment.reference_name]["forward"]
+        backward_ref = self.reference_map[guide_alignment.reference_name]["backward"]
+        assert os.path.isfile(forward_ref)
+        assert os.path.isfile(backward_ref)
+        forward_ref_flag = "-f {f_ref} ".format(f_ref=forward_ref)
+        backward_ref_flag = "-b {b_ref} ".format(b_ref=backward_ref)
+        # #
+        # # sequence_name_flag = '-n {seq_name}'.format(seq_name=guide_alignment.reference_name)
+        # # forward_ref_flag_fa = "-r {f_ref_fa}".format(f_ref_fa=self.forward_reference)
+        # # backward_ref_flag_fa = "-a {b_ref_fa}".format(b_ref_fa=self.forward_reference)
+        # # # fasta reference sequences
+        #
+        # forward_ref_flag = "-f {f_ref} ".format(f_ref=self.forward_reference)
+        # backward_ref_flag = "-b {b_ref} ".format(b_ref=self.forward_reference)
 
         # input HDPs
         if (self.in_templateHdp is not None) or (self.in_complementHdp is not None):
@@ -217,7 +232,7 @@ class SignalAlignment(object):
 
         # output format
         if self.output_format not in list(self.output_formats.keys()):
-            self.failStop("[SignalAlignment.run]ERROR illegal outpur format selected %s" % self.output_format)
+            self.failStop("[SignalAlignment.run]ERROR illegal output format selected %s" % self.output_format)
             return False
         out_fmt = "-s {fmt} ".format(fmt=self.output_formats[self.output_format])
 
@@ -239,25 +254,28 @@ class SignalAlignment(object):
             command = \
                 "{vA} {td} {degen}{sparse}{model}{f_ref}{b_ref} -q {npRead} " \
                 "{t_model}{c_model}{thresh}{expansion}{trim} {hdp}-L {readLabel} -p {cigarFile} " \
-                "-t {templateExpectations} -c {complementExpectations}" \
+                "-t {templateExpectations} -c {complementExpectations} -n {seq_name} -r {f_ref_fa} -a {b_ref_fa}" \
                     .format(vA=path_to_signalAlign, model=stateMachineType_flag,
                             f_ref=forward_ref_flag, b_ref=backward_ref_flag, cigarFile=cigar_file_,
                             npRead=npRead_, readLabel=read_label, td=twoD_flag,
                             templateExpectations=template_expectations_file_path, hdp=hdp_flags,
                             complementExpectations=complement_expectations_file_path, t_model=template_model_flag,
                             c_model=complement_model_flag, thresh=threshold_flag, expansion=diag_expansion_flag,
-                            trim=trim_flag, degen=degenerate_flag, sparse=out_fmt)
+                            trim=trim_flag, degen=degenerate_flag, sparse=out_fmt, seq_name=guide_alignment.reference_name,
+                            f_ref_fa=self.forward_reference, b_ref_fa=self.backward_reference)
+
         else:
             command = \
                 "{vA} {td} {degen}{sparse}{model}{f_ref}{b_ref} -q {npRead} " \
                 "{t_model}{c_model}{thresh}{expansion}{trim} -p {cigarFile} " \
-                "-u {posteriors} {hdp}-L {readLabel}" \
+                "-u {posteriors} {hdp}-L {readLabel} -n {seq_name} -r {f_ref_fa} -a {b_ref_fa}" \
                     .format(vA=path_to_signalAlign, model=stateMachineType_flag, sparse=out_fmt,
                             f_ref=forward_ref_flag, b_ref=backward_ref_flag, cigarFile=cigar_file_,
                             readLabel=read_label, npRead=npRead_, td=twoD_flag,
                             t_model=template_model_flag, c_model=complement_model_flag,
                             posteriors=posteriors_file_path, thresh=threshold_flag, expansion=diag_expansion_flag,
-                            trim=trim_flag, hdp=hdp_flags, degen=degenerate_flag)
+                            trim=trim_flag, hdp=hdp_flags, degen=degenerate_flag, seq_name=guide_alignment.reference_name,
+                            f_ref_fa=self.forward_reference, b_ref_fa=self.backward_reference)
 
         # run
         print("signalAlign - running command: ", command, end="\n", file=sys.stderr)
