@@ -130,4 +130,4 @@ ${libPath}/signalAlignLib.a : ${libSources} ${libHeaders} ${stBarDependencies} h
 
 
 hs :
-	cd htslib && autoheader && autoconf && ./configure && make && make install
+	cd htslib && autoheader && autoconf && ./configure --prefix=../htslib && make -j 2 -e && make install
