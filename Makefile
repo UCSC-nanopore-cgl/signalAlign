@@ -10,7 +10,7 @@ signalAlignLib = ${basicLibs}
 
 htsLib = -L././htslib -lhts
 
-all : sL bD ${libPath}/signalAlignLib.a ${signalAlignBin}/signalAlignLibTests index_fasta \
+all : sL bD hs ${libPath}/signalAlignLib.a ${signalAlignBin}/signalAlignLibTests index_fasta \
 	  ${signalAlignBin}/compareDistributions \
 	  ${signalAlignBin}/signalMachine ${signalAlignBin}/runSignalAlign \
 	  ${signalAlignBin}/signalAlignLib.py ${signalAlignBin}/variantCallingLib.py ${signalAlignBin}/alignmentAnalysisLib.py \
