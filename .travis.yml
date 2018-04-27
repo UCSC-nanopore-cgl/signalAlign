@@ -16,12 +16,6 @@ notifications: # set notification options
     # change is when the repo status goes from pass to fail or vice versa
     # on_failure: always
 
-addons:
-  apt:
-    packages:
-    - liblzma-dev
-    - libbz2-dev
-
 #branches:
 #  except:
 #    - rojin
@@ -29,6 +23,8 @@ before_install:
 - sudo apt-get update -qq
 - sudo apt-get install libhdf5-serial-dev
 - sudo apt-get install zlib1g-dev
+- sudo apt-get install libbz2-dev
+- sudo apt-get install liblzma-dev
 - sudo apt-get install autotools-dev
 - sudo apt-get install autoconf
 - pip install google-compute-engine
