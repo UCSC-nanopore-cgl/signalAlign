@@ -159,17 +159,11 @@ def main(args):
     temp_folder = FolderHandler()
     temp_dir_path = temp_folder.open_folder(args.out + "/tempFiles_alignment")
     #
-    # if args.motif_key is not None or args.ambig_char is not None or args.ambiguity_positions is not None:
-    reference_map, forward_reference, backward_reference = processReferenceFasta(fasta=args.ref,
+    forward_reference, backward_reference = processReferenceFasta(fasta=args.ref,
                                                                       motif_key=args.motif_key,
                                                                       work_folder=temp_folder,
                                                                       sub_char=args.ambig_char,
                                                                       positions_file=args.ambiguity_positions)
-    # else:
-    #     forward_reference = args.ref
-    #     backward_reference = None
-    # reference_map = time_it(processReferenceFasta, args.ref, temp_folder, args.motif_key, args.ambig_char,
-    #                                       args.ambiguity_positions)
 
     # index the reference for bwa
     if args.bwt is not None:
@@ -204,7 +198,6 @@ def main(args):
     for fast5 in fast5s:
         print(fast5)
         alignment_args = {
-            "reference_map": reference_map,
             "destination": temp_dir_path,
             "stateMachineType": args.stateMachineType,
             "bwa_index": bwa_ref_index,

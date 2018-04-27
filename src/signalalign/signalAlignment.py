@@ -17,8 +17,6 @@ from nanotensor.mea_algorithm import mea_alignment_from_signal_align, match_even
 class SignalAlignment(object):
     def __init__(self,
                  in_fast5,
-                 reference_map,
-                 forward_reference,
                  destination,
                  stateMachineType,
                  bwa_index,
@@ -31,13 +29,13 @@ class SignalAlignment(object):
                  constraint_trim,
                  degenerate,
                  twoD_chemistry,
+                 forward_reference,
                  backward_reference=None,
                  target_regions=None,
                  output_format="full",
                  embed=False,
                  event_table=False):
         self.in_fast5 = in_fast5  # fast5 file to align
-        self.reference_map = reference_map  # map with paths to reference sequences
         self.destination = destination  # place where the alignments go, should already exist
         self.stateMachineType = stateMachineType  # flag for signalMachine
         self.bwa_index = bwa_index  # index of reference sequence
@@ -56,9 +54,6 @@ class SignalAlignment(object):
         self.backward_reference = backward_reference  # fasta path to backward reference if modified bases are used
         self.forward_reference = forward_reference  # fasta path to forward reference
 
-
-    # if self.embed:
-        #     assert self.output_format == "full", "Cannot embed file unless output format is set to full'"
 
         if (in_templateHmm is not None) and os.path.isfile(in_templateHmm):
             self.in_templateHmm = in_templateHmm
@@ -186,23 +181,14 @@ class SignalAlignment(object):
         print("[SignalALignment.run]NOTICE: template model {t} complement model {c}"
               "".format(t=self.in_templateHmm, c=self.in_complementHmm), file=sys.stderr)
 
-        # # reference sequences
-        assert self.reference_map[guide_alignment.reference_name]["forward"] is not None
-        assert self.reference_map[guide_alignment.reference_name]["backward"] is not None
-        forward_ref = self.reference_map[guide_alignment.reference_name]["forward"]
-        backward_ref = self.reference_map[guide_alignment.reference_name]["backward"]
-        assert os.path.isfile(forward_ref)
-        assert os.path.isfile(backward_ref)
-        forward_ref_flag = "-f {f_ref} ".format(f_ref=forward_ref)
-        backward_ref_flag = "-b {b_ref} ".format(b_ref=backward_ref)
-        # #
-        # # sequence_name_flag = '-n {seq_name}'.format(seq_name=guide_alignment.reference_name)
-        # # forward_ref_flag_fa = "-r {f_ref_fa}".format(f_ref_fa=self.forward_reference)
-        # # backward_ref_flag_fa = "-a {b_ref_fa}".format(b_ref_fa=self.forward_reference)
-        # # # fasta reference sequences
-        #
-        # forward_ref_flag = "-f {f_ref} ".format(f_ref=self.forward_reference)
-        # backward_ref_flag = "-b {b_ref} ".format(b_ref=self.forward_reference)
+        # reference sequences
+        assert os.path.isfile(self.forward_reference)
+        forward_ref_flag = "-f {f_ref} ".format(f_ref=self.forward_reference)
+        if self.backward_reference:
+            assert os.path.isfile(self.backward_reference)
+            backward_ref_flag = "-b {b_ref} ".format(b_ref=self.backward_reference)
+        else:
+            backward_ref_flag = ""
 
         # input HDPs
         if (self.in_templateHdp is not None) or (self.in_complementHdp is not None):
@@ -252,30 +238,30 @@ class SignalAlignment(object):
             complement_expectations_file_path = self.destination + read_label + ".complement.expectations"
 
             command = \
-                "{vA} {td} {degen}{sparse}{model}{f_ref}{b_ref} -q {npRead} " \
+                "{vA} {td} {degen}{sparse}{model} -q {npRead} " \
                 "{t_model}{c_model}{thresh}{expansion}{trim} {hdp}-L {readLabel} -p {cigarFile} " \
-                "-t {templateExpectations} -c {complementExpectations} -n {seq_name} -r {f_ref_fa} -a {b_ref_fa}" \
+                "-t {templateExpectations} -c {complementExpectations} -n {seq_name} {f_ref_fa} {b_ref_fa}" \
                     .format(vA=path_to_signalAlign, model=stateMachineType_flag,
-                            f_ref=forward_ref_flag, b_ref=backward_ref_flag, cigarFile=cigar_file_,
+                            cigarFile=cigar_file_,
                             npRead=npRead_, readLabel=read_label, td=twoD_flag,
                             templateExpectations=template_expectations_file_path, hdp=hdp_flags,
                             complementExpectations=complement_expectations_file_path, t_model=template_model_flag,
                             c_model=complement_model_flag, thresh=threshold_flag, expansion=diag_expansion_flag,
                             trim=trim_flag, degen=degenerate_flag, sparse=out_fmt, seq_name=guide_alignment.reference_name,
-                            f_ref_fa=self.forward_reference, b_ref_fa=self.backward_reference)
-
+                            f_ref_fa=forward_ref_flag, b_ref_fa=backward_ref_flag)
         else:
             command = \
-                "{vA} {td} {degen}{sparse}{model}{f_ref}{b_ref} -q {npRead} " \
+                "{vA} {td} {degen}{sparse}{model} -q {npRead} " \
                 "{t_model}{c_model}{thresh}{expansion}{trim} -p {cigarFile} " \
-                "-u {posteriors} {hdp}-L {readLabel} -n {seq_name} -r {f_ref_fa} -a {b_ref_fa}" \
+                "-u {posteriors} {hdp}-L {readLabel} -n {seq_name} {f_ref_fa} {b_ref_fa}" \
                     .format(vA=path_to_signalAlign, model=stateMachineType_flag, sparse=out_fmt,
-                            f_ref=forward_ref_flag, b_ref=backward_ref_flag, cigarFile=cigar_file_,
+                            cigarFile=cigar_file_,
                             readLabel=read_label, npRead=npRead_, td=twoD_flag,
                             t_model=template_model_flag, c_model=complement_model_flag,
                             posteriors=posteriors_file_path, thresh=threshold_flag, expansion=diag_expansion_flag,
                             trim=trim_flag, hdp=hdp_flags, degen=degenerate_flag, seq_name=guide_alignment.reference_name,
-                            f_ref_fa=self.forward_reference, b_ref_fa=self.backward_reference)
+                            f_ref_fa=forward_ref_flag, b_ref_fa=backward_ref_flag)
+
 
         # run
         print("signalAlign - running command: ", command, end="\n", file=sys.stderr)

@@ -446,8 +446,6 @@ int main(int argc, char *argv[]) {
     char *complementModelFile = NULL;
     char *readLabel = NULL;
     char *npReadFile = NULL;
-    char *forwardReference = NULL;
-    char *backwardReference = NULL;
     char *exonerateCigarFile= NULL;
     char *posteriorProbsFile = NULL;
     char *templateExpectationsFile = NULL;
@@ -472,8 +470,6 @@ int main(int argc, char *argv[]) {
                 {"complementModel",         required_argument,  0,  'C'},
                 {"readLabel",               required_argument,  0,  'L'},
                 {"npRead",                  required_argument,  0,  'q'},
-                {"forward_reference",       required_argument,  0,  'f'},
-                {"backward_reference",      required_argument,  0,  'b'},
                 {"exonerate_cigar_file",    required_argument,  0,  'p'},
                 {"posteriors",              required_argument,  0,  'u'},
                 {"templateHdp",             required_argument,  0,  'v'},
@@ -483,14 +479,14 @@ int main(int argc, char *argv[]) {
                 {"diagonalExpansion",       required_argument,  0,  'x'},
                 {"threshold",               required_argument,  0,  'D'},
                 {"constraintTrim",          required_argument,  0,  'm'},
-                {"forward_reference_path",  required_argument,  0,  'r'},
-                {"backward_reference_path", optional_argument,  0,  'a'},
+                {"forward_reference_path",  required_argument,  0,  'f'},
+                {"backward_reference_path", optional_argument,  0,  'b'},
                 {"sequence_name",           required_argument,  0,  'n'},
                 {0, 0, 0, 0} };
 
         int option_index = 0;
 
-        key = getopt_long(argc, argv, "h:d:e:s:o:a:T:C:L:q:f:b:p:u:v:w:t:c:x:D:m:r:n:a:",
+        key = getopt_long(argc, argv, "h:d:e:s:o:a:T:C:L:q:f:b:p:u:v:w:t:c:x:D:m:n:",
                           long_options, &option_index);
 
         if (key == -1) {
@@ -527,12 +523,6 @@ int main(int argc, char *argv[]) {
             case 'q':
                 npReadFile = stString_copy(optarg);
                 break;
-            case 'f':
-                forwardReference = stString_copy(optarg);
-                break;
-            case 'b':
-                backwardReference= stString_copy(optarg);
-                break;
             case 'p':
                 exonerateCigarFile = stString_copy(optarg);
                 break;
@@ -568,10 +558,10 @@ int main(int argc, char *argv[]) {
                 assert (constraintTrim >= 0);
                 constraintTrim = (int64_t)constraintTrim;
                 break;
-            case 'r':
+            case 'f':
                 forward_reference_path = stString_copy(optarg);
                 break;
-            case 'a':
+            case 'b':
                 backward_reference_path = stString_copy(optarg);
                 break;
             case 'n':
@@ -642,10 +632,10 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    if ((forwardReference == NULL) || (backwardReference == NULL)) {
-        st_errAbort("[signalAlign] - ERROR: did not get reference files %s %s\n",
-                    forwardReference, backwardReference);
-    }
+//    if ((forwardReference == NULL) || (backwardReference == NULL)) {
+//        st_errAbort("[signalAlign] - ERROR: did not get reference files %s %s\n",
+//                    forwardReference, backwardReference);
+//    }
     ReferenceSequence *R;
 //    ReferenceSequence *R1;
 

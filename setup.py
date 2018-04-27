@@ -3,7 +3,7 @@
 from setuptools import setup, find_packages
 
 setup(name="signalAlign",
-      version="0.1.5",
+      version="0.1.6",
       description="A library for signal-level analysis of ONT data",
       author="Art Rand",
       author_email="arand@soe.ucsc.edu",
