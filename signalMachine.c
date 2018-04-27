@@ -677,7 +677,6 @@ int main(int argc, char *argv[]) {
 
 //    printPairwiseAlignmentSummary(pA);
 
-    // TODO this is where we loose anchor pairs
     stList *anchorPairs = signalUtils_guideAlignmentToRebasedAnchorPairs(pA, p);  // pA gets modified here, no turning back
 //    printPairwiseAlignmentSummary(pA);
 

@@ -1,0 +1,82 @@
+language: python
+python:
+  - 3.5
+notifications: # set notification options
+  slack:
+    rooms:
+      - ucsc-cgl:Edwfgt7MJEVZV9Lib3igueTF
+    on_success: change
+    on_failure: always
+  email: false
+
+  # email:
+  #   recipients:
+  #     - andbaile@ucsc.edu
+  #	-rsafavi@ucsc.edu
+    # change is when the repo status goes from pass to fail or vice versa
+    # on_failure: always
+
+#branches:
+#  except:
+#    - rojin
+before_install:
+- sudo apt-get update -qq
+- sudo apt-get install libhdf5-serial-dev
+- sudo apt-get install zlib1g-dev
+- pip install google-compute-engine
+#- pip install tensorflow
+- git clone https://github.com/lh3/bwa.git
+- cd bwa
+- make
+- export PATH=$PATH:$PWD
+- cd ..
+
+# sudo apt-get install libbz2-dev
+
+install:
+- sudo apt-get update
+# We do this conditionally because it saves us some downloading if the
+# version is the same.
+- if [[ "$TRAVIS_PYTHON_VERSION" == "2.7" ]]; then
+    wget https://repo.continuum.io/miniconda/Miniconda2-latest-Linux-x86_64.sh -O miniconda.sh;
+  else
+    wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh;
+  fi
+- bash miniconda.sh -b -p $HOME/miniconda
+- export PATH="$HOME/miniconda/bin:$PATH"
+- hash -r
+- conda config --set always_yes yes --set changeps1 no
+- conda update -q conda
+# Useful for debugging any issues with conda
+- conda info -a
+- git submodule update --remote
+#- conda env create -f requirements35.yml
+#- source activate nanotensor3.5
+#- pip install google-compute-engine
+- make
+#- cd nanonet
+#- python setup.py install
+#- cd ../signalAlign
+#- make
+#- python setup.py install
+#- pip install marginAlign
+#- cd marginAlign
+#- make test
+- export PATH=$PATH:$PWD/signalAlign/bin
+- export BOTO_CONFIG=/dev/null
+- make test
+#- pip install -U numpy
+#- pip install -U h5py
+#- cd nanotensor
+
+#script:
+#- coverage run --source nanotensor -m pytest
+# - coverage run --source nanotensor -a nanotensor/tests/data_preparation_test.py
+# - bash <(curl -s https://codecov.io/bash) -cF python
+# after_script: # here's a build step block
+# - echo "We can put normal shell commands here"
+# - echo "more shell commands here"
+
+#after_success:
+#  - codecov -t 3806b863-7185-4be7-9787-a0c1d7963703
+
