@@ -11,6 +11,7 @@
 #include "htslib/faidx.h"
 #include "pairwiseAlignment.h"
 #include "signalMachineUtils.h"
+#include "sonLib.h"
 
 
 void build_fai_index_file();

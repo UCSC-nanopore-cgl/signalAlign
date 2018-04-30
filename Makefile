@@ -120,8 +120,7 @@ ${signalAlignBin}/alignmentAnalysisLib.py : ${rootPath}src/signalalign/scripts/a
 	cp ${rootPath}src/signalalign/scripts/alignmentAnalysisLib.py ${signalAlignBin}/alignmentAnalysisLib.py
 
 ${libPath}/signalAlignLib.a : ${libSources} ${libHeaders} ${stBarDependencies}
-	${cxx} ${cflags} -I inc -I ${libPath}/ -I${htsLibRootPath} -I${htsLibPath}  ${htsLib} -c ${libSources} ${libPath}/signalAlignLib.a
-#	-I${htsLibRootPath}/libhts.a
+	${cxx} ${cflags} -I inc -I ${libPath}/ -I${htsLibRootPath} -I${htsLibPath}  ${htsLib} -c ${libSources}
 	ar rc signalAlignLib.a *.o
 	ranlib signalAlignLib.a
 	rm *.o

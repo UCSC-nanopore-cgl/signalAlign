@@ -6,7 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "htslib/faidx.h"
-#include "sonLibString.h"
+#include "sonLib.h"
 #include "signalMachineUtils.h"
 #include "htslib/hfile.h"
 
