@@ -99,6 +99,9 @@ void build_fai_index_file() {
 //        fprintf(stdout, "Indexed Fasta\n");
 //    }
 
+    char *test1 = "asdf";
+    char *test2 = stString_copy(test1);
+
 
     char *index_path = stString_concat(fast_path, ".fai");
     fprintf(stdout, "sequence name %s \n", index_path);
