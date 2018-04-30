@@ -65,7 +65,7 @@ ${signalAlignBin}/compareDistributions : compareDistributions.c ${libPath}/signa
 	${cxx} ${cflags} -I inc -I${libPath} -o ${signalAlignBin}/compareDistributions compareDistributions.c ${libPath}/signalAlignLib.a ${signalAlignLib}
 
 ${signalAlignBin}/signalAlignLibTests : ${libTests} tests/*.h ${libPath}/signalAlignLib.a ${signalAlignDependencies}
-	${cxx} ${cflags} -I inc -I${libPath} -Wno-error -o ${signalAlignBin}/signalAlignLibTests ${libTests} ${libPath}/signalAlignLib.a ${signalAlignLib} ${htsLib}
+	${cxx} ${cflags} -I inc -I${libPath} -Wno-error -o ${signalAlignBin}/signalAlignLibTests ${libTests} ${libPath}/signalAlignLib.a ${signalAlignLib} -I${htsLibRootPath} -I${htsLibPath} ${htsLib}
 
 ${signalAlignBin}/signalMachine : signalMachine.c ${libPath}/signalAlignLib.a ${signalAlignDependencies}
 	${cxx} ${cflags} -I inc -I${libPath} -o ${signalAlignBin}/signalMachine signalMachine.c ${libPath}/signalAlignLib.a ${signalAlignLib}  ${htsLib}
@@ -119,7 +119,7 @@ ${signalAlignBin}/variantCallingLib.py : ${rootPath}src/signalalign/scripts/vari
 ${signalAlignBin}/alignmentAnalysisLib.py : ${rootPath}src/signalalign/scripts/alignmentAnalysisLib.py
 	cp ${rootPath}src/signalalign/scripts/alignmentAnalysisLib.py ${signalAlignBin}/alignmentAnalysisLib.py
 
-${libPath}/signalAlignLib.a : ${libSources} ${libHeaders} ${stBarDependencies} hs
+${libPath}/signalAlignLib.a : ${libSources} ${libHeaders} ${stBarDependencies}
 	${cxx} ${cflags} -I inc -I ${libPath}/ -I${htsLibRootPath} -I${htsLibPath}  ${htsLib} -c ${libSources}
 #	-I${htsLibRootPath}/libhts.a
 	ar rc signalAlignLib.a *.o
