@@ -120,7 +120,7 @@ ${signalAlignBin}/alignmentAnalysisLib.py : ${rootPath}src/signalalign/scripts/a
 	cp ${rootPath}src/signalalign/scripts/alignmentAnalysisLib.py ${signalAlignBin}/alignmentAnalysisLib.py
 
 ${libPath}/signalAlignLib.a : ${libSources} ${libHeaders} ${stBarDependencies}
-	${cxx} ${cflags} -I inc -I ${libPath}/ -I${htsLibRootPath} -I${htsLibPath}  ${htsLib} -c ${libSources}
+	${cxx} ${cflags} -I inc -I ${libPath}/ -I ${htsLibRootPath} -I ${htsLibPath}  ${htsLib} -c ${libSources}
 	ar rc signalAlignLib.a *.o
 	ranlib signalAlignLib.a
 	rm *.o
@@ -129,4 +129,4 @@ ${libPath}/signalAlignLib.a : ${libSources} ${libHeaders} ${stBarDependencies}
 
 
 hs :
-	cd htslib && autoheader && autoconf && ./configure --prefix=${HOME} && make -j 2 -e && make install
+	cd htslib && make
