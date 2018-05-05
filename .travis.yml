@@ -63,14 +63,15 @@ install:
 #- python setup.py install
 #- pip install marginAlign
 #- cd marginAlign
-- export PATH=$PATH:$PWD/bin
-- make test
 #- export BOTO_CONFIG=/dev/null
 #- pip install -U numpy
 #- pip install -U h5py
 #- cd nanotensor
 
-#script:
+script:
+- export PATH=$PATH:$PWD/bin
+- make test
+
 #- cd bin
 #- coverage run -m pytest
 # - coverage run --source nanotensor -a nanotensor/tests/data_preparation_test.py
