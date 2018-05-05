@@ -1,4 +1,3 @@
-language: c
 python:
   - 3.5
 notifications: # set notification options
@@ -64,16 +63,16 @@ install:
 #- python setup.py install
 #- pip install marginAlign
 #- cd marginAlign
-#- make test
-- export PATH=$PATH:$PWD/signalAlign/bin
-- export BOTO_CONFIG=/dev/null
+- export PATH=$PATH:$PWD/bin
 - make test
+#- export BOTO_CONFIG=/dev/null
 #- pip install -U numpy
 #- pip install -U h5py
 #- cd nanotensor
 
 #script:
-#- coverage run --source nanotensor -m pytest
+#- cd bin
+#- coverage run -m pytest
 # - coverage run --source nanotensor -a nanotensor/tests/data_preparation_test.py
 # - bash <(curl -s https://codecov.io/bash) -cF python
 # after_script: # here's a build step block

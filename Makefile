@@ -14,7 +14,7 @@ all : sL bD hs ${libPath}/signalAlignLib.a ${signalAlignBin}/signalAlignLibTests
 	  ${signalAlignBin}/compareDistributions \
 	  ${signalAlignBin}/signalMachine ${signalAlignBin}/runSignalAlign \
 	  ${signalAlignBin}/signalAlignLib.py ${signalAlignBin}/variantCallingLib.py ${signalAlignBin}/alignmentAnalysisLib.py \
-	  ${signalAlignBin}/buildHdpUtil ${signalAlignBin}/trainModels ${signalAlignBin}/hdp_pipeline ${signalAlignBin}/testSignalAlign \
+	  ${signalAlignBin}/buildHdpUtil ${signalAlignBin}/trainModels ${signalAlignBin}/hdp_pipeline ${signalAlignBin}/test_SignalAlign.py \
 	  externals nanoporeParams python_setup  \
 	  #${signalAlignBin}/zayante ${signalAlignBin}/bonnyDoon \
 	  #${signalAlignBin}/empire ${signalAlignBin}/jamison \
@@ -58,7 +58,7 @@ externals :
 
 test :
 	#cd ${signalAlignBin} && ./signalAlignLibTests
-	cd ${signalAlignBin} && ./testSignalAlign
+	cd ${signalAlignBin} && ./test_SignalAlign.py
 	#cd ${binPath} && ./sonLibTests
 
 ${signalAlignBin}/compareDistributions : compareDistributions.c ${libPath}/signalAlignLib.a ${signalAlignDependencies}
@@ -90,9 +90,9 @@ ${signalAlignBin}/hdp_pipeline : ${rootPath}src/signalalign/scripts/hdp_pipeline
 	cp ${rootPath}src/signalalign/scripts/hdp_pipeline.py ${signalAlignBin}/hdp_pipeline
 	chmod +x ${signalAlignBin}/hdp_pipeline
 
-${signalAlignBin}/testSignalAlign : ${rootPath}src/signalalign/scripts/testSignalAlign.py
-	cp ${rootPath}src/signalalign/scripts/testSignalAlign.py ${signalAlignBin}/testSignalAlign
-	chmod +x ${signalAlignBin}/testSignalAlign
+${signalAlignBin}/test_SignalAlign.py : ${rootPath}src/signalalign/scripts/test_SignalAlign.py
+	cp ${rootPath}src/signalalign/scripts/test_SignalAlign.py ${signalAlignBin}/test_SignalAlign.py
+	chmod +x ${signalAlignBin}/test_SignalAlign.py
 
 ${signalAlignBin}/zayante : ${rootPath}src/signalalign/scripts/zayante.py
 	cp ${rootPath}src/signalalign/scripts/zayante.py ${signalAlignBin}/zayante
