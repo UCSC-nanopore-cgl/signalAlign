@@ -71,6 +71,7 @@ install:
 script:
 - export PATH=$PATH:$PWD/bin
 - make test
+#- gcov-4.9 bin/signalMachine.c
 
 #- cd bin
 #- coverage run -m pytest
@@ -81,5 +82,7 @@ script:
 # - echo "more shell commands here"
 
 #after_success:
-#  - codecov -t 3806b863-7185-4be7-9787-a0c1d7963703
+#  - bash <(curl -s https://codecov.io/bash)
+#
+#  - codecov -t abf16a83-0e8f-4834-b033-3d8c7b4b7e63
 
