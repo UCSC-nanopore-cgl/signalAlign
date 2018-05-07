@@ -12,7 +12,7 @@ signalAlignLib = ${basicLibs}
 
 htsLib = -L././htslib -lhts
 
-all : sL bD hs ${libPath}/signalAlignLib.a ${signalAlignBin}/signalAlignLibTests index_fasta \
+all : sL bD hs python_utils ${libPath}/signalAlignLib.a ${signalAlignBin}/signalAlignLibTests index_fasta \
 	  ${signalAlignBin}/compareDistributions \
 	  ${signalAlignBin}/signalMachine ${signalAlignBin}/runSignalAlign \
 	  ${signalAlignBin}/signalAlignLib.py ${signalAlignBin}/variantCallingLib.py ${signalAlignBin}/alignmentAnalysisLib.py \
@@ -20,6 +20,10 @@ all : sL bD hs ${libPath}/signalAlignLib.a ${signalAlignBin}/signalAlignLibTests
 	  externals nanoporeParams python_setup  \
 	  #${signalAlignBin}/zayante ${signalAlignBin}/bonnyDoon \
 	  #${signalAlignBin}/empire ${signalAlignBin}/jamison \
+
+python_utils:
+#	echo "NOT PYPORE MAN"
+	cd python_utils && python setup.py install
 
 
 index_fasta : hs ${libPath}/signalAlignLib.a ${signalAlignDependencies}

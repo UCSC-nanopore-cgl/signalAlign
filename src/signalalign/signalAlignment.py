@@ -11,7 +11,7 @@ from signalalign.nanoporeRead import NanoporeRead
 from signalalign.utils.bwaWrapper import generateGuideAlignment
 from signalalign.utils.fileHandlers import FolderHandler
 from signalalign.utils.sequenceTools import fastaWrite
-from nanotensor.mea_algorithm import mea_alignment_from_signal_align, match_events_with_signalalign
+from signalalign.mea_algorithm import mea_alignment_from_signal_align, match_events_with_signalalign
 
 
 class SignalAlignment(object):

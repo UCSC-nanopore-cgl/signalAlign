@@ -7,3 +7,6 @@
 [submodule "sonLib"]
 	path = sonLib
 	url = https://github.com/UCSC-nanopore-cgl/sonLib.git
+[submodule "python_utils"]
+	path = python_utils
+	url = https://github.com/adbailey4/python_utils

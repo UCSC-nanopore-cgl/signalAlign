@@ -5,7 +5,7 @@ import h5py
 import re
 
 from itertools import islice
-from nanotensor.event_detection import resegment_reads
+from signalalign.event_detection import resegment_reads
 
 
 TEMPLATE_BASECALL_KEY = "/Analyses/Basecall_1D_00{}"

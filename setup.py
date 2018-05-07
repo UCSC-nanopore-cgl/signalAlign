@@ -1,6 +1,29 @@
 #!/usr/bin/env python
 
-from setuptools import setup, find_packages
+from setuptools import setup, find_packages, Extension
+import os
+
+
+
+c_compile_args = ['-pedantic', '-Wall', '-std=c99']
+optimisation = ['-DNDEBUG', '-fstrict-aliasing']
+c_compile_args.extend(optimisation)
+
+
+event_detect = 'eventdetection'
+pkg_path = os.path.join(os.path.dirname(__file__), event_detect)
+
+include_dirs = [event_detect]
+
+extensions = []
+
+extensions.append(Extension(
+    'nanonetfilterss',
+    sources=[os.path.join(pkg_path, 'filters.c')],
+    include_dirs=include_dirs,
+    extra_compile_args=c_compile_args
+))
+
 
 setup(name="signalAlign",
       version="0.1.6",
@@ -9,6 +32,7 @@ setup(name="signalAlign",
       author_email="arand@soe.ucsc.edu",
       url="https://github.com/UCSC-nanopore-cgl/signalAlign",
       package_dir={"": "src"},
+      ext_modules=extensions,
       packages=find_packages("src"),
       install_requires=["numpy>=1.9.2",
                         "h5py>=2.2.1",
