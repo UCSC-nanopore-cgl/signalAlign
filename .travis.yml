@@ -27,7 +27,6 @@ before_install:
 - sudo apt-get install autotools-dev
 - sudo apt-get install autoconf
 - pip install google-compute-engine
-- pip install -U pytest
 #- pip install tensorflow
 - git clone https://github.com/lh3/bwa.git
 - cd bwa
@@ -53,6 +52,7 @@ install:
 - conda update -q conda
 # Useful for debugging any issues with conda
 - conda info -a
+- conda install pytest
 #- conda env create -f requirements35.yml
 #- source activate nanotensor3.5
 #- pip install google-compute-engine
