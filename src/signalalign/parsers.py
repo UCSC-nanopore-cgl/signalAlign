@@ -11,7 +11,7 @@ import sys
 from itertools import tee, chain
 import re
 
-import PyPore
+import signalalign
 import time
 import numpy as np
 try:
@@ -104,7 +104,7 @@ class parser( object ):
         name = d['name']
         del d['name']
 
-        return getattr( PyPore.parsers, name )( **d )
+        return getattr( signalalign.parsers, name )( **d )
 
 
 class MemoryParse( object):
