@@ -53,6 +53,7 @@ install:
 # Useful for debugging any issues with conda
 - conda info -a
 - conda install pytest
+- conda install numpy
 #- conda env create -f requirements35.yml
 #- source activate nanotensor3.5
 #- pip install google-compute-engine
