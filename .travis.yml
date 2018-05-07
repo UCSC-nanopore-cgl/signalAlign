@@ -70,7 +70,8 @@ install:
 
 script:
 - export PATH=$PATH:$PWD/bin
-- make test
+- cd bin
+- pytest
 #- gcov-4.9 bin/signalMachine.c
 
 #- cd bin

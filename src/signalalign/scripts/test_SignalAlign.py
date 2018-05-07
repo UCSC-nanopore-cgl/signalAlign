@@ -72,10 +72,10 @@ class SignalAlignAlignmentTest(unittest.TestCase):
         if extra_args is not None:
             alignment_command += extra_args
 
-        null_output = open(os.devnull, 'w')
-        result = call(alignment_command, shell=True, bufsize=-1, stdout=null_output, stderr=null_output)
+        # null_output = open(os.devnull, 'w')
+        # result = call(alignment_command, shell=True, bufsize=-1, stdout=null_output, stderr=null_output)
         #
-        # result = call(alignment_command, shell=True, bufsize=-1)
+        result = call(alignment_command, shell=True, bufsize=-1)
 
         self.assertTrue(result == 0, "error running signalAlign alignments command was {}"
                                      "".format(alignment_command))
