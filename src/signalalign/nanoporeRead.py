@@ -139,6 +139,8 @@ class NanoporeRead(object):
         elif self.rna:
             oned_root_address = self.get_latest_basecall_edition(RESEGMENT_KEY)
             print(oned_root_address)
+            # TODO go back to `not oned_rood_address`
+            # TODO fix bug for speedy stat split
             if not oned_root_address:
                 print("[SignalAlignment.run] Resegmenting read", file=sys.stderr)
                 MINKNOW = dict(window_lengths=(5, 10), thresholds=(2.0, 1.1), peak_height=1.2)

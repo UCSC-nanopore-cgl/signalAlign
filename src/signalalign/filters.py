@@ -3,9 +3,9 @@ import numpy as np
 from numpy.ctypeslib import ndpointer
 from ctypes import c_double, c_bool, c_size_t, c_int, Structure, POINTER
 
-from nanonet.util import get_shared_lib
+from signalalign.util import get_shared_lib
 
-nanonetfilters = get_shared_lib('nanonetfilterss')
+nanonetfilters = get_shared_lib('nanonetfilters')
 
 def compute_sum_sumsq(data):
     """Computer the cumulative sum and cumulative

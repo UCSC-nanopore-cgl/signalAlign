@@ -16,7 +16,7 @@ import numpy as np
 import traceback
 from collections import defaultdict
 from timeit import default_timer as timer
-from PyPore.parsers import SpeedyStatSplit
+from signalalign.parsers import SpeedyStatSplit
 from signalalign.fast5 import Fast5
 from signalalign.filters import minknow_event_detect
 from py3helpers.utils import check_numpy_table, list_dir, TimeStamp, change_np_field_type, merge_dicts

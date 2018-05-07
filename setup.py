@@ -2,7 +2,7 @@
 
 from setuptools import setup, find_packages, Extension
 import os
-
+import numpy as np
 
 
 c_compile_args = ['-pedantic', '-Wall', '-std=c99']
@@ -18,11 +18,13 @@ include_dirs = [event_detect]
 extensions = []
 
 extensions.append(Extension(
-    'nanonetfilterss',
+    'nanonetfilters',
     sources=[os.path.join(pkg_path, 'filters.c')],
     include_dirs=include_dirs,
     extra_compile_args=c_compile_args
 ))
+
+extensions.append(Extension("signalalign.cparsers", sources=[os.path.join(pkg_path, 'cparsers.c')], include_dirs=[np.get_include()]))
 
 
 setup(name="signalAlign",
