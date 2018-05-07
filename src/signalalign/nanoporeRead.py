@@ -141,10 +141,12 @@ class NanoporeRead(object):
             print(oned_root_address)
             # TODO go back to `not oned_rood_address`
             # TODO fix bug for speedy stat split
-            if not oned_root_address:
+            if oned_root_address:
                 print("[SignalAlignment.run] Resegmenting read", file=sys.stderr)
                 MINKNOW = dict(window_lengths=(5, 10), thresholds=(2.0, 1.1), peak_height=1.2)
-                # SPEEDY = dict(min_width=5, max_width=80, min_gain_per_sample=0.008, window_width=800)
+                SPEEDY = dict(min_width=5, max_width=80, min_gain_per_sample=0.008, window_width=800)
+                resegment_reads(self.filename, SPEEDY, speedy=True, overwrite=True)
+                print("Resegmenttwice")
                 resegment_reads(self.filename, MINKNOW, speedy=False, overwrite=True)
                 oned_root_address = self.get_latest_basecall_edition(RESEGMENT_KEY)
                 assert oned_root_address, "{} is not in fast5file".format(RESEGMENT_KEY)
