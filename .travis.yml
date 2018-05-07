@@ -27,6 +27,7 @@ before_install:
 - sudo apt-get install autotools-dev
 - sudo apt-get install autoconf
 - pip install google-compute-engine
+- pip install -U pytest
 #- pip install tensorflow
 - git clone https://github.com/lh3/bwa.git
 - cd bwa
