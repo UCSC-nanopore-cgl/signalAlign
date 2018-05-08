@@ -10,6 +10,8 @@ signalAlignLib = ${basicLibs}
 
 #coverage = -lgcov -coverage
 
+test_directory = ${rootPath}/src/tests/
+
 htsLib = -L././htslib -lhts
 
 all : sL bD hs python-utils ${libPath}/signalAlignLib.a ${signalAlignBin}/signalAlignLibTests index_fasta \
@@ -96,9 +98,16 @@ ${signalAlignBin}/hdp_pipeline : ${rootPath}src/signalalign/scripts/hdp_pipeline
 	cp ${rootPath}src/signalalign/scripts/hdp_pipeline.py ${signalAlignBin}/hdp_pipeline
 	chmod +x ${signalAlignBin}/hdp_pipeline
 
-${signalAlignBin}/test_SignalAlign.py : ${rootPath}src/signalalign/scripts/test_SignalAlign.py
-	cp ${rootPath}src/signalalign/scripts/test_SignalAlign.py ${signalAlignBin}/test_SignalAlign.py
+${signalAlignBin}/test_SignalAlign.py : ${rootPath}src/signalalign/tests/test_SignalAlign.py
+	cp ${rootPath}src/signalalign/tests/test_SignalAlign.py ${signalAlignBin}/test_SignalAlign.py
+	cp ${rootPath}src/signalalign/tests/event_detection_test.py ${signalAlignBin}/event_detection_test.py
+	cp ${rootPath}src/signalalign/tests/mea_algorithm_test.py ${signalAlignBin}/mea_algorithm_test.py
+	cp ${rootPath}src/signalalign/tests/fast5_test.py ${signalAlignBin}/fast5_test.py
+
 	chmod +x ${signalAlignBin}/test_SignalAlign.py
+	chmod +x ${signalAlignBin}/fast5_test.py
+	chmod +x ${signalAlignBin}/mea_algorithm_test.py
+	chmod +x ${signalAlignBin}/event_detection_test.py
 
 ${signalAlignBin}/zayante : ${rootPath}src/signalalign/scripts/zayante.py
 	cp ${rootPath}src/signalalign/scripts/zayante.py ${signalAlignBin}/zayante

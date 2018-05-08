@@ -360,9 +360,9 @@ def get_events_from_path(event_matrix, path):
         event_pos = index_pair[1]
         try:
             events = np.append(events, np.array(event_matrix[event_pos][ref_pos], dtype=events_dtype))
-        except TypeError:
+        except IndexError:
             traceback.print_exc(file=sys.stderr)
-            raise TypeError("Selected non event location in event matrix. Check path for correct indexes")
+            raise IndexError("Selected non event location in event matrix. Check path for correct indexes")
     return events
 
 
