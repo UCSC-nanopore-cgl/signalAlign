@@ -101,7 +101,7 @@ def aligner(work_queue, done_queue):
             alignment = SignalAlignment(**f)
             alignment.run()
     except Exception as e:
-        done_queue.put("%s failed with %s" % (current_process().name, e.message))
+        done_queue.put("%s failed with %s" % (current_process().name, e))
 
 
 def concat_variant_call_files(path):
