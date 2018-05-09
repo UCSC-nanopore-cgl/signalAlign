@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.8)
-project(nanopore-RNN)
+project(signalAlign)
 
 set(CMAKE_C_STANDARD 99)
 

@@ -114,7 +114,7 @@ def processReferenceFasta(fasta, work_folder, motif_key=None, sub_char=None, pos
         positions = CustomAmbiguityPositions(positions_file)
     else:
         positions = None
-    if motif_key is not None or sub_char is not None or positions_file is not None:
+    if motif_key is None and sub_char is None and positions_file is None:
         return fasta, None
     else:
         fw_fasta_path = work_folder.add_file_path("forward.{}".format(os.path.basename(fasta)))

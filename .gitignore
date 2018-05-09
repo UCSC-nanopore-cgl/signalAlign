@@ -79,7 +79,6 @@ externalTools/lastz-distrib-1.03.54/tools/probabilities_to_scores.py.bak
 externalTools/lastz-distrib-1.03.54/tools/qcode_to_scores.py.bak
 signalAlign.egg-info/
 build/
-src/signalAlign.egg-info/
 src/signalalign/__init__.pyc
 src/signalalign/__pycache__/
 src/signalalign/hiddenMarkovModel.py.bak
@@ -129,3 +128,8 @@ src/signalalign/utils/sequenceTools.pyc
 /tests/test_sequences/zymo_sequence.fasta.fai
 /tests/test_sequences/fake_rna_reversed.fa.fai
 /tests/test_sequences/pUC19_SspI_Zymo.fa.fai
+/tests/test_hdp/test_copy.hdp
+/tests/test_hdp/test.hdp
+cmake-build-debug/
+.idea/
+.cache/
