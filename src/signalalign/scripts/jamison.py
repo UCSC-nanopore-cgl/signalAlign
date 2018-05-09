@@ -4,7 +4,7 @@
 
 from .signalAlignLib import *
 from .variantCallingLib import scan_for_proposals, update_reference_with_marginal_probs
-from serviceCourse.file_handlers import FolderHandler
+from signalalign.utils.fileHandlers import FolderHandler
 from argparse import ArgumentParser
 from random import shuffle
 from shutil import copyfile

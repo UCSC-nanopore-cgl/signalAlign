@@ -8,7 +8,7 @@ from .signalAlignLib import *
 from .alignmentAnalysisLib import CallMethylation, get_first_sequence
 from .variantCallingLib import scan_for_proposals
 from multiprocessing import Process, Queue, current_process, Manager
-from serviceCourse.file_handlers import FolderHandler
+from signalalign.utils.fileHandlers import FolderHandler
 from argparse import ArgumentParser
 from random import shuffle
 from shutil import copyfile

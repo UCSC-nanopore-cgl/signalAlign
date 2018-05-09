@@ -8,7 +8,7 @@ from .signalAlignLib import *
 from .alignmentAnalysisLib import CallMethylation
 from .variantCallingLib import get_alignments_labels_and_mask
 from multiprocessing import Process, Queue, current_process, Manager
-from serviceCourse.file_handlers import FolderHandler
+from signalalign.utils.fileHandlers import FolderHandler
 from argparse import ArgumentParser
 from random import shuffle
 

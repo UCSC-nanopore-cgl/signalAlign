@@ -5,7 +5,7 @@ import os
 import pandas as pd
 import numpy as np
 from random import shuffle
-from serviceCourse.parsers import read_fasta
+from signalalign.utils.parsers import read_fasta
 
 
 def get_first_sequence(input_fasta):

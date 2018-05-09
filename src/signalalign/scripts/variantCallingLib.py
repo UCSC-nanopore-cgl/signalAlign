@@ -11,8 +11,8 @@ from random import shuffle
 from .signalAlignLib import SignalAlignment
 from .alignmentAnalysisLib import CallMethylation
 from multiprocessing import Process, Queue, current_process, Manager
-from serviceCourse.parsers import read_fasta
-from serviceCourse.sequenceTools import reverse_complement
+from signalalign.utils.parsers import read_fasta
+from signalalign.utils.sequenceTools import reverse_complement
 
 
 def randomly_select_alignments(path_to_alignments, max_alignments_to_use):
