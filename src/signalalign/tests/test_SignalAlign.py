@@ -74,10 +74,10 @@ class SignalAlignAlignmentTest(unittest.TestCase):
         if extra_args is not None:
             alignment_command += extra_args
 
-        # null_output = open(os.devnull, 'w')
-        # result = call(alignment_command, shell=True, bufsize=-1, stdout=null_output, stderr=null_output)
+        null_output = open(os.devnull, 'w')
+        result = call(alignment_command, shell=True, bufsize=-1, stdout=null_output, stderr=null_output)
         #
-        result = call(alignment_command, shell=True, bufsize=-1)
+        # result = call(alignment_command, shell=True, bufsize=-1)
 
         self.assertTrue(result == 0, "error running signalAlign alignments command was {}"
                                      "".format(alignment_command))
@@ -204,8 +204,6 @@ def main():
     testSuite.addTest(SignalAlignAlignmentTest('test_Ecoli1D_reads_5mer'))
     testSuite.addTest(SignalAlignAlignmentTest('test_RNA_edge_alignments_reads_5mer'))
     testSuite.addTest(signalAlign_EM_test('test_EM'))
-    testSuite.addTest(EventDetectTests())
-    testSuite.addTests(MeaTest("test_maximum_expected_accuracy_alignment"))
     add_all_tests_to_Suite(testSuite, MeaTest)
     add_all_tests_to_Suite(testSuite, EventDetectTests)
     add_all_tests_to_Suite(testSuite, Fast5Test)
