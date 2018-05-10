@@ -40,9 +40,9 @@ def usage(s=None):
 
 def main():
 
-	qdnaOldMagic = 0xF656659EL	# big endian magic number for older qdna files
-	qdnaMagic    = 0xC4B47197L	# big endian magic number for qdna files
-	qdnaVersion  = 0x00000200L 
+	qdnaOldMagic = 0xF656659E	# big endian magic number for older qdna files
+	qdnaMagic    = 0xC4B47197	# big endian magic number for qdna files
+	qdnaVersion  = 0x00000200 
 
 	# parse args
 

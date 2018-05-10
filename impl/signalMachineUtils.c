@@ -37,7 +37,7 @@ static inline void referenceSequence_loadReference(ReferenceSequence *self,
     self->complementOfReference = stFile_getLineFromFile(fopen(backwardReferencePath, "r"));
 }
 
-static inline struct PairwiseAlignment *referenceSequence_copyPairwiseAlignment(struct PairwiseAlignment *pA) {
+struct PairwiseAlignment *referenceSequence_copyPairwiseAlignment(struct PairwiseAlignment *pA) {
     struct PairwiseAlignment *A = constructPairwiseAlignment(pA->contig1, pA->start1, pA->end1, pA->strand1,
                                                               pA->contig2, pA->start2, pA->end2, pA->strand2,
                                                               pA->score, NULL);
@@ -210,6 +210,8 @@ void signalUtils_estimateNanoporeParams(StateMachine *sM, NanoporeRead *npRead,
     sM->scale = params->scale;
     sM->shift = params->shift;
     sM->var = params->var;
+
+//    printNanoporeReadAdjustmentParameters(params);
 
     if ((sM->scale != params->scale) || (sM->shift != params->shift) || (sM->var != params->var)) {
         st_errAbort("ERROR - Problem updating stateMachine\n");

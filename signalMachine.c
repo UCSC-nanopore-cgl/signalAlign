@@ -2,8 +2,8 @@
 #include <string.h>
 #include "signalMachineUtils.h"
 #include "pairwiseAligner.h"
+#include "fasta_handler.h"
 
-#define STEP 6  // space between degenerate nucleotides in for error correction
 #define ESTIMATE_PARAMS 1
 #define ASSIGNMENT_THRESHOLD 0.1
 
@@ -15,8 +15,27 @@ typedef enum {
 } OutputFormat;
 
 void usage() {
-    fprintf(stderr, "signalMachine binary, meant to be used through the signalAlign program.\n");
-    fprintf(stderr, "See doc for runSignalAlign for help\n");
+    fprintf(stderr, "\n\tsignalMachine - Align ONT ionic current to a reference sequence\n\n");
+    fprintf(stderr, "--help: Display this super useful message and exit\n");
+    fprintf(stderr, "--sm3Hdp, -d: Flag, enable HMM-HDP model\n");
+    fprintf(stderr, "--twoD, -e: Flag, use 2D workflow (enables complement alignment)\n");
+    fprintf(stderr, "-s: Output format, 0=full, 1=variantCaller, 2=assignments\n");
+    fprintf(stderr, "-o: Degernate, 0=C/E, 1=C/E/O, 2=A/I, 3=A/C/G/T\n");
+    fprintf(stderr, "-T: Template HMM model\n");
+    fprintf(stderr, "-C: Complement HMM model\n");
+    fprintf(stderr, "-L: Read (output) label\n");
+    fprintf(stderr, "-q: NanoporeRead (in npRead format)\n");
+    fprintf(stderr, "-f: Forward reference to align to as a flat file\n");
+    fprintf(stderr, "-b: Backward reference to align to as a flat file\n");
+    fprintf(stderr, "-p: Guide alignment file, containing CIGARs in EXONERATE format\n");
+    fprintf(stderr, "-u: Posteriors (output) file path, place to put the output\n");
+    fprintf(stderr, "-v: TemplateHDP file\n");
+    fprintf(stderr, "-w: Complement HDP file\n");
+    fprintf(stderr, "-t: Template expectations (HMM transitions) output location\n");
+    fprintf(stderr, "-c: Complement expectations (HMM transitions) output location\n");
+    fprintf(stderr, "-x: Diagonal expansion, how much to expand the dynamic programming envelope\n");
+    fprintf(stderr, "-D: Posterior probability threshold, keep aligned pairs with posterior prob >= this\n");
+    fprintf(stderr, "-m: Constranint trim, how much to trim the guide alignment anchors by\n\n");
 }
 
 void printPairwiseAlignmentSummary(struct PairwiseAlignment *pA) {
@@ -28,9 +47,10 @@ void printPairwiseAlignmentSummary(struct PairwiseAlignment *pA) {
     st_uglyf("strand 2: %lld\n", pA->strand2);
     st_uglyf("start  2: %lld\n", pA->start2);
     st_uglyf("end    2: %lld\n", pA->end2);
+
 }
 
-inline int64_t adjustReferenceCoordinate(int64_t x_i, int64_t referenceSeqOffset,
+static inline int64_t adjustReferenceCoordinate(int64_t x_i, int64_t referenceSeqOffset,
                                          int64_t referenceLengthInKmers, int64_t referenceLength,
                                          Strand strand, bool forward) {
     if ((strand == template && forward) || (strand == complement && !forward)) {
@@ -40,7 +60,7 @@ inline int64_t adjustReferenceCoordinate(int64_t x_i, int64_t referenceSeqOffset
     }
 }
 
-inline char *makeReferenceKmer(const char *k_i, Strand strand, bool forward) {
+static inline char *makeReferenceKmer(const char *k_i, Strand strand, bool forward) {
     if ((strand == template && forward) || (strand == complement && !forward)) {
         return stString_copy(k_i);
     } else {
@@ -48,7 +68,7 @@ inline char *makeReferenceKmer(const char *k_i, Strand strand, bool forward) {
     }
 }
 
-inline char *kmerFromString(const char *string, int64_t start, int64_t kmerLength) {
+static inline char *kmerFromString(const char *string, int64_t start, int64_t kmerLength) {
     char *k_i = st_malloc(kmerLength * sizeof(char));
     for (int64_t i = 0; i < kmerLength; i++) {
         k_i[i] = *(string + (start + i));
@@ -57,7 +77,7 @@ inline char *kmerFromString(const char *string, int64_t start, int64_t kmerLengt
     return k_i;
 }
 
-inline int64_t adjustQueryPosition(int64_t unadjustedQueryPosition, int64_t kmerLength, Strand strand, bool forward) {
+static inline int64_t adjustQueryPosition(int64_t unadjustedQueryPosition, int64_t kmerLength, Strand strand, bool forward) {
     if ((strand == template && forward) || (strand == complement && !forward)) {
         return unadjustedQueryPosition;
     } else {
@@ -78,6 +98,8 @@ void writePosteriorProbsFull(char *posteriorProbsFile, char *readLabel, StateMac
     // get some lengths outside the loop
     int64_t refLength = (int64_t )strlen(target);
     int64_t refLengthInKmers = refLength - sM->kmerLength;
+
+//    printf("%" PRIu64 "\n", stList_length(alignedPairs));
 
     for(int64_t i = 0; i < stList_length(alignedPairs); i++) {
         // grab the aligned pair
@@ -134,7 +156,7 @@ void writePosteriorProbsFull(char *posteriorProbsFile, char *readLabel, StateMac
 
 void writePosteriorProbsVC(char *posteriorProbsFile, char *readLabel, StateMachine *sM, char *target, bool forward,
                            int64_t eventSequenceOffset, int64_t referenceSequenceOffset, stList *alignedPairs,
-                           Strand strand) {
+                           Strand strand, double posteriorScore) {
     // label for tsv output
     char *strandLabel = strand == template ? "t" : "c";
     char *forwardLabel = forward ? "forward" : "backward";
@@ -189,8 +211,8 @@ void writePosteriorProbsVC(char *posteriorProbsFile, char *readLabel, StateMachi
             char base = pathKmer[queryPosition];
             // position in the reference we're reporting on
             int64_t reportPosition = x_adj + unadjustedQueryPosition;
-            fprintf(fH, "%"PRId64"\t%"PRId64"\t%c\t%f\t%s\t%s\t%s\n", y, reportPosition, base, p,
-                    strandLabel, forwardLabel, readLabel);
+            fprintf(fH, "%"PRId64"\t%"PRId64"\t%c\t%f\t%s\t%s\t%s\t%f\n", y, reportPosition, base, p,
+                    strandLabel, forwardLabel, readLabel, posteriorScore);
         }
         free(k_i);
         free(refKmer);
@@ -237,10 +259,21 @@ void writeAssignments(char *posteriorProbsFile, StateMachine *sM, double *events
     fclose(fH);
 }
 
-void outputAlignment(OutputFormat fmt,
-                     char *posteriorProbsFile, char *readLabel, StateMachine *sM, NanoporeReadAdjustmentParameters npp,
-                     double *events, char *target, bool forward, char *contig, int64_t eventSequenceOffset,
-                     int64_t referenceSequenceOffset, stList *alignedPairs, Strand strand) {
+void outputAlignment(
+        OutputFormat fmt,
+        char *posteriorProbsFile,
+        char *readLabel,
+        StateMachine *sM,
+        NanoporeReadAdjustmentParameters npp,
+        double *events,
+        char *target,
+        bool forward,
+        char *contig,
+        int64_t eventSequenceOffset,
+        int64_t referenceSequenceOffset,
+        stList *alignedPairs, 
+        double posteriorScore,
+        Strand strand) {
     switch (fmt) {
         case full:
             writePosteriorProbsFull(posteriorProbsFile, readLabel, sM, npp, events, target, forward, contig,
@@ -248,7 +281,7 @@ void outputAlignment(OutputFormat fmt,
             break;
         case variantCaller:
             writePosteriorProbsVC(posteriorProbsFile, readLabel, sM, target, forward, eventSequenceOffset,
-                                  referenceSequenceOffset, alignedPairs, strand);
+                                  referenceSequenceOffset, alignedPairs, strand, posteriorScore);
             break;
         case assignments:
             writeAssignments(posteriorProbsFile, sM, events, eventSequenceOffset, npp, alignedPairs, strand);
@@ -338,9 +371,11 @@ stList *performSignalAlignment(StateMachine *sM, Sequence *eventSequence, int64_
     }
 
     int64_t lX = sequence_correctSeqLength(strlen(target), kmer, sM->kmerLength);
+//    printf("stList_length(unmappedAnchors) %" PRIu64 "\n", stList_length(unmappedAnchors));
 
     // remap anchor pairs
     stList *filteredRemappedAnchors = signalUtils_getRemappedAnchorPairs(unmappedAnchors, eventMap, mapOffset);
+//    printf("stList_length(filteredRemappedAnchors) %" PRIu64 "\n", stList_length(filteredRemappedAnchors));
 
     // make sequences
     Sequence *sX = sequence_constructReferenceKmerSequence(lX, target, sequence_getKmer,
@@ -357,7 +392,11 @@ Sequence *makeEventSequenceFromPairwiseAlignment(double *events, int64_t querySt
                                                  int64_t *eventMap) {
     // find the event mapped to the start and end of the 2D read alignment
     int64_t startIdx = eventMap[queryStart];
-    int64_t endIdx = eventMap[queryEnd];
+    // We end up indexing past length of eventMap if we map to final base
+    int64_t endIdx = eventMap[queryEnd-1];
+//    printf("startIdx %" PRIu64 "\n", startIdx);
+//    printf("endIdx %" PRIu64 "\n", endIdx);
+
 
     // move the event pointer to the first event
     size_t elementSize = sizeof(double);
@@ -365,6 +404,9 @@ Sequence *makeEventSequenceFromPairwiseAlignment(double *events, int64_t querySt
 
     // make the eventSequence
     Sequence *eventS = sequence_constructEventSequence(endIdx - startIdx, elements);
+//    Sequence *test_events = eventS->sliceFcn(eventS, startIdx, endIdx);
+
+//    printf("Adding to alignedPairs! (%f)\n", test_events->get(test_events->elements, endIdx));
 
     return eventS;
 }
@@ -404,14 +446,17 @@ int main(int argc, char *argv[]) {
     char *complementModelFile = NULL;
     char *readLabel = NULL;
     char *npReadFile = NULL;
-    char *forwardReference = NULL;
-    char *backwardReference = NULL;
-    char *errorCorrectPath = NULL;
+    char *exonerateCigarFile= NULL;
     char *posteriorProbsFile = NULL;
     char *templateExpectationsFile = NULL;
     char *complementExpectationsFile = NULL;
     char *templateHdp = NULL;
     char *complementHdp = NULL;
+    char *forward_reference_path = NULL;
+    char *backward_reference_path = NULL;
+
+    const char *sequence_name = NULL;
+
 
     int key;
     while (1) {
@@ -425,9 +470,7 @@ int main(int argc, char *argv[]) {
                 {"complementModel",         required_argument,  0,  'C'},
                 {"readLabel",               required_argument,  0,  'L'},
                 {"npRead",                  required_argument,  0,  'q'},
-                {"forward_reference",       required_argument,  0,  'f'},
-                {"backward_reference",      required_argument,  0,  'b'},
-                {"error_correct_path",      required_argument,  0,  'p'},
+                {"exonerate_cigar_file",    required_argument,  0,  'p'},
                 {"posteriors",              required_argument,  0,  'u'},
                 {"templateHdp",             required_argument,  0,  'v'},
                 {"complementHdp",           required_argument,  0,  'w'},
@@ -436,11 +479,14 @@ int main(int argc, char *argv[]) {
                 {"diagonalExpansion",       required_argument,  0,  'x'},
                 {"threshold",               required_argument,  0,  'D'},
                 {"constraintTrim",          required_argument,  0,  'm'},
+                {"forward_reference_path",  required_argument,  0,  'f'},
+                {"backward_reference_path", optional_argument,  0,  'b'},
+                {"sequence_name",           required_argument,  0,  'n'},
                 {0, 0, 0, 0} };
 
         int option_index = 0;
 
-        key = getopt_long(argc, argv, "h:d:e:s:o:p:a:T:C:L:q:f:b:p:u:v:w:t:c:x:D:m:",
+        key = getopt_long(argc, argv, "h:d:e:s:o:a:T:C:L:q:f:b:p:u:v:w:t:c:x:D:m:n:",
                           long_options, &option_index);
 
         if (key == -1) {
@@ -477,14 +523,8 @@ int main(int argc, char *argv[]) {
             case 'q':
                 npReadFile = stString_copy(optarg);
                 break;
-            case 'f':
-                forwardReference = stString_copy(optarg);
-                break;
-            case 'b':
-                backwardReference= stString_copy(optarg);
-                break;
             case 'p':
-                errorCorrectPath = stString_copy(optarg);
+                exonerateCigarFile = stString_copy(optarg);
                 break;
             case 'u':
                 posteriorProbsFile = stString_copy(optarg);
@@ -518,22 +558,43 @@ int main(int argc, char *argv[]) {
                 assert (constraintTrim >= 0);
                 constraintTrim = (int64_t)constraintTrim;
                 break;
+            case 'f':
+                forward_reference_path = stString_copy(optarg);
+                break;
+            case 'b':
+                backward_reference_path = stString_copy(optarg);
+                break;
+            case 'n':
+                sequence_name = stString_copy(optarg);
+                break;
             default:
                 usage();
                 return 1;
         }
     }
     (void) j;  // silence unused variable warning.
-    
+
     // check for models
     if ((templateModelFile == NULL) || (complementModelFile == NULL && twoD)) {
         st_errAbort("Missing model files, exiting\n");
         return 1;
     }
 
+    if (exonerateCigarFile == NULL) {
+        st_errAbort("[signalMachine]ERROR: Need to provide input guide alignments, exiting\n");
+        return 1;
+    }
+
     // Anchors //
     // get pairwise alignment from stdin, in exonerate CIGAR format
-    FILE *fileHandleIn = stdin;
+    //FILE *fileHandleIn = stdin;
+    if (!stFile_exists(exonerateCigarFile)) {
+        st_errAbort("[signalMachine]ERROR: Didn't find input alignment file, looked %s\n", exonerateCigarFile);
+    } else {
+        st_uglyf("[signalMachine]NOTICE: Using guide alignments from %s\n", exonerateCigarFile);
+    }
+
+    FILE *fileHandleIn = fopen(exonerateCigarFile, "r");
     // parse input CIGAR to get anchors
     struct PairwiseAlignment *pA;
     pA = cigarRead(fileHandleIn);
@@ -571,17 +632,16 @@ int main(int argc, char *argv[]) {
         }
     }
 
+//    if ((forwardReference == NULL) || (backwardReference == NULL)) {
+//        st_errAbort("[signalAlign] - ERROR: did not get reference files %s %s\n",
+//                    forwardReference, backwardReference);
+//    }
     ReferenceSequence *R;
-    if (errorCorrectPath == NULL) { // not doing error correction
-        if ((forwardReference == NULL) || (backwardReference == NULL)) {
-            st_errAbort("[signalAlign] - ERROR: did not get reference files %s %s\n",
-                        forwardReference, backwardReference);
-        }
-        R = signalUtils_ReferenceSequenceConstructFull(forwardReference, backwardReference, pA);
-    } else {
-        R = signalUtils_ReferenceSequenceConstructEmpty(pA);
-    }
+//    ReferenceSequence *R1;
 
+//    R1 = signalUtils_ReferenceSequenceConstructFull(forwardReference, backwardReference, pA);
+//    ReferenceSequence *R1;
+    R = fastaHandler_ReferenceSequenceConstructFull(forward_reference_path, backward_reference_path, pA, sequence_name);
     // Nanopore Read //
     // load nanopore read
     NanoporeRead *npRead = nanopore_loadNanoporeReadFromFile(npReadFile);
@@ -589,8 +649,11 @@ int main(int argc, char *argv[]) {
     // constrain the event sequence to the positions given by the guide alignment
     Sequence *tEventSequence = makeEventSequenceFromPairwiseAlignment(npRead->templateEvents,
                                                                       pA->start2, pA->end2,
-                                                                      (twoD ? npRead->templateEventMap : 
+                                                                      (twoD ? npRead->templateEventMap :
                                                                        npRead->templateStrandEventMap));
+    // what is the template event sequence
+//    printf("tEventSequence %" PRIu64 "\n", tEventSequence->length);
+//    printf("tEventSequence %" PRIu64 "\n");
 
     Sequence *cEventSequence;
     if (twoD) {
@@ -612,7 +675,13 @@ int main(int argc, char *argv[]) {
     int64_t rCoordinateShift_c = twoD ? pA->end1 : 0;
     bool forward = pA->strand1;  // keep track of whether this is a forward mapped read or not
 
+//    printPairwiseAlignmentSummary(pA);
+
     stList *anchorPairs = signalUtils_guideAlignmentToRebasedAnchorPairs(pA, p);  // pA gets modified here, no turning back
+//    printPairwiseAlignmentSummary(pA);
+
+//    printf("stList_length(anchorPairs) %" PRIu64 "\n", stList_length(anchorPairs));
+
 
     if ((templateExpectationsFile != NULL) || (complementExpectationsFile != NULL)) {
         st_uglyf("Starting expectations routine\n");
@@ -630,12 +699,12 @@ int main(int argc, char *argv[]) {
 
         // get expectations for template
         fprintf(stderr, "signalAlign - getting expectations for template\n");
-
         getSignalExpectations(sMt, templateExpectations, tEventSequence,
                               (twoD ? npRead->templateEventMap : npRead->templateStrandEventMap),
                               pA->start2,
                               R->getTemplateTargetSequence(R),
                               p, anchorPairs, degenerate);
+
 
         if (sMtype == threeStateHdp) {
             fprintf(stderr, "signalAlign - got %" PRId64 "template HDP assignments\n",
@@ -662,7 +731,7 @@ int main(int argc, char *argv[]) {
             }
 
             complementExpectations = hmmContinuous_getExpectationsHmm(sMc, p->threshold, 0.001, 0.001);
-            
+
             getSignalExpectations(sMc, complementExpectations, cEventSequence, npRead->complementEventMap,
                                   pA->start2,
                                   R->getComplementTargetSequence(R),
@@ -709,12 +778,17 @@ int main(int argc, char *argv[]) {
         if (sMtype == threeStateHdp) {
             stateMachine3_setModelToHdpExpectedValues(sMt, nHdpT);
         }
+        // TODO errors get caught here
+//        printf("stList_length(anchorPairs) %" PRIu64 "\n", stList_length(anchorPairs));
 
-        stList *templateAlignedPairs = performSignalAlignment(sMt, tEventSequence, 
+        stList *templateAlignedPairs = performSignalAlignment(sMt, tEventSequence,
                                                               (twoD ? npRead->templateEventMap : npRead->templateStrandEventMap),
                                                               pA->start2, R->getTemplateTargetSequence(R),
                                                               p, anchorPairs,
                                                               degenerate);
+
+        printf("Passes SignalAlignment");
+
         double templatePosteriorScore = scoreByPosteriorProbabilityIgnoringGaps(templateAlignedPairs);
 
         // sort
@@ -724,7 +798,7 @@ int main(int argc, char *argv[]) {
         if (posteriorProbsFile != NULL) {
             outputAlignment(outFmt, posteriorProbsFile, readLabel, sMt, npRead->templateParams, npRead->templateEvents,
                             R->getTemplateTargetSequence(R), forward, pA->contig1, tCoordinateShift, rCoordinateShift_t,
-                            templateAlignedPairs, template);
+                            templateAlignedPairs, templatePosteriorScore,template);
         }
 
         stList *complementAlignedPairs;
@@ -759,7 +833,8 @@ int main(int argc, char *argv[]) {
             if (posteriorProbsFile != NULL) {
                 outputAlignment(outFmt, posteriorProbsFile, readLabel, sMc, npRead->complementParams,
                                 npRead->complementEvents, R->getComplementTargetSequence(R), forward, pA->contig1,
-                                cCoordinateShift, rCoordinateShift_c, complementAlignedPairs, complement);
+                                cCoordinateShift, rCoordinateShift_c, complementAlignedPairs, complementPosteriorScore,
+                                complement);
             }
 
         }

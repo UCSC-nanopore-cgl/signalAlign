@@ -75,11 +75,11 @@ def main():
 	for name in seqNames:
 		seq = hsx.get_sequence(name)
 		if (seq != None):
-			print seq
+			print(seq)
 			if (showProgress):
-				print >>sys.stderr, name
+				print(name, file=sys.stderr)
 		elif (warnOnMissing):
-			print >>sys.stderr, "WARNING: %s not found" % name
+			print("WARNING: %s not found" % name, file=sys.stderr)
 	hsx.close()
 
 

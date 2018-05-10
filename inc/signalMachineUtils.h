@@ -22,6 +22,12 @@ struct _referenceSequence {
 
 char *signalUtils_stringReverse(char *str);
 
+char *referenceSequence_getComplementTarget(ReferenceSequence *self);
+
+char *referenceSequence_getTemplateTarget(ReferenceSequence *self);
+
+struct PairwiseAlignment *referenceSequence_copyPairwiseAlignment(struct PairwiseAlignment *pA);
+
 ReferenceSequence *signalUtils_ReferenceSequenceConstructFull(char *forwardReferencePath, char *backwardReferencePath,
                                                               struct PairwiseAlignment *pA);
 

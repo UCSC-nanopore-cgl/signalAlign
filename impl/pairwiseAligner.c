@@ -1232,9 +1232,9 @@ void diagonalCalculationPosteriorMatchProbs(StateMachine *sM, int64_t xay, DpMat
                             if (posteriorProbability > 1.0) {
                                 posteriorProbability = 1.0;
                             }
-                            //st_uglyf("Adding to alignedPairs! posteriorProb: %f, X: %lld (%s), Y: %lld (%f)\n", posteriorProbability, x - 1, sX->get(sX->elements, x-1), y - 1, *(double *)sY->get(sY->elements, y-1));
-                            //st_uglyf("Adding to alignedPairs! posteriorProb: %f, X: %lld (%s), Y: %lld (%f)\n", posteriorProbability, x - 1, pathForward->kmer, y - 1, *(double *)sY->get(sY->elements, y-1));
-                            //st_uglyf("Adding to alignedPairs! posteriorProb: %f, X: %lld, Y: %lld (%f)\n", posteriorProbability, x - 1, y - 1, *(double *)sY->get(sY->elements, y-1));
+//                            st_uglyf("Adding to alignedPairs! posteriorProb: %f, X: %lld (%s), Y: %lld (%f)\n", posteriorProbability, x - 1, sX->get(sX->elements, x-1), y - 1, *(double *)sY->get(sY->elements, y-1));
+//                            st_uglyf("Adding to alignedPairs! posteriorProb: %f, X: %lld (%s), Y: %lld (%f)\n", posteriorProbability, x - 1, pathForward->kmer, y - 1, *(double *)sY->get(sY->elements, y-1));
+//                            st_uglyf("Adding to alignedPairs! posteriorProb: %f, X: %lld, Y: %lld (%f)\n", posteriorProbability, x - 1, y - 1, *(double *)sY->get(sY->elements, y-1));
                             posteriorProbability = floor(posteriorProbability * PAIR_ALIGNMENT_PROB_1);
                             stList_append(alignedPairs, stIntTuple_construct4((int64_t) posteriorProbability,
                                                                               x - 1, y - 1,
@@ -1299,7 +1299,7 @@ void getPosteriorProbsWithBanding(StateMachine *sM,
     if (diagonalNumber == 0) { //Deal with trivial case
         return;
     }
-
+    // TODO band construction is where the error starts
     //Primitives for the forward matrix recursion
     Band *band = band_construct(anchorPairs, sX->length, sY->length, p->diagonalExpansion);
 
@@ -1318,7 +1318,7 @@ void getPosteriorProbsWithBanding(StateMachine *sM,
 
     while (1) { //Loop that moves through the matrix forward
         Diagonal diagonal = bandIterator_getNext(forwardBandIterator);
-
+//        printf("One Loop in while");
         //Forward calculation
         dpDiagonal_zeroValues(dpMatrix_createDiagonal(forwardDpMatrix, diagonal, sX));
         diagonalCalculationForward(sM, diagonal_getXay(diagonal), forwardDpMatrix, sX, sY);
@@ -1457,8 +1457,16 @@ stList *convertPairwiseForwardStrandAlignmentToAnchorPairs(struct PairwiseAlignm
     int64_t k = pA->start2;
     assert(pA->strand1);
     assert(pA->strand2);
+
+//    fprintf(stderr, "pA->operationList->length % " PRIu64 "\n", pA->operationList->length);
+//    fprintf(stderr, "TRIM %" PRIu64 "\n", trim);
+//    fprintf(stderr, "pA->score %f \n", pA->score);
+
     for (int64_t i = 0; i < pA->operationList->length; i++) {
         struct AlignmentOperation *op = pA->operationList->list[i];
+//        fprintf(stderr, "op->opType %" PRIu64 "\n", op->opType);
+//        fprintf(stderr, "op->length %" PRIu64 "\n", op->length);
+
         if (op->opType == PAIRWISE_MATCH) {
             for (int64_t l = trim; l < op->length - trim; l++) {
                 stList_append(alignedPairs, stIntTuple_construct2(j + l, k + l));
@@ -1796,7 +1804,6 @@ void getPosteriorProbsWithBandingSplittingAlignmentsByLargeGaps(
         int64_t y1 = stIntTuple_get(subRegion, 1);
         int64_t x2 = stIntTuple_get(subRegion, 2);
         int64_t y2 = stIntTuple_get(subRegion, 3);
-
         Sequence *sX3 = SsX->sliceFcn(SsX, x1, x2 - x1);
         Sequence *sY3 = SsY->sliceFcn(SsY, y1, y2 - y1);
         //List of anchor pairs
@@ -1817,6 +1824,7 @@ void getPosteriorProbsWithBandingSplittingAlignmentsByLargeGaps(
             j++;
         }
 
+//        printf("One Loop");
         //Make the alignments
         getPosteriorProbsWithBanding(sM, subListOfAnchorPoints, sX3, sY3, p,
                                      (alignmentHasRaggedLeftEnd || i > 0),

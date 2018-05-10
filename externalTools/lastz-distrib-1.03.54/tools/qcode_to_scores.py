@@ -288,12 +288,12 @@ def main():
 	##########
 
 	if ("debug" in debug):
-		print "target" \
-		    + "  ".join([" %s:%.5f" % (nuc,rProb[nuc]) for nuc in bases])
-		print "query" \
-		    + "  ".join([" %s:%.5f" % (nuc,cProb[nuc]) for nuc in bases])
+		print("target" \
+		    + "  ".join([" %s:%.5f" % (nuc,rProb[nuc]) for nuc in bases]))
+		print("query" \
+		    + "  ".join([" %s:%.5f" % (nuc,cProb[nuc]) for nuc in bases]))
 		for y in bases:
-			print "  ".join(["%s:%.5f" % (y+x,rcProb[y+x]) for x in bases])
+			print("  ".join(["%s:%.5f" % (y+x,rcProb[y+x]) for x in bases]))
 
 	##########
 	# assign scores
@@ -326,14 +326,14 @@ def main():
 	##########
 
 	if (creator != None):
-		print "# created by %s" % creator
-		print
+		print("# created by %s" % creator)
+		print()
 
 	if (settings != []):
 		sLen = max([len(s) for (s,val) in settings])
 		for (s,val) in settings:
-			print "%-*s = %s" % (sLen,s,val)
-		print
+			print("%-*s = %s" % (sLen,s,val))
+		print()
 
 	##########
 	# print the substitution matrix
@@ -347,13 +347,13 @@ def main():
 			for col in colSymbols:
 				wCol = max(wCol,len("%d" % sub[row][col]))
 
-		print "%-*s %s" \
-		    % (wRow," ","  ".join(["%*s" % (wCol,col) for col in colSymbols]))
+		print("%-*s %s" \
+		    % (wRow," ","  ".join(["%*s" % (wCol,col) for col in colSymbols])))
 
 		for row in rowSymbols:
-			print "%-*s %s" \
+			print("%-*s %s" \
 			    % (wRow,row,
-			       "  ".join(["%*d" % (wCol,sub[row][col]) for col in colSymbols]))
+			       "  ".join(["%*d" % (wCol,sub[row][col]) for col in colSymbols])))
 
 	else:
 		wCol = 4
@@ -361,13 +361,13 @@ def main():
 			for col in colSymbols:
 				wCol = max(wCol,len("%.6f" % sub[row][col]))
 
-		print "%-*s %s" \
-		    % (wRow," ","  ".join(["%*s" % (wCol,col) for col in colSymbols]))
+		print("%-*s %s" \
+		    % (wRow," ","  ".join(["%*s" % (wCol,col) for col in colSymbols])))
 
 		for row in rowSymbols:
-			print "%-*s %s" \
+			print("%-*s %s" \
 			    % (wRow,row,
-			       "  ".join(["%*.6f" % (wCol,sub[row][col]) for col in colSymbols]))
+			       "  ".join(["%*.6f" % (wCol,sub[row][col]) for col in colSymbols])))
 
 
 def simple_dna_quantum_code():
