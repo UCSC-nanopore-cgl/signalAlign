@@ -133,4 +133,4 @@ src/signalalign/utils/sequenceTools.pyc
 cmake-build-debug/
 .idea/
 .cache/
-tests/test_sequences/pUC19_SspI.fa.fai
+tests/test_sequences/*.fai
