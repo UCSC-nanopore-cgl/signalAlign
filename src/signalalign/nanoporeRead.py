@@ -102,7 +102,7 @@ class NanoporeRead(object):
     #             else:
     #                 return path.format(highest)  # the new base-called version
 
-    def Initialize(self, parent_job):
+    def Initialize(self, parent_job=None):
         if not self.is_open:
             ok = self.open()
             if not ok:
@@ -115,7 +115,7 @@ class NanoporeRead(object):
             ok = self._initialize(parent_job)
         return ok
 
-    def _initialize(self, parent_job):
+    def _initialize(self, parent_job=None):
         """Routine setup 1D NanoporeReads, returns false if basecalled with upsupported
         version or is not base-called
         """

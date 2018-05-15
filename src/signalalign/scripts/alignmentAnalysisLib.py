@@ -148,11 +148,12 @@ class CallMethylation(object):
     def parse_alignment(self):
         # todo make this try, except
         self.data = pd.read_table(self.alignment_file,
-                                  usecols=(1, 2, 4, 5, 9, 12, 15),
+                                  usecols=(0, 1, 2, 4, 5, 9, 12, 15),
                                   header=None,
-                                  names=['ref_index', 'ref_kmer', 'strand', 'event_index',
+                                  names=['contig', 'ref_index', 'ref_kmer', 'strand', 'event_index',
                                          'match_kmer', 'prob', 'path_kmer'],
-                                  dtype={'ref_index': np.int64,
+                                  dtype={'contig': np.str,
+                                         'ref_index': np.int64,
                                          'ref_kmer': np.str,
                                          'strand': np.str,
                                          'event_index': np.int64,
@@ -215,30 +216,29 @@ class CallMethylation(object):
                     crit = self.data['ref_index'].map(lambda x: x in positions)
                     select = self.data[crit].ix[(self.data['strand'] == strand) & (self.data['prob'] >= threshold)]
                     select = select.drop(select[['strand', 'ref_kmer']], axis=1)
-                    # if report: print(self.identifier() + "{}: select {}".format(i, select))
 
                     if select.empty:
                         continue
 
+                    contig = None
                     marginal_probs = {"C": 0, "E": 0, "O": 0} if self.degenerate in [1, 2] \
                         else {"A": 0, "C": 0, "G": 0, "T": 0}
 
                     for r in select.itertuples():
-                        if len(r[5]) != self.kmer_length:
+                        if len(r.path_kmer) != self.kmer_length:
                             raise Exception("Got kmer_length mismatch!  Expected {} but got {} in {}.  Row:\n\t{}"
-                                            .format(self.kmer_length, len(r[5]), self.alignment_file_name, r))
-                        offset = site - r[1] if regular_offset is True else (self.kmer_length - 1) - (site - r[1])
-                        call = r[5][offset]
-                        marginal_probs[call] += r[4]
-                    # if report: print(self.identifier() + "{}: marginal_probs {}".format(i, marginal_probs))
+                                            .format(self.kmer_length, len(r.path_kmer), self.alignment_file_name, r))
+                        offset = site - r.event_index if regular_offset is True else (self.kmer_length - 1) - (site - r.event_index)
+                        call = r.path_kmer[offset]
+                        marginal_probs[call] += r.prob
+                        if contig is None: contig = r.contig
 
                     total_prob = sum(marginal_probs.values())
 
                     for call in marginal_probs:
                         marginal_probs[call] /= total_prob
 
-                    self.probs.append((strand, site, marginal_probs))
-                    # if report: print(self.identifier() + "{}: saved {}th probability".format(i, len(self.probs())))
+                    self.probs.append((contig, strand, site, marginal_probs))
                     i += 1
                 success = True
             finally:
@@ -265,24 +265,24 @@ class CallMethylation(object):
               .format(out))
 
         def output_line():
-            return "{site}\t{strand}\t{c}\t{mc}\t{hmc}\t{read}\n" if self.degenerate in [1, 2] \
-                else "{site}\t{strand}\t{A}\t{C}\t{G}\t{T}\t{read}\n"
+            return "{contig}\t{site}\t{strand}\t{c}\t{mc}\t{hmc}\t{read}\n" if self.degenerate in [1, 2] \
+                else "{contig}\t{site}\t{strand}\t{A}\t{C}\t{G}\t{T}\t{read}\n"
 
         with open(out, 'w') as fH:
             file_name = self.alignment_file_name
             line = output_line()
 
-            for strand, site, prob in self.probs:
+            for contig, strand, site, prob in self.probs:
                 if self.degenerate in [1, 2]:
-                    fH.write(line.format(site=site, strand=strand,
+                    fH.write(line.format(contig=contig, site=site, strand=strand,
                                          c=prob["C"], mc=prob["E"], hmc=prob["O"],
                                          read=file_name))
                 elif self.degenerate == 3:
-                    fH.write(line.format(site=site, strand=strand,
+                    fH.write(line.format(contig=contig, site=site, strand=strand,
                                          A=prob["A"], C=prob["C"], G=prob["G"], T=prob["T"],
                                          read=file_name))
                 else:
-                    error = "Error writing methylation call: {site:%s, strand:%s, read:%s, prob:%s, degenerate:%s}"\
+                    error = "Error writing methylation call: site:{}, strand:{}, read:{}, prob:{}, degenerate:{}"\
                         .format(site, strand, file_name, prob, self.degenerate)
                     print(error)
                     sys.exit(1)

@@ -103,7 +103,8 @@ def resolvePath(p):
 def build_fast5_to_read_id_dict(fast5_locations):
     fast5_to_read_id = dict()
     for fast5 in fast5_locations:
-        npr = NanoporeRead(fast5, False)
+        npr = NanoporeRead(fast5)
+        npr.Initialize()
         read_id = npr.read_label
         fast5_id = os.path.basename(fast5)[:-6]
         fast5_to_read_id[fast5_id] = read_id
@@ -644,16 +645,14 @@ def discover_single_nucleotide_probabilities(working_folder, kmer_length, refere
     print("[info] writing output to {}".format(output_directory))
     output_files = list()
 
-    # todo
-    reference_map_contig_name = "TEST"
-
     # iterate over input fast5s
-    for fast5_id in fast5_to_read.iterkeys():
+    for fast5_id, read_id in fast5_to_read.items():
         # get files
         files = glob.glob(os.path.join(working_folder.path,
-                                       "marginals*{}*{}".format(fast5_id, CallMethylation.FILE_EXTENSION)))
+                                       "marginals*{}*{}".format(read_id, CallMethylation.FILE_EXTENSION)))
         if len(files) != step_size:
-            print("[error] input fast5 '{}' yielded {} output files, expected {}".format(fast5_id, len(files), step_size))
+            print("[error] input fast5 '{}' for read {} yielded {} output files, expected {}".format(
+                fast5_id, read_id, len(files), step_size))
             if len(files) == 0:
                 continue
 
@@ -661,6 +660,7 @@ def discover_single_nucleotide_probabilities(working_folder, kmer_length, refere
         output_lines = list()
         template_count = 0
         complement_count = 0
+        contigs = set()
         for file in files:
             if "forward" in file.split("."):
                 template_count += 1
@@ -669,10 +669,10 @@ def discover_single_nucleotide_probabilities(working_folder, kmer_length, refere
             with open(file, 'r') as input:
                 for line in input:
                     line = line.split("\t")
-                    line[0] = int(line[0])
+                    contigs.add(line[0])
                     output_lines.append(line)
         # sort based on position
-        output_lines.sort(key=lambda x: x[0])
+        output_lines.sort(key=lambda x: int(x[1]))
 
         # template/complement and sanity checks
         reverse = complement_count > template_count
@@ -686,19 +686,19 @@ def discover_single_nucleotide_probabilities(working_folder, kmer_length, refere
             strand_identifier += " (by majority)"
 
         # write output
-        output_filename = "{}.tsv".format(fast5_to_read[fast5_id])
+        output_filename = "{}.tsv".format(read_id)
         output_file = os.path.join(output_directory, output_filename)
         with open(output_file, 'w') as output:
             output.write("## fast5_input: {}.fast5\n".format(fast5_id))
-            output.write("## read_id: {}\n".format(fast5_to_read[fast5_id]))
-            output.write("## contig: {}\n".format(reference_map_contig_name))
+            output.write("## read_id: {}\n".format(read_id))
+            output.write("## contig: {}\n".format(",".join(contigs)))
             output.write("## strand: {}\n".format(strand_identifier))
             output.write("#CHROM\tPOS\tpA\tpC\tpG\tpT\n")
             for line in output_lines:
                 if not reverse:
-                    line = [reference_map_contig_name, str(line[0]), line[2], line[3], line[4], line[5]]
+                    line = [line[0], line[1], line[3], line[4], line[5], line[6]]
                 else:
-                    line = [reference_map_contig_name, str(line[0]), line[5], line[4], line[3], line[2]]
+                    line = [line[0], line[1], line[6], line[5], line[4], line[3]]
                 output.write("\t".join(line) + "\n")
         #save
         output_files.append(output_file)
