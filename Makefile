@@ -25,7 +25,7 @@ all : sL bD hs python-utils ${libPath}/signalAlignLib.a ${signalAlignBin}/signal
 
 python-utils :
 #	echo "NOT PYPORE MAN"
-	cd python_utils && python setup.py install
+	cd python_utils && python3 setup.py install
 
 
 index_fasta : hs ${libPath}/signalAlignLib.a ${signalAlignDependencies}
@@ -48,10 +48,10 @@ clean :
 	cd externalTools && make clean
 
 python_setup :
-	python setup.py install
+	python3 setup.py install
 
 pip_install :
-	pip install -e .
+	pip3 install -e .
 
 signalAlignLib : ${libPath}/signalAlignLib.a
 

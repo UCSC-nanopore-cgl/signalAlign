@@ -598,6 +598,7 @@ int main(int argc, char *argv[]) {
     // parse input CIGAR to get anchors
     struct PairwiseAlignment *pA;
     pA = cigarRead(fileHandleIn);
+    fclose(fileHandleIn);
 
     // Alignment Parameters //
     // make the pairwise alignment parameters

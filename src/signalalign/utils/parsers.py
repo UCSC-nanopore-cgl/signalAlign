@@ -62,6 +62,7 @@ of a problem.  If there is no sequence data, these entries will propagate as
 empty entries. 
 """
 
+from __future__ import print_function
 import sys
 import re
 from math import log10

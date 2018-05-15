@@ -131,6 +131,7 @@ src/signalalign/utils/sequenceTools.pyc
 /tests/test_hdp/test_copy.hdp
 /tests/test_hdp/test.hdp
 cmake-build-debug/
-.idea/
+*.idea/
 .cache/
-tests/test_sequences/pUC19_SspI.fa.fai
+*.pyc
+*.so

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+from __future__ import print_function
 import os
 import sys
 import csv
@@ -8,10 +9,17 @@ import pysam
 # from sonLib.bioio import fastaWrite
 from signalalign import defaultModelFromVersion
 from signalalign.nanoporeRead import NanoporeRead
-from signalalign.utils.bwaWrapper import generateGuideAlignment
+from signalalign.utils.bwaWrapper import generateGuideAlignment, getGuideAlignmentFromAlignmentFile
 from signalalign.utils.fileHandlers import FolderHandler
 from signalalign.utils.sequenceTools import fastaWrite
 from signalalign.mea_algorithm import mea_alignment_from_signal_align, match_events_with_signalalign
+
+"""
+"remove_temp_folder": False,
+
+twoD_chemistry,
+
+"""
 
 
 class SignalAlignment(object):
@@ -28,13 +36,14 @@ class SignalAlignment(object):
                  diagonal_expansion,
                  constraint_trim,
                  degenerate,
-                 twoD_chemistry,
                  forward_reference,
                  backward_reference=None,
+                 twoD_chemistry=False,
                  target_regions=None,
                  output_format="full",
                  embed=False,
-                 event_table=False):
+                 event_table=False,
+                 alignment_file=None,):
         self.in_fast5 = in_fast5  # fast5 file to align
         self.destination = destination  # place where the alignments go, should already exist
         self.stateMachineType = stateMachineType  # flag for signalMachine
@@ -53,6 +62,7 @@ class SignalAlignment(object):
         self.event_table = event_table  # specify which event table to use to generate alignments
         self.backward_reference = backward_reference  # fasta path to backward reference if modified bases are used
         self.forward_reference = forward_reference  # fasta path to forward reference
+        self.alignment_file = alignment_file # guide aligments will be gotten from here if set
 
 
         if (in_templateHmm is not None) and os.path.isfile(in_templateHmm):
@@ -119,16 +129,34 @@ class SignalAlignment(object):
             model_label = ".sm"
             stateMachineType_flag = ""
 
-        guide_alignment = generateGuideAlignment(bwa_index=self.bwa_index, query=read_fasta_,
-                                                 temp_sam_path=temp_samfile_,
-                                                 target_regions=self.target_regions)
-        # ok = guide_alignment.validate(list(self.reference_map.keys()))
-        ok = guide_alignment.validate()
+        # get guide alignment
+        guide_alignment = None
 
-        if not ok:
-            self.failStop("[SignalAlignment.run]ERROR getting guide alignment", npRead)
+        # get from alignment file
+        if self.alignment_file is not None:
+            guide_alignment = getGuideAlignmentFromAlignmentFile(self.alignment_file, read_name=read_label)
+
+            # not found in alignment file
+            if guide_alignment is None:
+                self.failStop("[SignalAlignment.run] read {} not found in {}".format(read_label, self.alignment_file),
+                              npRead)
+                return False
+
+        # get using BWA
+        else:
+            guide_alignment = generateGuideAlignment(bwa_index=self.bwa_index, query=read_fasta_,
+                                                     temp_sam_path=temp_samfile_, target_regions=self.target_regions)
+            # could not map
+            if guide_alignment is None:
+                self.failStop("[SignalAlignment.run] ERROR getting guide alignment", npRead)
+                return False
+
+        # ensure valid
+        if not guide_alignment.validate():
+            self.failStop("[SignalAlignment.run] ERROR invalid guide alignment", npRead)
             return False
 
+        # write cigar to file
         cig_handle = open(cigar_file_, "w")
         cig_handle.write(guide_alignment.cigar + "\n")
         cig_handle.close()
