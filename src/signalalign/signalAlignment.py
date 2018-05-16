@@ -9,11 +9,11 @@ import pysam
 import subprocess
 # from sonLib.bioio import fastaWrite
 from signalalign import defaultModelFromVersion
-from SignalAlignment.nanoporeRead import NanoporeRead
-from SignalAlignment.utils.bwaWrapper import *
-from SignalAlignment.utils.fileHandlers import FolderHandler
-from SignalAlignment.utils.sequenceTools import fastaWrite
-from SignalAlignment.mea_algorithm import mea_alignment_from_signal_align, match_events_with_signalalign
+from signalalign.nanoporeRead import NanoporeRead
+from signalalign.utils.bwaWrapper import *
+from signalalign.utils.fileHandlers import FolderHandler
+from signalalign.utils.sequenceTools import fastaWrite
+from signalalign.mea_algorithm import mea_alignment_from_signal_align, match_events_with_signalalign
 
 class SignalAlignment(object):
     def __init__(self,
