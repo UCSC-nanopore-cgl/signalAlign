@@ -61,6 +61,7 @@ class SignalAlignment(object):
         self.check_for_temp_file_existance = check_for_temp_file_existance # don't recreate if files exist
         self.track_memory_usage = track_memory_usage # has the 'time' program append mem usage stats to output
         self.max_memory_usage_kb = None
+        self.read_label = None
 
 
         if (in_templateHmm is not None) and os.path.isfile(in_templateHmm):
@@ -97,6 +98,7 @@ class SignalAlignment(object):
         npRead = NanoporeRead(fast_five_file=self.in_fast5, twoD=self.twoD_chemistry, event_table=self.event_table,
                               initialize=True)
         read_label = npRead.read_label  # use this to identify the read throughout
+        self.read_label = read_label
 
         # np read
         npRead_ = self.addTempFilePath("temp_%s.npRead" % self.read_name)

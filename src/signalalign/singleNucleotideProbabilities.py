@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """Run signal-to-reference alignments
 """
 from __future__ import print_function
@@ -449,7 +449,8 @@ def aligner(work_queue, done_queue, service_name="aligner"):
                 f['track_memory_usage'] = True
                 alignment = SignalAlignment(**f)
                 alignment.run()
-                mem_usages.append(alignment.max_memory_usage_kb)
+                if alignment.max_memory_usage_kb is not None:
+                    mem_usages.append(alignment.max_memory_usage_kb)
             except Exception as e:
                 # get error and log it
                 message = "{}:{}".format(type(e), str(e))
