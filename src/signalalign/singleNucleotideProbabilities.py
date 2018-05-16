@@ -9,8 +9,10 @@ import shutil
 import subprocess
 import os
 import sys
+import pysam
 from argparse import ArgumentParser
 from random import shuffle
+from contextlib import closing
 from signalalign.nanoporeRead import NanoporeRead
 from signalalign.signalAlignment import SignalAlignment
 from signalalign.scripts.alignmentAnalysisLib import CallMethylation
@@ -30,6 +32,7 @@ POSTERIOR_IDENTITY_KEY = "posterior_identity"
 POSITIVE_STRAND_KEY = "positive_strand"
 ALIGNED_IDENTITY_KEY="aligned_identity"
 NO_GAP_ALIGNED_IDENTITY_KEY="no_gap_aligned_identity"
+MEM_USAGES="mem_usages"
 
 VALID_IDENTITY_RATIO = .85
 
@@ -87,10 +90,6 @@ def parse_args():
     return args
 
 
-def get_first_sequence(todo):
-    raise Exception("TODO")
-
-
 def resolvePath(p):
     if p is None:
         return None
@@ -111,6 +110,17 @@ def build_fast5_to_read_id_dict(fast5_locations):
     return fast5_to_read_id
 
 
+def get_reference_sequence(ref_location, contig, start_pos, end_pos):
+    # ensure faidx
+    if not os.path.isfile("{}.fai".format(ref_location)): subprocess.check_call(['samtools', 'faidx', ref_location])
+    if not os.path.isfile("{}.fai".format(ref_location)): pysam.faidx(ref_location)
+
+    # use pysam
+    with closing(pysam.FastaFile(ref_location)) as ref:
+        return ref.fetch(reference=contig, start=start_pos, end=end_pos)
+
+
+
 def validate_snp_directory(snp_directory, reference_sequence_path, alignment_file_location=None,
                            print_summary=False, move_files=True, make_plots=False):
     # prep
@@ -118,7 +128,7 @@ def validate_snp_directory(snp_directory, reference_sequence_path, alignment_fil
     all_posterior_identities = list()
     all_lengths = list()
     all_summaries = list()
-    full_reference_sequence = get_first_sequence(reference_sequence_path).upper()
+    # full_reference_sequence = get_first_sequence(reference_sequence_path).upper()
     files = glob.glob(os.path.join(snp_directory, "*.tsv"))
     if len(files) == 0:
         print("\n[singleNucleotideProbabilities] No files in {}\n".format(len(files), snp_directory))
@@ -142,8 +152,7 @@ def validate_snp_directory(snp_directory, reference_sequence_path, alignment_fil
     norw_cnt = 0
 
     for file in files:
-        summary, problem = validate_snp_file(file, full_reference_sequence,
-                                                      print_sequences=False, print_summary=print_summary)
+        summary, problem = validate_snp_file(file, reference_sequence_path, print_summary=print_summary)
         consensus_identity = summary[CONSENSUS_IDENTITY_KEY]
         posterior_identity = summary[POSTERIOR_IDENTITY_KEY]
         length = summary[LENGTH_KEY]
@@ -213,7 +222,7 @@ def validate_snp_directory(snp_directory, reference_sequence_path, alignment_fil
         missing_reads = 0
         min_read = 1
         min_signal = 1
-        read_identities = get_read_identities_from_sam(alignment_file_location, reference_string=full_reference_sequence)
+        read_identities = get_read_identities_from_sam(alignment_file_location, reference_sequence_path)
         for read in all_summaries:
             if read[READ_NAME_KEY] in read_identities:
                 read[NO_GAP_ALIGNED_IDENTITY_KEY] = read_identities[read[READ_NAME_KEY]][NO_GAP_ALIGNED_IDENTITY_KEY]
@@ -252,25 +261,7 @@ def validate_snp_directory(snp_directory, reference_sequence_path, alignment_fil
         plt.show()
 
 
-
-def rewrite_snp_file(snp_file, output_file_location):
-    with open(snp_file, 'r') as input, open(output_file_location, 'w') as output:
-        for line in input:
-            if line.startswith("#"):
-                output.write(line)
-            else:
-                line = line.strip().split("\t")
-                new_line = list()
-                new_line.append(line[0]) #ch -> cg
-                new_line.append(line[1]) #id -> id
-                new_line.append(line[5]) #pT -> pA
-                new_line.append(line[4]) #pG -> pC
-                new_line.append(line[3]) #pC -> pG
-                new_line.append(line[2]) #pA -> pT
-                output.write("\t".join(new_line) + "\n")
-
-
-def validate_snp_file(snp_file, full_reference_sequence, print_sequences=False, print_summary=False):
+def validate_snp_file(snp_file, reference_sequence_path, print_sequences=False, print_summary=False):
     identifier = os.path.basename(snp_file)
     consensus_sequence = list()
     all_probabilities = list()
@@ -285,6 +276,7 @@ def validate_snp_file(snp_file, full_reference_sequence, print_sequences=False, 
     forward = None
     read_name = None
     fast5_name =  None
+    contig = None
     with open(snp_file, 'r') as snp:
         for line in snp:
             if line.startswith("##"):
@@ -294,6 +286,8 @@ def validate_snp_file(snp_file, full_reference_sequence, print_sequences=False, 
                     read_name = line.split(":")[1].strip()
                 elif "fast5_input" in line:
                     fast5_name = line.split(":")[1].strip()
+                elif "contig" in line:
+                    contig = line.split(":")[1].strip()
                 continue
             elif line.startswith("#"):
                 identifier = "{}/{}".format(read_name, fast5_name)
@@ -342,7 +336,8 @@ def validate_snp_file(snp_file, full_reference_sequence, print_sequences=False, 
 
     # get sequences
     consensus_sequence = "".join(consensus_sequence)
-    reference_sequence = full_reference_sequence[min(first_pos, last_pos):max(first_pos, last_pos)+1].upper()
+    reference_sequence = get_reference_sequence(reference_sequence_path, contig,
+                                                min(first_pos, last_pos),max(first_pos, last_pos)+1).upper()
 
     # this is our quality metric
     length = 0
@@ -389,51 +384,52 @@ def validate_snp_file(snp_file, full_reference_sequence, print_sequences=False, 
     return summary, problem
 
 
-def get_read_identities_from_sam(sam_location, reference_string=None, reference_location=None):
-    #todo:
-    #ref string
-    #accept BAM or SAM
+def get_read_identities_from_sam(alignment_location, reference_location):
 
-    if reference_string is None:
-        reference_string = get_first_sequence(reference_location)
-
-    import pysam
-    sam = pysam.Samfile(sam_location, 'r')
+    # what we track
     read_to_identity = dict()
 
-    for aligned_segment in sam:
-        if not aligned_segment.is_secondary and not aligned_segment.is_unmapped:
-            query_name = aligned_segment.qname
-            read = aligned_segment.query_alignment_sequence
-            aligned_tuples = aligned_segment.get_aligned_pairs()
+    # ref mgmt
+    reference_string = None
+    ref_contig = None
 
-            # counts
-            len = 0
-            no_gap_len = 0
-            iden = 0.0
-            no_gap_iden = 0.0
+    with closing(pysam.AlignmentFile(alignment_location, 'rb' if alignment_location.endswith("bam") else 'r')) as aln:
+        for aligned_segment in aln:
+            if not aligned_segment.is_secondary and not aligned_segment.is_unmapped:
+                contig = aln.getrname(aligned_segment.rname)
+                if ref_contig is None or contig != ref_contig:
+                    reference_string = get_reference_sequence(reference_location, contig, 0, sys.maxsize)
+                query_name = aligned_segment.qname
+                read = aligned_segment.query_alignment_sequence
+                aligned_tuples = aligned_segment.get_aligned_pairs()
 
-            # iterate
-            for tuple in aligned_tuples:
-                # get characters
-                if tuple[0] is None: read_char = '-'
-                else: read_char = read[tuple[0]]
-                if tuple[1] is None: ref_char = '-'
-                else: ref_char = reference_string[tuple[1]]
+                # counts
+                len = 0
+                no_gap_len = 0
+                iden = 0.0
+                no_gap_iden = 0.0
 
-                #counts
-                len += 1
-                if read_char == ref_char: iden += 1
-                if read_char != '-' and ref_char != '-':
-                    no_gap_len += 1
-                    if read_char == ref_char: no_gap_iden += 1
+                # iterate
+                for tuple in aligned_tuples:
+                    # get characters
+                    if tuple[0] is None: read_char = '-'
+                    else: read_char = read[tuple[0]]
+                    if tuple[1] is None: ref_char = '-'
+                    else: ref_char = reference_string[tuple[1]]
 
-            # save
-            read_to_identity[query_name] = {
-                READ_NAME_KEY: query_name,
-                ALIGNED_IDENTITY_KEY: iden / len,
-                NO_GAP_ALIGNED_IDENTITY_KEY: no_gap_iden/ no_gap_len
-            }
+                    #counts
+                    len += 1
+                    if read_char == ref_char: iden += 1
+                    if read_char != '-' and ref_char != '-':
+                        no_gap_len += 1
+                        if read_char == ref_char: no_gap_iden += 1
+
+                # save
+                read_to_identity[query_name] = {
+                    READ_NAME_KEY: query_name,
+                    ALIGNED_IDENTITY_KEY: iden / len,
+                    NO_GAP_ALIGNED_IDENTITY_KEY: no_gap_iden/ no_gap_len
+                }
 
     return read_to_identity
 
@@ -443,14 +439,17 @@ def aligner(work_queue, done_queue, service_name="aligner"):
     # prep
     total_handled = 0
     failure_count = 0
+    mem_usages = list()
 
     #catch overall exceptions
     try:
         for f in iter(work_queue.get, 'STOP'):
             # catch exceptions on each element
             try:
+                f['track_memory_usage'] = True
                 alignment = SignalAlignment(**f)
                 alignment.run()
+                mem_usages.append(alignment.max_memory_usage_kb)
             except Exception as e:
                 # get error and log it
                 message = "{}:{}".format(type(e), str(e))
@@ -475,6 +474,7 @@ def aligner(work_queue, done_queue, service_name="aligner"):
               % (service_name, current_process().name, total_handled, failure_count))
         done_queue.put("{}:{}".format(TOTAL_KEY, total_handled))
         done_queue.put("{}:{}".format(FAILURE_KEY, failure_count))
+        done_queue.put("{}:{}".format(MEM_USAGES, ",".join(map(str, mem_usages))))
 
 
 def variant_caller(work_queue, done_queue, service_name="variant_caller"):
@@ -596,7 +596,16 @@ def discover_single_nucleotide_probabilities(working_folder, kmer_length, refere
 
             # run alignment
             print("[info] running aligner on %d fast5 files with %d workers" % (len(list_of_fast5s), workers))
-            run_service(aligner, list_of_fast5s, alignment_args, "in_fast5", workers)
+            total, failure, messages = run_service(aligner, list_of_fast5s, alignment_args, "in_fast5", workers)
+            memory_stats = list()
+            for message in messages:
+                if message.startswith(MEM_USAGES):
+                    memory_stats.extend(map(int, message.split(":")[1].split(",")))
+            if len(memory_stats) > 0:
+                kb_to_gb = lambda x: float(x) / (1 << 20)
+                print("[info] memory avg: %3f Gb" % (kb_to_gb(np.mean(memory_stats))))
+                print("[info] memory std: %3f Gb" % (kb_to_gb(np.std(memory_stats))))
+                print("[info] memory max: %3f Gb" % (kb_to_gb(max(memory_stats))))
 
             # get alignments
             alignments = [x for x in glob.glob(os.path.join(working_folder.path, "*.tsv")) if os.stat(x).st_size != 0]
@@ -719,8 +728,7 @@ def main(args):
     # first: see if we want to validate and return
     if args.validation_file is not None:
         if os.path.isfile(args.validation_file):
-            full_reference_sequence = get_first_sequence(args.ref).upper()
-            validate_snp_file(args.validation_file, full_reference_sequence, print_sequences=True, print_summary=True)
+            validate_snp_file(args.validation_file, args.ref, print_sequences=True, print_summary=True)
         elif os.path.isdir(args.validation_file):
             validate_snp_directory(args.validation_file, args.ref, print_summary=False, move_files=False,
                                    make_plots=True, alignment_file_location=args.alignment_file)

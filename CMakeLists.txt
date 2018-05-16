@@ -114,7 +114,7 @@ add_custom_target(
 
 #add_executable(estimateNanoporeParams ${estimateNanoporeParams})
 add_executable(signalMachine ${SOURCE_FILES} ${SIGNAL_MACHINE})
-target_link_libraries(signalMachine  -L${CMAKE_CURRENT_SOURCE_DIR}/htslib hts
+target_link_libraries(signalMachine -lpthread -lrt -lm -L${CMAKE_CURRENT_SOURCE_DIR}/htslib hts
         ${CMAKE_CURRENT_SOURCE_DIR}/sonLib/lib/sonLib.a
         ${CMAKE_CURRENT_SOURCE_DIR}/sonLib/lib/signalAlignLib.a
         ${CMAKE_CURRENT_SOURCE_DIR}/sonLib/lib/cuTest.a

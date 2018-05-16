@@ -198,6 +198,7 @@ class CallMethylation(object):
             i = 0
             success = False
             start = time.clock()
+            ref_char_counts = dict()
             try:
                 for site in sites:
                     # reporting
@@ -215,7 +216,8 @@ class CallMethylation(object):
                     # select the rows in the dataFrame that have events aligned to this position
                     crit = self.data['ref_index'].map(lambda x: x in positions)
                     select = self.data[crit].ix[(self.data['strand'] == strand) & (self.data['prob'] >= threshold)]
-                    select = select.drop(select[['strand', 'ref_kmer']], axis=1)
+                    # select = select.drop(select[['strand', 'ref_kmer']], axis=1)
+                    select = select.drop(select[['strand']], axis=1)
 
                     if select.empty:
                         continue
@@ -228,8 +230,10 @@ class CallMethylation(object):
                         if len(r.path_kmer) != self.kmer_length:
                             raise Exception("Got kmer_length mismatch!  Expected {} but got {} in {}.  Row:\n\t{}"
                                             .format(self.kmer_length, len(r.path_kmer), self.alignment_file_name, r))
-                        offset = site - r.event_index if regular_offset is True else (self.kmer_length - 1) - (site - r.event_index)
+                        offset = site - r.ref_index if regular_offset is True else (self.kmer_length - 1) - (site - r.ref_index)
                         call = r.path_kmer[offset]
+                        ref_char = r.ref_kmer[offset]
+                        ref_char_counts[ref_char] = ref_char_counts[ref_char] + 1 if ref_char in ref_char_counts else 1
                         marginal_probs[call] += r.prob
                         if contig is None: contig = r.contig
 
@@ -242,8 +246,8 @@ class CallMethylation(object):
                     i += 1
                 success = True
             finally:
-                print(self.identifier() + "completed {}/{} sites in {}s with {}".format(
-                    i, total_sites, int(time.clock() - start), "success" if success else "failure"))
+                print(self.identifier() + "completed {}/{} sites in {}s with {}.  (ref_chars: {})".format(
+                    i, total_sites, int(time.clock() - start), "success" if success else "failure", ref_char_counts))
 
         template_offset = True if self.forward is True else False
         complement_offset = False if self.forward is True else True

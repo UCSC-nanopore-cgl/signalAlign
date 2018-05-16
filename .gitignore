@@ -131,7 +131,8 @@ src/signalalign/utils/sequenceTools.pyc
 /tests/test_hdp/test_copy.hdp
 /tests/test_hdp/test.hdp
 cmake-build-debug/
-*.idea/
+*.idea
+.idea*
 .cache/
 *.pyc
 *.so

@@ -137,22 +137,22 @@ def getGuideAlignmentFromAlignmentFile(alignment_location, read_name=None, targe
 
     # couldn't find anything
     if n_aligned_segments == 0:
-        print("[exonerated_bwa_pysam] Found no aligned segments" +
+        print("[generateGuideAlignment] Found no aligned segments" +
               ("" if read_name is None else " for read {}".format(read_name)))
         return None
 
     if n_aligned_segments > 1:
-        print("[exonerated_bwa_pysam] WARNING more than 1 mapping, taking the first one heuristically")
+        print("[generateGuideAlignment] WARNING more than 1 mapping, taking the first one heuristically")
 
     # get cigar info
     try:
         query_start, query_end, reference_start, reference_end, cigar_string = _parseCigar(sam_cigar, reference_pos)
     except AssertionError as e:
-        print("[generateGuideAlignment]ERROR %s" % e)
+        print("[generateGuideAlignment] ERROR %s" % e)
         return None
 
     strand = ""
-    assert(flag is not None), "[exonerated_bwa_pysam] ERROR flag is None"
+    assert(flag is not None), "[generateGuideAlignment] ERROR flag is None"
 
     if int(flag) == 16:
         strand = "-"
@@ -162,12 +162,12 @@ def getGuideAlignmentFromAlignmentFile(alignment_location, read_name=None, targe
     if int(flag) == 0:
         strand = "+"
     elif int(flag) != 0 and int(flag) != 16:
-        print("[exonerated_bwa_pysam]ERROR unexpected alignment flag {flag}, not continuing with signal alignment"
+        print("[generateGuideAlignment] ERROR unexpected alignment flag {flag}, not continuing with signal alignment"
               " for {query}".format(flag=flag, query=query_name), file=sys.stderr)
         return None
 
-    assert(reference_name is not None), "[exonerated_bwa_pysam] ERROR reference_name is None"
-    assert(query_name is not None), "[exonerated_bwa_pysam] ERROR query_name is None"
+    assert(reference_name is not None), "[generateGuideAlignment] ERROR reference_name is None"
+    assert(query_name is not None), "[generateGuideAlignment] ERROR query_name is None"
 
     completeCigarString = "cigar: %s %i %i + %s %i %i %s 1 %s" % (
         query_name, query_start, query_end, reference_name, reference_start, reference_end, strand, cigar_string)
@@ -176,13 +176,27 @@ def getGuideAlignmentFromAlignmentFile(alignment_location, read_name=None, targe
         target_regions = target_regions if type(target_regions) == TargetRegions else TargetRegions(target_regions)
         keep = target_regions.check_aligned_region(reference_start, reference_end)
         if keep is False:
-            print("[exonerated_bwa_pysam]Read does not map witin the target regions, passing "
+            print("[generateGuideAlignment] Read does not map witin the target regions, passing "
                   "on signal-level alignment", file=sys.stderr)
             return None
         else:
             pass
 
     return GuideAlignment(completeCigarString, strand, reference_name)
+
+
+def getInfoFromCigarFile(cigar_file):
+    with open(cigar_file, 'r') as cig:
+        for line in cig:
+            if not line.startswith("cigar:"): continue
+            parts = line.split()
+            assert len(parts) >= 11, "[generateGuideAlignment] Malformed cigar file {}".format(cigar_file)
+            strand = parts[8]
+            assert strand == '+' or strand == "-", "[generateGuideAlignment] Unexpected strand '{}' in cigar line {}".format(strand, line)
+            reference_name = parts[5]
+            return strand, reference_name
+    assert False, "[generateGuideAlignment] No cigar line found in {}".format(cigar_file)
+
 
 
 def generateGuideAlignment(bwa_index, query, temp_sam_path, target_regions=None):
