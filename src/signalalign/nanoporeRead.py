@@ -151,7 +151,7 @@ class NanoporeRead(object):
         else:
             oned_root_address = self.get_latest_basecall_edition(TEMPLATE_BASECALL_KEY)
             assert oned_root_address, "{} is not in fast5file".format(TEMPLATE_BASECALL_KEY)
-        print("self.rna", self.rna)
+        # print("self.rna", self.rna)
         assert oned_root_address in self.fastFive, "{} is not in fast5file".format(oned_root_address)
         # print("oned_root_address", oned_root_address)
         if not any(x in self.fastFive[oned_root_address].attrs.keys() for x in VERSION_KEY):
@@ -190,7 +190,7 @@ class NanoporeRead(object):
             # reverse and replace "U"
             self.template_read = self.template_read.replace("U", "T")[::-1]
 
-        print(self.template_read)
+        # print(self.template_read)
         self.read_label           = self.bytes_to_string(self.fastFive[fastq_sequence_address][()].split()[0][1:])
         self.kmer_length          = len(self.fastFive[self.template_event_table_address][0][4])
         self.template_read_length = len(self.template_read)

@@ -77,8 +77,9 @@ class SignalAlignment(object):
     def run(self, get_expectations=False):
         print("[SignalAlignment.run]INFO: Starting on {read}".format(read=self.in_fast5), file=sys.stderr)
         if get_expectations:
-            assert self.in_templateHmm is not None and self.in_complementHmm is not None, \
-                "Need HMM files for model training"
+            assert self.in_templateHmm is not None, "Need template HMM files for model training"
+            if self.twoD_chemistry:
+                assert self.in_complementHmm is not None, "Need compement HMM files for model training"
         # file checks
         if os.path.isfile(self.in_fast5) is False:
             print("[SignalAlignment.run]ERROR: Did not find .fast5 at{file}".format(file=self.in_fast5))
@@ -86,7 +87,6 @@ class SignalAlignment(object):
 
         self.openTempFolder("tempFiles_%s" % self.read_name)
         npRead_ = self.addTempFilePath("temp_%s.npRead" % self.read_name)
-        # TODO is this totally fucked for RNA because of 3'-5' mapping?
         npRead = NanoporeRead(fast_five_file=self.in_fast5, twoD=self.twoD_chemistry, event_table=self.event_table)
         fH = open(npRead_, "w")
         ok = npRead.Write(parent_job=None, out_file=fH, initialize=True)
