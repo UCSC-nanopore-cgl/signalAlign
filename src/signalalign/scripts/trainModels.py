@@ -2,7 +2,6 @@
 """Train HMMs for alignment of signal data from the MinION
 """
 
-
 import sys
 import os
 import urllib.parse
@@ -25,9 +24,10 @@ from signalalign.utils.bwaWrapper import getBwaIndex
 
 
 class AbstractSamples(object):
-    def __init__(self, source, reference_map):
+    def __init__(self, source, fw_fasta_path, bw_fasta_path):
         self.source = source
-        self.reference_map = reference_map
+        self.fw_fasta_path = fw_fasta_path
+        self.bw_fasta_path = bw_fasta_path
 
     def _parse(self):
         raise NotImplementedError
@@ -38,25 +38,25 @@ class AbstractSamples(object):
     def getKey(self):
         return self.source
 
-    def getReferenceMap(self):
-        return self.reference_map
+    def getReferences(self):
+        return self.fw_fasta_path, self.bw_fasta_path
 
 
 class Fast5Directory(AbstractSamples):
-    def __init__(self, source, reference_map):
-        AbstractSamples.__init__(self, source, reference_map)
+    def __init__(self, source, fw_fasta_path, bw_fasta_path):
+        AbstractSamples.__init__(self, source, fw_fasta_path, bw_fasta_path)
         self.files = self._parse()
 
     def _parse(self):
-        return [self.source + x for x in os.listdir(self.source) if x.endswith(".fast5")]
+        return [os.path.join(self.source, x) for x in os.listdir(self.source) if x.endswith(".fast5")]
 
     def getFiles(self):
         return self.files
 
 
 class FileOfFilenames(AbstractSamples):
-    def __init__(self, source, reference_map):
-        AbstractSamples.__init__(self, source, reference_map)
+    def __init__(self, source, fw_fasta_path, bw_fasta_path):
+        AbstractSamples.__init__(self, source, fw_fasta_path, bw_fasta_path)
         self.files = self._parse()
 
     def _parse(self):
@@ -93,10 +93,11 @@ def parse_args():
                         help="limit the total length of sequence to use in training (batch size).")
     parser.add_argument('--in_template_hmm', '-T', action='store', dest='in_T_Hmm',
                         required=True, type=str, help="template model to bootstrap from, find a starting model in the "
-                        "models directory")
+                                                      "models directory")
     parser.add_argument('--in_complement_hmm', '-C', action='store', dest='in_C_Hmm',
-                        required=True, type=str, help="complement model to bootstrap from, find a starting model in the "
-                        "models directory")
+                        required=True, type=str,
+                        help="complement model to bootstrap from, find a starting model in the "
+                             "models directory")
     parser.add_argument('--templateHDP', '-tH', action='store', dest='templateHDP', default=None,
                         help="path to template HDP model to use")
     parser.add_argument('--complementHDP', '-cH', action='store', dest='complementHDP', default=None,
@@ -135,6 +136,7 @@ def get_2d_length(fast5):
 
 
 def get_1d_length(fast5):
+    print(fast5)
     read = h5py.File(fast5, "r")
     read_length = 0
     template_fastq_address = "/Analyses/Basecall_1D_000/BaseCalled_template/Fastq"
@@ -154,13 +156,13 @@ def cull_training_files(samples, training_amount, twoD):
     training_files = []
     for sample in samples:
         shuffle(sample.getFiles())
-        total_amount    = 0
-        file_count      = 0
+        total_amount = 0
+        file_count = 0
         get_seq_len_fcn = get_2d_length if twoD else get_1d_length
         # loop over files and add them to training list, break when we have enough bases to complete a batch
         # make a list of tuples [(fast5_path, (plus_ref_seq, minus_ref_seq))]
         for f in sample.getFiles():
-            training_files.append((f, sample.getReferenceMap()))
+            yield f, sample.fw_fasta_path, sample.bw_fasta_path
             file_count += 1
             total_amount += get_seq_len_fcn(f)
             if total_amount >= training_amount:
@@ -169,7 +171,7 @@ def cull_training_files(samples, training_amount, twoD):
               .format(file_count=file_count, bases=total_amount, sample=sample.getKey()), end="\n", file=sys.stderr)
 
     shuffle(training_files)
-    return training_files  # [(path_to_fast5, reference_map)...]
+    # return training_files  # [(path_to_fast5, reference_map)...]
 
 
 def get_expectations(work_queue, done_queue):
@@ -263,9 +265,9 @@ def validateConfig(config):
 
 
 def generateConfig(config_path):
-        if os.path.exists(config_path):
-            raise RuntimeError
-        config_content = textwrap.dedent("""\
+    if os.path.exists(config_path):
+        raise RuntimeError
+    config_content = textwrap.dedent("""\
                 # SignalAlign model training config file
                 output_dir: ../tests/
                 samples: [
@@ -295,10 +297,10 @@ def generateConfig(config_path):
                 TEST:
 
                 """)
-        fH = open(config_path, "w")
-        fH.write(config_content)
-        fH.flush()
-        fH.close()
+    fH = open(config_path, "w")
+    fH.write(config_content)
+    fH.flush()
+    fH.close()
 
 
 def trainModelTransitions(config):
@@ -307,23 +309,23 @@ def trainModelTransitions(config):
         options.update(sample)
         if options["fast5_dir"] is None and options["fofn"] is None:
             raise RuntimeError("Need to provide path to .fast5 files or file with filenames (fofn)")
-        reference_map = processReferenceFasta(fasta=config["reference"],
-                                              work_folder=working_folder,
-                                              motif_key=options["motif"],
-                                              sub_char=options["label"],
-                                              positions_file=options["positions_file"])
+        fw_fasta_path, bw_fasta_path = processReferenceFasta(fasta=config["reference"],
+                                                             work_folder=working_folder,
+                                                             motif_key=options["motif"],
+                                                             sub_char=options["label"],
+                                                             positions_file=options["positions_file"])
         if options["fast5_dir"] is not None:
             if options["fofn"] is not None:
                 print("WARNING Only using files is directory %s ignoring fofn %s"
                       % (options["files_dir"], options["fofn"]))
-            sample = Fast5Directory(options["fast5_dir"], reference_map)
+            sample = Fast5Directory(options["fast5_dir"], fw_fasta_path, bw_fasta_path)
         else:
-            sample = FileOfFilenames(options["fofn"], reference_map)
+            sample = FileOfFilenames(options["fofn"], fw_fasta_path, bw_fasta_path)
         return sample
 
     # make directory to put the files we're using
     working_folder = FolderHandler()
-    working_folder_path = working_folder.open_folder(config["output_dir"] + "temp_trainModels")
+    working_folder_path = working_folder.open_folder(os.path.join(config["output_dir"] + "temp_trainModels"))
     samples = [process_sample(s) for s in config["samples"]]
     if config["bwt"] is not None:
         print("[trainModels]Using provided BWT")
@@ -333,16 +335,37 @@ def trainModelTransitions(config):
         bwa_ref_index = getBwaIndex(config["reference"], working_folder_path)
         print("signalAlign - indexing reference, done", file=sys.stderr)
 
-    template_model_path   = config["in_T_Hmm"]
+    template_model_path = config["in_T_Hmm"]
     complement_model_path = config["in_C_Hmm"]
-    assert os.path.exists(template_model_path) and os.path.exists(complement_model_path), \
-        "Missing input models %s and %s" % (template_model_path, complement_model_path)
-    template_model   = get_model(config["stateMachineType"], template_model_path)
-    complement_model = get_model(config["stateMachineType"], complement_model_path) if config["twoD"] else None
+    complement_model = None
+    complement_hmm = None
+    # find model files
+    # make some paths to files to hold the HMMs
+    if config['twoD']:
+        assert os.path.exists(complement_model_path), \
+            "Missing complement model %s" % (complement_model_path)
+        complement_model = get_model(config["stateMachineType"], complement_model_path)
+        complement_hmm = working_folder.add_file_path("complement_trained.hmm")
+        copyfile(complement_model_path, complement_hmm)
+        assert os.path.exists(complement_hmm), "Problem copying default model to {}".format(complement_hmm)
+
+    assert os.path.exists(template_model_path), \
+        "Missing template model %s" % (template_model_path)
+    template_model = get_model(config["stateMachineType"], template_model_path)
+    template_hmm = working_folder.add_file_path("template_trained.hmm")
+    copyfile(template_model_path, template_hmm)
+    assert os.path.exists(template_hmm), "Problem copying default model to {}".format(template_hmm)
+    # # trained_models = [template_hmm, complement_hmm]
+    # # untrained_models = [template_model_path, complement_model_path]
+    # for default_model, trained_model in zip(untrained_models, trained_models):
+    #     assert os.path.exists(default_model), "Didn't find default model {}".format(default_model)
+    #     copyfile(default_model, trained_model)
+    #     assert os.path.exists(trained_model), "Problem copying default model to {}".format(trained_model)
+
 
     # get the input HDP, if we're using it
     if config["stateMachineType"] == "threeStateHdp":
-        template_hdp   = working_folder.add_file_path("%s" % config["templateHdp"].split("/")[-1])
+        template_hdp = working_folder.add_file_path("%s" % config["templateHdp"].split("/")[-1])
         copyfile(config["templateHdp"], template_hdp)
         if config["twoD"]:
             complement_hdp = working_folder.add_file_path("%s" % config["complementHdp"].split("/")[-1])
@@ -350,19 +373,8 @@ def trainModelTransitions(config):
         else:
             complement_hdp = None
     else:
-        template_hdp   = None
+        template_hdp = None
         complement_hdp = None
-
-    # make some paths to files to hold the HMMs
-    template_hmm     = working_folder.add_file_path("template_trained.hmm")
-    complement_hmm   = working_folder.add_file_path("complement_trained.hmm")
-    trained_models   = [template_hmm, complement_hmm]
-    untrained_models = [template_model_path, complement_model_path]
-
-    for default_model, trained_model in zip(untrained_models, trained_models):
-        assert os.path.exists(default_model), "Didn't find default model {}".format(default_model)
-        copyfile(default_model, trained_model)
-        assert os.path.exists(trained_model), "Problem copying default model to {}".format(trained_model)
 
     # start iterating
     i = 0
@@ -372,16 +384,17 @@ def trainModelTransitions(config):
                                              training_amount=config["training_bases"],
                                              twoD=config["twoD"])
         # setup
-        workers    = config["job_count"]
+        workers = config["job_count"]
         work_queue = Manager().Queue()
         done_queue = Manager().Queue()
         jobs = []
 
         # get expectations for all the files in the queue
         # file_ref_tuple should be (fast5, (plus_ref_seq, minus_ref_seq))
-        for fast5, ref_map in training_files:
+        for fast5, forward_reference, backward_reference in training_files:
             alignment_args = {
-                "reference_map": ref_map,
+                "backward_reference": backward_reference,
+                "forward_reference": forward_reference,
                 "destination": working_folder_path,
                 "stateMachineType": config["stateMachineType"],
                 "bwa_index": bwa_ref_index,
@@ -447,6 +460,12 @@ def trainModelTransitions(config):
                 assert (template_model.running_likelihoods[-2] < template_model.running_likelihoods[-1]) and \
                        (complement_model.running_likelihoods[-2] < complement_model.running_likelihoods[-1]), \
                     "Testing: Likelihood error, went up"
+        elif len(template_model.running_likelihoods) > 0:
+            print("{i}| {t_likelihood}".format(t_likelihood=template_model.running_likelihoods[-1], i=i))
+            if config["TEST"] and (len(template_model.running_likelihoods) >= 2):
+                print("TESTING")
+                assert (template_model.running_likelihoods[-2] < template_model.running_likelihoods[-1]), "Testing: Likelihood error, went up"
+
         i += 1
 
     # if we're using HDP, trim the final Hmm (remove assignments)
@@ -466,7 +485,8 @@ def main():
                                 help='Path to the (filled in) config file, generated with "generate".')
         subparsers.add_parser("generate", help="generates a config file for your run, do this first")
         return parser.parse_args()
-    args   = parse_args()
+
+    args = parse_args()
     if args.command == "generate":
         try:
             config_path = os.path.join(os.getcwd(), "trainModels-config.yaml")

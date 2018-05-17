@@ -384,7 +384,7 @@ stList *performSignalAlignment(StateMachine *sM, Sequence *eventSequence, int64_
     // do alignment
     stList *alignedPairs = getAlignedPairsUsingAnchors(sM, sX, eventSequence, filteredRemappedAnchors, p,
                                                        diagonalCalculationPosteriorMatchProbs, 1, 1);
-
+    sequence_destruct(sX);
     return alignedPairs;
 }
 
