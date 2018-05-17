@@ -122,7 +122,7 @@ def get_reference_sequence(ref_location, contig, start_pos, end_pos):
 
 
 def validate_snp_directory(snp_directory, reference_sequence_path, alignment_file_location=None,
-                           print_summary=False, move_files=True, make_plots=False):
+                           print_summary=False, move_files=False, make_plots=False):
     # prep
     all_consensus_identities = list()
     all_posterior_identities = list()

@@ -199,6 +199,7 @@ class CallMethylation(object):
             success = False
             start = time.clock()
             ref_char_counts = dict()
+            match_char_counts = dict()
             try:
                 for site in sites:
                     # reporting
@@ -232,6 +233,8 @@ class CallMethylation(object):
                                             .format(self.kmer_length, len(r.path_kmer), self.alignment_file_name, r))
                         offset = site - r.ref_index if regular_offset is True else (self.kmer_length - 1) - (site - r.ref_index)
                         call = r.path_kmer[offset]
+                        match_char = r.match_kmer[offset]
+                        match_char_counts[match_char] = match_char_counts[match_char] + 1 if match_char in match_char_counts else 1
                         ref_char = r.ref_kmer[offset]
                         ref_char_counts[ref_char] = ref_char_counts[ref_char] + 1 if ref_char in ref_char_counts else 1
                         marginal_probs[call] += r.prob
@@ -246,8 +249,8 @@ class CallMethylation(object):
                     i += 1
                 success = True
             finally:
-                print(self.identifier() + "completed {}/{} sites in {}s with {}.  (ref_chars: {})".format(
-                    i, total_sites, int(time.clock() - start), "success" if success else "failure", ref_char_counts))
+                print(self.identifier() + "completed {}/{} sites in {}s with {}.  (ref_chars: {}, match_chars: {})".format(
+                    i, total_sites, int(time.clock() - start), "success" if success else "failure", ref_char_counts, match_char_counts))
 
         template_offset = True if self.forward is True else False
         complement_offset = False if self.forward is True else True
