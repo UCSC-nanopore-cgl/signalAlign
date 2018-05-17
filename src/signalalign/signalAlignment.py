@@ -86,8 +86,9 @@ class SignalAlignment(object):
     def run(self, get_expectations=False):
         print("[SignalAlignment.run] INFO: Starting on {read}".format(read=self.in_fast5))
         if get_expectations:
-            assert self.in_templateHmm is not None and self.in_complementHmm is not None, \
-                "Need HMM files for model training"
+            assert self.in_templateHmm is not None, "Need template HMM files for model training"
+            if self.twoD_chemistry:
+                assert self.in_complementHmm is not None, "Need compement HMM files for model training"
         # file checks
         if os.path.isfile(self.in_fast5) is False:
             print("[SignalAlignment.run] ERROR: Did not find .fast5 at{file}".format(file=self.in_fast5))
@@ -110,7 +111,6 @@ class SignalAlignment(object):
             if not ok:
                 self.failStop("[SignalAlignment.run] File: %s did not pass initial checks" % self.read_name, npRead)
                 return False
-
         # read info
         read_fasta_ = self.addTempFilePath("temp_seq_%s.fa" % read_label)
         if self.twoD_chemistry:

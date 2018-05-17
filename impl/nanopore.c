@@ -585,6 +585,12 @@ void nanopore_nanoporeReadDestruct(NanoporeRead *npRead) {
     free(npRead->templateEvents);
     free(npRead->complementEventMap);
     free(npRead->complementEvents);
+    free(npRead->complementRead);
+    free(npRead->templateRead);
+    free(npRead->templateStrandEventMap);
+    free(npRead->complementStrandEventMap);
+    free(npRead->templateModelState);
+    free(npRead->complementModelState);
     free(npRead);
 }
 
