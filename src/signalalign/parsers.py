@@ -6,7 +6,6 @@
 # This program will read in an abf file using read_abf.py and
 # pull out the events, saving them as text files.
 
-
 import sys
 from itertools import tee, chain
 import re

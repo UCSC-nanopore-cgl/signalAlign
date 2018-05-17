@@ -20,7 +20,7 @@ def reverse_complement(dna, reverse=True, complement=True):
     """
     
     # Make translation table
-    trans_table = string.maketrans('ATGCatgc', 'TACGtacg')
+    trans_table = str.maketrans('ATGCatgc', 'TACGtacg')
     
     # Make complement to DNA
     comp_dna = dna.translate(trans_table)

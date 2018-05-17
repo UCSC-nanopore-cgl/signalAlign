@@ -17,14 +17,11 @@ char *fastaHandler_getSubSequence(char *fastaReferencePath, int64_t start, int64
                                 const char *sequence_name) {
     // index reference
     faidx_t *fasta_index = fai_load(fastaReferencePath);
+    int length;
 
     if (strand) {
-        //    need pointer to length for fetching the sequence
 
-        int length = end - start;
-        int *l = &length;
-
-        char *sequence = faidx_fetch_seq(fasta_index, sequence_name, start, end-1, l);
+        char *sequence = faidx_fetch_seq(fasta_index, sequence_name, start, end-1, &length);
         if (length == -2) {
             st_errAbort("[signalMachine] ERROR %d: sequence name: %s is not in reference fasta: %s \n",
                         length, sequence_name, fastaReferencePath);
@@ -33,10 +30,8 @@ char *fastaHandler_getSubSequence(char *fastaReferencePath, int64_t start, int64
         return sequence;
 
     }
-    int length = start - end;
-    int *l = &length;
 
-    char *sequence = faidx_fetch_seq(fasta_index, sequence_name, end, start-1, l);
+    char *sequence = faidx_fetch_seq(fasta_index, sequence_name, end, start-1, &length);
     if (length == -2) {
         st_errAbort("[signalMachine] ERROR %d: sequence name: %s is not in reference fasta: %s \n",
                     length, sequence_name, fastaReferencePath);

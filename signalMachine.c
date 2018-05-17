@@ -69,7 +69,7 @@ static inline char *makeReferenceKmer(const char *k_i, Strand strand, bool forwa
 }
 
 static inline char *kmerFromString(const char *string, int64_t start, int64_t kmerLength) {
-    char *k_i = st_malloc(kmerLength * sizeof(char));
+    char *k_i = st_malloc((kmerLength + 1) * sizeof(char));
     for (int64_t i = 0; i < kmerLength; i++) {
         k_i[i] = *(string + (start + i));
     }
@@ -598,6 +598,7 @@ int main(int argc, char *argv[]) {
     // parse input CIGAR to get anchors
     struct PairwiseAlignment *pA;
     pA = cigarRead(fileHandleIn);
+    fclose(fileHandleIn);
 
     // Alignment Parameters //
     // make the pairwise alignment parameters

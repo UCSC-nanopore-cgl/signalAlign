@@ -1,6 +1,7 @@
 """hiddenMarkovModel.py contains objects for handling HMMs for SignalAlign"""
 
 
+from __future__ import print_function
 import sys
 import os
 

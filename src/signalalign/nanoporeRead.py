@@ -1,5 +1,5 @@
 
-
+from __future__ import print_function
 import sys
 import h5py
 import re
@@ -18,7 +18,7 @@ SUPPORTED_1D_VERSIONS   = ("1.0.1", "1.2.1", "1.2.4", "1.23.0", "1.22.4", "2.1.0
 
 
 class NanoporeRead(object):
-    def __init__(self, fast_five_file, twoD=False, event_table=''):
+    def __init__(self, fast_five_file, twoD=False, event_table='', initialize=False):
         # load the fast5
         self.filename = fast_five_file         # fast5 file path
         self.is_open = self.open()             # bool, is the member .fast5 open?
@@ -53,6 +53,8 @@ class NanoporeRead(object):
         if self.is_read_rna():
             self.rna = True
             assert self.twoD is False, "Cannot perform 2D analysis when using RNA data"
+        if initialize:
+            self.Initialize()
 
     def open(self):
         try:
@@ -102,7 +104,7 @@ class NanoporeRead(object):
     #             else:
     #                 return path.format(highest)  # the new base-called version
 
-    def Initialize(self, parent_job):
+    def Initialize(self, parent_job=None):
         if not self.is_open:
             ok = self.open()
             if not ok:
@@ -115,7 +117,7 @@ class NanoporeRead(object):
             ok = self._initialize(parent_job)
         return ok
 
-    def _initialize(self, parent_job):
+    def _initialize(self, parent_job=None):
         """Routine setup 1D NanoporeReads, returns false if basecalled with upsupported
         version or is not base-called
         """
@@ -195,7 +197,7 @@ class NanoporeRead(object):
         self.kmer_length          = len(self.fastFive[self.template_event_table_address][0][4])
         self.template_read_length = len(self.template_read)
         if self.template_read_length <= 0 or not self.read_label or self.kmer_length <= 0:
-            self.logError("[NanoporeRead:_initialize]ERROR %s illegal read parameters "
+            self.logError("[NanoporeRead:_initialize]ERROR illegal read parameters "
                           "template_read_length: %s, read_label: %s, kmer_length: %s"
                           % (self.template_read_length, self.read_label, self.kmer_length), parent_job)
             self.close()

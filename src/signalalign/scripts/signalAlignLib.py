@@ -1,6 +1,7 @@
 """Small library for working with MinION data
 """
 
+from __future__ import print_function
 import sys
 import os
 import pysam
