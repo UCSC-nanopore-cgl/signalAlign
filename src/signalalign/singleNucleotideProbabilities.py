@@ -398,13 +398,13 @@ def get_read_identities_from_sam(alignment_location, reference_location):
             if not aligned_segment.is_secondary and not aligned_segment.is_unmapped:
                 contig = aln.getrname(aligned_segment.rname)
                 if ref_contig is None or contig != ref_contig:
-                    reference_string = get_reference_sequence(reference_location, contig, 0, sys.maxsize)
+                    reference_string = get_reference_sequence(reference_location, contig, None, None)
                 query_name = aligned_segment.qname
-                read = aligned_segment.query_alignment_sequence
+                read = aligned_segment.query_sequence
                 aligned_tuples = aligned_segment.get_aligned_pairs()
 
                 # counts
-                len = 0
+                length = 0
                 no_gap_len = 0
                 iden = 0.0
                 no_gap_iden = 0.0
@@ -413,12 +413,19 @@ def get_read_identities_from_sam(alignment_location, reference_location):
                 for tuple in aligned_tuples:
                     # get characters
                     if tuple[0] is None: read_char = '-'
+                    elif len(read) <= tuple[0]:
+                        print("Alignment pos {} exceeds read length {}: {}".format(tuple[0], len(read), query_name))
+                        read_char = '-'
                     else: read_char = read[tuple[0]]
                     if tuple[1] is None: ref_char = '-'
                     else: ref_char = reference_string[tuple[1]]
 
+                    # upper
+                    read_char = read_char.upper()
+                    ref_char = ref_char.upper()
+
                     #counts
-                    len += 1
+                    length += 1
                     if read_char == ref_char: iden += 1
                     if read_char != '-' and ref_char != '-':
                         no_gap_len += 1
@@ -427,8 +434,8 @@ def get_read_identities_from_sam(alignment_location, reference_location):
                 # save
                 read_to_identity[query_name] = {
                     READ_NAME_KEY: query_name,
-                    ALIGNED_IDENTITY_KEY: iden / len,
-                    NO_GAP_ALIGNED_IDENTITY_KEY: no_gap_iden/ no_gap_len
+                    ALIGNED_IDENTITY_KEY: iden / length,
+                    NO_GAP_ALIGNED_IDENTITY_KEY: no_gap_iden / no_gap_len
                 }
 
     return read_to_identity
@@ -521,50 +528,38 @@ def variant_caller(work_queue, done_queue, service_name="variant_caller"):
 def substitute_reference_positions(reference_location, step, offset, work_folder, ambiguity_char="X"):
 
     # file locations
-    fw_fasta_path = work_folder.add_file_path(
-        "forward.s{}.o{}.{}".format(step, offset, os.path.basename(reference_location)))
-    bw_fasta_path = work_folder.add_file_path(
-        "backward.s{}.o{}.{}".format(step, offset, os.path.basename(reference_location)))
+    sub_fasta_path = work_folder.add_file_path(
+        "ref_ambig.s{}.o{}.{}".format(step, offset, os.path.basename(reference_location)))
 
     # already created
-    if os.path.isfile(fw_fasta_path) and os.path.isfile(bw_fasta_path):
-        print("[substitute_reference_positions] Forward and backward fasta files exist: {}, {}".format(
-            fw_fasta_path, bw_fasta_path))
-        return fw_fasta_path, bw_fasta_path
+    if os.path.isfile(sub_fasta_path):
+        print("[substitute_reference_positions] Substituted reference fasta file exists: {}".format(
+            sub_fasta_path))
+        return sub_fasta_path
 
     # log
-    print("[substitute_reference_positions] Creating forward and backward fasta files: {}, {}".format(
-        fw_fasta_path, bw_fasta_path))
+    print("[substitute_reference_positions] Creating substituted reference fasta file: {}".format(
+        sub_fasta_path))
     
-    # todo - this is how it was done, and I think it's different from below
-    # t_seq = list(sequence)
-    # c_seq = list(reverse_complement(sequence, reverse=False, complement=True))
-    # for position in positions:
-    #     t_seq[position] = "X"
-    #     c_seq[position] = "X"
-    # t_seq = ''.join(t_seq)
-    # c_seq = ''.join(c_seq)
-
     # write
-    with open(bw_fasta_path, 'w') as bw_outfasta, open(fw_fasta_path, 'w') as fw_outfasta:
+    with open(sub_fasta_path, 'w') as outfasta:
         for header, comment, sequence in read_fasta(reference_location):
             sequence = list(sequence)
             for i in range(len(sequence)):
                 if i % step == offset: sequence[i] = ambiguity_char
-            fw_sequence = ''.join(sequence).upper()
-            bw_sequence = reverse_complement(fw_sequence, reverse=False, complement=True)
+            subst_sequence = ''.join(sequence).upper()
 
-            print(">%s %s\n%s" % (header, "backward", bw_sequence), file=bw_outfasta)
-            print(">%s %s\n%s" % (header, "forward", fw_sequence), file=fw_outfasta)
+            print(">%s %s\n%s" % (header, "substituted:{},step:{},offset:{}".format(ambiguity_char, step, offset),
+                                  subst_sequence), file=outfasta)
 
     # produce faidx file
-    for path in [fw_fasta_path, bw_fasta_path]:
+    for path in [sub_fasta_path]:
         args = ["samtools", "faidx", path]
         subprocess.check_call(args)
         assert os.path.isfile("{}.fai".format(path)), "Error creating FAIDX file for: {}".format(path)
 
     # return locations
-    return fw_fasta_path, bw_fasta_path
+    return sub_fasta_path
 
 
 def discover_single_nucleotide_probabilities(working_folder, kmer_length, reference_location,
@@ -591,9 +586,8 @@ def discover_single_nucleotide_probabilities(working_folder, kmer_length, refere
                 len(alignments), len(list_of_fast5s), saved_step_dir))
         else:
             # build reference
-            fw_sub_ref, bw_sub_ref = substitute_reference_positions(reference_location, step_size, s, working_folder)
-            alignment_args['forward_reference'] = fw_sub_ref
-            alignment_args['backward_reference'] = bw_sub_ref
+            substitution_ref = substitute_reference_positions(reference_location, step_size, s, working_folder)
+            alignment_args['forward_reference'] = substitution_ref
 
             # run alignment
             print("[info] running aligner on %d fast5 files with %d workers" % (len(list_of_fast5s), workers))

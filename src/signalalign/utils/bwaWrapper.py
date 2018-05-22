@@ -144,21 +144,12 @@ def getGuideAlignmentFromAlignmentFile(alignment_location, read_name=None, targe
     if n_aligned_segments > 1:
         print("[generateGuideAlignment] WARNING more than 1 mapping, taking the first one heuristically")
 
-    # get cigar info
-    try:
-        query_start, query_end, reference_start, reference_end, cigar_string = _parseCigar(sam_cigar, reference_pos)
-    except AssertionError as e:
-        print("[generateGuideAlignment] ERROR %s" % e)
-        return None
-
+    # get strand
     strand = ""
     assert(flag is not None), "[generateGuideAlignment] ERROR flag is None"
 
     if int(flag) == 16:
         strand = "-"
-        temp = reference_start
-        reference_start = reference_end
-        reference_end = temp
     if int(flag) == 0:
         strand = "+"
     elif int(flag) != 0 and int(flag) != 16:
@@ -166,6 +157,21 @@ def getGuideAlignmentFromAlignmentFile(alignment_location, read_name=None, targe
               " for {query}".format(flag=flag, query=query_name), file=sys.stderr)
         return None
 
+    # get cigar info
+    try:
+        query_start, query_end, reference_start, reference_end, cigar_string = _parseCigar(sam_cigar, reference_pos,
+                                                                                           forward=strand == "+")
+    except AssertionError as e:
+        print("[generateGuideAlignment] ERROR %s" % e)
+        return None
+
+    # account for strand
+    if strand == '-':
+        temp = reference_start
+        reference_start = reference_end
+        reference_end = temp
+
+    # santity
     assert(reference_name is not None), "[generateGuideAlignment] ERROR reference_name is None"
     assert(query_name is not None), "[generateGuideAlignment] ERROR query_name is None"
 
