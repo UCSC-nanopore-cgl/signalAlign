@@ -14,11 +14,9 @@ from argparse import ArgumentParser
 from random import shuffle
 from contextlib import closing
 from signalalign.nanoporeRead import NanoporeRead
-from signalalign.signalAlignment import SignalAlignment
+from signalalign.signalAlignment import SignalAlignment, multithread_signal_alignment
 from signalalign.scripts.alignmentAnalysisLib import CallMethylation
 from signalalign.utils.fileHandlers import FolderHandler
-from signalalign.utils.bwaWrapper import getBwaIndex
-from signalalign.utils.sequenceTools import reverse_complement
 from signalalign.utils.parsers import read_fasta
 from signalalign.utils.multithread import *
 from signalalign.motif import getDegenerateEnum
@@ -587,20 +585,20 @@ def discover_single_nucleotide_probabilities(working_folder, kmer_length, refere
         else:
             # build reference
             substitution_ref = substitute_reference_positions(reference_location, step_size, s, working_folder)
-            alignment_args['forward_reference'] = substitution_ref
 
             # run alignment
-            print("[info] running aligner on %d fast5 files with %d workers" % (len(list_of_fast5s), workers))
-            total, failure, messages = run_service(aligner, list_of_fast5s, alignment_args, "in_fast5", workers)
-            memory_stats = list()
-            for message in messages:
-                if message.startswith(MEM_USAGES):
-                    memory_stats.extend(map(int, message.split(":")[1].split(",")))
-            if len(memory_stats) > 0:
-                kb_to_gb = lambda x: float(x) / (1 << 20)
-                print("[info] memory avg: %3f Gb" % (kb_to_gb(np.mean(memory_stats))))
-                print("[info] memory std: %3f Gb" % (kb_to_gb(np.std(memory_stats))))
-                print("[info] memory max: %3f Gb" % (kb_to_gb(max(memory_stats))))
+            # print("[info] running aligner on %d fast5 files with %d workers" % (len(list_of_fast5s), workers))
+            # total, failure, messages = run_service(aligner, list_of_fast5s, alignment_args, "in_fast5", workers)
+            # memory_stats = list()
+            # for message in messages:
+            #     if message.startswith(MEM_USAGES):
+            #         memory_stats.extend(map(int, message.split(":")[1].split(",")))
+            # if len(memory_stats) > 0:
+            #     kb_to_gb = lambda x: float(x) / (1 << 20)
+            #     print("[info] memory avg: %3f Gb" % (kb_to_gb(np.mean(memory_stats))))
+            #     print("[info] memory std: %3f Gb" % (kb_to_gb(np.std(memory_stats))))
+            #     print("[info] memory max: %3f Gb" % (kb_to_gb(max(memory_stats))))
+            multithread_signal_alignment(alignment_args, list_of_fast5s, workers, substitution_ref)
 
             # get alignments
             alignments = [x for x in glob.glob(os.path.join(working_folder.path, "*.tsv")) if os.stat(x).st_size != 0]
@@ -719,7 +717,6 @@ def main(args):
     command_line = " ".join(sys.argv[:])
     print("[singleNucleotideProbabilities] Command Line: {cmdLine}\n".format(cmdLine=command_line), file=sys.stderr)
 
-
     # first: see if we want to validate and return
     if args.validation_file is not None:
         if os.path.isfile(args.validation_file):
@@ -735,7 +732,6 @@ def main(args):
     args.files_dir           = resolvePath(args.files_dir)
     args.ref                 = resolvePath(args.ref)
     args.out                 = resolvePath(args.out)
-    args.bwt                 = resolvePath(args.bwt)
     args.in_T_Hmm            = resolvePath(args.in_T_Hmm)
     args.in_C_Hmm            = resolvePath(args.in_C_Hmm)
     args.templateHDP         = resolvePath(args.templateHDP)
@@ -748,7 +744,8 @@ def main(args):
     args.kmer_size = int(args.kmer_size)
 
     start_message = """
-#   Starting BonnyDoon Error-Correction
+#   Single Nucleotide Probabilities
+#
 #   Aligning files from: {fileDir}
 #   Aligning to reference: {reference}
 #   Aligning maximum of {nbFiles} files
@@ -789,22 +786,12 @@ def main(args):
     temp_folder = FolderHandler()
     temp_dir_path = temp_folder.open_folder(os.path.join(args.out, "tempFiles_errorCorrection"))
 
-    # get bwa index
-    if args.bwt is not None:
-        print("[singleNucleotideProbabilities] using provided BWT %s" % args.bwt)
-        bwa_ref_index = args.bwt
-    else:
-        print("[singleNucleotideProbabilities] indexing reference at %s" % args.ref, file=sys.stderr)
-        bwa_ref_index =  getBwaIndex(args.ref, temp_dir_path)
-        print("[singleNucleotideProbabilities] indexing reference, done", file=sys.stderr)
-
-
     # alignment args are the parameters to the HMM/HDP model, and don't change
     alignment_args = {
         # "path_to_EC_refs": None,
         "destination": temp_dir_path,
         "stateMachineType": args.stateMachineType,
-        "bwa_index": bwa_ref_index,
+        "bwa_index": args.bwt,
         "in_templateHmm": args.in_T_Hmm,
         "in_complementHmm": args.in_C_Hmm,
         "in_templateHdp": args.templateHDP,
@@ -814,7 +801,8 @@ def main(args):
         "constraint_trim": args.constraint_trim,
         "target_regions": None,
         "degenerate": getDegenerateEnum("variant"),
-        "alignment_file": args.alignment_file
+        "alignment_file": args.alignment_file,
+        'track_memory_usage': True,
     }
 
     # get the sites that have proposed edits
