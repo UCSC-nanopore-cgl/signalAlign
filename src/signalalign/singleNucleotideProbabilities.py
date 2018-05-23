@@ -18,7 +18,7 @@ from signalalign.signalAlignment import SignalAlignment
 from signalalign.scripts.alignmentAnalysisLib import CallMethylation
 from signalalign.utils.fileHandlers import FolderHandler
 from signalalign.utils.bwaWrapper import getBwaIndex
-from signalalign.utils.sequenceTools import reverse_complement
+from signalalign.utils.sequenceTools import reverse_complement, replace_periodic_reference_positions
 from signalalign.utils.parsers import read_fasta
 from signalalign.utils.multithread import *
 from signalalign.motif import getDegenerateEnum
@@ -524,44 +524,6 @@ def variant_caller(work_queue, done_queue, service_name="variant_caller"):
         done_queue.put("{}:{}".format(FAILURE_KEY, failure_count))
 
 
-
-def substitute_reference_positions(reference_location, step, offset, work_folder, ambiguity_char="X"):
-
-    # file locations
-    sub_fasta_path = work_folder.add_file_path(
-        "ref_ambig.s{}.o{}.{}".format(step, offset, os.path.basename(reference_location)))
-
-    # already created
-    if os.path.isfile(sub_fasta_path):
-        print("[substitute_reference_positions] Substituted reference fasta file exists: {}".format(
-            sub_fasta_path))
-        return sub_fasta_path
-
-    # log
-    print("[substitute_reference_positions] Creating substituted reference fasta file: {}".format(
-        sub_fasta_path))
-    
-    # write
-    with open(sub_fasta_path, 'w') as outfasta:
-        for header, comment, sequence in read_fasta(reference_location):
-            sequence = list(sequence)
-            for i in range(len(sequence)):
-                if i % step == offset: sequence[i] = ambiguity_char
-            subst_sequence = ''.join(sequence).upper()
-
-            print(">%s %s\n%s" % (header, "substituted:{},step:{},offset:{}".format(ambiguity_char, step, offset),
-                                  subst_sequence), file=outfasta)
-
-    # produce faidx file
-    for path in [sub_fasta_path]:
-        args = ["samtools", "faidx", path]
-        subprocess.check_call(args)
-        assert os.path.isfile("{}.fai".format(path)), "Error creating FAIDX file for: {}".format(path)
-
-    # return locations
-    return sub_fasta_path
-
-
 def discover_single_nucleotide_probabilities(working_folder, kmer_length, reference_location,
                                              list_of_fast5s, alignment_args, workers, step_size,
                                              output_directory=None, use_saved_alignments=True, save_alignments=True):
@@ -585,8 +547,12 @@ def discover_single_nucleotide_probabilities(working_folder, kmer_length, refere
             print("[info] using {} saved alignments (of {} fast5s) in {}".format(
                 len(alignments), len(list_of_fast5s), saved_step_dir))
         else:
+            # file locations
+            sub_fasta_path = work_folder.add_file_path(
+                "ref_ambig.s{}.o{}.{}".format(step, offset, os.path.basename(reference_location)))
             # build reference
-            substitution_ref = substitute_reference_positions(reference_location, step_size, s, working_folder)
+            substitution_ref = replace_periodic_reference_positions(reference_location, sub_fasta_path, step_size, s)
+            samtools_faidx_fasta(substitution_ref)
             alignment_args['forward_reference'] = substitution_ref
 
             # run alignment

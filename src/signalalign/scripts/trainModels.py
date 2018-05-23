@@ -153,7 +153,7 @@ def get_1d_length(fast5):
 
 def cull_training_files(samples, training_amount, twoD):
     print("trainModels - culling training files.\n", end="", file=sys.stderr)
-    training_files = []
+    # training_files = []
     for sample in samples:
         shuffle(sample.getFiles())
         total_amount = 0
@@ -163,6 +163,7 @@ def cull_training_files(samples, training_amount, twoD):
         # make a list of tuples [(fast5_path, (plus_ref_seq, minus_ref_seq))]
         for f in sample.getFiles():
             yield f, sample.fw_fasta_path, sample.bw_fasta_path
+            # training_files.append((f, sample.fw_fasta_path, sample.bw_fasta_path))
             file_count += 1
             total_amount += get_seq_len_fcn(f)
             if total_amount >= training_amount:
@@ -170,7 +171,7 @@ def cull_training_files(samples, training_amount, twoD):
         print("Culled {file_count} training files, for {bases} from {sample}."
               .format(file_count=file_count, bases=total_amount, sample=sample.getKey()), end="\n", file=sys.stderr)
 
-    shuffle(training_files)
+    # shuffle(training_files)
     # return training_files  # [(path_to_fast5, reference_map)...]
 
 
@@ -292,7 +293,6 @@ def generateConfig(config_path):
                 diagonal_expansion:
                 constraint_trim:
                 twoD: true
-
                 DEBUG: true
                 TEST:
 
@@ -355,24 +355,23 @@ def trainModelTransitions(config):
     template_hmm = working_folder.add_file_path("template_trained.hmm")
     copyfile(template_model_path, template_hmm)
     assert os.path.exists(template_hmm), "Problem copying default model to {}".format(template_hmm)
-    # # trained_models = [template_hmm, complement_hmm]
-    # # untrained_models = [template_model_path, complement_model_path]
-    # for default_model, trained_model in zip(untrained_models, trained_models):
-    #     assert os.path.exists(default_model), "Didn't find default model {}".format(default_model)
-    #     copyfile(default_model, trained_model)
-    #     assert os.path.exists(trained_model), "Problem copying default model to {}".format(trained_model)
-
-
+    # determine if we train HMM emissions or HDP
+    update_template_hmm_emissions = False
+    update_complement_hmm_emissions = False
     # get the input HDP, if we're using it
     if config["stateMachineType"] == "threeStateHdp":
         template_hdp = working_folder.add_file_path("%s" % config["templateHdp"].split("/")[-1])
         copyfile(config["templateHdp"], template_hdp)
         if config["twoD"]:
+
             complement_hdp = working_folder.add_file_path("%s" % config["complementHdp"].split("/")[-1])
             copyfile(config["complementHdp"], complement_hdp)
         else:
+            update_complement_hmm_emissions = True
             complement_hdp = None
     else:
+        update_template_hmm_emissions = True
+        update_complement_hmm_emissions = True
         template_hdp = None
         complement_hdp = None
 
@@ -434,19 +433,21 @@ def trainModelTransitions(config):
         complement_expectations_files = [x for x in os.listdir(working_folder_path)
                                          if x.endswith(".complement.expectations")]
 
+        print(working_folder_path, template_expectations_files)
         if len(template_expectations_files) > 0:
             add_and_norm_expectations(path=working_folder_path,
                                       files=template_expectations_files,
                                       model=template_model,
                                       hmm_file=template_hmm,
-                                      update_transitions=True)
-
+                                      update_transitions=True,
+                                      update_emissions=False)
         if config["twoD"] and len(complement_expectations_files) > 0:
             add_and_norm_expectations(path=working_folder_path,
                                       files=complement_expectations_files,
                                       model=complement_model,
                                       hmm_file=complement_hmm,
-                                      update_transitions=True)
+                                      update_transitions=True,
+                                      update_emissions=False)
 
         # log the running likelihood
         if len(template_model.running_likelihoods) > 0 and \

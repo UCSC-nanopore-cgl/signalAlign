@@ -3,7 +3,7 @@ import numpy as np
 from numpy.ctypeslib import ndpointer
 from ctypes import c_double, c_bool, c_size_t, c_int, Structure, POINTER
 
-from signalalign.util import get_shared_lib
+from signalalign.utils.nanonetUtils import get_shared_lib
 
 nanonetfilters = get_shared_lib('nanonetfilters')
 
