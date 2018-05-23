@@ -510,7 +510,17 @@ def multithread_signal_alignment(signal_align_arguments, fast5_locations, worker
                                  backward_reference_location=None):
 
     # ensure required arguments are in signal_align_argments
-    #todo
+    required_arguments = {'destination', 'stateMachineType', 'in_templateHmm', 'in_complementHmm',
+                          'in_templateHdp', 'in_complementHdp', 'threshold', 'diagonal_expansion', 'constraint_trim',
+                          'degenerate', }
+    optional_arguments = {'forward_reference', 'backward_reference', 'alignment_file', 'bwa_index', 'twoD_chemistry',
+                          'target_regions', 'output_format', 'embed', 'event_table', 'check_for_temp_file_existance',
+                          'track_memory_usage', }
+    missing_arguments = list(filter(lambda x: x not in signal_align_arguments.keys(), required_arguments))
+    unexpected_arguments = list(filter(lambda x: x not in required_arguments and x not in optional_arguments,
+                                       signal_align_arguments.keys()))
+    assert len(missing_arguments) == 0 and len(unexpected_arguments) == 0, \
+        "Invalid arguments to signal_align.  Missing: {}, Invalid: {}".format(missing_arguments, unexpected_arguments)
 
     # ensure reference is indexed
     def ensure_reference_index(ref):
@@ -528,7 +538,6 @@ def multithread_signal_alignment(signal_align_arguments, fast5_locations, worker
         ensure_reference_index(backward_reference_location)
         if 'backward_reference' not in signal_align_arguments:
             signal_align_arguments['backward_reference'] = backward_reference_location
-
 
     # ensure alignments can be generated (either from bwa on the reference or by an alignment file)
     if ('bwa_index' not in signal_align_arguments or signal_align_arguments['bwa_index'] is None) and \
