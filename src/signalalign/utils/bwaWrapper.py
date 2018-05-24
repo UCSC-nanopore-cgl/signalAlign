@@ -66,7 +66,11 @@ class Bwa(object):
         self.db_handle = ''
 
     def build_index(self, destination, output=None):
-        self.db_handle = destination + '/temp_bwaIndex'
+        self.db_handle = os.path.join(destination, 'temp_bwaIndex.{}'.format(os.path.basename(self.target)))
+        # is this a directory and are all bwa files present? we can return early
+        if False not in set(map(os.path.isfile, ["{}{}".format(self.db_handle, suffix) for suffix in self.suffixes()])):
+            return self.db_handle
+
         cmd = "bwa index -p {0} {1}".format(self.db_handle, self.target)
         if output is None:
             output = open(os.devnull, 'w')
@@ -74,11 +78,11 @@ class Bwa(object):
             output = open(output, 'w')
         try:
             subprocess.check_call(cmd.split(), stdout=output, stderr=output)
-            output.close()
-            return True
+            return self.db_handle
         except subprocess.CalledProcessError:
+            return None
+        finally:
             output.close()
-            return False
 
     @staticmethod
     def suffixes():
@@ -108,9 +112,8 @@ class Bwa(object):
 
 def getBwaIndex(reference, dest, output=None):
     bwa = Bwa(reference)
-    bwa.build_index(dest, output=output)
-    bwa_ref_index = dest + "temp_bwaIndex"
-    return bwa_ref_index
+    index_location = bwa.build_index(dest, output=output)
+    return index_location
 
 
 def getGuideAlignmentFromAlignmentFile(alignment_location, read_name=None, target_regions=None):

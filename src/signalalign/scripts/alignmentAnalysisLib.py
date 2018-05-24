@@ -11,12 +11,12 @@ import time
 import datetime
 
 
-def get_first_sequence(input_fasta):
-    input_sequence = ""
-    for header, comment, sequence in read_fasta(input_fasta):
-        input_sequence += sequence
-        break
-    return input_sequence
+# def get_first_sequence(input_fasta):
+#     input_sequence = ""
+#     for header, comment, sequence in read_fasta(input_fasta):
+#         input_sequence += sequence
+#         break
+#     return input_sequence
 
 def parse_alignment_file(alignment_file):
     data = pd.read_table(alignment_file, usecols=(1, 4, 5, 9, 12, 13),
@@ -31,14 +31,14 @@ def parse_alignment_file(alignment_file):
     return data
 
 
-def randomly_select_alignments(path_to_alignments):
-    files = os.listdir(path_to_alignments)
-    files = [f for f in files if f.endswith(".tsv")]
-    files = [path_to_alignments + f for f in files]
-    files = [f for f in files if os.path.isfile(f)]
-    shuffle(files)
-    print("[notice] sampling from {} files".format(len(files)), file=sys.stderr)
-    return files
+# def randomly_select_alignments(path_to_alignments):
+#     files = os.listdir(path_to_alignments)
+#     files = [f for f in files if f.endswith(".tsv")]
+#     files = [path_to_alignments + f for f in files]
+#     files = [f for f in files if os.path.isfile(f)]
+#     shuffle(files)
+#     print("[notice] sampling from {} files".format(len(files)), file=sys.stderr)
+#     return files
 
 
 def get_alignments_from_directory(path_to_alignments):
