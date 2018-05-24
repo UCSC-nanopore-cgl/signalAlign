@@ -8,6 +8,8 @@ import numpy as np
 import pysam
 import subprocess
 # from sonLib.bioio import fastaWrite
+
+import signalalign.utils.multithread as multithread
 from signalalign import defaultModelFromVersion
 from signalalign.nanoporeRead import NanoporeRead
 from signalalign.utils.bwaWrapper import *
@@ -20,7 +22,6 @@ class SignalAlignment(object):
                  in_fast5,
                  destination,
                  stateMachineType,
-                 bwa_index,
                  in_templateHmm,
                  in_complementHmm,
                  in_templateHdp,
@@ -31,12 +32,15 @@ class SignalAlignment(object):
                  degenerate,
                  forward_reference,
                  backward_reference=None,
+                 # one of these needs to be set
+                 alignment_file=None,
+                 bwa_index = None,
+                 # reasonable defaults
                  twoD_chemistry=False,
                  target_regions=None,
                  output_format="full",
                  embed=False,
                  event_table=False,
-                 alignment_file=None,
                  check_for_temp_file_existance=True,
                  track_memory_usage=False):
         self.in_fast5 = in_fast5  # fast5 file to align
@@ -63,6 +67,8 @@ class SignalAlignment(object):
         self.max_memory_usage_kb = None
         self.read_label = None
 
+        assert self.bwa_index is not None or self.alignment_file is not None, \
+            "either 'bwa_index' or 'alignment_file' argument is needed to generate cigar strings"
 
         if (in_templateHmm is not None) and os.path.isfile(in_templateHmm):
             self.in_templateHmm = in_templateHmm
@@ -132,22 +138,20 @@ class SignalAlignment(object):
             # get from alignment file
             if self.alignment_file is not None:
                 guide_alignment = getGuideAlignmentFromAlignmentFile(self.alignment_file, read_name=read_label)
-
-                # not found in alignment file
                 if guide_alignment is None:
-                    self.failStop(
-                        "[SignalAlignment.run] read {} not found in {}".format(read_label, self.alignment_file),
-                        npRead)
-                    return False
+                    print("[SignalAlignment.run] read {} not found in {}".format(read_label, self.alignment_file))
 
             # get from bwa
-            else:
+            if guide_alignment is None and self.bwa_index is not None:
                 guide_alignment = generateGuideAlignment(bwa_index=self.bwa_index, query=read_fasta_,
                                                          temp_sam_path=temp_samfile_, target_regions=self.target_regions)
-                # could not map
                 if guide_alignment is None:
-                    self.failStop("[SignalAlignment.run] ERROR getting guide alignment", npRead)
-                    return False
+                    print("[SignalAlignment.run] read {} could not be aligned with BWA".format(read_label))
+
+            # could not map
+            if guide_alignment is None:
+                self.failStop("[SignalAlignment.run] ERROR getting guide alignment", npRead)
+                return False
 
             # ensure valid
             if not guide_alignment.validate():
@@ -456,3 +460,109 @@ class SignalAlignment(object):
             event_table = remove_field_name(event_table, "read_file")
 
         return event_table
+
+
+def signal_alignment_service(work_queue, done_queue, service_name="signal_alignment"):
+    # prep
+    total_handled = 0
+    failure_count = 0
+    mem_usages = list()
+
+    #catch overall exceptions
+    try:
+        for f in iter(work_queue.get, 'STOP'):
+            # catch exceptions on each element
+            try:
+                alignment = SignalAlignment(**f)
+                success = alignment.run()
+                if alignment.max_memory_usage_kb is not None:
+                    mem_usages.append(alignment.max_memory_usage_kb)
+                if not success: failure_count += 1
+            except Exception as e:
+                # get error and log it
+                message = "{}:{}".format(type(e), str(e))
+                error = "{} '{}' failed with: {}".format(service_name, multithread.current_process().name, message)
+                print("[{}] ".format(service_name) + error)
+                done_queue.put(error)
+                failure_count += 1
+
+            # increment total handling
+            total_handled += 1
+
+    except Exception as e:
+        # get error and log it
+        message = "{}:{}".format(type(e), str(e))
+        error = "{} '{}' critically failed with: {}".format(service_name, multithread.current_process().name, message)
+        print("[{}] ".format(service_name) + error)
+        done_queue.put(error)
+
+    finally:
+        # logging and final reporting
+        print("[%s] '%s' completed %d calls with %d failures"
+              % (service_name, multithread.current_process().name, total_handled, failure_count))
+        done_queue.put("{}:{}".format(multithread.TOTAL_KEY, total_handled))
+        done_queue.put("{}:{}".format(multithread.FAILURE_KEY, failure_count))
+        if len(mem_usages) > 0:
+            done_queue.put("{}:{}".format(multithread.MEM_USAGE_KEY, ",".join(map(str, mem_usages))))
+
+
+def multithread_signal_alignment(signal_align_arguments, fast5_locations, worker_count, reference_location,
+                                 backward_reference_location=None):
+
+    # ensure required arguments are in signal_align_argments
+    required_arguments = {'destination', 'stateMachineType', 'in_templateHmm', 'in_complementHmm',
+                          'in_templateHdp', 'in_complementHdp', 'threshold', 'diagonal_expansion', 'constraint_trim',
+                          'degenerate', }
+    optional_arguments = {'forward_reference', 'backward_reference', 'alignment_file', 'bwa_index', 'twoD_chemistry',
+                          'target_regions', 'output_format', 'embed', 'event_table', 'check_for_temp_file_existance',
+                          'track_memory_usage', }
+    missing_arguments = list(filter(lambda x: x not in signal_align_arguments.keys(), required_arguments))
+    unexpected_arguments = list(filter(lambda x: x not in required_arguments and x not in optional_arguments,
+                                       signal_align_arguments.keys()))
+    assert len(missing_arguments) == 0 and len(unexpected_arguments) == 0, \
+        "Invalid arguments to signal_align.  Missing: {}, Invalid: {}".format(missing_arguments, unexpected_arguments)
+
+    # ensure reference is indexed
+    def ensure_reference_index(ref):
+        assert os.path.isfile(ref), "Reference does not exist: {}".format(ref)
+        if not os.path.isfile("{}.fai".format(ref)):
+            print("[multithread_signal_alignment] indexing reference {}".format(ref))
+            subprocess.check_call(["samtools", "faidx", ref])
+            assert os.path.isfile("{}.fai".format(ref)), "Error creating FAIDX file for: {}".format(ref)
+
+    # ensure it for references
+    ensure_reference_index(reference_location)
+    if 'forward_reference' not in signal_align_arguments:
+        signal_align_arguments['forward_reference'] = reference_location
+    if backward_reference_location is not None:
+        ensure_reference_index(backward_reference_location)
+        if 'backward_reference' not in signal_align_arguments:
+            signal_align_arguments['backward_reference'] = backward_reference_location
+
+    # ensure alignments can be generated (either from bwa on the reference or by an alignment file)
+    if ('bwa_index' not in signal_align_arguments or signal_align_arguments['bwa_index'] is None) and \
+            ('alignment_file' not in signal_align_arguments or signal_align_arguments['alignment_file'] is None):
+        print("[multithread_signal_alignment] creating BWA index for {}".format(reference_location))
+        bwa_index = getBwaIndex(reference_location, os.path.dirname(reference_location))
+        assert bwa_index is not None, "Error creating BWA index for: {}".format(reference_location)
+        signal_align_arguments['bwa_index'] = bwa_index
+
+    # run the signal_align_service
+    print("[multithread_signal_alignment] running signal_alignment on {} fast5s with {} workers".format(
+        len(fast5_locations), worker_count))
+    total, failure, messages = multithread.run_service(
+        signal_alignment_service, fast5_locations, signal_align_arguments, 'in_fast5', worker_count)
+
+    # report memory usage
+    memory_stats = list()
+    for message in messages:
+        if message.startswith(multithread.MEM_USAGE_KEY):
+            memory_stats.extend(map(int, message.split(":")[1].split(",")))
+    if len(memory_stats) > 0:
+        kb_to_gb = lambda x: float(x) / (1 << 20)
+        print("[multithread_signal_alignment] memory avg: %3f Gb" % (kb_to_gb(np.mean(memory_stats))))
+        print("[multithread_signal_alignment] memory std: %3f Gb" % (kb_to_gb(np.std(memory_stats))))
+        print("[multithread_signal_alignment] memory max: %3f Gb" % (kb_to_gb(max(memory_stats))))
+
+    # fin
+    print("[multithread_signal_alignment] fin")
