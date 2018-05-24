@@ -7,6 +7,7 @@ import sys
 import shutil
 
 from signalalign.utils.multithread import *
+from signalalign.tools.fast5_lookup import RUN_NAME, FAST5_LOCATION, READ_ID, FAST5_ROOT
 
 
 KEY_ID = "id"
@@ -118,8 +119,8 @@ def organize_fast5s(workdir, fast5_data_locations, destination_dir, keep_workdir
     stored_reads = 0
     fast5_idx, read_id_idx, run_id_idx = None, None, None
     with open(summary_loc, 'r') as input, open(completed_index_location, 'w') as output:
-        output.write("##s3_root:{}\n".format(s3_root))
-        output.write("#file_location\tread_id\trun_id\n")
+        output.write("##{}:{}\n".format(FAST5_ROOT, s3_root))
+        output.write("#{}\t{}\t{}\n".format(FAST5_LOCATION, READ_ID, RUN_NAME))
         for line in input:
             line = line.split("\t")
             if len(line) < 3: continue
