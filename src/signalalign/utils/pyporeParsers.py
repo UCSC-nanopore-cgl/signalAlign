@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # Contact: Jacob Schreiber
 #          jacobtribe@soe.ucsc.com
 # parsers.py 
@@ -18,7 +18,7 @@ try:
     from PyQt4 import QtCore as Qc
 except:
     pass
-from signalalign.core import *
+from signalalign.utils.core import *
 
 # import pyximport
 # pyximport.install(setup_args={'include_dirs': np.get_include()})

@@ -17,9 +17,10 @@ htsLib = -L././htslib -lhts
 all : sL bD hs python-utils ${libPath}/signalAlignLib.a ${signalAlignBin}/signalAlignLibTests index_fasta \
 	  ${signalAlignBin}/compareDistributions \
 	  ${signalAlignBin}/signalMachine ${signalAlignBin}/runSignalAlign \
-	  ${signalAlignBin}/signalAlignLib.py ${signalAlignBin}/variantCallingLib.py ${signalAlignBin}/alignmentAnalysisLib.py \
+	  ${signalAlignBin}/variantCallingLib.py ${signalAlignBin}/alignmentAnalysisLib.py \
 	  ${signalAlignBin}/buildHdpUtil ${signalAlignBin}/trainModels ${signalAlignBin}/hdp_pipeline ${signalAlignBin}/test_SignalAlign.py \
 	  externals nanoporeParams python_setup  \
+#	  ${signalAlignBin}/signalAlignLib.py \
 	  #${signalAlignBin}/zayante ${signalAlignBin}/bonnyDoon \
 	  #${signalAlignBin}/empire ${signalAlignBin}/jamison \
 
@@ -98,7 +99,7 @@ ${signalAlignBin}/hdp_pipeline : ${rootPath}src/signalalign/scripts/hdp_pipeline
 	cp ${rootPath}src/signalalign/scripts/hdp_pipeline.py ${signalAlignBin}/hdp_pipeline
 	chmod +x ${signalAlignBin}/hdp_pipeline
 
-${signalAlignBin}/test_SignalAlign.py : ${rootPath}src/signalalign/tests/test_SignalAlign.py
+${signalAlignBin}/test_SignalAlign.py : .FORCE
 	cp ${rootPath}src/signalalign/tests/test_SignalAlign.py ${signalAlignBin}/test_SignalAlign.py
 	cp ${rootPath}src/signalalign/tests/event_detection_test.py ${signalAlignBin}/event_detection_test.py
 	cp ${rootPath}src/signalalign/tests/mea_algorithm_test.py ${signalAlignBin}/mea_algorithm_test.py
@@ -125,8 +126,8 @@ ${signalAlignBin}/jamison : ${rootPath}src/signalalign/scripts/jamison.py
 	cp ${rootPath}src/signalalign/scripts/jamison.py ${signalAlignBin}/jamison
 	chmod +x ${signalAlignBin}/jamison
 
-${signalAlignBin}/signalAlignLib.py : ${rootPath}src/signalalign/scripts/signalAlignLib.py
-	cp ${rootPath}src/signalalign/scripts/signalAlignLib.py ${signalAlignBin}/signalAlignLib.py
+#${signalAlignBin}/signalAlignLib.py : ${rootPath}src/signalalign/scripts/signalAlignLib.py
+#	cp ${rootPath}src/signalalign/scripts/signalAlignLib.py ${signalAlignBin}/signalAlignLib.py
 
 ${signalAlignBin}/variantCallingLib.py : ${rootPath}src/signalalign/scripts/variantCallingLib.py
 	cp ${rootPath}src/signalalign/scripts/variantCallingLib.py ${signalAlignBin}/variantCallingLib.py
@@ -145,3 +146,5 @@ ${libPath}/signalAlignLib.a : ${libSources} ${libHeaders} ${stBarDependencies}
 
 hs :
 	cd htslib && make
+
+.FORCE:

@@ -11,6 +11,24 @@ from signalalign.motif import getMotif
 from signalalign.utils.parsers import read_fasta
 
 
+def parse_substitution_file(substitution_file):
+    fH = open(substitution_file, 'r')
+    line = fH.readline().split()
+    forward_sub = line[0]
+    forward_pos = list(map(np.int64, line[1:]))
+    line = fH.readline().split()
+    backward_sub = line[0]
+    backward_pos = list(map(np.int64, line[1:]))
+    return (forward_sub, forward_pos), (backward_sub, backward_pos)
+
+
+def kmer_iterator(dna, k):
+    for i in range(len(dna)):
+        kmer = dna[i:(i + k)]
+        if len(kmer) == k:
+            yield kmer
+
+
 def parseFofn(fofn_file):
     files = []
     with open(fofn_file, "r") as fH:
@@ -133,14 +151,14 @@ def processReferenceFasta(fasta, work_folder, motif_key=None, sub_char=None, pos
                 motif, ok = getMotif(motif_key, sequence)
                 if not ok:
                     raise RuntimeError("[processReferenceFasta]Illegal motif key %s" % motif_key)
-                fw_sequence = motif.forwardSubstitutedSequence(sub_char)
-                bw_sequence = motif.complementSubstitutedSequence(sub_char)
+                fw_sequence = motif.forwardSubstitutedSequence(sub_char).upper()
+                bw_sequence = motif.complementSubstitutedSequence(sub_char).upper()
             elif positions is not None:
                 fw_sequence = positions.getForwardSequence(contig=header, raw_sequence=sequence.upper())
                 bw_sequence = positions.getBackwardSequence(contig=header, raw_sequence=sequence.upper())
             else:
                 fw_sequence = sequence.upper()
-                bw_sequence = reverse_complement(fw_sequence, reverse=False, complement=True)
+                bw_sequence = reverse_complement(fw_sequence, reverse=False, complement=True).upper()
 
             print(">%s %s\n%s" % (header, "backward", bw_sequence), file=bw_outfasta)
             print(">%s %s\n%s" % (header, "forward", fw_sequence), file=fw_outfasta)

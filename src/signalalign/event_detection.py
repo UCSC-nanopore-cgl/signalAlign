@@ -18,9 +18,9 @@ import numpy as np
 import traceback
 from collections import defaultdict
 from timeit import default_timer as timer
-from signalalign.parsers import SpeedyStatSplit
+from signalalign.utils.pyporeParsers import SpeedyStatSplit
 from signalalign.fast5 import Fast5
-from signalalign.filters import minknow_event_detect
+from signalalign.utils.filters import minknow_event_detect
 from py3helpers.utils import check_numpy_table, list_dir, TimeStamp, change_np_field_type, merge_dicts
 from py3helpers.seq_tools import create_fastq_line, check_fastq_line, ReverseComplement, pairwise_alignment_accuracy
 
