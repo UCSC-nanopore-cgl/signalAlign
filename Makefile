@@ -66,8 +66,8 @@ externals :
 	cd externalTools && make all
 
 test :
-	cd ${signalAlignBin} && ./test_SignalAlign.py
-	cd ${binPath} && ./sonLibTests
+	cd ${signalAlignBin} && pytest
+#	cd ${binPath} && ./sonLibTests
 	cd python_utils && pytest
 
 ${signalAlignBin}/compareDistributions : compareDistributions.c ${libPath}/signalAlignLib.a ${signalAlignDependencies}
