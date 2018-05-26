@@ -4,7 +4,7 @@ import os
 import sys
 from .alignmentAnalysisLib import KmerHistogram
 from signalalign.utils.parsers import read_fasta
-from .signalAlignLib import kmer_iterator, parse_substitution_file
+from signalalign.utils import kmer_iterator, parse_substitution_file
 from argparse import ArgumentParser
 from multiprocessing import Process, current_process, Manager
 

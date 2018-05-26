@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """Test maximum expected accuracy alignment algorithm"""
 ########################################################################
 # File: mea_algorithm_test.py

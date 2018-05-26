@@ -30,13 +30,6 @@ def parse_fofn(fofn_file):
     return files
 
 
-def kmer_iterator(dna, k):
-    for i in range(len(dna)):
-        kmer = dna[i:(i + k)]
-        if len(kmer) == k:
-            yield kmer
-
-
 def write_fasta(id, sequence, destination):
     print(">", id, sep="", end="\n", file=destination)
     print(sequence, end="\n", file=destination)
