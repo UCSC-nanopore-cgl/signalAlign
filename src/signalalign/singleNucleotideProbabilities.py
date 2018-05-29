@@ -36,7 +36,7 @@ MEM_USAGES="mem_usages"
 
 VALID_IDENTITY_RATIO = .85
 
-def parse_args():
+def parse_args(args=None):
     parser = ArgumentParser(description=__doc__)
 
     parser.add_argument('--file_directory', '-d', action='store',
@@ -71,7 +71,7 @@ def parse_args():
     parser.add_argument('---un-banded', '-ub', action='store_false', dest='banded',
                         default=True, help='flag, turn off banding')
     parser.add_argument('--jobs', '-j', action='store', dest='nb_jobs', required=False,
-                        default=4, type=int, help="number of jobs to run concurrently")
+                        default=1, type=int, help="number of jobs to run concurrently")
     parser.add_argument('--nb_files', '-n', action='store', dest='nb_files', required=False,
                         default=None, type=int, help="maximum number of reads to align")
     parser.add_argument("--bwt", action='store', dest="bwt", default=None, required=False,
@@ -86,7 +86,7 @@ def parse_args():
     parser.add_argument("--validate", action='store', dest='validation_file', default=None, required=False,
                         help="validate an output file as compared to its fast5 file (only performs this action)")
 
-    args = parser.parse_args()
+    args = parser.parse_args(args)
     return args
 
 
@@ -548,12 +548,14 @@ def discover_single_nucleotide_probabilities(working_folder, kmer_length, refere
                 len(alignments), len(list_of_fast5s), saved_step_dir))
         else:
             # file locations
-            sub_fasta_path = work_folder.add_file_path(
-                "ref_ambig.s{}.o{}.{}".format(step, offset, os.path.basename(reference_location)))
+            sub_fasta_path = working_folder.add_file_path(
+                "ref_ambig.s{}.o{}.{}".format(s, step_size, os.path.basename(reference_location)))
+
             # build reference
             substitution_ref = replace_periodic_reference_positions(reference_location, sub_fasta_path, step_size, s)
-            samtools_faidx_fasta(substitution_ref)
-            alignment_args['forward_reference'] = substitution_ref
+
+            # samtools_faidx_fasta(substitution_ref)
+            # alignment_args['forward_reference'] = substitution_ref
 
             # run alignment
             # print("[info] running aligner on %d fast5 files with %d workers" % (len(list_of_fast5s), workers))
@@ -681,7 +683,7 @@ def discover_single_nucleotide_probabilities(working_folder, kmer_length, refere
 
 def main(args):
     # parse args
-    args = parse_args()
+    args = parse_args(args)
 
     command_line = " ".join(sys.argv[:])
     print("[singleNucleotideProbabilities] Command Line: {cmdLine}\n".format(cmdLine=command_line), file=sys.stderr)
@@ -796,4 +798,4 @@ def main(args):
     return 0
 
 if __name__ == "__main__":
-    sys.exit(main(sys.argv))
+    sys.exit(main(sys.argv[1:]))

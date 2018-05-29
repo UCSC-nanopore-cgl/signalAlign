@@ -28,9 +28,7 @@ def parse_args():
     parser.add_argument('--stats', '-s', action='store_true', dest='stats', default=False,
                         help="print stats for the file")
     parser.add_argument('--read_ids', '-r', action='store', dest='read_ids', type=str, default=None,
-                        help="file with one read_id per line. fast5 files will be downloaded (only supports s3)")
-    parser.add_argument('--output_dir', '-o', action='store', dest='output_dir', type=str, default=".",
-                        help="output directory if fast5s are to be downloaded")
+                        help="file with one read_id per line. fast5 locations found in db will printed to stdout")
 
 
     args = parser.parse_args()
@@ -154,6 +152,7 @@ class Fast5LookupDB(object):
         return self.get_by_read_ids([read_id], only_fast5_location)
 
     def get_stats(self):
+        filesize = os.stat(self.db).st_size / (1 << 20)
         with closing(sqlite3.connect(self.db)) as conn:
             c = conn.cursor()
             read_count = 0
@@ -168,53 +167,62 @@ class Fast5LookupDB(object):
             for row in c.execute("SELECT COUNT(*) FROM fast5_root"):
                 root_count = row[0]
 
-            return read_count, run_count, root_count
+            return read_count, run_count, root_count, filesize
 
 
+def load_index_into_database(db, index_glob):
+    import glob
+    files = glob.glob(index_glob)
+    files.sort()
+    print("\nLoading reads from {} files matching {}".format(len(files), index_glob), file=sys.stderr)
+    total_read_count = 0
 
-def load_index_into_database(db, index_file):
+    for file_idx, index_file in zip(range(len(files)), files):
+        fast5_root, fast5_idx, read_id_idx, run_id_idx = None, None, None, None
+        reads = list()
+        with open(index_file, 'r') as input:
+            for line in input:
+                if line.startswith("##"):
+                    if line.startswith("##{}:".format(FAST5_ROOT)):
+                        fast5_root = line.strip()[len("##{}:".format(FAST5_ROOT)):]
+                        # fast5_root = line.lstrip("##{}:".format(FAST5_ROOT))
+                elif line.startswith("#"):
+                    line = line.lstrip('#').split()
+                    if fast5_idx is None:
+                        for column, idx in zip(line, range(len(line))):
+                            if column == FAST5_LOCATION: fast5_idx = idx
+                            if column == READ_ID: read_id_idx = idx
+                            if column == RUN_NAME: run_id_idx = idx
+                        if None in [fast5_idx, read_id_idx, run_id_idx]:
+                            raise Exception("Invalid header line in {}: {}".format(index_file, line))
+                else:
+                    line = line.split()
+                    reads.append({FAST5_LOCATION:line[fast5_idx], READ_ID:line[read_id_idx], RUN_NAME:line[run_id_idx]})
 
-    fast5_root,fast5_idx,read_id_idx,run_id_idx = None, None, None, None
-    reads = list()
+        stored_count = db.insert_reads(reads, fast5_root)
+        print("{}: Loaded {} / {} into database from {}".format(file_idx, stored_count, len(reads), index_file),
+              file=sys.stderr)
+        total_read_count += stored_count
 
-    with open(index_file, 'r') as input:
-        for line in input:
-            if line.startswith("##"):
-                if line.startswith("##{}:".format(FAST5_ROOT)):
-                    fast5_root = line.lstrip("##{}:".format(FAST5_ROOT))
-            elif line.startswith("#"):
-                line = line.lstrip('#').split()
-                if fast5_idx is None:
-                    for column, idx in zip(line, range(len(line))):
-                        if column == FAST5_LOCATION: fast5_idx = idx
-                        if column == READ_ID: read_id_idx = idx
-                        if column == RUN_NAME: run_id_idx = idx
-                    if None in [fast5_idx, read_id_idx, run_id_idx]:
-                        raise Exception("Invalid header line in {}: {}".format(index_file, line))
-            else:
-                line = line.split()
-                reads.append({FAST5_LOCATION:line[fast5_idx], READ_ID:line[read_id_idx], RUN_NAME:line[run_id_idx]})
-
-    stored_count = db.insert_reads(reads, fast5_root)
-    print("Loaded {} / {} into database from {}".format(stored_count, len(reads), index_file), file=sys.stderr)
-    return stored_count
+    print("Loaded total of {} reads successfully.".format(total_read_count), file=sys.stderr)
 
 
-def download_reads(db, read_filename, output_directory):
+def get_fast5_locations(db, read_filename, print_to_stdout=True):
 
     read_ids = list()
     with open(read_filename, 'r') as input:
         for line in input:
-            if not line.startswith("#"): read_ids.append(line)
+            if not line.startswith("#"): read_ids.append(line.strip())
     print("\nRead {} reads for downloading from {}".format(len(read_ids), read_filename), file=sys.stderr)
 
-    if not os.path.isdir(output_directory):
-        print("Creating output directory {}".format(output_directory), file=sys.stderr)
-
     fast5_locations = db.get_by_read_ids(read_ids, only_fast5_location=True)
-    print("Found {} fast5 locations".format(len(fast5_locations)))
+    print("Found {} fast5 locations (of {} reads)".format(len(fast5_locations), len(read_ids)), file=sys.stderr)
 
-    #todo
+    if print_to_stdout:
+        for fast5 in fast5_locations:
+            print(fast5)
+
+    return fast5_locations
 
 def main():
     args = parse_args()
@@ -222,22 +230,15 @@ def main():
     fast5_db = Fast5LookupDB(args.database, initialize=args.initialize)
 
     if args.input is not None:
-        import glob
-        files = glob.glob(args.input)
-        print("Loading reads from {} files matching {}\n".format(len(files), args.input), file=sys.stderr)
-        total_read_count = 0
-        for file in files:
-            total_read_count += load_index_into_database(fast5_db, file)
-        print("\nLoaded total of {} reads successfully.".format(total_read_count), file=sys.stderr)
+        load_index_into_database(fast5_db, args.input)
 
     if args.stats:
-        read_count, run_count, root_count = fast5_db.get_stats()
-        filesize = os.stat(args.database).st_size / (1 << 20)
+        read_count, run_count, root_count, filesize = fast5_db.get_stats()
         print("{}:\n\tfile_size:  {} Mb\n\tread_count: {}\n\trun_count:  {}\n\troot_count: {}\n"
               .format(args.database, filesize, read_count, run_count, root_count))
 
     if args.read_ids is not None:
-        download_reads(args.database, args.read_ids, args.output_dir)
+        get_fast5_locations(fast5_db, args.read_ids)
 
 
 
