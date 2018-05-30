@@ -39,7 +39,7 @@ def log(msg):
     print(msg)
 
 
-def fast5_organization_service(work_queue, done_queue, service_name="fast5_organization"):
+def fast5_promethion_s3_organization_service(work_queue, done_queue, service_name="fast5_organization"):
     # prep
     total_handled = 0
     failure_count = 0
@@ -50,7 +50,7 @@ def fast5_organization_service(work_queue, done_queue, service_name="fast5_organ
         for f in iter(work_queue.get, 'STOP'):
             # catch exceptions on each element
             try:
-                success, count = organize_fast5s(**f)
+                success, count = organize_promethion_s3_fast5s(**f)
                 if success:
                     total_reads += count
             except Exception as e:
@@ -80,7 +80,7 @@ def fast5_organization_service(work_queue, done_queue, service_name="fast5_organ
         done_queue.put("{}:{}".format(KEY_READ_COUNT, total_reads))
 
 
-def organize_fast5s(workdir, fast5_data_locations, destination_dir, keep_workdir=False):
+def organize_promethion_s3_fast5s(workdir, fast5_data_locations, destination_dir, keep_workdir=False):
     # get run info
     reads = fast5_data_locations[KEY_READS].rstrip("/")
     summary = fast5_data_locations[KEY_SUMMARY]
@@ -91,7 +91,7 @@ def organize_fast5s(workdir, fast5_data_locations, destination_dir, keep_workdir
 
     # evaluate completedness
     run_id = "f5run_{}_{}".format(hashlib.md5(s3_root.encode()).hexdigest(), id)
-    completed_index_location = os.path.join(destination_dir, "{}.index.readdb".format(run_id))
+    completed_index_location = os.path.join(destination_dir, "{}.index.tsv".format(run_id))
     if os.path.isfile(completed_index_location):
         log("Indexing appears to be completed for:")
         log("\ts3_root:     {}".format(s3_root))
@@ -253,7 +253,7 @@ def main():
         'workdir': args.workdir,
         'destination_dir': args.index_destination
     }
-    total, failures, messages = run_service(fast5_organization_service, datasets, organization_args,
+    total, failures, messages = run_service(fast5_promethion_s3_organization_service, datasets, organization_args,
                                             "fast5_data_locations", args.threads)
 
     # loggit

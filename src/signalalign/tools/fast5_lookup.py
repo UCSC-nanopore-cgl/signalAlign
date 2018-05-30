@@ -14,7 +14,7 @@ from contextlib import closing
 RUN_NAME = 'run_id'
 FAST5_LOCATION = 'file_location'
 READ_ID = 'read_id'
-FAST5_ROOT = 's3_root'
+FAST5_ROOT = 'fast5_root'
 
 def parse_args():
     parser = ArgumentParser(description="Build indices from fast5 output stored in S3")
