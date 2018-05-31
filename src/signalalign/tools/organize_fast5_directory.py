@@ -2,7 +2,7 @@
 from argparse import ArgumentParser
 import subprocess
 import os
-import hashlib
+import sys
 import glob
 import shutil
 
@@ -36,7 +36,9 @@ def parse_args():
     parser.add_argument('--output_folder_count', '-n', action='store', dest='output_folder_count', default=16, type=int,
                         help="number of output folders")
     parser.add_argument('--s3_upload_directory', '-s', action='store', dest='s3_upload_directory', default=None, type=str,
-                        help="if set, files will be uploaded to this s3 directory")
+                        help="directory where s3 upload will be prepared for")
+    parser.add_argument('--actually_do_upload', '-S', action='store_true', dest='actually_do_upload', default=False,
+                        help="if set, files will ACTUALLY be uploaded to the s3 directory (instead of printing to screen)")
     parser.add_argument('--threads', '-t', action='store', dest='threads', required=False, type=int, default=1,
                         help="number of threads to use while indexing")
 
@@ -200,6 +202,7 @@ def main():
     if args.s3_upload_directory is not None:
         # get output folders
         output_folders = glob.glob(get_output_directory(base_output_location, "*"))
+        output_folders.sort()
         log("Preparing to move {} folders to {}".format(len(output_folders), args.s3_upload_directory))
 
         # prep for reindexing
@@ -221,9 +224,21 @@ def main():
 
         # force the user to do the upload
         log("\nScript to upload files:\n")
+        upload_commands = list()
         for output_folder in output_folders:
-            log("s3cmd put --recursive {}* {}".format(output_folder, output_folder.replace(
-                args.output_directory, args.s3_upload_directory)))
+            cmd = "s3cmd put --recursive {}* {}".format(output_folder, output_folder.replace(
+                args.output_directory, args.s3_upload_directory))
+            log(cmd)
+            upload_commands.append(cmd.split())
+
+        # only actually upload if set
+        if args.actually_do_upload:
+            log("")
+            with open(os.devnull, 'w') as devnull:
+                for idx, cmd in zip(range(len(upload_commands)), upload_commands):
+                    log("%3d: %s" % (idx, " ".join(cmd)))
+                    subprocess.check_call(cmd, stdout=devnull)
+
 
     # no s3 uploading
     else:
