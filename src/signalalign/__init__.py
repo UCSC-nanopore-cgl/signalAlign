@@ -10,6 +10,8 @@ DEFAULT_TRAINMODELS_OPTIONS = {
     "positions_file": None,
     "motif": None,
     "label": None,
+    "edited_fw_reference": None,
+    "edited_bw_reference": None
 }
 
 

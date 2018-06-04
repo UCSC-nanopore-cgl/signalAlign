@@ -14,7 +14,7 @@ test_directory = ${rootPath}/src/tests/
 
 htsLib = -L././htslib -lhts
 
-all : sL bD hs python-utils ${libPath}/signalAlignLib.a ${signalAlignBin}/signalAlignLibTests index_fasta \
+all : sL bD hs python-utils ${libPath}/signalAlignLib.a ${signalAlignBin}/signalAlignLibTests \
 	  ${signalAlignBin}/compareDistributions \
 	  ${signalAlignBin}/signalMachine ${signalAlignBin}/runSignalAlign \
 	  ${signalAlignBin}/variantCallingLib.py ${signalAlignBin}/alignmentAnalysisLib.py \
@@ -29,8 +29,8 @@ python-utils :
 	cd python_utils && python3 setup.py install
 
 
-index_fasta : hs ${libPath}/signalAlignLib.a ${signalAlignDependencies}
-	${cxx} ${cflags} -I inc -I${libPath} -I${htsLibRootPath} -o ${signalAlignBin}/index_fasta index_fasta.c ${libPath}/signalAlignLib.a ${signalAlignLib} ${htsLib}
+debugging : hs ${libPath}/signalAlignLib.a ${signalAlignDependencies}
+	${cxx} ${cflags} -I inc -I${libPath} -I${htsLibRootPath} -o ${signalAlignBin}/debugging debugging.c ${libPath}/signalAlignLib.a ${signalAlignLib} ${htsLib}
 
 # -I${htsLibPath}  -I${htsLibRootPath}
 #_curl_easy_init
@@ -51,7 +51,7 @@ clean :
 python_setup :
 	python3 setup.py install
 
-pip_install :
+pip_install : .FORCE
 	pip3 install -e .
 
 signalAlignLib : ${libPath}/signalAlignLib.a
@@ -91,8 +91,8 @@ ${signalAlignBin}/runSignalAlign : ${rootPath}src/signalalign/scripts/runSignalA
 	cp ${rootPath}src/signalalign/scripts/runSignalAlign.py ${signalAlignBin}/runSignalAlign
 	chmod +x ${signalAlignBin}/runSignalAlign
 
-${signalAlignBin}/trainModels : ${rootPath}src/signalalign/scripts/trainModels.py
-	cp ${rootPath}src/signalalign/scripts/trainModels.py ${signalAlignBin}/trainModels
+${signalAlignBin}/trainModels : ${rootPath}src/signalalign/train/trainModels.py
+	cp ${rootPath}src/signalalign/train/trainModels.py ${signalAlignBin}/trainModels
 	chmod +x ${signalAlignBin}/trainModels
 
 ${signalAlignBin}/hdp_pipeline : ${rootPath}src/signalalign/scripts/hdp_pipeline.py
@@ -104,11 +104,13 @@ ${signalAlignBin}/test_SignalAlign.py : .FORCE
 	cp ${rootPath}src/signalalign/tests/event_detection_test.py ${signalAlignBin}/event_detection_test.py
 	cp ${rootPath}src/signalalign/tests/mea_algorithm_test.py ${signalAlignBin}/mea_algorithm_test.py
 	cp ${rootPath}src/signalalign/tests/fast5_test.py ${signalAlignBin}/fast5_test.py
+	cp ${rootPath}src/signalalign/tests/test_sequenceTools.py ${signalAlignBin}/test_sequenceTools.py
 
 	chmod +x ${signalAlignBin}/test_SignalAlign.py
 	chmod +x ${signalAlignBin}/fast5_test.py
 	chmod +x ${signalAlignBin}/mea_algorithm_test.py
 	chmod +x ${signalAlignBin}/event_detection_test.py
+	chmod +x ${signalAlignBin}/test_sequenceTools.py
 
 ${signalAlignBin}/zayante : ${rootPath}src/signalalign/scripts/zayante.py
 	cp ${rootPath}src/signalalign/scripts/zayante.py ${signalAlignBin}/zayante

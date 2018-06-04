@@ -16,11 +16,11 @@ from shutil import copyfile
 from multiprocessing import Process, current_process, Manager
 
 from signalalign import parseFofn, DEFAULT_TRAINMODELS_OPTIONS
-from signalalign.signalAlignment import SignalAlignment
+from signalalign.signalAlignment import multithread_signal_alignment
 from signalalign.hiddenMarkovModel import ContinuousPairHmm, HdpSignalHmm
 from signalalign.utils import processReferenceFasta
 from signalalign.utils.fileHandlers import FolderHandler
-from signalalign.utils.bwaWrapper import getBwaIndex
+from signalalign.utils.bwaWrapper import buildBwaIndex
 
 
 class AbstractSamples(object):
@@ -46,6 +46,8 @@ class Fast5Directory(AbstractSamples):
     def __init__(self, source, fw_fasta_path, bw_fasta_path):
         AbstractSamples.__init__(self, source, fw_fasta_path, bw_fasta_path)
         self.files = self._parse()
+        self.fw_fasta_path = fw_fasta_path
+        self.bw_fasta_path = bw_fasta_path
 
     def _parse(self):
         return [os.path.join(self.source, x) for x in os.listdir(self.source) if x.endswith(".fast5")]
@@ -58,6 +60,8 @@ class FileOfFilenames(AbstractSamples):
     def __init__(self, source, fw_fasta_path, bw_fasta_path):
         AbstractSamples.__init__(self, source, fw_fasta_path, bw_fasta_path)
         self.files = self._parse()
+        self.fw_fasta_path = fw_fasta_path
+        self.bw_fasta_path = bw_fasta_path
 
     def _parse(self):
         return parseFofn(self.source)
@@ -175,15 +179,6 @@ def cull_training_files(samples, training_amount, twoD):
     # return training_files  # [(path_to_fast5, reference_map)...]
 
 
-def get_expectations(work_queue, done_queue):
-    try:
-        for f in iter(work_queue.get, 'STOP'):
-            alignment = SignalAlignment(**f)
-            alignment.run(get_expectations=True)
-    except Exception as e:
-        done_queue.put("%s failed with %s" % (current_process().name, e.message))
-
-
 def get_model(model_type, model_file):
     assert (model_type in ["threeState", "threeStateHdp"]), "Unsupported StateMachine type"
     # todo clean this up
@@ -252,19 +247,6 @@ def build_hdp(template_hdp_path, complement_hdp_path, template_assignments, comp
     return
 
 
-def validateConfig(config):
-    # check for inputs
-    if config["fast5_dir"] is None and config["fofn"] is None:
-        raise RuntimeError("Need to provide a directory of Fast5 files or a file of filenames (fofn)")
-
-    # check for valid paths (if local)
-    ref_url = urllib.parse.urlparse(config["reference_url"])
-    if ref_url.scheme == "file":
-        if not os.path.exists(ref_url.path):
-            raise RuntimeError("Cannot find file: %s" % config["reference_url"])
-    return
-
-
 def generateConfig(config_path):
     if os.path.exists(config_path):
         raise RuntimeError
@@ -303,55 +285,113 @@ def generateConfig(config_path):
     fH.close()
 
 
-def trainModelTransitions(config):
-    def process_sample(sample):
-        options = dict(**DEFAULT_TRAINMODELS_OPTIONS)
-        options.update(sample)
-        if options["fast5_dir"] is None and options["fofn"] is None:
-            raise RuntimeError("Need to provide path to .fast5 files or file with filenames (fofn)")
-        fw_fasta_path, bw_fasta_path = processReferenceFasta(fasta=config["reference"],
+def process_sample(sample, reference, working_folder):
+    """Process a set of Fast5 files. Creates edited reference sequences if needed
+
+    :param samples: dictionary of a sample of fast5's
+            fast5_dir:  path to fast5s,
+            fofn: file with paths to fast5s
+            positions_file: changes to nucleotides by position,
+            edited_fw_reference: forward reference if different than canonical
+            edited_bw_reference: backward reference if needed
+
+    :param reference: reference sequence if needed to process
+    :param working_folder: FolderHandler object with a folder already created.
+    """
+
+    options = dict(**DEFAULT_TRAINMODELS_OPTIONS)
+    options.update(sample)
+    if options["fast5_dir"] is None and options["fofn"] is None:
+        raise RuntimeError("Need to provide path to .fast5 files or file with filenames (fofn)")
+
+    if options["edited_fw_reference"] is None:
+        assert os.path.exists(reference), "Must specify a bwa_reference in order to create signalAlignments"
+        fw_fasta_path, bw_fasta_path = processReferenceFasta(fasta=reference,
                                                              work_folder=working_folder,
                                                              motif_key=options["motif"],
                                                              sub_char=options["label"],
                                                              positions_file=options["positions_file"])
-        if options["fast5_dir"] is not None:
-            if options["fofn"] is not None:
-                print("WARNING Only using files is directory %s ignoring fofn %s"
-                      % (options["files_dir"], options["fofn"]))
-            sample = Fast5Directory(options["fast5_dir"], fw_fasta_path, bw_fasta_path)
-        else:
-            sample = FileOfFilenames(options["fofn"], fw_fasta_path, bw_fasta_path)
-        return sample
 
-    # make directory to put the files we're using
-    working_folder = FolderHandler()
-    working_folder_path = working_folder.open_folder(os.path.join(config["output_dir"] + "temp_trainModels"))
-    samples = [process_sample(s) for s in config["samples"]]
-    if config["bwt"] is not None:
-        print("[trainModels]Using provided BWT")
-        bwa_ref_index = config["bwt"]
     else:
-        print("signalAlign - indexing reference", file=sys.stderr)
-        bwa_ref_index = getBwaIndex(config["reference"], working_folder_path)
-        print("signalAlign - indexing reference, done", file=sys.stderr)
+        fw_fasta_path = options["edited_fw_reference"]
+        bw_fasta_path = options["edited_bw_reference"]
 
+    if options["fast5_dir"] is not None:
+        if options["fofn"] is not None:
+            print("WARNING Only using files is directory %s ignoring fofn %s"
+                  % (options["files_dir"], options["fofn"]))
+        sample = Fast5Directory(options["fast5_dir"], fw_fasta_path, bw_fasta_path)
+    else:
+        sample = FileOfFilenames(options["fofn"], fw_fasta_path, bw_fasta_path)
+    return sample
+
+
+def trainHMMTransitions(config):
+    """Train HMM transitions.
+
+    :param config: config dictionary with required arguments
+
+    config required keys
+    _____________
+    output_dir : path to output directory
+    samples: list of dictionary of samples
+            fast5_dir:  path to fast5s,
+            fofn: file with paths to fast5s
+            positions_file: changes to nucleotides by position,
+            edited_fw_reference: forward reference if different than canonical
+            edited_bw_reference: backward reference if needed
+
+    reference: reference to index if bwt does not exist
+    bwa_reference : original reference to create guide alignments
+    in_T_Hmm: path to template HMM model file
+    in_C_Hmm: path to complement HMM model file
+    templateHdp: path to template HDP model file
+    complementHdp: path to complement HDP model file
+    twoD: boolean option for 2D reads
+    training_bases: number of bases to use for each sample during training
+    job_count: number of processes to use when running SignalAlign
+    iterations: number of iterations over the entire updating pipeline
+    stateMachineType: type of stateMachine ("threeStateHdp" or "threeStateHmm")
+    diagonal_expansion: alignment algorithm param to expand how far a path can get from guide alignment
+    constraint_trim: alignment algorithm param for how much to trim the guide alignment anchors
+    """
+    # make directory to put the files we're using
+    output_dir = config["output_dir"]
+    bwa_reference = config["bwa_reference"]
+    alignment_file = config["alignment_file"]
+    training_amount = config["training_bases"]
+    workers = config["job_count"]
+    iterations = config["iterations"]
+    twoD = config['twoD']
+    state_machine_type = config["stateMachineType"]
     template_model_path = config["in_T_Hmm"]
     complement_model_path = config["in_C_Hmm"]
-    complement_model = None
-    complement_hmm = None
+    original_template_hdp_path = config["templateHdp"]
+    original_complement_hdp_path = config["complementHdp"]
+    diagonal_expansion = config["diagonal_expansion"]
+    constraint_trim = config["constraint_trim"]
+    test = config["test"]
+
+    working_folder = FolderHandler()
+    working_folder_path = working_folder.open_folder(os.path.join(output_dir, "temp_trainModels"))
+
+
     # find model files
     # make some paths to files to hold the HMMs
-    if config['twoD']:
+    complement_model = None
+    complement_hmm = None
+
+    if twoD:
         assert os.path.exists(complement_model_path), \
             "Missing complement model %s" % (complement_model_path)
-        complement_model = get_model(config["stateMachineType"], complement_model_path)
+        complement_model = get_model(state_machine_type, complement_model_path)
         complement_hmm = working_folder.add_file_path("complement_trained.hmm")
         copyfile(complement_model_path, complement_hmm)
         assert os.path.exists(complement_hmm), "Problem copying default model to {}".format(complement_hmm)
 
     assert os.path.exists(template_model_path), \
         "Missing template model %s" % (template_model_path)
-    template_model = get_model(config["stateMachineType"], template_model_path)
+    template_model = get_model(state_machine_type, template_model_path)
     template_hmm = working_folder.add_file_path("template_trained.hmm")
     copyfile(template_model_path, template_hmm)
     assert os.path.exists(template_hmm), "Problem copying default model to {}".format(template_hmm)
@@ -359,13 +399,12 @@ def trainModelTransitions(config):
     update_template_hmm_emissions = False
     update_complement_hmm_emissions = False
     # get the input HDP, if we're using it
-    if config["stateMachineType"] == "threeStateHdp":
-        template_hdp = working_folder.add_file_path("%s" % config["templateHdp"].split("/")[-1])
-        copyfile(config["templateHdp"], template_hdp)
-        if config["twoD"]:
-
-            complement_hdp = working_folder.add_file_path("%s" % config["complementHdp"].split("/")[-1])
-            copyfile(config["complementHdp"], complement_hdp)
+    if state_machine_type == "threeStateHdp":
+        template_hdp = working_folder.add_file_path("%s" % os.path.basename(original_template_hdp_path))
+        copyfile(original_template_hdp_path, template_hdp)
+        if twoD:
+            complement_hdp = working_folder.add_file_path("%s" % os.path.basename(original_complement_hdp_path))
+            copyfile(original_complement_hdp_path, complement_hdp)
         else:
             update_complement_hmm_emissions = True
             complement_hdp = None
@@ -377,54 +416,55 @@ def trainModelTransitions(config):
 
     # start iterating
     i = 0
-    while i < config["iterations"]:
-        # first cull a set of files to get expectations on
-        training_files = cull_training_files(samples=samples,
-                                             training_amount=config["training_bases"],
-                                             twoD=config["twoD"])
-        # setup
-        workers = config["job_count"]
-        work_queue = Manager().Queue()
-        done_queue = Manager().Queue()
-        jobs = []
+    samples = [process_sample(s, bwa_reference, working_folder) for s in config["samples"]]
 
-        # get expectations for all the files in the queue
-        # file_ref_tuple should be (fast5, (plus_ref_seq, minus_ref_seq))
-        for fast5, forward_reference, backward_reference in training_files:
+    while i < iterations:
+        # first cull a set of files to get expectations on
+        # training_files = cull_training_files(samples=samples,
+        #                                      training_amount=config["training_bases"],
+        #                                      twoD=config["twoD"])
+
+        for sample in samples:
+            shuffle(sample.getFiles())
+            total_amount = 0
+            file_count = 0
+            get_seq_len_fcn = get_2d_length if twoD else get_1d_length
+            # loop over files and add them to training list, break when we have enough bases to complete a batch
+            # collect paths to fast5 files
+            list_of_fast5s = []
+            for f in sample.getFiles():
+                # yield f, sample.fw_fasta_path, sample.bw_fasta_path
+                list_of_fast5s.append(f)
+                # training_files.append((f, sample.fw_fasta_path, sample.bw_fasta_path))
+                file_count += 1
+                total_amount += get_seq_len_fcn(f)
+                if total_amount >= training_amount:
+                    break
+                print("[trainModels_HMM] Culled {file_count} training files, for {bases} from {sample}."
+                      .format(file_count=file_count, bases=total_amount, sample=sample.getKey()), end="\n", file=sys.stderr)
+
             alignment_args = {
-                "backward_reference": backward_reference,
-                "forward_reference": forward_reference,
+                "backward_reference": sample.bw_fasta_path,
+                "forward_reference": sample.fw_fasta_path,
                 "destination": working_folder_path,
-                "stateMachineType": config["stateMachineType"],
-                "bwa_index": bwa_ref_index,
+                "stateMachineType": state_machine_type,
                 "in_templateHmm": template_hmm,
                 "in_complementHmm": complement_hmm,
                 "in_templateHdp": template_hdp,
                 "in_complementHdp": complement_hdp,
-                "in_fast5": fast5,
                 "threshold": 0.01,
-                "diagonal_expansion": config["diagonal_expansion"],
-                "constraint_trim": config["constraint_trim"],
+                "diagonal_expansion": diagonal_expansion,
+                "constraint_trim": constraint_trim,
                 "target_regions": None,
                 "degenerate": None,
-                "twoD_chemistry": config["twoD"],
+                "twoD_chemistry": twoD,
+                "alignment_file": alignment_file,
+                "bwa_reference": bwa_reference,
+                'track_memory_usage': False,
+                'get_expectations': True
             }
-            if config["DEBUG"]:
-                alignment = SignalAlignment(**alignment_args)
-                alignment.run(get_expectations=True)
-            else:
-                work_queue.put(alignment_args)
+            multithread_signal_alignment(alignment_args, list_of_fast5s, workers)
 
-        for w in range(workers):
-            p = Process(target=get_expectations, args=(work_queue, done_queue))
-            p.start()
-            jobs.append(p)
-            work_queue.put('STOP')
-
-        for p in jobs:
-            p.join()
-
-        done_queue.put('STOP')
 
         # load then normalize the expectations
         template_expectations_files = [x for x in os.listdir(working_folder_path)
@@ -433,7 +473,6 @@ def trainModelTransitions(config):
         complement_expectations_files = [x for x in os.listdir(working_folder_path)
                                          if x.endswith(".complement.expectations")]
 
-        print(working_folder_path, template_expectations_files)
         if len(template_expectations_files) > 0:
             add_and_norm_expectations(path=working_folder_path,
                                       files=template_expectations_files,
@@ -441,7 +480,7 @@ def trainModelTransitions(config):
                                       hmm_file=template_hmm,
                                       update_transitions=True,
                                       update_emissions=False)
-        if config["twoD"] and len(complement_expectations_files) > 0:
+        if twoD and len(complement_expectations_files) > 0:
             add_and_norm_expectations(path=working_folder_path,
                                       files=complement_expectations_files,
                                       model=complement_model,
@@ -451,20 +490,18 @@ def trainModelTransitions(config):
 
         # log the running likelihood
         if len(template_model.running_likelihoods) > 0 and \
-                (config["twoD"] and len(complement_model.running_likelihoods)) > 0:
-            print("{i}| {t_likelihood}\t{c_likelihood}".format(t_likelihood=template_model.running_likelihoods[-1],
+                (twoD and len(complement_model.running_likelihoods)) > 0:
+            print("[trainModels_HMM] {i}| {t_likelihood}\t{c_likelihood}".format(t_likelihood=template_model.running_likelihoods[-1],
                                                                c_likelihood=complement_model.running_likelihoods[-1],
                                                                i=i))
-            if config["TEST"] and (len(template_model.running_likelihoods) >= 2) and \
+            if test and (len(template_model.running_likelihoods) >= 2) and \
                     (config["twoD"] and len(complement_model.running_likelihoods) >= 2):
-                print("TESTING")
                 assert (template_model.running_likelihoods[-2] < template_model.running_likelihoods[-1]) and \
                        (complement_model.running_likelihoods[-2] < complement_model.running_likelihoods[-1]), \
                     "Testing: Likelihood error, went up"
         elif len(template_model.running_likelihoods) > 0:
-            print("{i}| {t_likelihood}".format(t_likelihood=template_model.running_likelihoods[-1], i=i))
-            if config["TEST"] and (len(template_model.running_likelihoods) >= 2):
-                print("TESTING")
+            print("[trainModels_HMM] {i}| {t_likelihood}".format(t_likelihood=template_model.running_likelihoods[-1], i=i))
+            if test and (len(template_model.running_likelihoods) >= 2):
                 assert (template_model.running_likelihoods[-2] < template_model.running_likelihoods[-1]), "Testing: Likelihood error, went up"
 
         i += 1
@@ -473,6 +510,8 @@ def trainModelTransitions(config):
 
     print("trainModels - finished training routine", file=sys.stdout)
     print("trainModels - finished training routine", file=sys.stderr)
+
+    return [template_hmm, complement_hmm, template_hdp, complement_hdp]
 
 
 def main():
@@ -501,7 +540,7 @@ def main():
             exit(1)
         # Parse config
         config = {x.replace('-', '_'): y for x, y in yaml.load(open(args.config).read()).items()}
-        trainModelTransitions(config)
+        trainHMMTransitions(config)
 
 
 if __name__ == "__main__":

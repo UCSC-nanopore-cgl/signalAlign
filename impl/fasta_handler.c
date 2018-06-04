@@ -86,7 +86,7 @@ ReferenceSequence *fastaHandler_ReferenceSequenceConstructFull(char *forward_fas
 void build_fai_index_file() {
 //    int bugs = 100;
 //    double bug_rate = 1.2;
-    char fast_path[] = "/Users/andrewbailey/CLionProjects/nanopore-RNN/signalAlign/tests/test_sequences/fake_rna_reversed.fa";
+    char fast_path[] = "/Users/andrewbailey/CLionProjects/nanopore-RNN/submodules/signalAlign/tests/test_sequences/fake_rna_reversed.fa";
 //    fprintf(stdout, "You have %d bugs at the imaginary rate of %f.\n", bugs, bug_rate);
     fprintf(stdout, "fasta path: %s. \n", fast_path);
 //    int success = fai_build(fast_path);

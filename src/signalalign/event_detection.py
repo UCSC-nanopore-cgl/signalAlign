@@ -400,6 +400,30 @@ def get_resegment_accuracy(fast5handle, section="template"):
     return pairwise_alignment_accuracy(original_seq, resegment_seq, soft_clip=True)
 
 
+def create_minknow_events_from_fast5(fast5_path, window_lengths=(16, 40), thresholds=(8.0, 4.0), peak_height=1.0):
+    """Create events with ('start', 'length', 'mean', 'stdv', 'model_state', 'move', 'p_model_state') fields from
+        fast5 file. The 'model_state', 'move' and 'p_model_state' are all empty
+
+    :param fast5_path: path to fast5 file
+    :param window_lengths: Length 2 list of window lengths across
+        raw data from which `t_stats` are derived
+    :param thresholds: Length 2 list of thresholds on t-statistics
+    :peak_height: Absolute height a peak in signal must rise below
+        previous and following minima to be considered relevant
+    """
+    assert os.path.isfile(fast5_path), "File does not exist: {}".format(fast5_path)
+    f5fh = Fast5(fast5_path, read='r+')
+    signal = f5fh.get_read(raw=True, scale=True)
+    # read_id = bytes.decode(f5fh.raw_attributes['read_id'])
+    sampling_freq = f5fh.sample_rate
+    start_time = f5fh.raw_attributes['start_time']
+    #
+    event_table = create_minknow_event_table(signal, sampling_freq, start_time, window_lengths=window_lengths,
+                                             thresholds=thresholds, peak_height=peak_height)
+
+    return event_table
+
+
 def main():
     """Main docstring"""
     start = timer()
