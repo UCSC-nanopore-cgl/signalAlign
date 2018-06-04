@@ -10,3 +10,6 @@
 [submodule "python_utils"]
 	path = python_utils
 	url = https://github.com/adbailey4/python_utils
+[submodule "scrappie"]
+	path = scrappie
+	url = https://github.com/nanoporetech/scrappie.git
