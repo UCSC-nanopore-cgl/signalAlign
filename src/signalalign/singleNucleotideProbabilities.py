@@ -107,6 +107,7 @@ def build_fast5_to_read_id_dict(fast5_locations):
         read_id = npr.read_label
         fast5_id = os.path.basename(fast5)[:-6]
         fast5_to_read_id[fast5_id] = read_id
+        npr.close()
     return fast5_to_read_id
 
 

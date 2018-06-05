@@ -5,7 +5,7 @@ import h5py
 import re
 
 from itertools import islice
-from signalalign.event_detection import resegment_reads
+from signalalign.event_detection import resegment_reads, RESEGMENT_SCRAPPIE
 
 
 TEMPLATE_BASECALL_KEY   = "/Analyses/Basecall_1D_00{}"
@@ -72,6 +72,11 @@ class NanoporeRead(object):
             self.logError("[NanoporeRead:open] ERROR opening {filename}, {e}".format(filename=self.filename, e=e), parent_job)
             return False
 
+    def close(self):
+        self.is_open = False
+        if self.fastFive is None: return
+        self.fastFive.close()
+
     def get_latest_basecall_edition(self, address, new=False):
         """Check if path exists, if it does increment numbering
 
@@ -86,30 +91,14 @@ class NanoporeRead(object):
                 continue
             else:
                 if new:
-                    # print(address.format(highest))
                     return address.format(highest)  # the last base-called version we saw
                 else:
                     if highest > 0:
                         return address.format(max(0, highest - 1))  # the last base-called version we saw
                     else:
                         return False  # didn't find the version
-        # print("highest", highest)
         return False
 
-    # def check_path(self, path, latest=False):
-    #     """Check if path exists, if it does increment numbering
-    #
-    #     :param path: path to fast5 object. Needs to have a field where string.format can work! """
-    #     highest = 0
-    #     while highest < 10:
-    #         if path.format(highest) in self:
-    #             highest += 1
-    #             continue
-    #         else:
-    #             if latest and highest > 0:
-    #                 return path.format(highest-1)  # the last base-called version we saw
-    #             else:
-    #                 return path.format(highest)  # the new base-called version
 
     def Initialize(self, parent_job=None):
         if not self.open(parent_job): return False
@@ -154,13 +143,6 @@ class NanoporeRead(object):
         """
         if not self.open(): return False
 
-        # if not any(x in self.fastFive for x in TEMPLATE_BASECALL_KEY_0):
-        #     self.logError("[NanoporeRead:_initialize]ERROR %s not basecalled" % self.filename, parent_job)
-        #     self.close()
-        #     return False
-
-        # make sure that this version is supported
-
         # get oneD directory and check if the table location exists in the fast5file
         if self.event_table:
             oned_root_address = self.get_latest_basecall_edition(self.event_table)
@@ -183,6 +165,10 @@ class NanoporeRead(object):
                 oned_root_address = self.get_latest_basecall_edition(RESEGMENT_KEY)
         else:
             oned_root_address = self.get_latest_basecall_edition(TEMPLATE_BASECALL_KEY)
+            if not oned_root_address:
+                print("[SignalAlignment.run] Resegmenting read", file=sys.stderr)
+                resegment_reads(self.filename, {}, overwrite=True, resegment_strat=RESEGMENT_SCRAPPIE)
+                oned_root_address = self.get_latest_basecall_edition(RESEGMENT_KEY)
 
         # sanity check
         if not oned_root_address:
@@ -234,18 +220,6 @@ class NanoporeRead(object):
 
         return True
 
-    @staticmethod
-    def bytes_to_string(string):
-        """Check string. If bytes, convert to string and return string
-
-        :param string: string or bytes
-        """
-        if string is None or type(string) == str:
-            return string
-        elif 'bytes' in str(type(string)):
-            return string.decode()
-        else:
-            raise AssertionError("String needs to be bytes or string ")
 
     def _initialize_twoD(self, parent_job=None):
 
@@ -697,18 +671,6 @@ class NanoporeRead(object):
 
         return True
 
-    def close(self):
-        self.is_open = False
-        if self.fastFive is None: return
-        self.fastFive.close()
-
-    @staticmethod
-    def logError(message, parent_job=None):
-        if parent_job is None:
-            print(message, file=sys.stderr)
-        else:
-            parent_job.fileStore.logToMaster(message)
-
     def is_read_rna(self):
         """
         Determine if a read is RNA or DNA
@@ -739,3 +701,24 @@ class NanoporeRead(object):
                 (exp_kit is not None and re.search('rna', exp_kit) is not None))
 
         return rna
+
+    @staticmethod
+    def logError(message, parent_job=None):
+        if parent_job is None:
+            print(message, file=sys.stderr)
+        else:
+            parent_job.fileStore.logToMaster(message)
+
+    @staticmethod
+    def bytes_to_string(string):
+        """Check string. If bytes, convert to string and return string
+
+        :param string: string or bytes
+        """
+        if string is None or type(string) == str:
+            return string
+        elif 'bytes' in str(type(string)):
+            return string.decode()
+        else:
+            raise AssertionError("String needs to be bytes or string ")
+

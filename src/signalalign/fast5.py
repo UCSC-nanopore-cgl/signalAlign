@@ -815,6 +815,20 @@ class Fast5(h5py.File):
     ###
     # 1D Basecalling data
 
+    def has_basecall_data(self, section=__default_section__, analysis=__default_basecall_1d_analysis__):
+        """
+        Return whether basecall information exists
+
+        :param section: String to use in paths, e.g. 'template' or 'complement'.
+        :param analysis: Base analysis name (under {})
+        :return: False if get_basecall_data(..) will raise an exception, True otherwise
+        """
+        if not analysis in self: return False
+        base = self.get_analysis_latest(analysis)
+        events_path = self._join_path(base, self.__default_basecall_1d_events__.format(section))
+        return events_path in self
+
+
     def get_basecall_data(self, section=__default_section__, analysis=__default_basecall_1d_analysis__):
         """Read the annotated basecall_1D events from the fast5 file.
 
