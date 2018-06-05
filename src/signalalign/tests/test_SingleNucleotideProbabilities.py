@@ -13,10 +13,6 @@ import signalalign.singleNucleotideProbabilities as singleNuclProb
 SIGNALALIGN_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../.."))
 SIGNALMACHINE_EXE = os.path.join(SIGNALALIGN_ROOT, "bin/signalMachine")
 TEMPLATE_MODEL=os.path.join(SIGNALALIGN_ROOT, "models/testModelR9_5mer_acgt_template.model")
-# ZYMO_C_READS = os.path.join(SIGNALALIGN_ROOT, "tests/minion_test_reads/C/")
-# ZYMO_REFERENCE = os.path.join(SIGNALALIGN_ROOT, "tests/test_sequences/zymo_sequence.fasta")
-
-
 
 
 class SingleNuclProbsTest(unittest.TestCase):
@@ -32,23 +28,24 @@ class SingleNuclProbsTest(unittest.TestCase):
     def tearDown(self):
         shutil.rmtree(SingleNuclProbsTest.WORK_DIR)
 
-    def run_single_nucl_prob(self, fast5_dir, reference_location):
+    def run_single_nucl_prob(self, fast5_glob, reference_location):
         output_tmp_dir = os.path.join(os.path.abspath(SingleNuclProbsTest.WORK_DIR), "output")
-        args = ['-d', fast5_dir,
+        args = ['-g', fast5_glob,
                 '-r', reference_location,
                 '-T', TEMPLATE_MODEL,
-                '-o', output_tmp_dir, ]
+                '-o', output_tmp_dir,
+                '--step_size', '5']
 
         singleNuclProb.main(args)
 
-        in_file_count = len(glob.glob(os.path.join(fast5_dir, "*.fast5")))
+        in_file_count = len(glob.glob(fast5_glob))
         output_files = glob.glob(os.path.join(output_tmp_dir, "*.tsv"))
         out_file_count = len(output_files)
         assert out_file_count == in_file_count, "Expected {} output files, got {}".format(in_file_count, out_file_count)
 
 
     def test_1D_reads(self):
-        oneD_reads = os.path.join(SIGNALALIGN_ROOT, "tests/minion_test_reads/1D/")
+        oneD_reads = os.path.join(SIGNALALIGN_ROOT, "tests/minion_test_reads/1D/LomanLabz_PC_20161025_FNFAB42699_MN17633_sequencing_run_20161025_E_coli_native_450bps_82361_ch112_read108_strand.fast5")
         ecoli_ref = os.path.join(SIGNALALIGN_ROOT, "tests/test_sequences/E.coli_K12.fasta")
         self.run_single_nucl_prob(oneD_reads, ecoli_ref)
 

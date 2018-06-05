@@ -40,8 +40,11 @@ def parse_args(args=None):
     parser = ArgumentParser(description=__doc__)
 
     parser.add_argument('--file_directory', '-d', action='store',
-                        dest='files_dir', required=True, type=str, default=None,
-                        help="directory with MinION fast5 reads to align")
+                        dest='files_dir', required=False, type=str, default=None,
+                        help="directory with fast5 reads to align")
+    parser.add_argument('--fast5_glob', '-g', action='store',
+                        dest='fast5_glob', required=False, type=str, default=None,
+                        help="glob matching fast5 reads to align")
     parser.add_argument('--ref', '-r', action='store',
                         dest='ref', required=True, type=str,
                         help="reference sequence to align to, in FASTA")
@@ -84,10 +87,16 @@ def parse_args(args=None):
                         help="a SAM/BAM with alignments of reads.  if set, cigar strings will be used only from this file")
 
     parser.add_argument("--validate", action='store', dest='validation_file', default=None, required=False,
-                        help="validate an output file as compared to its fast5 file (only performs this action)")
+                        help="validate an output file or directory (signalAlign will not be run)")
 
     args = parser.parse_args(args)
+
+    # either: a) exactly one of [files_dir, fast5_glob], b) validation
+    if not ((args.files_dir is None) ^ (args.fast5_glob is None)) or args.validation_file is not None:
+        raise Exception("Unless validating, exactly one of --file_directory and --fast5_glob must be set")
+
     return args
+
 
 
 def resolvePath(p):
@@ -701,6 +710,7 @@ def main(args):
 
     # get absolute paths to inputs
     args.files_dir           = resolvePath(args.files_dir)
+    args.fast5_glob          = resolvePath(args.fast5_glob)
     args.ref                 = resolvePath(args.ref)
     args.out                 = resolvePath(args.out)
     args.in_T_Hmm            = resolvePath(args.in_T_Hmm)
@@ -714,10 +724,13 @@ def main(args):
     args.step_size = int(args.step_size)
     args.kmer_size = int(args.kmer_size)
 
+    # get input glob
+    input_glob = args.fast5_glob if args.fast5_glob is not None else os.path.join(args.files_dir, "*.fast5")
+
     start_message = """
 #   Single Nucleotide Probabilities
 #
-#   Aligning files from: {fileDir}
+#   Aligning files matching: {inputGlob}
 #   Aligning to reference: {reference}
 #   Aligning maximum of {nbFiles} files
 #   Using BWT: {bwt}
@@ -731,7 +744,7 @@ def main(args):
 #   Kmer size: {kmerSize}
 #   Step size: {stepSize}
 #   Alignment File: {alignmentFile}
-    """.format(fileDir=args.files_dir, reference=args.ref, bwt=args.bwt, banding=args.banded, nbFiles=args.nb_files,
+    """.format(inputGlob=input_glob, reference=args.ref, bwt=args.bwt, banding=args.banded, nbFiles=args.nb_files,
                inThmm=args.in_T_Hmm, inChmm=args.in_C_Hmm, model=args.stateMachineType, regions=args.target_regions,
                tHdp=args.templateHDP, cHdp=args.complementHDP, kmerSize=args.kmer_size, stepSize=args.step_size,
                alignmentFile=args.alignment_file)
@@ -741,7 +754,7 @@ def main(args):
     if not os.path.isdir(args.out): os.mkdir(args.out)
 
     # get fast5 locations and prune
-    fast5s = glob.glob(os.path.join(args.files_dir, "*.fast5"))
+    fast5s = glob.glob(input_glob)
     if args.nb_files is not None and args.nb_files < len(fast5s):
         print("[singleNucleotideProbabilities] pruning {} fast5 files down to configured max {}".format(len(fast5s), args.nb_files))
         shuffle(fast5s)
