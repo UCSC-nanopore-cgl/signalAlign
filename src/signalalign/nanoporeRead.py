@@ -52,12 +52,25 @@ class NanoporeRead(object):
         self.complement_var = 1                #
         self.complement_scale_sd = 1           #
         self.complement_var_sd = 1             #
-        self.twoD = twoD                       # 2D read flag, necessary right now, and the client should know
         self.event_table = event_table         # if we look for alternative events table
+
+        # determination of 2D reads
+        self.twoD = twoD                       # 2D read flag, necessary right now, and the client should know
+        if type(self) == NanoporeRead:
+            if twoD:
+                raise Exception("The 'twoD' initialization flag is deprecated for NanoporeRead.  "
+                                "Use 'NanoporeRead2D' object instead.")
+            self.twoD = False
+        elif type(self) == NanoporeRead2D:
+            self.twoD = True
+
+        # determination of RNA read
         self.rna = False
         if self.is_read_rna():
             self.rna = True
             assert self.twoD is False, "Cannot perform 2D analysis when using RNA data"
+
+        # initialize if appropriate
         if initialize:
             self.Initialize()
 
@@ -99,19 +112,14 @@ class NanoporeRead(object):
                         return False  # didn't find the version
         return False
 
-
-    def Initialize(self, parent_job=None):
+    def Initialize(self, call_events=None, call_nucleotides=None, parent_job=None):
         if not self.open(parent_job): return False
 
-        ok = self._initialize_metadata(parent_job)
-
-        if self.twoD:
-            ok &= self._initialize_twoD(parent_job)
-        else:
-            ok &= self._initialize(parent_job)
+        ok = self._initialize_metadata()
+        ok &= self._initialize()
         return ok
 
-    def _initialize_metadata(self, parent_job=None):
+    def _initialize_metadata(self):
         if not self.open(): return False
 
         path_locations = [METADATA_PATH_KEY, READS_KEY]
@@ -119,7 +127,7 @@ class NanoporeRead(object):
 
         if len(missing_paths) > 0:
             self.logError("[NanoporeRead:Initialize] ERROR keys are missing from {}: {}"
-                          .format(self.filename, missing_paths), parent_job)
+                          .format(self.filename, missing_paths))
             self.close()
             return False
 
@@ -127,7 +135,7 @@ class NanoporeRead(object):
         reads = list(self.fastFive[READS_KEY])
         if len(reads) != 1:
             self.logError("[NanoporeRead:Initialize] ERROR expected 1 read in {} ({}): got {}"
-                          .format(self.filename, READS_KEY, reads), parent_job)
+                          .format(self.filename, READS_KEY, reads))
             self.close()
             return False
         read_loc = READS_KEY + reads[0]
@@ -136,8 +144,7 @@ class NanoporeRead(object):
 
         return self.run_id is not None and self.read_label is not None
 
-
-    def _initialize(self, parent_job=None):
+    def _initialize(self):
         """Routine setup 1D NanoporeReads, returns false if basecalled with upsupported
         version or is not base-called
         """
@@ -173,13 +180,13 @@ class NanoporeRead(object):
         # sanity check
         if not oned_root_address:
             self.logError("[NanoporeRead:_initialize] ERROR could not find 1D root address in {}"
-                          .format(self.filename), parent_job)
+                          .format(self.filename))
             self.close()
             return False
 
         # get basecall version
         if not any(x in self.fastFive[oned_root_address].attrs.keys() for x in VERSION_KEY):
-            self.logError("[NanoporeRead:_initialize] ERROR %s missing version" % self.filename, parent_job)
+            self.logError("[NanoporeRead:_initialize] ERROR %s missing version" % self.filename)
             self.close()
             return False
         if "version" in self.fastFive[oned_root_address].attrs.keys():
@@ -189,8 +196,7 @@ class NanoporeRead(object):
         else:
             self.version = self.fastFive[oned_root_address].attrs["nanotensor version"]
         if self.version not in SUPPORTED_1D_VERSIONS:
-            self.logError("[NanoporeRead:_initialize] ERROR %s unsupported version %s " % (self.filename, self.version),
-                          parent_job)
+            self.logError("[NanoporeRead:_initialize] ERROR %s unsupported version %s " % (self.filename, self.version))
             self.close()
             return False
 
@@ -200,7 +206,7 @@ class NanoporeRead(object):
 
         fastq_sequence_address = "%s/BaseCalled_template/Fastq" % oned_root_address
         if fastq_sequence_address not in self.fastFive:
-            self.logError("[NanoporeRead:_initialize]ERROR %s missing fastq" % self.filename, parent_job)
+            self.logError("[NanoporeRead:_initialize]ERROR %s missing fastq" % self.filename)
             self.close()
             return False
 
@@ -214,173 +220,46 @@ class NanoporeRead(object):
         if self.template_read_length <= 0 or self.kmer_length <= 0:
             self.logError("[NanoporeRead:_initialize] ERROR illegal read parameters "
                           "template_read_length: %s, kmer_length: %s"
-                          % (self.template_read_length, self.kmer_length), parent_job)
+                          % (self.template_read_length, self.kmer_length))
             self.close()
             return False
 
         return True
 
+    @staticmethod
+    def make_event_map(events, kmer_length):
+        event_map = [0]
+        previous_prob = 0
+        for i, line in islice(enumerate(events), 1, None):
+            move = line['move']
+            this_prob = line['p_model_state']
+            if move == 1:
+                event_map.append(i)
+            if move > 1:
+                for skip in range(move - 1):
+                    event_map.append(i - 1)
+                event_map.append(i)
+            if move == 0:
+                if this_prob > previous_prob:
+                    event_map[-1] = i
+            previous_prob = this_prob
+        final_event_index = [event_map[-1]]
+        padding = final_event_index * (kmer_length - 1)
+        event_map = event_map + padding
+        return event_map
 
-    def _initialize_twoD(self, parent_job=None):
-
-        if not self.open(): return False
-
-        self.has2D = False
-        self.has2D_alignment_table = False
-
-        if TWOD_BASECALL_KEY_0 not in self.fastFive:
-            self.logError("[NanoporeRead::initialize_twoD] Didn't find twoD address, looked here {}"
-                          .format(TWOD_BASECALL_KEY_0), parent_job)
-            self.close()
-            return False
-
-        twoD_address = self.get_latest_basecall_edition(TWOD_BASECALL_KEY)
-        if twoD_address not in self.fastFive:
-            self.logError("[NanoporeRead::initialize_twoD] Didn't find twoD address, looked here %s "%twoD_address,
-                          parent_job)
-            self.close()
-            return False
-
-        self.version = bytes.decode(self.fastFive[twoD_address].attrs["dragonet version"])
-
-        supported_versions = ["1.15.0", "1.19.0", "1.20.0", "1.22.2", "1.22.4", "1.23.0"]
-        if self.version not in supported_versions:
-            self.logError("[NanoporeRead::initialize_twoD]Unsupported Version {} (1.15.0, 1.19.0, 1.20.0, "
-                          "1.22.2, 1.22.4, 1.23.0 supported)".format(self.version), parent_job)
-            self.close()
-            return False
-
-        if self.version == "1.15.0":
-            oneD_address = self.get_latest_basecall_edition(TWOD_BASECALL_KEY)
-        else:
-            oneD_address = self.get_latest_basecall_edition(TEMPLATE_BASECALL_KEY)
-
-        twoD_alignment_table_address = twoD_address + "/BaseCalled_2D/Alignment"
-        if twoD_alignment_table_address in self.fastFive:
-            self.twoD_alignment_table = self.fastFive[twoD_alignment_table_address]
-            if len(self.twoD_alignment_table) > 0:
-                self.has2D_alignment_table = True
-            self.kmer_length = len(self.twoD_alignment_table[0][2])
-
-        twoD_read_sequence_address = twoD_address + "/BaseCalled_2D/Fastq"
-        if twoD_read_sequence_address in self.fastFive:
-            self.has2D = True
-            self.twoD_read_sequence = bytes.decode(self.fastFive[twoD_read_sequence_address][()].split()[2])
-
-        # initialize version-specific paths
-        if self.version == "1.15.0":
-            self.template_event_table_address = twoD_address + '/BaseCalled_template/Events'
-            self.template_model_address = twoD_address + "/BaseCalled_template/Model"
-            self.template_model_id = self.get_model_id(twoD_address + "/Summary/basecall_1d_template")
-            self.template_read = bytes.decode(self.fastFive[twoD_address + "/BaseCalled_template/Fastq"][()].split()[2])
-
-            self.complement_event_table_address = twoD_address + '/BaseCalled_complement/Events'
-            self.complement_model_address = twoD_address + "/BaseCalled_complement/Model"
-            self.complement_model_id = self.get_model_id(twoD_address + "/Summary/basecall_1d_complement")
-            self.complement_read = bytes.decode(self.fastFive[twoD_address + "/BaseCalled_complement/Fastq"][()].split()[2])
-            return True
-
-        elif self.version == "1.19.0" or self.version == "1.20.0":
-            self.template_event_table_address = oneD_address + '/BaseCalled_template/Events'
-            self.template_model_address = oneD_address + "/BaseCalled_template/Model"
-            self.template_model_id = self.get_model_id(oneD_address + "/Summary/basecall_1d_template")
-            self.template_read = bytes.decode(self.fastFive[oneD_address + "/BaseCalled_template/Fastq"][()].split()[2])
-
-            self.complement_event_table_address = oneD_address + '/BaseCalled_complement/Events'
-            self.complement_model_address = oneD_address + "/BaseCalled_complement/Model"
-            self.complement_model_id = self.get_model_id(oneD_address + "/Summary/basecall_1d_complement")
-            self.complement_read = bytes.decode(self.fastFive[oneD_address + "/BaseCalled_complement/Fastq"][()].split()[2])
-            return True
-
-        elif self.version == "1.22.2" or self.version == "1.22.4" or self.version == "1.23.0":
-            self.template_event_table_address = oneD_address + '/BaseCalled_template/Events'
-            self.template_model_address = ""
-            self.template_model_id = None
-            self.template_read = bytes.decode(self.fastFive[oneD_address + "/BaseCalled_template/Fastq"][()].split()[2])
-
-            self.complement_event_table_address = oneD_address + '/BaseCalled_complement/Events'
-            self.complement_model_address = ""
-            self.complement_model_id = None
-            self.complement_read = bytes.decode(self.fastFive[oneD_address + "/BaseCalled_complement/Fastq"][()].split()[2])
-            return True
-        else:
-            self.logError("Unsupported Version (1.15.0, 1.19.0, 1.20.0, 1.22.2, 1.22.4 supported)", parent_job)
-            return False
-
-    def assemble_2d_sequence_from_table(self):
-        """The 2D read sequence contains kmers that may not map to a template or complement event, which can make
-        mapping difficult downstream. This function makes a sequence from the 2D alignment table, which is usually
-        pretty similar to the 2D read, except it is guaranteed to have an event map to every position.
-
-        returns: sequence made from alignment table
-        """
-        def find_kmer_overlap(k_i, k_j):
-            """ finds the overlap between two non-identical kmers.
-            k_i: one kmer
-            k_j: another kmer
-            returns: The number of positions not matching
-            """
-            for i in range(1, len(k_i)):
-                sk_i = k_i[i:]
-                sk_j = k_j[:-i]
-                if sk_i == sk_j:
-                    return i
-            return len(k_i)
-
-        self.alignment_table_sequence = ''
-        self.alignment_table_sequence = self.twoD_alignment_table[0][2]
-        p_kmer = self.twoD_alignment_table[0][2]
-
-        # iterate through the k-mers in the alignment table
-        for t, c, kmer in self.twoD_alignment_table:
-            # if we're at a new 6-mer
-            if kmer != p_kmer:
-                # find overlap, could move up to len(k-mer) - 1 bases
-                i = find_kmer_overlap(p_kmer, kmer)
-                # append the suffix of the new 6-mer to the sequence
-                self.alignment_table_sequence += kmer[-i:]
-                # update
-                p_kmer = kmer
-            else:
-                continue
-        self.alignment_table_sequence = bytes.decode(self.alignment_table_sequence)
-        return
-
-    def init_1d_event_maps(self):
+    def init_event_map(self):
         """Maps the events from the template and complement strands to their base called kmers. The map
         generated by this function is called the "strand_event_map" because it only works for mapping the
         strand read (1D read) to to it's events. Uses the same fields as 'get_twoD_event_map' below.
         """
-        def make_map(events):
-            event_map = [0]
-            previous_prob = 0
-            for i, line in islice(enumerate(events), 1, None):
-                move = line['move']
-                this_prob = line['p_model_state']
-                if move == 1:
-                    event_map.append(i)
-                if move > 1:
-                    for skip in range(move - 1):
-                        event_map.append(i - 1)
-                    event_map.append(i)
-                if move == 0:
-                    if this_prob > previous_prob:
-                        event_map[-1] = i
-                previous_prob = this_prob
-            final_event_index = [event_map[-1]]
-            padding = final_event_index * (self.kmer_length - 1)
-            event_map = event_map + padding
-            return event_map
 
-        self.template_strand_event_map = make_map(self.template_events)
+        self.template_strand_event_map = self.make_event_map(self.template_events, self.kmer_length)
         assert len(self.template_strand_event_map) == len(self.template_read), \
             "Read and event map lengths do not match {} != {}".format(len(self.template_read),
                                                                       len(self.template_strand_event_map))
         # if self.rna:
         #     self.template_strand_event_map = self.template_strand_event_map[::-1]
-        if self.twoD:
-            self.complement_strand_event_map = make_map(self.complement_events)
-            assert len(self.complement_strand_event_map) == len(self.complement_read)
 
         return True
 
@@ -401,117 +280,13 @@ class NanoporeRead(object):
     def _join_path(self, *args):
         return '/'.join(args)
 
-    def get_twoD_event_map(self):
-        """Maps the kmers in the alignment table sequence read to events in the template and complement strand reads
-        """
-        def kmer_iterator(dna, k):
-            for i in range(len(dna)):
-                kmer = dna[i:(i + k)]
-                if len(kmer) == k:
-                    yield kmer
-        # initialize
-        alignment_row = 0
-        prev_alignment_kmer = ''
-        nb_template_gaps = 0
-        previous_complement_event = None
-        previous_template_event = None
-
-        #twoD_init = self.initialize_twoD()
-        #if twoD_init is False:
-        #    return False
-
-        if not self.has2D_alignment_table:
-            print("{file} doesn't have 2D alignment table".format(file=self.filename))
-            return False
-
-        self.assemble_2d_sequence_from_table()
-
-        # go thought the kmers in the read sequence and match up the events
-        for i, seq_kmer in enumerate(kmer_iterator(self.alignment_table_sequence, self.kmer_length)):
-            # assign the current row's kmer
-            current_alignment_kmer = bytes.decode(self.twoD_alignment_table[alignment_row][2])
-
-            # in the situation where there is a repeat kmer in the alignment then
-            # we want to pick the best event to kmer alignment, TODO implement this
-            # right now we just use the first alignment
-            while current_alignment_kmer == prev_alignment_kmer:
-                alignment_row += 1
-                current_alignment_kmer = bytes.decode(self.twoD_alignment_table[alignment_row][2])
-            # a match
-            if seq_kmer == current_alignment_kmer:
-                template_event = self.twoD_alignment_table[alignment_row][0]
-                complement_event = self.twoD_alignment_table[alignment_row][1]
-
-                # handle template event
-                # if there is a gap, count it and don't add anything to the map
-                if template_event == -1:
-                    nb_template_gaps += 1
-
-                # if there is an aligned event
-                if template_event != -1:
-                    # if it is an aligned event and there are no gaps, add it to the map
-                    if nb_template_gaps == 0:
-                        self.template_event_map.append(template_event)
-                        # update
-                        previous_template_event = template_event
-                    # if there were gaps in the alignment we have to add 'best guess'
-                    # event alignments to the map which is the current aligned event
-                    if nb_template_gaps > 0:
-                        self.template_event_map += [template_event] * (nb_template_gaps + 1)
-                        # reset template gaps
-                        nb_template_gaps = 0
-                        # update
-                        previous_template_event = template_event
-
-                # handle complement event
-                # if there is a gap, add the last aligned complement event to the map
-                if complement_event == -1:
-                    self.complement_event_map.append(previous_complement_event)
-
-                # if there is an aligned complement event add it to the map
-                if complement_event != -1:
-                    self.complement_event_map.append(complement_event)
-                    # update the most recent aligned complement event
-                    previous_complement_event = complement_event
-
-                # update previous alignment kmer and increment alignment row
-                prev_alignment_kmer = current_alignment_kmer
-                alignment_row += 1
-                continue
-
-            # not a match, meaning that this kmer in the read sequence is not
-            # in the event alignment but we need to assign an event to it so
-            # we use the heuristic that we use the alignment of the most
-            # recent aligned events to this base
-            if seq_kmer != current_alignment_kmer:
-                self.template_event_map.append(previous_template_event)
-                self.complement_event_map.append(previous_complement_event)
-                continue
-
-        # fill in the final events for the partial last kmer
-        for _ in range(self.kmer_length - 1):
-            self.template_event_map += [previous_template_event] * (nb_template_gaps + 1)
-            self.complement_event_map.append(previous_complement_event)
-            nb_template_gaps = 0
-
-        # check that we have mapped all of the bases in the 2D read
-        assert(len(self.template_event_map) == len(self.alignment_table_sequence))
-        assert(len(self.complement_event_map) == len(self.alignment_table_sequence))
-        return True
-
     def get_template_events(self):
         if self.template_event_table_address in self.fastFive:
             self.template_events = self.fastFive[self.template_event_table_address]
             return True
         return False
 
-    def get_complement_events(self):
-        if self.complement_event_table_address in self.fastFive:
-            self.complement_events = self.fastFive[self.complement_event_table_address]
-            return True
-        return False
-
-    def get_template_model_adjustments(self):
+    def get_model_adjustments(self):
         if self.template_model_address in self.fastFive:
             self.has_template_model = True
             self.template_scale = self.fastFive[self.template_model_address].attrs["scale"]
@@ -523,20 +298,6 @@ class NanoporeRead(object):
 
         if self.template_model_address not in self.fastFive:
             self.has_template_model = False
-        return
-
-    def get_complement_model_adjustments(self):
-        if self.complement_model_address in self.fastFive:
-            self.has_complement_model = True
-            self.complement_scale = self.fastFive[self.complement_model_address].attrs["scale"]
-            self.complement_shift = self.fastFive[self.complement_model_address].attrs["shift"]
-            self.complement_drift = self.fastFive[self.complement_model_address].attrs["drift"]
-            self.complement_var = self.fastFive[self.complement_model_address].attrs["var"]
-            self.complement_scale_sd = self.fastFive[self.complement_model_address].attrs["scale_sd"]
-            self.complement_var_sd = self.fastFive[self.complement_model_address].attrs["var_sd"]
-
-        if self.complement_model_address not in self.fastFive:
-            self.has_complement_model = False
         return
 
     def get_model_id(self, address):
@@ -555,6 +316,13 @@ class NanoporeRead(object):
             pass
         self.fastFive.create_dataset(location, data=data, compression=compression)
 
+    def assert_events_and_event_map(self):
+        template_events_check = self.get_template_events()
+        oneD_event_map_check  = self.init_event_map()
+
+        ok = False not in [template_events_check, oneD_event_map_check]
+        return ok
+
     def Write(self, parent_job, out_file, initialize=True):
         if initialize:
             ok = self.Initialize(parent_job)
@@ -562,25 +330,13 @@ class NanoporeRead(object):
                 self.close()
                 return False
 
-        if self.twoD:
-            twoD_map_check          = self.get_twoD_event_map()
-            complement_events_check = self.get_complement_events()
-        else:
-            twoD_map_check          = True
-            complement_events_check = True
-
-        template_events_check = self.get_template_events()
-        oneD_event_map_check  = self.init_1d_event_maps()
-
-        ok = False not in [twoD_map_check, template_events_check, complement_events_check, oneD_event_map_check]
+        ok = self.assert_events_and_event_map()
         if not ok:
             self.close()
             return False
 
         # get model params
-        self.get_template_model_adjustments()
-        if self.twoD:
-            self.get_complement_model_adjustments()
+        self.get_model_adjustments()
 
         # Make the npRead
         # line 1 parameters
@@ -722,3 +478,277 @@ class NanoporeRead(object):
         else:
             raise AssertionError("String needs to be bytes or string ")
 
+
+class NanoporeRead2D(NanoporeRead):
+
+    def _initialize(self):
+        """
+        Separate initialization routine for 2D reads
+        :return:
+        """
+
+        if not self.open(): return False
+
+        self.has2D = False
+        self.has2D_alignment_table = False
+
+        if TWOD_BASECALL_KEY_0 not in self.fastFive:
+            self.logError("[NanoporeRead::initialize_twoD] Didn't find twoD address, looked here {}"
+                          .format(TWOD_BASECALL_KEY_0))
+            self.close()
+            return False
+
+        twoD_address = self.get_latest_basecall_edition(TWOD_BASECALL_KEY)
+        if twoD_address not in self.fastFive:
+            self.logError("[NanoporeRead::initialize_twoD] Didn't find twoD address, looked here %s "%twoD_address)
+            self.close()
+            return False
+
+        self.version = bytes.decode(self.fastFive[twoD_address].attrs["dragonet version"])
+
+        supported_versions = ["1.15.0", "1.19.0", "1.20.0", "1.22.2", "1.22.4", "1.23.0"]
+        if self.version not in supported_versions:
+            self.logError("[NanoporeRead::initialize_twoD]Unsupported Version {} (1.15.0, 1.19.0, 1.20.0, "
+                          "1.22.2, 1.22.4, 1.23.0 supported)".format(self.version))
+            self.close()
+            return False
+
+        if self.version == "1.15.0":
+            oneD_address = self.get_latest_basecall_edition(TWOD_BASECALL_KEY)
+        else:
+            oneD_address = self.get_latest_basecall_edition(TEMPLATE_BASECALL_KEY)
+
+        twoD_alignment_table_address = twoD_address + "/BaseCalled_2D/Alignment"
+        if twoD_alignment_table_address in self.fastFive:
+            self.twoD_alignment_table = self.fastFive[twoD_alignment_table_address]
+            if len(self.twoD_alignment_table) > 0:
+                self.has2D_alignment_table = True
+            self.kmer_length = len(self.twoD_alignment_table[0][2])
+
+        twoD_read_sequence_address = twoD_address + "/BaseCalled_2D/Fastq"
+        if twoD_read_sequence_address in self.fastFive:
+            self.has2D = True
+            self.twoD_read_sequence = bytes.decode(self.fastFive[twoD_read_sequence_address][()].split()[2])
+
+        # initialize version-specific paths
+        if self.version == "1.15.0":
+            self.template_event_table_address = twoD_address + '/BaseCalled_template/Events'
+            self.template_model_address = twoD_address + "/BaseCalled_template/Model"
+            self.template_model_id = self.get_model_id(twoD_address + "/Summary/basecall_1d_template")
+            self.template_read = bytes.decode(self.fastFive[twoD_address + "/BaseCalled_template/Fastq"][()].split()[2])
+
+            self.complement_event_table_address = twoD_address + '/BaseCalled_complement/Events'
+            self.complement_model_address = twoD_address + "/BaseCalled_complement/Model"
+            self.complement_model_id = self.get_model_id(twoD_address + "/Summary/basecall_1d_complement")
+            self.complement_read = bytes.decode(self.fastFive[twoD_address + "/BaseCalled_complement/Fastq"][()].split()[2])
+            return True
+
+        elif self.version == "1.19.0" or self.version == "1.20.0":
+            self.template_event_table_address = oneD_address + '/BaseCalled_template/Events'
+            self.template_model_address = oneD_address + "/BaseCalled_template/Model"
+            self.template_model_id = self.get_model_id(oneD_address + "/Summary/basecall_1d_template")
+            self.template_read = bytes.decode(self.fastFive[oneD_address + "/BaseCalled_template/Fastq"][()].split()[2])
+
+            self.complement_event_table_address = oneD_address + '/BaseCalled_complement/Events'
+            self.complement_model_address = oneD_address + "/BaseCalled_complement/Model"
+            self.complement_model_id = self.get_model_id(oneD_address + "/Summary/basecall_1d_complement")
+            self.complement_read = bytes.decode(self.fastFive[oneD_address + "/BaseCalled_complement/Fastq"][()].split()[2])
+            return True
+
+        elif self.version == "1.22.2" or self.version == "1.22.4" or self.version == "1.23.0":
+            self.template_event_table_address = oneD_address + '/BaseCalled_template/Events'
+            self.template_model_address = ""
+            self.template_model_id = None
+            self.template_read = bytes.decode(self.fastFive[oneD_address + "/BaseCalled_template/Fastq"][()].split()[2])
+
+            self.complement_event_table_address = oneD_address + '/BaseCalled_complement/Events'
+            self.complement_model_address = ""
+            self.complement_model_id = None
+            self.complement_read = bytes.decode(self.fastFive[oneD_address + "/BaseCalled_complement/Fastq"][()].split()[2])
+            return True
+        else:
+            self.logError("Unsupported Version (1.15.0, 1.19.0, 1.20.0, 1.22.2, 1.22.4 supported)")
+            return False
+
+    def assemble_2d_sequence_from_table(self):
+        """The 2D read sequence contains kmers that may not map to a template or complement event, which can make
+        mapping difficult downstream. This function makes a sequence from the 2D alignment table, which is usually
+        pretty similar to the 2D read, except it is guaranteed to have an event map to every position.
+
+        returns: sequence made from alignment table
+        """
+        def find_kmer_overlap(k_i, k_j):
+            """ finds the overlap between two non-identical kmers.
+            k_i: one kmer
+            k_j: another kmer
+            returns: The number of positions not matching
+            """
+            for i in range(1, len(k_i)):
+                sk_i = k_i[i:]
+                sk_j = k_j[:-i]
+                if sk_i == sk_j:
+                    return i
+            return len(k_i)
+
+        self.alignment_table_sequence = ''
+        self.alignment_table_sequence = self.twoD_alignment_table[0][2]
+        p_kmer = self.twoD_alignment_table[0][2]
+
+        # iterate through the k-mers in the alignment table
+        for t, c, kmer in self.twoD_alignment_table:
+            # if we're at a new 6-mer
+            if kmer != p_kmer:
+                # find overlap, could move up to len(k-mer) - 1 bases
+                i = find_kmer_overlap(p_kmer, kmer)
+                # append the suffix of the new 6-mer to the sequence
+                self.alignment_table_sequence += kmer[-i:]
+                # update
+                p_kmer = kmer
+            else:
+                continue
+        self.alignment_table_sequence = bytes.decode(self.alignment_table_sequence)
+        return
+
+    def get_twoD_event_map(self):
+        """Maps the kmers in the alignment table sequence read to events in the template and complement strand reads
+        """
+        def kmer_iterator(dna, k):
+            for i in range(len(dna)):
+                kmer = dna[i:(i + k)]
+                if len(kmer) == k:
+                    yield kmer
+        # initialize
+        alignment_row = 0
+        prev_alignment_kmer = ''
+        nb_template_gaps = 0
+        previous_complement_event = None
+        previous_template_event = None
+
+        #twoD_init = self.initialize_twoD()
+        #if twoD_init is False:
+        #    return False
+
+        if not self.has2D_alignment_table:
+            print("{file} doesn't have 2D alignment table".format(file=self.filename))
+            return False
+
+        self.assemble_2d_sequence_from_table()
+
+        # go thought the kmers in the read sequence and match up the events
+        for i, seq_kmer in enumerate(kmer_iterator(self.alignment_table_sequence, self.kmer_length)):
+            # assign the current row's kmer
+            current_alignment_kmer = bytes.decode(self.twoD_alignment_table[alignment_row][2])
+
+            # in the situation where there is a repeat kmer in the alignment then
+            # we want to pick the best event to kmer alignment, TODO implement this
+            # right now we just use the first alignment
+            while current_alignment_kmer == prev_alignment_kmer:
+                alignment_row += 1
+                current_alignment_kmer = bytes.decode(self.twoD_alignment_table[alignment_row][2])
+            # a match
+            if seq_kmer == current_alignment_kmer:
+                template_event = self.twoD_alignment_table[alignment_row][0]
+                complement_event = self.twoD_alignment_table[alignment_row][1]
+
+                # handle template event
+                # if there is a gap, count it and don't add anything to the map
+                if template_event == -1:
+                    nb_template_gaps += 1
+
+                # if there is an aligned event
+                if template_event != -1:
+                    # if it is an aligned event and there are no gaps, add it to the map
+                    if nb_template_gaps == 0:
+                        self.template_event_map.append(template_event)
+                        # update
+                        previous_template_event = template_event
+                    # if there were gaps in the alignment we have to add 'best guess'
+                    # event alignments to the map which is the current aligned event
+                    if nb_template_gaps > 0:
+                        self.template_event_map += [template_event] * (nb_template_gaps + 1)
+                        # reset template gaps
+                        nb_template_gaps = 0
+                        # update
+                        previous_template_event = template_event
+
+                # handle complement event
+                # if there is a gap, add the last aligned complement event to the map
+                if complement_event == -1:
+                    self.complement_event_map.append(previous_complement_event)
+
+                # if there is an aligned complement event add it to the map
+                if complement_event != -1:
+                    self.complement_event_map.append(complement_event)
+                    # update the most recent aligned complement event
+                    previous_complement_event = complement_event
+
+                # update previous alignment kmer and increment alignment row
+                prev_alignment_kmer = current_alignment_kmer
+                alignment_row += 1
+                continue
+
+            # not a match, meaning that this kmer in the read sequence is not
+            # in the event alignment but we need to assign an event to it so
+            # we use the heuristic that we use the alignment of the most
+            # recent aligned events to this base
+            if seq_kmer != current_alignment_kmer:
+                self.template_event_map.append(previous_template_event)
+                self.complement_event_map.append(previous_complement_event)
+                continue
+
+        # fill in the final events for the partial last kmer
+        for _ in range(self.kmer_length - 1):
+            self.template_event_map += [previous_template_event] * (nb_template_gaps + 1)
+            self.complement_event_map.append(previous_complement_event)
+            nb_template_gaps = 0
+
+        # check that we have mapped all of the bases in the 2D read
+        assert(len(self.template_event_map) == len(self.alignment_table_sequence))
+        assert(len(self.complement_event_map) == len(self.alignment_table_sequence))
+        return True
+
+    def init_event_map(self):
+        """Maps the events from the template and complement strands to their base called kmers. The map
+        generated by this function is called the "strand_event_map" because it only works for mapping the
+        strand read (1D read) to to it's events. Uses the same fields as 'get_twoD_event_map' below.
+        """
+
+        super(NanoporeRead2D, self).init_event_map()
+
+        self.complement_strand_event_map = self.make_event_map(self.complement_events, self.kmer_length)
+        assert len(self.complement_strand_event_map) == len(self.complement_read), \
+            "Complement read and event map lengths do not match {} != {}".format(len(self.complement_read),
+                                                                                 len(self.complement_strand_event_map))
+        return True
+
+    def get_complement_events(self):
+        if self.complement_event_table_address in self.fastFive:
+            self.complement_events = self.fastFive[self.complement_event_table_address]
+            return True
+        return False
+
+    def get_model_adjustments(self):
+
+        super(NanoporeRead2D, self).get_model_adjustments()
+
+        if self.complement_model_address in self.fastFive:
+            self.has_complement_model = True
+            self.complement_scale = self.fastFive[self.complement_model_address].attrs["scale"]
+            self.complement_shift = self.fastFive[self.complement_model_address].attrs["shift"]
+            self.complement_drift = self.fastFive[self.complement_model_address].attrs["drift"]
+            self.complement_var = self.fastFive[self.complement_model_address].attrs["var"]
+            self.complement_scale_sd = self.fastFive[self.complement_model_address].attrs["scale_sd"]
+            self.complement_var_sd = self.fastFive[self.complement_model_address].attrs["var_sd"]
+
+        if self.complement_model_address not in self.fastFive:
+            self.has_complement_model = False
+        return
+
+    def assert_events_and_event_map(self):
+
+        oneD_check = super(NanoporeRead2D, self).assert_events_and_event_map()
+        twoD_map_check = self.get_twoD_event_map()
+        complement_events_check = self.get_complement_events()
+
+        ok = False not in [oneD_check, twoD_map_check, complement_events_check]
+        return ok
