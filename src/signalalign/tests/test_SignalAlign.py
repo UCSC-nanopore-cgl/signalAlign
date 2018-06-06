@@ -12,6 +12,7 @@ from mea_algorithm_test import MeaTest
 from fast5_test import Fast5Test
 from event_detection_test import EventDetectTests
 from signalalign.utils.sequenceTools import getFastaDictionary
+from test_sequenceTools import TestMakePositionsFiles
 
 SIGNALALIGN_ROOT = "../"
 ZYMO_C_READS = SIGNALALIGN_ROOT + "tests/minion_test_reads/C/"
@@ -69,15 +70,15 @@ class SignalAlignAlignmentTest(unittest.TestCase):
         assert len(glob.glob(reads + "*.fast5")) > 0, "Didn't find zymo test MinION reads"
         assert os.path.isfile(reference), "Didn't find zymo reference sequence"
 
-        alignment_command = "./runSignalAlign -d={reads} -r={ref} -smt=threeState -o={testDir} " \
+        alignment_command = "./runSignalAlign -d={reads} --bwa_reference={ref} -smt=threeState -o={testDir} " \
                             "".format(reads=reads, ref=reference, testDir="./signalAlign_unittest/")
         if extra_args is not None:
             alignment_command += extra_args
 
-        null_output = open(os.devnull, 'w')
-        result = call(alignment_command, shell=True, bufsize=-1, stdout=null_output, stderr=null_output)
+        # null_output = open(os.devnull, 'w')
+        # result = call(alignment_command, shell=True, bufsize=-1, stdout=null_output, stderr=null_output)
         #
-        # result = call(alignment_command, shell=True, bufsize=-1)
+        result = call(alignment_command, shell=True, bufsize=-1)
 
         self.assertTrue(result == 0, "error running signalAlign alignments command was {}"
                                      "".format(alignment_command))
@@ -197,16 +198,17 @@ def add_all_tests_to_Suite(test_suite, test_class):
 
 def main():
     testSuite = unittest.TestSuite()
-    testSuite.addTest(LibTest('test_signalAlign_library'))
+    # testSuite.addTest(LibTest('test_signalAlign_library'))
     testSuite.addTest(SignalAlignAlignmentTest('test_zymo_reads'))
-    testSuite.addTest(SignalAlignAlignmentTest('test_pUC_r9_reads_5mer'))
-    testSuite.addTest(SignalAlignAlignmentTest('test_pUC_r9_reads_6mer'))
-    testSuite.addTest(SignalAlignAlignmentTest('test_Ecoli1D_reads_5mer'))
-    testSuite.addTest(SignalAlignAlignmentTest('test_RNA_edge_alignments_reads_5mer'))
+    # testSuite.addTest(SignalAlignAlignmentTest('test_pUC_r9_reads_5mer'))
+    # testSuite.addTest(SignalAlignAlignmentTest('test_pUC_r9_reads_6mer'))
+    # testSuite.addTest(SignalAlignAlignmentTest('test_Ecoli1D_reads_5mer'))
+    # testSuite.addTest(SignalAlignAlignmentTest('test_RNA_edge_alignments_reads_5mer'))
     testSuite.addTest(signalAlign_EM_test('test_EM'))
-    add_all_tests_to_Suite(testSuite, MeaTest)
-    add_all_tests_to_Suite(testSuite, EventDetectTests)
-    add_all_tests_to_Suite(testSuite, Fast5Test)
+    # add_all_tests_to_Suite(testSuite, MeaTest)
+    # add_all_tests_to_Suite(testSuite, EventDetectTests)
+    # add_all_tests_to_Suite(testSuite, Fast5Test)
+    # add_all_tests_to_Suite(testSuite, TestMakePositionsFiles)
 
     testRunner = unittest.TextTestRunner(verbosity=2)
     testRunner.run(testSuite)

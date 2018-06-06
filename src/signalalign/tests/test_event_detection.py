@@ -499,6 +499,12 @@ class EventDetectTests(unittest.TestCase):
         f5fh = resegment_reads("test_rna.fast5", minknow_params, speedy=False, overwrite=True)
         self.assertAlmostEqual(get_resegment_accuracy(f5fh), 1.0)
 
+    def test_create_minknow_events_from_fast5(self):
+        for path in ["test_rna.fast5", "test_dna.fast5"]:
+            events = create_minknow_events_from_fast5(path)
+            passing = check_numpy_table(events, req_fields=('start', 'length', 'mean', 'stdv', 'model_state', 'move', 'p_model_state'))
+            self.assertTrue(passing)
+
     @classmethod
     def tearDownClass(cls):
         """Remove test fast5 file"""
