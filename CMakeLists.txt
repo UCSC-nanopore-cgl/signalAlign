@@ -77,10 +77,12 @@ set(SOURCE_FILES
             impl/ranlib.c
             impl/rnglib.c
             impl/signalMachineUtils.c
-            impl/fasta_handler.c)
+            impl/fasta_handler.c
+            impl/banded_alignment.c
+            impl/)
 
 set(SIGNAL_MACHINE signalMachine.c)
-set(INDEX_FASTA index_fasta.c)
+set(DEBUGGING debugging.c)
 
 set(EVENTDETECT eventdetection/filters.c)
 
@@ -124,13 +126,13 @@ add_dependencies(signalMachine signalAlign)
 
 
 
-add_executable(index_fasta ${SOURCE_FILES} ${INDEX_FASTA})
-target_link_libraries(index_fasta)
-target_link_libraries(index_fasta -L${CMAKE_CURRENT_SOURCE_DIR}/htslib hts ${CMAKE_CURRENT_SOURCE_DIR}/htslib/libhts.a
+add_executable(debugging ${SOURCE_FILES} ${DEBUGGING})
+target_link_libraries(debugging)
+target_link_libraries(debugging -L${CMAKE_CURRENT_SOURCE_DIR}/htslib hts ${CMAKE_CURRENT_SOURCE_DIR}/htslib/libhts.a
         ${CMAKE_CURRENT_SOURCE_DIR}/sonLib/lib/sonLib.a
 
         ${CMAKE_CURRENT_SOURCE_DIR}/sonLib/lib/cuTest.a)
-add_dependencies(index_fasta signalAlign)
+add_dependencies(debugging signalAlign)
 
 
 

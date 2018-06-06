@@ -137,6 +137,8 @@ def processReferenceFasta(fasta, work_folder, motif_key=None, sub_char=None, pos
     else:
         positions = None
 
+    if positions_file is None and motif_key is None and sub_char is None:
+        return fasta, None
     # process fasta
     fw_fasta_path = work_folder.add_file_path("forward.{}".format(os.path.basename(fasta)))
     bw_fasta_path = work_folder.add_file_path("backward.{}".format(os.path.basename(fasta)))
