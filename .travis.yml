@@ -15,9 +15,9 @@ notifications: # set notification options
     # change is when the repo status goes from pass to fail or vice versa
     # on_failure: always
 
-#branches:
-#  except:
-#    - rojin
+branches:
+  except:
+    - train_rna2
 before_install:
 - sudo apt-get update -qq
 - sudo apt-get install libhdf5-serial-dev
@@ -74,8 +74,7 @@ install:
 script:
 - export PATH=$PATH:$PWD/bin
 - export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$PWD/htslib
-- cd bin
-- pytest
+- make test
 #- gcov-4.9 bin/signalMachine.c
 
 #- cd bin

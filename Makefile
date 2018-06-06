@@ -10,7 +10,7 @@ signalAlignLib = ${basicLibs}
 
 #coverage = -lgcov -coverage
 
-test_directory = ${rootPath}/src/tests/
+test_directory = ${rootPath}/src/signalalign/tests/
 
 htsLib = -L././htslib -lhts
 
@@ -18,7 +18,7 @@ all : sL bD hs python-utils ${libPath}/signalAlignLib.a ${signalAlignBin}/signal
 	  ${signalAlignBin}/compareDistributions \
 	  ${signalAlignBin}/signalMachine ${signalAlignBin}/runSignalAlign \
 	  ${signalAlignBin}/variantCallingLib.py ${signalAlignBin}/alignmentAnalysisLib.py \
-	  ${signalAlignBin}/buildHdpUtil ${signalAlignBin}/trainModels ${signalAlignBin}/hdp_pipeline ${signalAlignBin}/test_SignalAlign.py \
+	  ${signalAlignBin}/buildHdpUtil ${signalAlignBin}/trainModels ${signalAlignBin}/hdp_pipeline all_tests \
 	  externals nanoporeParams python_setup  \
 #	  ${signalAlignBin}/signalAlignLib.py \
 	  #${signalAlignBin}/zayante ${signalAlignBin}/bonnyDoon \
@@ -66,7 +66,7 @@ externals :
 	cd externalTools && make all
 
 test :
-	cd ${signalAlignBin} && pytest
+	cd ${test_directory} && pytest
 #	cd ${binPath} && ./sonLibTests
 	cd python_utils && pytest
 
@@ -99,18 +99,8 @@ ${signalAlignBin}/hdp_pipeline : ${rootPath}src/signalalign/scripts/hdp_pipeline
 	cp ${rootPath}src/signalalign/scripts/hdp_pipeline.py ${signalAlignBin}/hdp_pipeline
 	chmod +x ${signalAlignBin}/hdp_pipeline
 
-${signalAlignBin}/test_SignalAlign.py : .FORCE
-	cp ${rootPath}src/signalalign/tests/test_SignalAlign.py ${signalAlignBin}/test_SignalAlign.py
-	cp ${rootPath}src/signalalign/tests/event_detection_test.py ${signalAlignBin}/event_detection_test.py
-	cp ${rootPath}src/signalalign/tests/mea_algorithm_test.py ${signalAlignBin}/mea_algorithm_test.py
-	cp ${rootPath}src/signalalign/tests/fast5_test.py ${signalAlignBin}/fast5_test.py
-	cp ${rootPath}src/signalalign/tests/test_sequenceTools.py ${signalAlignBin}/test_sequenceTools.py
-
-	chmod +x ${signalAlignBin}/test_SignalAlign.py
-	chmod +x ${signalAlignBin}/fast5_test.py
-	chmod +x ${signalAlignBin}/mea_algorithm_test.py
-	chmod +x ${signalAlignBin}/event_detection_test.py
-	chmod +x ${signalAlignBin}/test_sequenceTools.py
+all_tests : .FORCE
+	chmod +x ${test_directory}/*
 
 ${signalAlignBin}/zayante : ${rootPath}src/signalalign/scripts/zayante.py
 	cp ${rootPath}src/signalalign/scripts/zayante.py ${signalAlignBin}/zayante
