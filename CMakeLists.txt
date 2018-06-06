@@ -63,23 +63,24 @@ set(estimateNanoporeParams estimateNanoporeParams.c)
 
 
 set(SOURCE_FILES
-            impl/stateMachine.c
-            impl/signalMachineUtils.c
-            impl/nanopore.c
-            impl/continuousHmm.c
-            impl/discreteHmm.c
-            impl/hdp.c
-            impl/hdp_math_utils.c
-            impl/multipleAligner.c
-            impl/nanopore.c
-            impl/nanopore_hdp.c
-            impl/pairwiseAligner.c
-            impl/ranlib.c
-            impl/rnglib.c
-            impl/signalMachineUtils.c
-            impl/fasta_handler.c
-            impl/banded_alignment.c
-            impl/)
+        impl/stateMachine.c
+        impl/signalMachineUtils.c
+        impl/nanopore.c
+        impl/continuousHmm.c
+        impl/discreteHmm.c
+        impl/hdp.c
+        impl/hdp_math_utils.c
+        impl/multipleAligner.c
+        impl/nanopore.c
+        impl/nanopore_hdp.c
+        impl/pairwiseAligner.c
+        impl/ranlib.c
+        impl/rnglib.c
+        impl/signalMachineUtils.c
+        impl/fasta_handler.c
+        impl/banded_alignment.c
+        impl/
+        /Users/andrewbailey/CLionProjects/nanopore-RNN/submodules/signalAlign/tests/allTests.c)
 
 set(SIGNAL_MACHINE signalMachine.c)
 set(DEBUGGING debugging.c)

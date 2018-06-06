@@ -26,7 +26,7 @@ class TestMakePositionsFiles(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         super(TestMakePositionsFiles, cls).setUpClass()
-        cls.HOME = '/'.join(os.path.abspath(__file__).split("/")[:-2])
+        cls.HOME = '/'.join(os.path.abspath(__file__).split("/")[:-4])
         cls.reference = os.path.join(cls.HOME, "tests/test_sequences/pUC19_SspI_Zymo.fa")
         # cls.reference = "/Users/andrewbailey/CLionProjects/nanopore-RNN/submodules/signalAlign/tests/test_sequences/pUC19_SspI_Zymo.fa"
 

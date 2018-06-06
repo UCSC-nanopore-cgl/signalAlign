@@ -24,7 +24,7 @@ class EventDetectTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         super(EventDetectTests, cls).setUpClass()
-        cls.HOME = '/'.join(os.path.abspath(__file__).split("/")[:-2])
+        cls.HOME = '/'.join(os.path.abspath(__file__).split("/")[:-4])
         cls.dna_file = os.path.join(cls.HOME, "tests/minion_test_reads/canonical_ecoli_R9/miten_PC_20160820_FNFAD20259_MN17223_mux_scan_AMS_158_R9_WGA_Ecoli_08_20_16_83098_ch138_read23_strand.fast5")
         cls.rna_file = os.path.join(cls.HOME,
                                     "tests/minion_test_reads/RNA_edge_cases/DEAMERNANOPORE_20170922_FAH26525_MN16450_sequencing_run_MA_821_R94_NA12878_mRNA_09_22_17_67136_read_61_ch_151_strand.fast5")
@@ -501,9 +501,10 @@ class EventDetectTests(unittest.TestCase):
 
     def test_create_minknow_events_from_fast5(self):
         for path in ["test_rna.fast5", "test_dna.fast5"]:
-            events = create_minknow_events_from_fast5(path)
+            events, f5handle = create_minknow_events_from_fast5(path)
             passing = check_numpy_table(events, req_fields=('start', 'length', 'mean', 'stdv', 'model_state', 'move', 'p_model_state'))
             self.assertTrue(passing)
+            self.assertIsInstance(f5handle, Fast5)
 
     @classmethod
     def tearDownClass(cls):

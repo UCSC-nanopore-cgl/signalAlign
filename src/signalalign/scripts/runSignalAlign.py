@@ -2,12 +2,11 @@
 """Main driver script for running an ionic current-to-sequence alignment on a single machine.
 """
 
-
 from __future__ import print_function
 import sys
 import os
 
-#import pysam
+# import pysam
 
 from argparse import ArgumentParser
 from random import shuffle
@@ -50,7 +49,8 @@ def parse_args():
                         dest='bwa_reference', required=True, type=str,
                         help="Reference sequence required for generating guide alignment")
 
-    parser.add_argument("--bwt", action='store', dest="bwt", default=None, help="path to BWT files. example: ../ref.fasta")
+    parser.add_argument("--bwt", action='store', dest="bwt", default=None,
+                        help="path to BWT files. example: ../ref.fasta")
     parser.add_argument('--output_location', '-o', action='store', dest='out',
                         required=True, type=str, default=None,
                         help="directory to put the alignments")
@@ -127,17 +127,17 @@ def main(args):
     print("Command Line: {cmdLine}\n".format(cmdLine=command_line), file=sys.stderr)
 
     # get absolute paths to inputs
-    args.files_dir           = resolvePath(args.files_dir)
-    args.forward_reference   = resolvePath(args.forward_ref)
-    args.backward_reference  = resolvePath(args.backward_ref)
-    args.out                 = resolvePath(args.out)
-    args.bwa_reference       = resolvePath(args.bwa_reference)
-    args.in_T_Hmm            = resolvePath(args.in_T_Hmm)
-    args.in_C_Hmm            = resolvePath(args.in_C_Hmm)
-    args.templateHDP         = resolvePath(args.templateHDP)
-    args.complementHDP       = resolvePath(args.complementHDP)
-    args.fofn                = resolvePath(args.fofn)
-    args.target_regions      = resolvePath(args.target_regions)
+    args.files_dir = resolvePath(args.files_dir)
+    args.forward_reference = resolvePath(args.forward_ref)
+    args.backward_reference = resolvePath(args.backward_ref)
+    args.out = resolvePath(args.out)
+    args.bwa_reference = resolvePath(args.bwa_reference)
+    args.in_T_Hmm = resolvePath(args.in_T_Hmm)
+    args.in_C_Hmm = resolvePath(args.in_C_Hmm)
+    args.templateHDP = resolvePath(args.templateHDP)
+    args.complementHDP = resolvePath(args.complementHDP)
+    args.fofn = resolvePath(args.fofn)
+    args.target_regions = resolvePath(args.target_regions)
     args.ambiguity_positions = resolvePath(args.ambiguity_positions)
     start_message = """
 #   Starting Signal Align
@@ -162,7 +162,8 @@ def main(args):
         sys.exit(1)
 
     if not os.path.isfile(args.bwa_reference):
-        print("Did not find valid reference file, looked for it {here}".format(here=args.bwa_reference), file=sys.stderr)
+        print("Did not find valid reference file, looked for it {here}".format(here=args.bwa_reference),
+              file=sys.stderr)
         sys.exit(1)
 
     # make directory to put temporary files
@@ -171,10 +172,10 @@ def main(args):
     #
     if not args.forward_reference or not args.backward_reference:
         args.forward_reference, args.backward_reference = processReferenceFasta(fasta=args.bwa_reference,
-                                                                      motif_key=args.motif_key,
-                                                                      work_folder=temp_folder,
-                                                                      sub_char=args.ambig_char,
-                                                                      positions_file=args.ambiguity_positions)
+                                                                                motif_key=args.motif_key,
+                                                                                work_folder=temp_folder,
+                                                                                sub_char=args.ambig_char,
+                                                                                positions_file=args.ambiguity_positions)
 
     # index the reference for bwa
     # if args.bwt is not None:

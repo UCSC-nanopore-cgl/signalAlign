@@ -191,7 +191,6 @@ class SignalAlignment(object):
             stateMachineType_flag = ""
 
         # next section makes the output file name with the format: /directory/for/files/file.model.orientation.tsv
-        posteriors_file_path = ''
         # forward strand
         if strand == "+":
             if self.output_format == "full":
@@ -541,6 +540,7 @@ def multithread_signal_alignment(signal_align_arguments, fast5_locations, worker
             bwa_reference = buildBwaIndex(signal_align_arguments["bwa_reference"],
                                           os.path.dirname(signal_align_arguments["bwa_reference"]),
                                           log='multithread_signal_alignment')
+            signal_align_arguments["bwa_reference"] = bwa_reference
             assert os.path.exists(bwa_reference+".bwt"), "Error creating BWA index for: {}".format(bwa_reference)
 
     # ensure required arguments are in signal_align_argments

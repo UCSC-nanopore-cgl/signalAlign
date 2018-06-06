@@ -50,7 +50,7 @@ class Fast5Directory(AbstractSamples):
         self.bw_fasta_path = bw_fasta_path
 
     def _parse(self):
-        return [os.path.join(self.source, x) for x in os.listdir(self.source) if x.endswith(".fast5")]
+        return [os.path.abspath(os.path.join(self.source, x)) for x in os.listdir(self.source) if x.endswith(".fast5")]
 
     def getFiles(self):
         return self.files
@@ -252,32 +252,30 @@ def generateConfig(config_path):
         raise RuntimeError
     config_content = textwrap.dedent("""\
                 # SignalAlign model training config file
-                output_dir: ../tests/
-                samples: [
-                {
-                    fast5_dir:  ../tests/minion_test_reads/C/,
+                output_dir: signalAlign_unittest/
+                samples: [{
+                    fast5_dir: ../tests/minion_test_reads/canonical_ecoli_R9/,
                     fofn:,
                     positions_file:,
                     motif:,
                     label:,
-                }
-                ]
-                reference:  ../tests/test_sequences/zymo_sequence.fasta
+                }]
+                bwa_reference: ../tests/test_sequences/E.coli_k12.fasta
                 bwt:
                 stateMachineType: threeState
-                in_T_Hmm: ../models/testModelR73_acegot_template.model
-                in_C_Hmm: ../models/testModelR73_acegot_complement.model
+                in_T_Hmm: ../models/testModelR9_5mer_acegot_template.model
+                in_C_Hmm: ../models/testModelR9_5mer_acegot_complement.model
                 templateHdp:
                 complementHdp:
-                iterations: 2
-                training_bases: 1000
+                iterations: 3
+                training_bases: 10000
                 job_count: 4
                 diagonal_expansion:
                 constraint_trim:
                 twoD: true
-                DEBUG: true
-                TEST:
-
+                alignment_file:
+                DEBUG:
+                test: true
                 """)
     fH = open(config_path, "w")
     fH.write(config_content)
@@ -374,7 +372,7 @@ def trainHMMTransitions(config):
 
     working_folder = FolderHandler()
     working_folder_path = working_folder.open_folder(os.path.join(output_dir, "temp_trainModels"))
-
+    print(working_folder_path)
 
     # find model files
     # make some paths to files to hold the HMMs
@@ -384,6 +382,7 @@ def trainHMMTransitions(config):
     if twoD:
         assert os.path.exists(complement_model_path), \
             "Missing complement model %s" % (complement_model_path)
+        complement_model_path = os.path.abspath(complement_model_path)
         complement_model = get_model(state_machine_type, complement_model_path)
         complement_hmm = working_folder.add_file_path("complement_trained.hmm")
         copyfile(complement_model_path, complement_hmm)
@@ -391,18 +390,24 @@ def trainHMMTransitions(config):
 
     assert os.path.exists(template_model_path), \
         "Missing template model %s" % (template_model_path)
+    template_model_path = os.path.abspath(template_model_path)
     template_model = get_model(state_machine_type, template_model_path)
     template_hmm = working_folder.add_file_path("template_trained.hmm")
-    copyfile(template_model_path, template_hmm)
+    copyfile(os.path.abspath(template_model_path), template_hmm)
     assert os.path.exists(template_hmm), "Problem copying default model to {}".format(template_hmm)
     # determine if we train HMM emissions or HDP
     update_template_hmm_emissions = False
     update_complement_hmm_emissions = False
     # get the input HDP, if we're using it
     if state_machine_type == "threeStateHdp":
+        assert os.path.exists(original_template_hdp_path), "Templace HDP path not found {}".format(original_template_hdp_path)
+        original_template_hdp_path = os.path.abspath(original_template_hdp_path)
         template_hdp = working_folder.add_file_path("%s" % os.path.basename(original_template_hdp_path))
         copyfile(original_template_hdp_path, template_hdp)
         if twoD:
+            assert os.path.exists(original_complement_hdp_path), "Templace HDP path not found {}".format(original_complement_hdp_path)
+            original_complement_hdp_path = os.path.abspath(original_complement_hdp_path)
+
             complement_hdp = working_folder.add_file_path("%s" % os.path.basename(original_complement_hdp_path))
             copyfile(original_complement_hdp_path, complement_hdp)
         else:
@@ -442,6 +447,10 @@ def trainHMMTransitions(config):
                     break
                 print("[trainModels_HMM] Culled {file_count} training files, for {bases} from {sample}."
                       .format(file_count=file_count, bases=total_amount, sample=sample.getKey()), end="\n", file=sys.stderr)
+            if bwa_reference:
+                bwa_reference = os.path.abspath(bwa_reference)
+            if alignment_file:
+                alignment_file = os.path.abspath(alignment_file)
 
             alignment_args = {
                 "backward_reference": sample.bw_fasta_path,

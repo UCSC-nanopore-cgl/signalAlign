@@ -66,13 +66,13 @@ class Bwa(object):
         self.db_handle = ''
 
     def build_index(self, destination, output=None, log=None):
-        self.db_handle = os.path.join(destination, 'temp_bwaIndex.{}'.format(os.path.basename(self.target)))
+        self.db_handle = os.path.join(destination, self.target)
         # is this a directory and are all bwa files present? we can return early
         if False not in set(map(os.path.isfile, ["{}{}".format(self.db_handle, suffix) for suffix in self.suffixes()])):
             return self.db_handle
 
         if log:
-            print("[{}] creating BWA index for {}".format(log, reference_location))
+            print("[{}] creating BWA index for {}".format(log, self.db_handle))
 
         cmd = "bwa index -p {0} {1}".format(self.db_handle, self.target)
         if output is None:

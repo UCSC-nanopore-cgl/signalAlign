@@ -47,10 +47,10 @@ class TrainSignalAlignTest(unittest.TestCase):
         positions_file = make_gatc_position_file(fasta=self.reference,
                                                  outfile=path)
         print(positions_file)
-            # os.remove(path)
+        os.remove(path)
 
-    def test_find_gatc_motifs(self):
-        find_gatc_motifs(seq, )
+    # def test_find_gatc_motifs(self):
+    #     find_gatc_motifs(seq, )
 
 
 if __name__ == '__main__':

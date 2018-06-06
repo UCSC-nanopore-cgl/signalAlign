@@ -246,7 +246,7 @@ def samtools_faidx_fasta(fasta_path, log=None):
     index_path = "{}.fai".format(fasta_path)
     if not os.path.exists(index_path):
         if log:
-            print("[{}] indexing reference {}".format(log, ref))
+            print("[{}] indexing reference {}".format(log, fasta_path))
         args = ["samtools", "faidx", fasta_path]
         subprocess.check_call(args)
     assert os.path.isfile(index_path), "Error creating FAIDX file for: {}".format(fasta_path)

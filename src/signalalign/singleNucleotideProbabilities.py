@@ -17,7 +17,6 @@ from signalalign.nanoporeRead import NanoporeRead
 from signalalign.signalAlignment import SignalAlignment, multithread_signal_alignment
 from signalalign.scripts.alignmentAnalysisLib import CallMethylation
 from signalalign.utils.fileHandlers import FolderHandler
-from signalalign.utils.bwaWrapper import getBwaIndex
 from signalalign.utils.sequenceTools import reverse_complement, replace_periodic_reference_positions
 from signalalign.utils.parsers import read_fasta
 from signalalign.utils.multithread import *
@@ -77,8 +76,6 @@ def parse_args(args=None):
                         default=1, type=int, help="number of jobs to run concurrently")
     parser.add_argument('--nb_files', '-n', action='store', dest='nb_files', required=False,
                         default=None, type=int, help="maximum number of reads to align")
-    parser.add_argument("--bwt", action='store', dest="bwa_reference", default=None, required=False,
-                        help="path to BWT files. example: ../ref.fasta")
     parser.add_argument("--kmer_size", action='store', dest="kmer_size", default=5, required=False,
                         help="size of kmers in fast5 file")
     parser.add_argument("--step_size", action='store', dest="step_size", default=10, required=False,
@@ -562,10 +559,7 @@ def discover_single_nucleotide_probabilities(working_folder, kmer_length, refere
 
             # build reference
             substitution_ref = replace_periodic_reference_positions(reference_location, sub_fasta_path, step_size, s)
-
-            # samtools_faidx_fasta(substitution_ref)
-            # alignment_args['forward_reference'] = substitution_ref
-
+            alignment_args['forward_reference'] = substitution_ref
             # run alignment
             multithread_signal_alignment(alignment_args, list_of_fast5s, workers)
 
@@ -722,7 +716,6 @@ def main(args):
 #   Aligning files matching: {inputGlob}
 #   Aligning to reference: {reference}
 #   Aligning maximum of {nbFiles} files
-#   Using BWT: {bwt}
 #   Using model: {model}
 #   Using banding: {banding}
 #   Aligning to regions in: {regions}
@@ -733,7 +726,7 @@ def main(args):
 #   Kmer size: {kmerSize}
 #   Step size: {stepSize}
 #   Alignment File: {alignmentFile}
-    """.format(inputGlob=input_glob, reference=args.ref, bwt=args.bwt, banding=args.banded, nbFiles=args.nb_files,
+    """.format(inputGlob=input_glob, reference=args.ref, banding=args.banded, nbFiles=args.nb_files,
                inThmm=args.in_T_Hmm, inChmm=args.in_C_Hmm, model=args.stateMachineType, regions=args.target_regions,
                tHdp=args.templateHDP, cHdp=args.complementHDP, kmerSize=args.kmer_size, stepSize=args.step_size,
                alignmentFile=args.alignment_file)
@@ -764,7 +757,7 @@ def main(args):
         # "path_to_EC_refs": None,
         "destination": temp_dir_path,
         "stateMachineType": args.stateMachineType,
-        "bwa_reference": args.bwa_reference,
+        "bwa_reference": args.ref,
         "in_templateHmm": args.in_T_Hmm,
         "in_complementHmm": args.in_C_Hmm,
         "in_templateHdp": args.templateHDP,
