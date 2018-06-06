@@ -430,6 +430,55 @@ NanoporeRead *nanopore_loadNanoporeReadFromFile(const char *nanoporeReadFile) {
     stList_destruct(tokens);
 
     fclose(fH);
+
+    /*
+
+    // needed
+    npRead->readLength;
+    npRead->templateReadLength;
+    npRead->complementReadLength;
+    npRead->nbTemplateEvents;
+    npRead->nbComplementEvents;
+
+    // needed
+    npRead->twoD;
+    npRead->templateEvents;
+    npRead->templateStrandEventMap;
+    npRead->templateEventMap;
+
+    // needed if 2d
+    npRead->complementEventMap;
+    npRead->complementStrandEventMap;
+    npRead->complementEvents;
+
+    // needed if ESTIMATE_PARAMS
+    npRead->templateRead;
+    npRead->templateParams;
+    npRead->complementRead;
+    npRead->complementParams;
+
+    // unused
+    npRead->scaled;
+    npRead->complementModelState;
+    npRead->complementPModel;
+    npRead->templateModelState;
+    npRead->templatePModel;
+    npRead->twoDread;
+
+    // to verify:
+    npRead->complementEventMap = NULL;
+    npRead->complementStrandEventMap = NULL;
+    npRead->complementEvents = NULL;
+    npRead->complementModelState = NULL;
+    npRead->complementPModel = NULL;
+    npRead->templateModelState = NULL;
+    npRead->templatePModel = NULL;
+    npRead->scaled = NULL;
+    npRead->twoDread = NULL;
+    npRead->complementRead = NULL;
+
+     */
+
     return npRead;
 }
 

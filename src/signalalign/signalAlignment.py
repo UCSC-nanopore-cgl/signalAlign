@@ -508,19 +508,8 @@ def signal_alignment_service(work_queue, done_queue, service_name="signal_alignm
 
 def multithread_signal_alignment(signal_align_arguments, fast5_locations, worker_count, reference_location,
                                  backward_reference_location=None):
-
-    # ensure required arguments are in signal_align_argments
-    required_arguments = {'destination', 'stateMachineType', 'in_templateHmm', 'in_complementHmm',
-                          'in_templateHdp', 'in_complementHdp', 'threshold', 'diagonal_expansion', 'constraint_trim',
-                          'degenerate', }
-    optional_arguments = {'forward_reference', 'backward_reference', 'alignment_file', 'bwa_index', 'twoD_chemistry',
-                          'target_regions', 'output_format', 'embed', 'event_table', 'check_for_temp_file_existance',
-                          'track_memory_usage', }
-    missing_arguments = list(filter(lambda x: x not in signal_align_arguments.keys(), required_arguments))
-    unexpected_arguments = list(filter(lambda x: x not in required_arguments and x not in optional_arguments,
-                                       signal_align_arguments.keys()))
-    assert len(missing_arguments) == 0 and len(unexpected_arguments) == 0, \
-        "Invalid arguments to signal_align.  Missing: {}, Invalid: {}".format(missing_arguments, unexpected_arguments)
+    # don't modify the signal_align_arguments
+    signal_align_arguments = dict(**signal_align_arguments)
 
     # ensure reference is indexed
     def ensure_reference_index(ref):
@@ -546,6 +535,19 @@ def multithread_signal_alignment(signal_align_arguments, fast5_locations, worker
         bwa_index = getBwaIndex(reference_location, os.path.dirname(reference_location))
         assert bwa_index is not None, "Error creating BWA index for: {}".format(reference_location)
         signal_align_arguments['bwa_index'] = bwa_index
+
+    # ensure required arguments are in signal_align_argments
+    required_arguments = {'destination', 'stateMachineType', 'in_templateHmm', 'in_complementHmm',
+                          'in_templateHdp', 'in_complementHdp', 'threshold', 'diagonal_expansion', 'constraint_trim',
+                          'degenerate', 'forward_reference', }
+    optional_arguments = {'backward_reference', 'alignment_file', 'bwa_index', 'twoD_chemistry',
+                          'target_regions', 'output_format', 'embed', 'event_table', 'check_for_temp_file_existance',
+                          'track_memory_usage', }
+    missing_arguments = list(filter(lambda x: x not in signal_align_arguments.keys(), required_arguments))
+    unexpected_arguments = list(filter(lambda x: x not in required_arguments and x not in optional_arguments,
+                                       signal_align_arguments.keys()))
+    assert len(missing_arguments) == 0 and len(unexpected_arguments) == 0, \
+        "Invalid arguments to signal_align.  Missing: {}, Invalid: {}".format(missing_arguments, unexpected_arguments)
 
     # run the signal_align_service
     print("[multithread_signal_alignment] running signal_alignment on {} fast5s with {} workers".format(

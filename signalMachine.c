@@ -371,11 +371,9 @@ stList *performSignalAlignment(StateMachine *sM, Sequence *eventSequence, int64_
     }
 
     int64_t lX = sequence_correctSeqLength(strlen(target), kmer, sM->kmerLength);
-//    printf("stList_length(unmappedAnchors) %" PRIu64 "\n", stList_length(unmappedAnchors));
 
     // remap anchor pairs
     stList *filteredRemappedAnchors = signalUtils_getRemappedAnchorPairs(unmappedAnchors, eventMap, mapOffset);
-//    printf("stList_length(filteredRemappedAnchors) %" PRIu64 "\n", stList_length(filteredRemappedAnchors));
 
     // make sequences
     Sequence *sX = sequence_constructReferenceKmerSequence(lX, target, sequence_getKmer,
@@ -394,9 +392,6 @@ Sequence *makeEventSequenceFromPairwiseAlignment(double *events, int64_t querySt
     int64_t startIdx = eventMap[queryStart];
     // We end up indexing past length of eventMap if we map to final base
     int64_t endIdx = eventMap[queryEnd-1];
-//    printf("startIdx %" PRIu64 "\n", startIdx);
-//    printf("endIdx %" PRIu64 "\n", endIdx);
-
 
     // move the event pointer to the first event
     size_t elementSize = sizeof(double);
@@ -404,9 +399,6 @@ Sequence *makeEventSequenceFromPairwiseAlignment(double *events, int64_t querySt
 
     // make the eventSequence
     Sequence *eventS = sequence_constructEventSequence(endIdx - startIdx, elements);
-//    Sequence *test_events = eventS->sliceFcn(eventS, startIdx, endIdx);
-
-//    printf("Adding to alignedPairs! (%f)\n", test_events->get(test_events->elements, endIdx));
 
     return eventS;
 }
@@ -638,11 +630,8 @@ int main(int argc, char *argv[]) {
 //                    forwardReference, backwardReference);
 //    }
     ReferenceSequence *R;
-//    ReferenceSequence *R1;
-
-//    R1 = signalUtils_ReferenceSequenceConstructFull(forwardReference, backwardReference, pA);
-//    ReferenceSequence *R1;
     R = fastaHandler_ReferenceSequenceConstructFull(forward_reference_path, backward_reference_path, pA, sequence_name);
+
     // Nanopore Read //
     // load nanopore read
     NanoporeRead *npRead = nanopore_loadNanoporeReadFromFile(npReadFile);
@@ -652,9 +641,6 @@ int main(int argc, char *argv[]) {
                                                                       pA->start2, pA->end2,
                                                                       (twoD ? npRead->templateEventMap :
                                                                        npRead->templateStrandEventMap));
-    // what is the template event sequence
-//    printf("tEventSequence %" PRIu64 "\n", tEventSequence->length);
-//    printf("tEventSequence %" PRIu64 "\n");
 
     Sequence *cEventSequence;
     if (twoD) {
@@ -676,12 +662,7 @@ int main(int argc, char *argv[]) {
     int64_t rCoordinateShift_c = twoD ? pA->end1 : 0;
     bool forward = pA->strand1;  // keep track of whether this is a forward mapped read or not
 
-//    printPairwiseAlignmentSummary(pA);
-
     stList *anchorPairs = signalUtils_guideAlignmentToRebasedAnchorPairs(pA, p);  // pA gets modified here, no turning back
-//    printPairwiseAlignmentSummary(pA);
-
-//    printf("stList_length(anchorPairs) %" PRIu64 "\n", stList_length(anchorPairs));
 
 
     if ((templateExpectationsFile != NULL) || (complementExpectationsFile != NULL)) {
@@ -780,15 +761,12 @@ int main(int argc, char *argv[]) {
             stateMachine3_setModelToHdpExpectedValues(sMt, nHdpT);
         }
         // TODO errors get caught here
-//        printf("stList_length(anchorPairs) %" PRIu64 "\n", stList_length(anchorPairs));
 
         stList *templateAlignedPairs = performSignalAlignment(sMt, tEventSequence,
                                                               (twoD ? npRead->templateEventMap : npRead->templateStrandEventMap),
                                                               pA->start2, R->getTemplateTargetSequence(R),
                                                               p, anchorPairs,
                                                               degenerate);
-
-        printf("Passes SignalAlignment");
 
         double templatePosteriorScore = scoreByPosteriorProbabilityIgnoringGaps(templateAlignedPairs);
 
