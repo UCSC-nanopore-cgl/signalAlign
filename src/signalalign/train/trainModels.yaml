@@ -1,0 +1,63 @@
+# SignalAlign model training config file
+samples: [
+{
+    fast5_dir:  /Users/andrewbailey/data/r9/canonical/,
+    fofn:,
+    positions_file:,
+    motif:,
+    label:,
+    edited_fw_reference:  ,
+    edited_bw_reference:
+
+},
+{
+    fast5_dir:  /Users/andrewbailey/data/r9/modified/,
+    fofn:,
+    positions_file:,
+    motif:,
+    label:,
+    edited_fw_reference:,
+    edited_bw_reference:
+}
+]
+alignment_file:
+bwa_reference: /Users/andrewbailey/data/references/ecoli/ecoli_k12_mg1655.fa
+output_dir: /Users/andrewbailey/data/trainSignalAlign/
+stateMachineType: threeState
+in_T_Hmm: /Users/andrewbailey/CLionProjects/nanopore-RNN/submodules/signalAlign/models/testModelR9_acegt_template.model
+in_C_Hmm: /Users/andrewbailey/CLionProjects/nanopore-RNN/submodules/signalAlign/models/testModelR9_acegt_complement.model
+templateHdp:
+complementHdp:
+train_trainsitions: true
+train_HDP_expectations: true
+train_HMM_expectations: true
+train_transitions_options: {
+    iterations: 3,
+    training_bases: 5000,
+    job_count: 2,
+    diagonal_expansion: ,
+    constraint_trim: ,
+}
+train_HMM_expectations_options: [{
+
+}
+]
+train_HDP_expectations_options: [{
+    hdp_type: multiset
+
+
+}
+]
+twoD: false
+degenerate: cytosine
+bulk: false
+batch: 10
+assignments: 30
+methyl_assignments: 10
+n_aligns: 1000
+n_test_alns: 1000
+assignment_threshold: 0.8
+#samples: 1000
+split: false
+debug: true
+test: false

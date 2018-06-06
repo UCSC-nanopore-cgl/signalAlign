@@ -74,7 +74,7 @@ def parse_args():
                         default=4, type=int, help="number of jobs to run concurrently")
     parser.add_argument('--nb_files', '-n', action='store', dest='nb_files', required=False,
                         default=None, type=int, help="maximum number of reads to align")
-    parser.add_argument("--bwt", action='store', dest="bwt", default=None, required=False,
+    parser.add_argument("--bwt", action='store', dest="bwa_reference", default=None, required=False,
                         help="path to BWT files. example: ../ref.fasta")
     parser.add_argument("--kmer_size", action='store', dest="kmer_size", default=5, required=False,
                         help="size of kmers in fast5 file")
@@ -556,18 +556,7 @@ def discover_single_nucleotide_probabilities(working_folder, kmer_length, refere
             alignment_args['forward_reference'] = substitution_ref
 
             # run alignment
-            # print("[info] running aligner on %d fast5 files with %d workers" % (len(list_of_fast5s), workers))
-            # total, failure, messages = run_service(aligner, list_of_fast5s, alignment_args, "in_fast5", workers)
-            # memory_stats = list()
-            # for message in messages:
-            #     if message.startswith(MEM_USAGES):
-            #         memory_stats.extend(map(int, message.split(":")[1].split(",")))
-            # if len(memory_stats) > 0:
-            #     kb_to_gb = lambda x: float(x) / (1 << 20)
-            #     print("[info] memory avg: %3f Gb" % (kb_to_gb(np.mean(memory_stats))))
-            #     print("[info] memory std: %3f Gb" % (kb_to_gb(np.std(memory_stats))))
-            #     print("[info] memory max: %3f Gb" % (kb_to_gb(max(memory_stats))))
-            multithread_signal_alignment(alignment_args, list_of_fast5s, workers, substitution_ref)
+            multithread_signal_alignment(alignment_args, list_of_fast5s, workers)
 
             # get alignments
             alignments = [x for x in glob.glob(os.path.join(working_folder.path, "*.tsv")) if os.stat(x).st_size != 0]
@@ -760,7 +749,7 @@ def main(args):
         # "path_to_EC_refs": None,
         "destination": temp_dir_path,
         "stateMachineType": args.stateMachineType,
-        "bwa_index": args.bwt,
+        "bwa_reference": args.bwa_reference,
         "in_templateHmm": args.in_T_Hmm,
         "in_complementHmm": args.in_C_Hmm,
         "in_templateHdp": args.templateHDP,
@@ -771,7 +760,8 @@ def main(args):
         "target_regions": None,
         "degenerate": getDegenerateEnum("variant"),
         "alignment_file": args.alignment_file,
-        'track_memory_usage': True,
+        'track_memory_usage': False,
+        'get_expectations': False
     }
 
     # get the sites that have proposed edits

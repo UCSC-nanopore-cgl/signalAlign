@@ -67,7 +67,7 @@ def create_speedy_event_table(signal, sampling_freq, start_time, min_width=5, ma
 
 
 def create_minknow_event_table(signal, sampling_freq, start_time,
-                               window_lengths=(16, 40), thresholds=(8.0, 4.0), peak_height=1.0):
+                               window_lengths=(3, 6), thresholds=(1.4, 9.0), peak_height=0.2):
     """Create new event table using minknow_event_detect event detection
 
     :param signal: list or array of signal in pA for finding events
@@ -361,7 +361,6 @@ def time_to_index(event_table, sampling_freq=0, start_time=0):
     return event_table
 
 
-
 def sequence_from_events(events):
     """Get new read from event table with 'model_state' and 'move' fields
 
@@ -400,7 +399,7 @@ def get_resegment_accuracy(fast5handle, section="template"):
     return pairwise_alignment_accuracy(original_seq, resegment_seq, soft_clip=True)
 
 
-def create_minknow_events_from_fast5(fast5_path, window_lengths=(16, 40), thresholds=(8.0, 4.0), peak_height=1.0):
+def create_minknow_events_from_fast5(fast5_path, window_lengths=(3, 6), thresholds=(1.4, 9.0), peak_height=0.2):
     """Create events with ('start', 'length', 'mean', 'stdv', 'model_state', 'move', 'p_model_state') fields from
         fast5 file. The 'model_state', 'move' and 'p_model_state' are all empty
 
@@ -408,7 +407,7 @@ def create_minknow_events_from_fast5(fast5_path, window_lengths=(16, 40), thresh
     :param window_lengths: Length 2 list of window lengths across
         raw data from which `t_stats` are derived
     :param thresholds: Length 2 list of thresholds on t-statistics
-    :peak_height: Absolute height a peak in signal must rise below
+    :param peak_height: Absolute height a peak in signal must rise below
         previous and following minima to be considered relevant
     """
     assert os.path.isfile(fast5_path), "File does not exist: {}".format(fast5_path)
@@ -421,7 +420,7 @@ def create_minknow_events_from_fast5(fast5_path, window_lengths=(16, 40), thresh
     event_table = create_minknow_event_table(signal, sampling_freq, start_time, window_lengths=window_lengths,
                                              thresholds=thresholds, peak_height=peak_height)
 
-    return event_table
+    return event_table, f5fh
 
 
 def main():
