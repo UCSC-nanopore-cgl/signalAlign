@@ -262,7 +262,7 @@ class Fast5(h5py.File):
         path_tmp = '{}.tmp'.format(path)
         mode = self.mode
         self.close()
-        subprocess.call(['h5repack', path, path_tmp])
+        subprocess.check_call(['h5repack', path, path_tmp])
         shutil.move(path_tmp, path)
         return Fast5(path, mode)
 
@@ -272,7 +272,7 @@ class Fast5(h5py.File):
         path_tmp = copy_path
         mode = self.mode
         self.close()
-        subprocess.call(['h5repack', path, path_tmp])
+        subprocess.check_call(['h5repack', path, path_tmp])
         return Fast5(path_tmp, mode)
 
     ###

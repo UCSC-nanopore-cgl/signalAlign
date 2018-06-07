@@ -25,9 +25,8 @@ class HiddenMarkovTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         super(HiddenMarkovTests, cls).setUpClass()
-        cls.HOME = '/'.join(os.path.abspath(__file__).split("/")[:-2])
-        # fast5_file = os.path.join(cls.HOME, "tests/minion_test_reads/canonical_ecoli_R9/miten_PC_20160820_FNFAD20259_MN17223_mux_scan_AMS_158_R9_WGA_Ecoli_08_20_16_83098_ch138_read23_strand.fast5")
-        cls.model_file = "/Users/andrewbailey/CLionProjects/nanopore-RNN/submodules/signalAlign/models/testModelR9p4_5mer_acgt_RNA.model"
+        cls.HOME = '/'.join(os.path.abspath(__file__).split("/")[:-4])
+        cls.model_file = os.path.join(cls.HOME, "models/testModelR9p4_5mer_acgt_RNA.model")
         cls.model = get_model(model_type="threeState", model_file=cls.model_file)
 
     def test_get_kmer_index(self):

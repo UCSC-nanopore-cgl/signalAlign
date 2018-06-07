@@ -57,6 +57,9 @@ install:
 - conda install numpy
 - conda install hdf5
 - conda install scipy
+- conda install samtools
+- samtools
+- h5repack
 #- conda env create -f requirements35.yml
 #- source activate nanotensor3.5
 #- pip install google-compute-engine

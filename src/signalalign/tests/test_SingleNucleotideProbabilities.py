@@ -11,7 +11,7 @@ from subprocess import call
 import signalalign.singleNucleotideProbabilities as singleNuclProb
 from py3helpers.utils import captured_output
 
-SIGNALALIGN_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../.."))
+SIGNALALIGN_ROOT = '/'.join(os.path.abspath(__file__).split("/")[:-4])
 SIGNALMACHINE_EXE = os.path.join(SIGNALALIGN_ROOT, "bin/signalMachine")
 TEMPLATE_MODEL = os.path.join(SIGNALALIGN_ROOT, "models/testModelR9_5mer_acgt_template.model")
 TEST_FILES = os.path.join(SIGNALALIGN_ROOT, "tests/test_singleNucProbs_errorCorrection")
