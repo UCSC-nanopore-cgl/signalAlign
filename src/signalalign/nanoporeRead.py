@@ -6,11 +6,11 @@ import re
 from signalalign.fast5 import Fast5
 
 from itertools import islice
-from signalalign.event_detection import resegment_reads, RESEGMENT_MINKNOW, RESEGMENT_SCRAPPIE, RESEGMENT_SPEEDY
+from signalalign.event_detection import resegment_reads, EVENT_DETECT_MINKNOW, EVENT_DETECT_SCRAPPIE, EVENT_DETECT_SPEEDY
 
 
 TEMPLATE_BASECALL_KEY   = Fast5.__default_basecall_1d_analysis__ #"/Analyses/Basecall_1D_00{}"
-RESEGMENT_KEY           = "SignalAlign_Basecall_1D" #"/Analyses/ReSegmentBasecall_00{}"
+RESEGMENT_KEY           = "SignalAlign_Basecall_1D_000" #"/Analyses/ReSegmentBasecall_00{}"
 TWOD_BASECALL_KEY       = Fast5.__default_basecall_2d_analysis__ #"/Analyses/Basecall_2D_00{}"
 TWOD_BASECALL_KEY_0     = os.path.join(Fast5.__base_analysis__, TWOD_BASECALL_KEY + "_000") #"/Analyses/Basecall_2D_000"
 METADATA_PATH_KEY       = Fast5.__tracking_id_path__ #"/UniqueGlobalKey/tracking_id"
@@ -18,7 +18,7 @@ READS_KEY               = Fast5.__raw_path__ #"/Raw/Reads/"
 VERSION_KEY             = ("version", "dragonet version", "nanotensor version")
 SUPPORTED_1D_VERSIONS   = ("1.0.1", "1.2.1", "1.2.4", "1.23.0", "1.22.4", "2.1.0", "0.2.0")
 
-RESEGMENT_STRAGEGIES     = [RESEGMENT_MINKNOW, RESEGMENT_SCRAPPIE, RESEGMENT_SPEEDY]
+RESEGMENT_STRAGEGIES     = [EVENT_DETECT_MINKNOW, EVENT_DETECT_SCRAPPIE, EVENT_DETECT_SPEEDY]
 
 # promethion read_name: self.fast5['PreviousReadInfo'].attrs['previous_read_id'].decode()
 
@@ -149,8 +149,7 @@ class NanoporeRead(object):
             oned_root_address = self.get_latest_basecall_edition(self.event_table)
             if not oned_root_address:
                 print("[SignalAlignment.run] Resegmenting read", file=sys.stderr)
-                MINKNOW = dict(window_lengths=(5, 10), thresholds=(2.0, 1.1), peak_height=1.2)
-                resegment_reads(self.filename, MINKNOW, speedy=False, overwrite=True)
+                resegment_reads(self.filename, speedy=False, overwrite=True, analysis_path=RESEGMENT_KEY)
                 oned_root_address = self.get_latest_basecall_edition(self.event_table)
 
         elif self.rna:
@@ -158,18 +157,10 @@ class NanoporeRead(object):
             # TODO fix bug for speedy stat split
             if not oned_root_address:
                 print("[SignalAlignment.run] Resegmenting read", file=sys.stderr)
-                MINKNOW = dict(window_lengths=(5, 10), thresholds=(2.0, 1.1), peak_height=1.2)
-                # SPEEDY = dict(min_width=5, max_width=80, min_gain_per_sample=0.008, window_width=800)
-                # resegment_reads(self.filename, SPEEDY, speedy=True, overwrite=True)
-                # print("Resegmenttwice")
-                resegment_reads(self.filename, MINKNOW, speedy=False, overwrite=True)
+                resegment_reads(self.filename, speedy=False, overwrite=True, analysis_path=RESEGMENT_KEY)
                 oned_root_address = self.get_latest_basecall_edition(RESEGMENT_KEY)
         else:
             oned_root_address = self.get_latest_basecall_edition(TEMPLATE_BASECALL_KEY)
-            if not oned_root_address:
-                print("[SignalAlignment.run] Resegmenting read", file=sys.stderr)
-                resegment_reads(self.filename, {}, overwrite=True, resegment_strat=RESEGMENT_SCRAPPIE)
-                oned_root_address = self.get_latest_basecall_edition(RESEGMENT_KEY)
 
         # sanity check
         if not oned_root_address:
@@ -219,34 +210,6 @@ class NanoporeRead(object):
             return False
 
         return True
-
-    def resegment(self, resegment_strategy=RESEGMENT_STRAGEGIES[0], resegment_params=None,
-                         basecall_root_address=TEMPLATE_BASECALL_KEY, overwrite=False):
-        # sanity check
-        assert resegment_strategy not in RESEGMENT_STRAGEGIES, "Invalid resegment strategy '{}', expected {}"\
-            .format(resegment_strategy, RESEGMENT_STRAGEGIES)
-
-        # prep
-        if resegment_params is None:
-            resegment_params = self.get_default_resegment_params(resegment_strategy)
-        self.close() # so that any changes are flushed, as resegment_reads saves new data
-
-        print("[SignalAlignment.resegment_events] Resegmenting read with strategy '{}'".format(resegment_strategy), file=sys.stderr)
-        resegment_reads(self.filename, resegment_params, overwrite=overwrite, resegment_strat=resegment_strategy)
-
-        self.oned_root_address = self.get_latest_basecall_edition(self.event_table)
-
-
-    @staticmethod
-    def get_default_resegment_params(resegment_strategy):
-        if resegment_strategy == RESEGMENT_SPEEDY:
-            return {}
-        elif resegment_strategy == RESEGMENT_MINKNOW:
-            return dict(window_lengths=(5, 10), thresholds=(2.0, 1.1), peak_height=1.2)
-        elif resegment_strategy == RESEGMENT_SCRAPPIE:
-            return {}
-        else:
-            return None
 
 
     @staticmethod
