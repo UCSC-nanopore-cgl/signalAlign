@@ -1,21 +1,24 @@
 
 from __future__ import print_function
 import sys
-import h5py
+import os
 import re
+from signalalign.fast5 import Fast5
 
 from itertools import islice
-from signalalign.event_detection import resegment_reads, RESEGMENT_SCRAPPIE
+from signalalign.event_detection import resegment_reads, RESEGMENT_MINKNOW, RESEGMENT_SCRAPPIE, RESEGMENT_SPEEDY
 
 
-TEMPLATE_BASECALL_KEY   = "/Analyses/Basecall_1D_00{}"
-RESEGMENT_KEY           = "/Analyses/ReSegmentBasecall_00{}"
-TWOD_BASECALL_KEY       = "/Analyses/Basecall_2D_00{}"
-TWOD_BASECALL_KEY_0     = "/Analyses/Basecall_2D_000"
-METADATA_PATH_KEY       = "/UniqueGlobalKey/tracking_id"
-READS_KEY               = "/Raw/Reads/"
+TEMPLATE_BASECALL_KEY   = Fast5.__default_basecall_1d_analysis__ #"/Analyses/Basecall_1D_00{}"
+RESEGMENT_KEY           = "SignalAlign_Basecall_1D" #"/Analyses/ReSegmentBasecall_00{}"
+TWOD_BASECALL_KEY       = Fast5.__default_basecall_2d_analysis__ #"/Analyses/Basecall_2D_00{}"
+TWOD_BASECALL_KEY_0     = os.path.join(Fast5.__base_analysis__, TWOD_BASECALL_KEY + "_000") #"/Analyses/Basecall_2D_000"
+METADATA_PATH_KEY       = Fast5.__tracking_id_path__ #"/UniqueGlobalKey/tracking_id"
+READS_KEY               = Fast5.__raw_path__ #"/Raw/Reads/"
 VERSION_KEY             = ("version", "dragonet version", "nanotensor version")
 SUPPORTED_1D_VERSIONS   = ("1.0.1", "1.2.1", "1.2.4", "1.23.0", "1.22.4", "2.1.0", "0.2.0")
+
+RESEGMENT_STRAGEGIES     = [RESEGMENT_MINKNOW, RESEGMENT_SCRAPPIE, RESEGMENT_SPEEDY]
 
 # promethion read_name: self.fast5['PreviousReadInfo'].attrs['previous_read_id'].decode()
 
@@ -77,7 +80,7 @@ class NanoporeRead(object):
     def open(self, parent_job=None):
         if self.is_open: return True
         try:
-            self.fastFive = h5py.File(self.filename, 'r+')
+            self.fastFive = Fast5(self.filename, 'r+')
             self.is_open = True
             return True
         except Exception as e:
@@ -91,26 +94,17 @@ class NanoporeRead(object):
         self.fastFive.close()
 
     def get_latest_basecall_edition(self, address, new=False):
-        """Check if path exists, if it does increment numbering
+        if address.startswith(Fast5.__base_analysis__):
+            address = address.replace(Fast5.__base_analysis__, "").lstrip("/")
 
-        :param address: path to fast5 object. Needs to have a field where string.format can work!
-        :param new: get one more than most recent address
-        """
-
-        highest = 0
-        while(highest < 30):
-            if address.format(highest) in self.fastFive:
-                highest += 1
-                continue
+        try:
+            if new:
+                return self.fastFive.get_analysis_new(address)
             else:
-                if new:
-                    return address.format(highest)  # the last base-called version we saw
-                else:
-                    if highest > 0:
-                        return address.format(max(0, highest - 1))  # the last base-called version we saw
-                    else:
-                        return False  # didn't find the version
-        return False
+                return self.fastFive.get_analysis_latest(address)
+        except (ValueError, IndexError) as e:
+            print("[NanoporeRead:get_latest_basecall_edition] could not find {} in {}".format(address, self.filename), file=sys.stderr)
+            return False
 
     def Initialize(self, call_events=None, call_nucleotides=None, parent_job=None):
         if not self.open(parent_job): return False
@@ -138,7 +132,7 @@ class NanoporeRead(object):
                           .format(self.filename, READS_KEY, reads))
             self.close()
             return False
-        read_loc = READS_KEY + reads[0]
+        read_loc = os.path.join(READS_KEY, reads[0])
 
         self.read_label = self.bytes_to_string(self.fastFive[read_loc].attrs.get('read_id'))
 
@@ -200,11 +194,11 @@ class NanoporeRead(object):
             self.close()
             return False
 
-        self.template_event_table_address = "%s/BaseCalled_template/Events" % oned_root_address
-        self.template_model_address       = "%s/BaseCalled_template/Model" % oned_root_address
+        self.template_event_table_address = os.path.join(oned_root_address, "BaseCalled_template/Events")
+        self.template_model_address       = os.path.join(oned_root_address, "BaseCalled_template/Model")
         self.template_model_id            = None
 
-        fastq_sequence_address = "%s/BaseCalled_template/Fastq" % oned_root_address
+        fastq_sequence_address = os.path.join(oned_root_address, "BaseCalled_template/Fastq")
         if fastq_sequence_address not in self.fastFive:
             self.logError("[NanoporeRead:_initialize]ERROR %s missing fastq" % self.filename)
             self.close()
@@ -225,6 +219,35 @@ class NanoporeRead(object):
             return False
 
         return True
+
+    def resegment(self, resegment_strategy=RESEGMENT_STRAGEGIES[0], resegment_params=None,
+                         basecall_root_address=TEMPLATE_BASECALL_KEY, overwrite=False):
+        # sanity check
+        assert resegment_strategy not in RESEGMENT_STRAGEGIES, "Invalid resegment strategy '{}', expected {}"\
+            .format(resegment_strategy, RESEGMENT_STRAGEGIES)
+
+        # prep
+        if resegment_params is None:
+            resegment_params = self.get_default_resegment_params(resegment_strategy)
+        self.close() # so that any changes are flushed, as resegment_reads saves new data
+
+        print("[SignalAlignment.resegment_events] Resegmenting read with strategy '{}'".format(resegment_strategy), file=sys.stderr)
+        resegment_reads(self.filename, resegment_params, overwrite=overwrite, resegment_strat=resegment_strategy)
+
+        self.oned_root_address = self.get_latest_basecall_edition(self.event_table)
+
+
+    @staticmethod
+    def get_default_resegment_params(resegment_strategy):
+        if resegment_strategy == RESEGMENT_SPEEDY:
+            return {}
+        elif resegment_strategy == RESEGMENT_MINKNOW:
+            return dict(window_lengths=(5, 10), thresholds=(2.0, 1.1), peak_height=1.2)
+        elif resegment_strategy == RESEGMENT_SCRAPPIE:
+            return {}
+        else:
+            return None
+
 
     @staticmethod
     def make_event_map(events, kmer_length):
@@ -323,9 +346,9 @@ class NanoporeRead(object):
         ok = False not in [template_events_check, oneD_event_map_check]
         return ok
 
-    def Write(self, parent_job, out_file, initialize=True):
+    def Write(self, out_file, initialize=True):
         if initialize:
-            ok = self.Initialize(parent_job)
+            ok = self.Initialize()
             if not ok:
                 self.close()
                 return False

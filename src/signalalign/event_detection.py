@@ -309,7 +309,8 @@ RESEGMENT_SPEEDY = "speedy"
 RESEGMENT_MINKNOW = "minknow"
 RESEGMENT_SCRAPPIE = "scrappie"
 
-def resegment_reads(fast5_path, params, speedy=False, overwrite=False, resegment_strat=None, perform_basecall=True):
+def resegment_reads(fast5_path, params, analysis_identifier=Fast5.__default_basecall_1d_analysis__, overwrite=False,
+                    resegment_strat=RESEGMENT_MINKNOW, perform_basecall=True):
     """Re-segment and create anchor alignment from previously base-called fast5 file
     :param fast5_path: path to fast5 file
     :param params: event detection parameters
@@ -318,12 +319,8 @@ def resegment_reads(fast5_path, params, speedy=False, overwrite=False, resegment
     :param name: name of key where events table will be placed (Analyses/'name'/Events)
     :return True when completed
     """
-    # todo actually refactor this instead of hacking it together
-    if resegment_strat is None:
-        resegment_strat = RESEGMENT_SPEEDY if speedy else RESEGMENT_MINKNOW
 
     assert os.path.isfile(fast5_path), "File does not exist: {}".format(fast5_path)
-    name = "ReSegmentBasecall_00{}"
 
     # create Fast5 object
     f5fh = Fast5(fast5_path, read='r+')
@@ -352,6 +349,7 @@ def resegment_reads(fast5_path, params, speedy=False, overwrite=False, resegment
     attributes = merge_dicts([params, dict(zip(keys, values)), f5fh.raw_attributes])
 
     # gather previous event detection (if exists)
+    #todo is this a shim until we get read alignment working?
     if f5fh.has_basecall_data():
         old_event_table = f5fh.get_basecall_data()
         if f5fh.is_read_rna():
@@ -360,8 +358,21 @@ def resegment_reads(fast5_path, params, speedy=False, overwrite=False, resegment
     else:
         new_event_table = event_table
 
+    # get destination root
+    if overwrite:
+        try:
+            # get current identifier
+            destination = f5fh.get_analysis_latest(analysis_identifier)
+            f5fh.delete(destination, ignore=True)
+        except IndexError:
+            # doesn't exist, get initial location (ie Basecall_000)
+            destination = f5fh.get_analysis_new(analysis_identifier)
+    else:
+        # get incremented directory for identifier
+        destination = f5fh.get_analysis_new(analysis_identifier)
+
     # set event table
-    f5fh.set_new_event_table(name, new_event_table, attributes, overwrite=overwrite)
+    f5fh.set_event_table(destination, new_event_table, attributes)
 
     # gather new sequence
     if perform_basecall:
@@ -372,7 +383,7 @@ def resegment_reads(fast5_path, params, speedy=False, overwrite=False, resegment
         quality_scores = '!'*len(sequence)
         fastq = create_fastq_line(read_id+" :", sequence, quality_scores)
         # set fastq
-        f5fh.set_fastq(name, fastq)
+        f5fh.set_fastq(destination, fastq)
 
     return f5fh
 

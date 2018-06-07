@@ -65,7 +65,9 @@ class Fast5(h5py.File):
     __default_alignment_analysis__ = 'Alignment'
 
     __default_hairpin_split_analysis__ = 'Hairpin_Split'
-    __default_section__ = 'template'
+    __template_section__ = 'template'
+    __complement_section__ = 'complement'
+    __default_section__ = __template_section__
 
     __default_mapping_analysis__ = 'Squiggle_Map'
     __default_mapping_events__ = 'SquiggleMapped_{}/Events'
@@ -80,6 +82,7 @@ class Fast5(h5py.File):
     __default_basecall_mapping_summary__ = '/Summary/current_space_map_{}/'  # under AlignToRef analysis
     __default_basecall_alignment_summary__ = '/Summary/genome_mapping_{}/'  # under Alignment analysis
 
+    #todo fix the form of these
     __default_corrected_genome__ = '/Analyses/RawGenomeCorrected_000/BaseCalled_template'  # nanoraw
     __default_signalalign_events__ = '/Analyses/SignalAlign_00{}'  # signalalign events
     __default_resegment_basecall__ = '/Analyses/ReSegmentBasecall_00{}'
@@ -333,6 +336,7 @@ class Fast5(h5py.File):
             raise KeyError('Read does not contain required fields: {}'.format(self.__default_corrected_genome__))
         return np.asarray(events), corr_start_rel_to_raw
 
+    #todo fix path creation
     def get_signalalign_events(self, mea=False, sam=False):
         """Get signal align events, sam or mea alignment"""
         assert (not mea or not sam), "Both mea and sam cannot be set to True"
@@ -350,9 +354,10 @@ class Fast5(h5py.File):
             raise KeyError('Read does not contain required fields: {}'.format(path))
         return events
 
-    def get_eventalign_events(self, section='template'):
+    #todo fix path creation
+    def get_eventalign_events(self, section=__default_section__):
         """Get signal align events, sam or mea alignment"""
-        assert section == 'template' or section == 'complement', \
+        assert section in [self.__template_section__, self.__complement_section__], \
             "Section must be template or complement: {}".format(section)
         try:
             path = self.check_path(self.__default_eventalign_events__, latest=True)
@@ -363,6 +368,7 @@ class Fast5(h5py.File):
             raise KeyError('Read does not contain required fields: {}'.format(path))
         return events
 
+    #todo fix path creation
     def get_resegment_basecall(self, number=None):
         """Get most recent resegmented basecall events table
 
@@ -441,6 +447,7 @@ class Fast5(h5py.File):
             data = (data + meta['offset']) * raw_unit
         return data
 
+    #todo fix path creation
     def set_read(self, data, meta, scale=True):
         """Write event data to file
 
@@ -472,22 +479,23 @@ class Fast5(h5py.File):
 
         self._add_event_table(data, self._join_path(path, 'Events'))
 
-    def set_fastq(self, path, data, section='template'):
+    def set_fastq(self, destination_root, data, section=__default_section__):
         """Write new fasta file to file
 
-        :param path: path to fasta file
+        :param destination_root: root directory; data will be stored in {destination_root}/Basecalled_{section}/Fastq
         :param data: fastq file
         :param section: name of basecall analysis default (template)
         """
         check_fastq_line(data)
-        path = self._join_path(self.__base_analysis__, path, "BaseCalled_{}".format(section))
-        path = self.check_path(path, latest=True)
-        self._add_string_dataset(data, self._join_path(path, 'Fastq'))
 
-    def set_new_event_table(self, path, data, meta, section='template', scale=False, overwrite=False):
+        path = self._join_path(destination_root, self.__default_basecall_fastq__.format(section))
+
+        self._add_string_dataset(data, path)
+
+    def set_event_table(self, destination_root, data, meta, section=__default_section__, scale=False, overwrite=False):
         """Write new event data to file
 
-        :param path: path to Events table
+        :param destination_root: root directory; data will be stored in {destination_root}/Basecalled_{section}/Events
         :param data: event data
         :param meta: meta data to attach to read
         :param section: name of basecall analysis default (template)
@@ -496,29 +504,24 @@ class Fast5(h5py.File):
         """
 
         self.assert_writable()
-        # req_fields = [
-        #     'start_time', 'duration', 'read_number',
-        #     'start_mux', 'read_id', 'scaling_used'
-        # ]
-        # if not set(req_fields).issubset(meta.keys()):
-        #     raise KeyError(
-        #         'Read meta does not contain required fields: {}, got {}'.format(
-        #             req_fields, meta.keys()
-        #         )
-        #     )
         self.test_event_table(data)
 
-        path = self._join_path(self.__base_analysis__, path)
-        path = self.check_path(path, latest=overwrite)
-        if overwrite:
-            self.delete(path, ignore=True)
+        #todo this should be handled elsewhere?
+        if overwrite: self.delete(destination_root, ignore=True)
+
+        # modification to data
         if meta:
-            self._add_attrs(meta, path)
+            #todo add attrs to dest_root or dest_events?
+            self._add_attrs(meta, destination_root)
         if scale:
             data['start'] *= self.sample_rate
             data['length'] *= self.sample_rate
-        self._add_event_table(data, self._join_path(path, "BaseCalled_{}".format(section), 'Events'))
 
+        # store
+        destination_events = self._join_path(destination_root, self.__default_basecall_1d_events__.format(section))
+        self._add_event_table(data, destination_events)
+
+    #todo fix path creation
     def set_eventalign_table(self, template, complement, meta, overwrite=False):
         """Write eventalign table to fast5 file
 
@@ -548,6 +551,7 @@ class Fast5(h5py.File):
 
         return True
 
+    #todo change to look like get_analysis_latest
     def check_path(self, path, latest=False):
         """Check if path exists, if it does increment numbering
 
@@ -815,18 +819,20 @@ class Fast5(h5py.File):
     ###
     # 1D Basecalling data
 
+
     def has_basecall_data(self, section=__default_section__, analysis=__default_basecall_1d_analysis__):
         """
-        Return whether basecall information exists
+        Determines whether events table exists
 
         :param section: String to use in paths, e.g. 'template' or 'complement'.
         :param analysis: Base analysis name (under {})
-        :return: False if get_basecall_data(..) will raise an exception, True otherwise
         """
-        if not analysis in self: return False
-        base = self.get_analysis_latest(analysis)
-        events_path = self._join_path(base, self.__default_basecall_1d_events__.format(section))
-        return events_path in self
+
+        try:
+            self.get_basecall_data(section=section, analysis=analysis)
+            return True
+        except:
+            return False
 
 
     def get_basecall_data(self, section=__default_section__, analysis=__default_basecall_1d_analysis__):
@@ -1057,8 +1063,8 @@ class Fast5(h5py.File):
             #    more than likely incorrect. Try alternative analysis
             if section != self.__default_seq_section__ and analysis == self.__default_basecall_2d_analysis__:
                 location = self._join_path(
-                    self.get_analysis_latest(__default_basecall_1d_analysis__),
-                    __default_basecall_fastq__.format(section)
+                    self.get_analysis_latest(self.__default_basecall_1d_analysis__),
+                    self.__default_basecall_fastq__.format(section)
                 )
                 try:
                     return self[location][()]

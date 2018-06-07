@@ -116,7 +116,7 @@ class SignalAlignment(object):
         if not (self.check_for_temp_file_existance and os.path.isfile(npRead_)):
             # TODO is this totally fucked for RNA because of 3'-5' mapping?
             fH = open(npRead_, "w")
-            ok = npRead.Write(parent_job=None, out_file=fH, initialize=True)
+            ok = npRead.Write(out_file=fH, initialize=True)
             fH.close()
             if not ok:
                 self.failStop("[SignalAlignment.run] File: %s did not pass initial checks" % self.read_name, npRead)
