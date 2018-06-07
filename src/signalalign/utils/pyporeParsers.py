@@ -20,8 +20,8 @@ except:
     pass
 from signalalign.utils.core import *
 
-# import pyximport
-# pyximport.install(setup_args={'include_dirs': np.get_include()})
+import pyximport
+pyximport.install(setup_args={'include_dirs': np.get_include()})
 from signalalign.cparsers import FastStatSplit
 
 import json
