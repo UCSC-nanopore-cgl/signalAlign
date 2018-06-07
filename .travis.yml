@@ -57,6 +57,7 @@ install:
 - conda install numpy
 - conda install hdf5
 - conda install scipy
+- conda config --add channels bioconda
 - conda install samtools
 - samtools
 - h5repack
@@ -79,7 +80,9 @@ install:
 script:
 - export PATH=$PATH:$PWD/bin
 - export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$PWD/htslib
-- make test
+#- make test
+- cd src/signalalign/tests
+- pytest
 #- gcov-4.9 bin/signalMachine.c
 
 #- cd bin
