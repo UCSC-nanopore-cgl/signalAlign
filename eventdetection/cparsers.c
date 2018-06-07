@@ -23749,7 +23749,7 @@ PyMODINIT_FUNC PyInit_cparsers(void)
  * cimport cython
  * 
  * from itertools import tee, chain             # <<<<<<<<<<<<<<
- * from core import Segment
+ * from signalalign.utils.core import Segment
  * 
  */
   __pyx_t_1 = PyList_New(2); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 17, __pyx_L1_error)
@@ -23776,7 +23776,7 @@ PyMODINIT_FUNC PyInit_cparsers(void)
   /* "PyPore/cparsers.pyx":18
  * 
  * from itertools import tee, chain
- * from core import Segment             # <<<<<<<<<<<<<<
+ * from signalalign.utils.core import Segment             # <<<<<<<<<<<<<<
  * 
  * # Implement the max and min functions as cython
  */

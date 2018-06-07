@@ -56,6 +56,7 @@ install:
 - conda install pytest
 - conda install numpy
 - conda install hdf5
+- conda install scipy
 #- conda env create -f requirements35.yml
 #- source activate nanotensor3.5
 #- pip install google-compute-engine

@@ -15,7 +15,7 @@ from libc.math cimport log
 cimport cython
 
 from itertools import tee, chain
-from signalalign.utils.core import Segment
+from core import Segment
 
 # Implement the max and min functions as cython
 cdef inline int int_max( int a, int b ): return a if a >= b else b

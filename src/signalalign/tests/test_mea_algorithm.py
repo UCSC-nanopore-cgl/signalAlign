@@ -145,13 +145,11 @@ class MeaTest(unittest.TestCase):
                         [0, 0, 0, event1[0]]]
         events = get_events_from_path(event_matrix, path)
         self.assertSequenceEqual(events.tolist(), event1.tolist())
+        event_matrix = [[0, 0, 0, 0],
+                        [0, 0, 0, 0],
+                        [0, 0, 0, 0]]
 
-        with self.assertRaises(IndexError):
-            event_matrix = [[0, 0, 0, 0],
-                            [0, 0, 0, 0],
-                            [0, 0, 0, 0]]
-
-            get_events_from_path(event_matrix, path)
+        self.assertRaises(IndexError, get_events_from_path, event_matrix, path)
 
     def test_get_mea_params_from_events(self):
         # """Test get_mea_params_from_events"""
