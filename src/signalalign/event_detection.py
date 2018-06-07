@@ -389,7 +389,7 @@ def get_resegment_accuracy(fast5handle, section="template"):
     assert isinstance(fast5handle, Fast5), "fast5handle needs to be a Fast5 instance"
     # get fastqs
     resegment_fastq = fast5handle.get_fastq(analysis="ReSegmentBasecall", section=section)
-    original_fastq = bytes.decode(fast5handle.get_fastq(analysis="Basecall_1D", section=section))[:-1]
+    original_fastq = fast5handle.get_fastq(analysis="Basecall_1D", section=section)[:-1]
     # make sure the underlying assumption that we can split on newline is ok
     check_fastq_line(resegment_fastq)
     check_fastq_line(original_fastq)

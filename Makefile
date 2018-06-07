@@ -66,7 +66,7 @@ externals :
 	cd externalTools && make all
 
 test :
-	cd ${test_directory} && pytest
+	cd ${test_directory} && ./run_tests.sh
 #	cd ${binPath} && ./sonLibTests
 	cd python_utils && pytest
 

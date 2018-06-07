@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """Segment raw signal and create banded alignment to fasta sequence"""
 ########################################################################
 # File: banded_alignment.py
@@ -38,8 +38,9 @@ def simple_banded_event_align(events, model, nucleotide_seq):
     # # // qc
     min_average_log_emission = -5.0
 
+    n_kmers = len(nucleotide_seq) - k + 1
     # // banding
-    bandwidth = min(1000, len(nucleotide_seq))
+    bandwidth = min(1000, n_kmers+1)
     half_band = bandwidth / 2
 
     # // transitions
@@ -49,7 +50,6 @@ def simple_banded_event_align(events, model, nucleotide_seq):
     lp_trim = np.log(0.1)
 
     n_events = len(events)
-    n_kmers = len(nucleotide_seq) - k + 1
     events_per_kmer = float(n_kmers) / n_events
     min_event_idx_by_kmer = []
     # // Calculate the minimum event index that is within the band for each read kmer
@@ -172,8 +172,9 @@ def simple_banded_event_align(events, model, nucleotide_seq):
 
         kmer_emission = model.log_event_mean_gaussian_probability_match(event_mean, kmer)
         sum_emission += kmer_emission
-        events['model_state'][curr_event_idx] = kmer
-        events['p_model_state'][curr_event_idx] = np.exp(kmer_emission)
+        if moves == 0:
+            events['model_state'][curr_event_idx] = kmer
+            events['p_model_state'][curr_event_idx] = np.exp(kmer_emission)
 
         # kmer_rank = alphabet->kmer_rank(sequence.substr(curr_k_idx, k).c_str(), k);
         # sum_emission += log_probability_match_r9(read, pore_model, kmer_rank, curr_event_idx, strand_idx);
@@ -186,6 +187,7 @@ def simple_banded_event_align(events, model, nucleotide_seq):
         if from_where == FROM_D:
             moves += 1
             events['move'][curr_event_idx] = moves
+
             curr_k_idx -= 1
             curr_event_idx -= 1
             moves = 0
@@ -198,7 +200,7 @@ def simple_banded_event_align(events, model, nucleotide_seq):
             moves += 1
             curr_k_idx -= 1
 
-    events['move'][curr_event_idx] = 0
+    events['move'][0] = 0
     out = out[::-1]
     avg_log_emission = sum_emission / n_aligned_events
     spanned = out[0][0] == 0 and out[-1][0] == n_kmers - 1
@@ -290,8 +292,9 @@ def adaptive_banded_simple_event_align(events, model, nucleotide_seq, debug=Fals
     n_cols = n_kmers + 1
     n_bands = n_rows + n_cols
 
-    bands = [[-np.infty]*bandwidth]*n_bands
-    trace = [[0]*bandwidth]*n_bands
+    bands = pd.DataFrame(np.zeros([bandwidth, n_bands])) * -np.infty
+
+    trace = pd.DataFrame(np.zeros([bandwidth, n_bands]))
     # Keep track of the event/kmer index for the lower left corner of the band
     # these indices are updated at every iteration to perform the adaptive banding
     # Only the first two bands have their coordinates initialized, the rest are computed adaptively
@@ -468,8 +471,9 @@ def adaptive_banded_simple_event_align(events, model, nucleotide_seq, debug=Fals
 
         kmer_emission = model.log_event_mean_gaussian_probability_match(event_mean, kmer)
         sum_emission += kmer_emission
-        events['model_state'][curr_event_idx] = kmer
-        events['p_model_state'][curr_event_idx] = np.exp(kmer_emission)
+        if moves == 0:
+            events['model_state'][curr_event_idx] = kmer
+            events['p_model_state'][curr_event_idx] = np.exp(kmer_emission)
 
         n_aligned_events += 1
 
@@ -492,17 +496,15 @@ def adaptive_banded_simple_event_align(events, model, nucleotide_seq, debug=Fals
             events['move'][curr_event_idx] = 0
             print("Moves when skip {}".format(moves))
             moves = 0
-
             curr_event_idx -= 1
             curr_gap = 0
 
         else:
             moves += 1
-
             curr_kmer_idx -= 1
             curr_gap += 1
             max_gap = max(curr_gap, max_gap)
-
+    events['move'][0] = 0
     # QC results
     out = out[::-1]
     avg_log_emission = sum_emission / n_aligned_events
@@ -540,6 +542,7 @@ def main():
     # create events
     # events, sum_emission = simple_banded_event_align(event_table, model, nucleotide_seq_3_to_5)
     events, sum_emission = simple_banded_event_align(event_table, model, nucleotide_seq_3_to_5)
+    events, sum_emission = adaptive_banded_simple_event_align(event_table, model, nucleotide_seq_3_to_5)
 
     # embed
     name = "SimpleBandedAlignment_00{}"

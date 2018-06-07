@@ -121,42 +121,42 @@ class SignalHmm(object):
         # line 2: [level_mean] [level_sd] [noise_mean] [noise_sd] [noise_lambda ](.../kmer) \n
         assert os.path.exists(model_file), "signalHmm.load_model - didn't find model here{}?".format(model_file)
 
-        fH = open(model_file, 'r')
+        with open(model_file, 'r') as fH:
 
-        line = fH.readline().split()
-        # check for correct header length
-        assert len(line) == 4, "signalHmm.load_model - incorrect line length line:{}".format(''.join(line))
-        # check stateNumber
-        assert int(line[0]) == self.state_number, "signalHmm.load_model - incorrect stateNumber got {got} should be {exp}" \
-                                                  "".format(got=int(line[0]), exp=self.state_number)
-        # load model parameters
-        self.alphabet_size = int(line[1])
-        self.alphabet = line[2]
-        self.kmer_length = int(line[3])
-        self.symbol_set_size = self.alphabet_size**self.kmer_length
-        assert self.symbol_set_size > 0, "signalHmm.load_model - Got 0 for symbol_set_size"
-        assert self.symbol_set_size <= 6**6, "signalHmm.load_model - Got more than 6^6 for symbol_set_size got {}" \
-                                             "".format(self.symbol_set_size)
+            line = fH.readline().split()
+            # check for correct header length
+            assert len(line) == 4, "signalHmm.load_model - incorrect line length line:{}".format(''.join(line))
+            # check stateNumber
+            assert int(line[0]) == self.state_number, "signalHmm.load_model - incorrect stateNumber got {got} should be {exp}" \
+                                                      "".format(got=int(line[0]), exp=self.state_number)
+            # load model parameters
+            self.alphabet_size = int(line[1])
+            self.alphabet = line[2]
+            self.kmer_length = int(line[3])
+            self.symbol_set_size = self.alphabet_size**self.kmer_length
+            assert self.symbol_set_size > 0, "signalHmm.load_model - Got 0 for symbol_set_size"
+            assert self.symbol_set_size <= 6**6, "signalHmm.load_model - Got more than 6^6 for symbol_set_size got {}" \
+                                                 "".format(self.symbol_set_size)
 
-        line = list(map(float, fH.readline().split()))
-        assert len(line) == len(self.transitions) + 1, "signalHmm.load_model incorrect transitions line"
-        self.transitions = line[:-1]
-        self.likelihood = line[-1]
+            line = list(map(float, fH.readline().split()))
+            assert len(line) == len(self.transitions) + 1, "signalHmm.load_model incorrect transitions line"
+            self.transitions = line[:-1]
+            self.likelihood = line[-1]
 
-        line = list(map(float, fH.readline().split()))
-        assert len(line) == self.symbol_set_size * NB_MODEL_PARAMS, \
-            "signalHmm.load_model incorrect event model line"
-        self.event_model["means"] = line[::NB_MODEL_PARAMS]
-        self.event_model["SDs"] = line[1::NB_MODEL_PARAMS]
-        self.event_model["noise_means"] = line[2::NB_MODEL_PARAMS]
-        self.event_model["noise_SDs"] = line[3::NB_MODEL_PARAMS]
-        self.event_model["noise_lambdas"] = line[4::NB_MODEL_PARAMS]
+            line = list(map(float, fH.readline().split()))
+            assert len(line) == self.symbol_set_size * NB_MODEL_PARAMS, \
+                "signalHmm.load_model incorrect event model line"
+            self.event_model["means"] = line[::NB_MODEL_PARAMS]
+            self.event_model["SDs"] = line[1::NB_MODEL_PARAMS]
+            self.event_model["noise_means"] = line[2::NB_MODEL_PARAMS]
+            self.event_model["noise_SDs"] = line[3::NB_MODEL_PARAMS]
+            self.event_model["noise_lambdas"] = line[4::NB_MODEL_PARAMS]
 
-        assert not np.any(self.event_model["means"] == 0.0), "signalHmm.load_model, this model has 0 E_means"
-        assert not np.any(self.event_model["SDs"] == 0.0), "signalHmm.load_model, this model has 0 E_means"
-        assert not np.any(self.event_model["noise_means"] == 0.0), "signalHmm.load_model, this model has 0 E_noise_means"
-        assert not np.any(self.event_model["noise_SDs"] == 0.0), "signalHmm.load_model, this model has 0 E_noise_SDs"
-        self.has_model = True
+            assert not np.any(self.event_model["means"] == 0.0), "signalHmm.load_model, this model has 0 E_means"
+            assert not np.any(self.event_model["SDs"] == 0.0), "signalHmm.load_model, this model has 0 E_means"
+            assert not np.any(self.event_model["noise_means"] == 0.0), "signalHmm.load_model, this model has 0 E_noise_means"
+            assert not np.any(self.event_model["noise_SDs"] == 0.0), "signalHmm.load_model, this model has 0 E_noise_SDs"
+            self.has_model = True
 
     def write(self, out_file):
         # the model file has the format:

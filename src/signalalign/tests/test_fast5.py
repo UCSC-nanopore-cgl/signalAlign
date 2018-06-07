@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """
     Place unit tests for fast5.py
 """
@@ -62,8 +62,6 @@ class Fast5Test(unittest.TestCase):
     def test_test_event_table(self):
         # """Test the method test_event_table"""
         pass
-
-
 
     @classmethod
     def tearDownClass(cls):

@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """Test sequenceTools.py"""
 ########################################################################
 # File: test_sequenceTools.py
