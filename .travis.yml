@@ -59,7 +59,6 @@ install:
 - conda install scipy
 - conda config --add channels bioconda
 - conda install samtools
-- h5repack
 #- conda env create -f requirements35.yml
 #- source activate nanotensor3.5
 #- pip install google-compute-engine
@@ -97,3 +96,5 @@ script:
 #
 #  - codecov -t abf16a83-0e8f-4834-b033-3d8c7b4b7e63
 
+after_failure:
+  - h5repack
