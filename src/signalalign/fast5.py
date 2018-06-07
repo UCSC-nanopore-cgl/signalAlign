@@ -1037,7 +1037,7 @@ class Fast5(h5py.File):
                 self.get_analysis_latest(analysis), self.__default_basecall_fastq__.format(section)
             )
         try:
-            return self[location][()]
+            return bytes.decode(self[location][()])
         except:
             # Did we get given section != 2D and no analysis, that's
             #    more than likely incorrect. Try alternative analysis
@@ -1047,7 +1047,7 @@ class Fast5(h5py.File):
                     __default_basecall_fastq__.format(section)
                 )
                 try:
-                    return self[location][()]
+                    return bytes.decode(self[location][()])
                 except:
                     raise ValueError(err_msg.format(location))
             else:
