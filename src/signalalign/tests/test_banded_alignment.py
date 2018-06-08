@@ -116,24 +116,26 @@ class BandedAlignmentTests(unittest.TestCase):
         self.assertSequenceEqual([bytes.decode(x) for x in events['model_state']], ["AAAAA", "AAAAT", "AAATA"])
         self.assertSequenceEqual(events['move'].tolist(), [0, 1, 1])
 
-    # def test_simple_banded_alignment2(self):
-    #     event_table = self.dna_handle.get_basecall_data()
-    #     fastq = self.dna_handle.get_fastq(analysis="Basecall_1D", section='template')
-    #     nuc_sequence = fastq.split('\n')[1]
-    #     # event_table = np.empty(3, dtype=[('start', float), ('length', float),
-    #     #                                  ('mean', float), ('stdv', float),
-    #     #                                  ('model_state', 'S5'), ('move', '<i4'),
-    #     #                                  ('p_model_state', float)])
-    #     #
-    #     # event_table["mean"] = [86.9, 75.3, 80.2]
-    #     # nuc_sequence = "AAAAATA"
-    #
-    #     events, sum_emission = simple_banded_event_align(event_table, self.dna_model, nuc_sequence)
-    #     self.assertSequenceEqual(events['mean'].tolist(), [86.9, 75.3, 80.2])
-    #     self.assertSequenceEqual([bytes.decode(x) for x in events['model_state']], ["AAAAA", "AAAAT", "AAATA"])
-    #     self.assertSequenceEqual(events['move'].tolist(), [0, 1, 1])
+    def test_simple_banded_alignment2(self):
+        # event_table = self.dna_handle.get_basecall_data()
+        # fastq = self.dna_handle.get_fastq(analysis="Basecall_1D", section='template')
+        # print(fastq)
+        # nuc_sequence = fastq.split('\n')[1]
+        # print(nuc_sequence)
+        event_table = np.empty(3, dtype=[('start', float), ('length', float),
+                                         ('mean', float), ('stdv', float),
+                                         ('model_state', 'S5'), ('move', '<i4'),
+                                         ('p_model_state', float)])
 
-    def test_adaptive_banded_alignment(self):
+        event_table["mean"] = [86.9, 75.3, 80.2]
+        nuc_sequence = "AAAAATA"
+
+        events, sum_emission = simple_banded_event_align(event_table, self.dna_model, nuc_sequence)
+        self.assertSequenceEqual(events['mean'].tolist(), [86.9, 75.3, 80.2])
+        self.assertSequenceEqual([bytes.decode(x) for x in events['model_state']], ["AAAAA", "AAAAT", "AAATA"])
+        self.assertSequenceEqual(events['move'].tolist(), [0, 1, 1])
+
+    def test_adaptive_banded_alignment1(self):
         # event_table = self.dna_handle.get_basecall_data()
         # fastq = self.dna_handle.get_fastq(analysis="Basecall_1D", section='template')
         # print(fastq)

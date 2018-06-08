@@ -79,8 +79,8 @@ script:
 - export PATH=$PATH:$PWD/bin
 - export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$PWD/htslib
 #- make test
-#- cd src/signalalign/tests
-- make test
+- cd src/signalalign/tests
+- python -m pytest
 #- gcov-4.9 bin/signalMachine.c
 
 #- cd bin
