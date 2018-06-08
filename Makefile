@@ -66,7 +66,13 @@ externals :
 	cd externalTools && make all
 
 test :
-	cd ${test_directory} && python -m pytest
+	cd ${test_directory} && python test_sequenceTools.py
+	cd ${test_directory} && python test_SignalAlign.py
+	cd ${test_directory} && python test_SingleNucleotideProbabilities.py
+	cd ${test_directory} && python test_banded_alignment.py
+	cd ${test_directory} && python test_event_detection.py
+	cd ${test_directory} && python test_fast5.py
+	cd ${test_directory} && python test_mea_algorithm.py
 #	cd ${binPath} && ./sonLibTests
 	cd python_utils && pytest
 
