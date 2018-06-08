@@ -65,14 +65,13 @@ bD :
 externals :
 	cd externalTools && make all
 
+test_files := $(shell find $(test_directory) -name '*.py')
+
 test :
-	cd ${test_directory} && python test_sequenceTools.py
-	cd ${test_directory} && python test_SignalAlign.py
-	cd ${test_directory} && python test_SingleNucleotideProbabilities.py
-	cd ${test_directory} && python test_banded_alignment.py
-	cd ${test_directory} && python test_event_detection.py
-	cd ${test_directory} && python test_fast5.py
-	cd ${test_directory} && python test_mea_algorithm.py
+	for i in ${test_files}; do \
+		python $$i;\
+		[[ $$? != 0 ]] && exit -1; \
+	done
 #	cd ${binPath} && ./sonLibTests
 	cd python_utils && pytest
 
@@ -145,5 +144,14 @@ ${libPath}/signalAlignLib.a : ${libSources} ${libHeaders} ${stBarDependencies}
 
 hs :
 	cd htslib && make
+
+#	echo DIR
+#	cd ${test_directory} && \
+#	for i in 1 2 3; do \
+#		python $$i; \
+#		[[ $$? != 0 ]] && exit -1; \
+#	    echo 'done'; \
+#	done
+
 
 .FORCE:
