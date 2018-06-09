@@ -212,11 +212,11 @@ def add_all_tests_to_Suite(test_suite, test_class):
 
 def main():
     testSuite = unittest.TestSuite()
-    # testSuite.addTest(LibTest('test_signalAlign_library'))
-    # testSuite.addTest(SignalAlignAlignmentTest('test_pUC_r9_reads_5mer'))
-    # testSuite.addTest(SignalAlignAlignmentTest('test_pUC_r9_reads_6mer'))
-    # testSuite.addTest(SignalAlignAlignmentTest('test_Ecoli1D_reads_5mer'))
-    # testSuite.addTest(SignalAlignAlignmentTest('test_RNA_edge_alignments_reads_5mer'))
+    testSuite.addTest(LibTest('test_signalAlign_library'))
+    testSuite.addTest(SignalAlignAlignmentTest('test_pUC_r9_reads_5mer'))
+    testSuite.addTest(SignalAlignAlignmentTest('test_pUC_r9_reads_6mer'))
+    testSuite.addTest(SignalAlignAlignmentTest('test_Ecoli1D_reads_5mer'))
+    testSuite.addTest(SignalAlignAlignmentTest('test_RNA_edge_alignments_reads_5mer'))
     testSuite.addTest(signalAlign_EM_test('test_EM'))
     # testSuite.addTest(SignalAlignAlignmentTest('test_zymo_reads'))
 

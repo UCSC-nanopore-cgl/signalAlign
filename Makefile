@@ -71,15 +71,18 @@ bD :
 externals :
 	cd externalTools && make all
 
-test_files := $(shell find $(test_directory) -name '*.py')
+test_files := $(shell find $(test_directory) -name '*t.py')
 
 test :
 	for i in ${test_files}; do \
-		python $$i;\
-		[[ $$? != 0 ]] && exit -1; \
+		python $$i; \
+		if [ $$? -ne 0 ]; then\
+		exit -1;\
+		fi;\
 	done
 #	cd ${binPath} && ./sonLibTests
 	cd python_utils && pytest
+# //		exit "$$?"; \
 
 ${signalAlignBin}/compareDistributions : compareDistributions.c ${libPath}/signalAlignLib.a ${signalAlignDependencies}
 	${cxx} ${cflags}  -I inc -I${libPath} -o ${signalAlignBin}/compareDistributions compareDistributions.c ${libPath}/signalAlignLib.a ${signalAlignLib}
