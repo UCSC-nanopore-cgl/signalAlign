@@ -71,7 +71,7 @@ bD :
 externals :
 	cd externalTools && make all
 
-test_files := $(shell find $(test_directory) -name '*t.py')
+test_files := $(shell find $(test_directory) -name '*.py')
 
 test :
 	for i in ${test_files}; do \
