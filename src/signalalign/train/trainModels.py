@@ -303,7 +303,7 @@ def process_sample(sample, reference, working_folder):
         raise RuntimeError("Need to provide path to .fast5 files or file with filenames (fofn)")
 
     if options["edited_fw_reference"] is None:
-        assert os.path.exists(reference), "Must specify a bwa_reference in order to create signalAlignments. {}" \
+        assert os.path.isfile(reference), "Must specify a bwa_reference in order to create signalAlignments. {}" \
                                           "".format(reference)
         fw_fasta_path, bw_fasta_path = processReferenceFasta(fasta=reference,
                                                              work_folder=working_folder,
@@ -424,7 +424,7 @@ def trainHMMTransitions(config):
     if bwa_reference:
         print("BWA_REFERENCE")
         bwa_reference = os.path.abspath(bwa_reference)
-        print("os.path.exists(bwa_reference)", os.path.exists(bwa_reference))
+        print("os.path.isfile(bwa_reference)", os.path.isfile(bwa_reference))
     print("BWA_REFERENCE222", bwa_reference)
 
     i = 0
