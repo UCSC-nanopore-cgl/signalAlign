@@ -7,7 +7,7 @@ samples: [{
     motif:,
     label:,
 }]
-bwa_reference: ../tests/test_sequences/E.coli_k12.fasta
+bwa_reference: ../tests/test_sequences/E.coli_K12.fasta
 bwt:
 stateMachineType: threeState
 in_T_Hmm: ../models/testModelR9_5mer_acgt_template.model
