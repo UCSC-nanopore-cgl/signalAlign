@@ -16,7 +16,7 @@ templateHdp:
 complementHdp:
 iterations: 3
 training_bases: 10000
-job_count: 4
+job_count: 2
 diagonal_expansion:
 constraint_trim:
 twoD: true

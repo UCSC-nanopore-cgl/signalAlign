@@ -424,6 +424,7 @@ def trainHMMTransitions(config):
     if bwa_reference:
         print("BWA_REFERENCE")
         bwa_reference = os.path.abspath(bwa_reference)
+        print("os.path.exists(bwa_reference)", os.path.exists(bwa_reference))
     print("BWA_REFERENCE222", bwa_reference)
 
     i = 0
