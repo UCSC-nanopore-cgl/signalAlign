@@ -187,9 +187,9 @@ class signalAlign_EM_test(unittest.TestCase):
         trainModels_path = os.path.join(BIN_PATH, "trainModels")
         config_path = os.path.join(SIGNALALIGN_ROOT, "tests/trainModels-config.yaml")
         em_command = "{train_models} run --config={config}".format(train_models=trainModels_path, config=config_path)
-        null_output = open(os.devnull, 'w')
-        result = call(em_command, shell=True, bufsize=-1, stdout=null_output, stderr=null_output)
-        # result = call(em_command, shell=True, bufsize=-1)
+        # null_output = open(os.devnull, 'w')
+        # result = call(em_command, shell=True, bufsize=-1, stdout=null_output, stderr=null_output)
+        result = call(em_command, shell=True, bufsize=-1)
 
         self.assertTrue(result == 0, "error running signalAlign alignments command was {}"
                                      "".format(em_command))
@@ -212,11 +212,11 @@ def add_all_tests_to_Suite(test_suite, test_class):
 
 def main():
     testSuite = unittest.TestSuite()
-    testSuite.addTest(LibTest('test_signalAlign_library'))
-    testSuite.addTest(SignalAlignAlignmentTest('test_pUC_r9_reads_5mer'))
-    testSuite.addTest(SignalAlignAlignmentTest('test_pUC_r9_reads_6mer'))
-    testSuite.addTest(SignalAlignAlignmentTest('test_Ecoli1D_reads_5mer'))
-    testSuite.addTest(SignalAlignAlignmentTest('test_RNA_edge_alignments_reads_5mer'))
+    # testSuite.addTest(LibTest('test_signalAlign_library'))
+    # testSuite.addTest(SignalAlignAlignmentTest('test_pUC_r9_reads_5mer'))
+    # testSuite.addTest(SignalAlignAlignmentTest('test_pUC_r9_reads_6mer'))
+    # testSuite.addTest(SignalAlignAlignmentTest('test_Ecoli1D_reads_5mer'))
+    # testSuite.addTest(SignalAlignAlignmentTest('test_RNA_edge_alignments_reads_5mer'))
     testSuite.addTest(signalAlign_EM_test('test_EM'))
     # testSuite.addTest(SignalAlignAlignmentTest('test_zymo_reads'))
 

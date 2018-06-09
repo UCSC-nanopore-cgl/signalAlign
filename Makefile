@@ -4,6 +4,9 @@ include ./include.mk
 libSources = impl/*.c
 libHeaders = inc/*.h
 libTests = tests/*.c
+scrappie_c = scrappie/*.c
+scrappie_h = scrappie/*.h
+
 
 signalAlignDependencies =  ${basicLibsDependencies}
 signalAlignLib = ${basicLibs}
@@ -28,6 +31,9 @@ python-utils :
 #	echo "NOT PYPORE MAN"
 	cd python_utils && python3 setup.py install
 
+
+scrappie :
+	${cxx} ${cflags} -I inc -I${libPath}
 
 debugging : hs ${libPath}/signalAlignLib.a ${signalAlignDependencies}
 	${cxx} ${cflags} -I inc -I${libPath} -I${htsLibRootPath} -o ${signalAlignBin}/debugging debugging.c ${libPath}/signalAlignLib.a ${signalAlignLib} ${htsLib}
