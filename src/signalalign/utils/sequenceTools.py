@@ -10,11 +10,14 @@
 
 import re
 import os
+import sys
 import string
 import array
 import subprocess
 from collections import Counter
 from signalalign.utils.parsers import read_fasta
+from contextlib import closing
+import pysam
 
 
 def find_substring_indices(main_string, sub_string, offset=0, overlap=True):
@@ -683,3 +686,46 @@ def getFastaDictionary(fastaFile):
     names = [x[0] for x in namesAndSequences]
     assert len(names) == len(set(names)) #Check all the names are unique
     return dict(namesAndSequences) #Hash of names to sequences
+
+
+def get_full_nucleotide_read_from_alignment(alignment_location, read_name):
+    sequence, qualities, hardclipped_start, hardclipped_end = None, None, 0, 0
+    with closing(pysam.AlignmentFile(alignment_location, 'rb' if alignment_location.endswith("bam") else 'r')) as aln:
+        for aligned_segment in aln.fetch():
+            if aligned_segment.qname != read_name: continue
+            BAM_CHARD_CLIP = 5
+
+            # get data and sanity check
+            sequence = aligned_segment.query_sequence.upper()
+            qualities = aligned_segment.query_qualities
+            cigar_tuples = aligned_segment.cigartuples
+            if cigar_tuples is None or len(cigar_tuples) == 0:
+                print("[get_full_nucleotide_read_from_alignment] no alignment found for {} in {}".format(
+                    read_name, alignment_location), file=sys.stderr)
+                break
+
+            # check for hard clipping
+            if cigar_tuples[0][0] == BAM_CHARD_CLIP:
+                hardclipped_start = cigar_tuples[0][1]
+                sequence = ("N" * hardclipped_start) + sequence
+                if qualities is not None and len(qualities) != 0:
+                    qualities = ("!" * hardclipped_start) + qualities
+            if cigar_tuples[-1][0] == BAM_CHARD_CLIP:
+                hardclipped_end = cigar_tuples[-1][1]
+                sequence = sequence + ("N" * hardclipped_end)
+                if qualities is not None and len(qualities) != 0:
+                    qualities = qualities + ("!" * hardclipped_end)
+
+            # check for reverse mapping
+            if aligned_segment.is_reverse:
+                sequence = reverse_complement(sequence, reverse=True, complement=True)
+                if qualities is not None and len(qualities) != 0:
+                    qualities = ''.join(reversed(list(qualities)))
+                tmp = hardclipped_end
+                hardclipped_end = hardclipped_start
+                hardclipped_start = tmp
+
+            # stop looking (assuming only one alignment per read in file)
+            break
+
+    return sequence, qualities, hardclipped_start, hardclipped_end

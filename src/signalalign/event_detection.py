@@ -309,7 +309,7 @@ def check_event_table_time(event_table):
     return True
 
 
-def resegment_reads(fast5_path, params=None, speedy=False, overwrite=False, analysis_path="ReSegmentBasecall_000"):
+def resegment_reads(fast5_path, params=None, speedy=False, overwrite=True, analysis_path="ReSegmentBasecall_000"):
     """Re-segment and create anchor alignment from previously base-called fast5 file
     :param fast5_path: path to fast5 file
     :param params: event detection parameters
@@ -385,8 +385,8 @@ def get_default_event_detection_params(event_detection_strategy):
         return None
 
 
-def generate_events_and_alignment(fast5_path, nucleotide_sequence,
-                                  event_detection_params=None, event_detection_strategy=EVENT_DETECT_SCRAPPIE,
+def generate_events_and_alignment(fast5_path, nucleotide_sequence, nucleotide_qualities=None,
+                                  event_detection_params=None, event_detection_strategy=None,
                                   save_to_fast5=True, overwrite=False,
                                   analysis_identifier=Fast5.__default_basecall_1d_analysis__, ):
 
@@ -397,17 +397,21 @@ def generate_events_and_alignment(fast5_path, nucleotide_sequence,
     read_id = bytes.decode(f5fh.raw_attributes['read_id'])
     sampling_freq = f5fh.sample_rate
     start_time = f5fh.raw_attributes['start_time']
+    success = False
 
     # event detection prep
-    signal = f5fh.get_read(raw=True, scale=True)
+    if event_detection_strategy is None:
+        event_detection_strategy = EVENT_DETECT_MINKNOW
     if event_detection_params is None:
         event_detection_params = get_default_event_detection_params(event_detection_strategy)
 
     # detect events
     if event_detection_strategy == EVENT_DETECT_SPEEDY:
+        signal = f5fh.get_read(raw=True, scale=True)
         event_table = create_speedy_event_table(signal, sampling_freq, start_time, **event_detection_params)
         event_detection_params = merge_dicts([event_detection_params, {"event_detection": "speedy_stat_split"}])
     elif event_detection_strategy == EVENT_DETECT_MINKNOW:
+        signal = f5fh.get_read(raw=True, scale=True)
         event_table = create_minknow_event_table(signal, sampling_freq, start_time, **event_detection_params)
         event_detection_params = merge_dicts([event_detection_params, {"event_detection": "minknow_event_detect"}])
     elif event_detection_strategy == EVENT_DETECT_SCRAPPIE:
@@ -423,20 +427,21 @@ def generate_events_and_alignment(fast5_path, nucleotide_sequence,
     attributes = merge_dicts([event_detection_params, dict(zip(keys, values)), f5fh.raw_attributes])
 
     # do the alignment
-    #todo do_alignment(events, nucleotide_sequence)
+    # todo do_alignment(events, nucleotide_sequence)
+    # success = evaluate_success()
 
     # save to fast5 (if appropriate)
     saved_location = None
     if save_to_fast5:
-        #todo fastq? fasta? generate or get from prameters?
-        fastq = nucleotide_sequence
+        fastq = create_fastq_line(read_id, nucleotide_sequence,
+                                  "*" if nucleotide_qualities is None else nucleotide_qualities)
         saved_location = save_event_table_and_fastq(f5fh, event_table, fastq, attributes=attributes,
                                                     overwrite=overwrite, analysis_identifier=analysis_identifier)
 
     # close
     f5fh.close()
 
-    return event_table, saved_location
+    return success, event_table, saved_location
 
 
 def save_event_table_and_fastq(f5fh, event_table, fastq_line, attributes=None, overwrite=False,
@@ -463,7 +468,6 @@ def save_event_table_and_fastq(f5fh, event_table, fastq_line, attributes=None, o
         f5fh.set_fastq(destination, fastq_line)
 
     return destination
-
 
 
 def index_to_time(basecall_events, sampling_freq=0, start_time=0):

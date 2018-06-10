@@ -77,7 +77,7 @@ class NanoporeRead(object):
         if initialize:
             self.Initialize()
 
-    def open(self, parent_job=None):
+    def open(self):
         if self.is_open: return True
         try:
             self.fastFive = Fast5(self.filename, 'r+')
@@ -85,7 +85,7 @@ class NanoporeRead(object):
             return True
         except Exception as e:
             self.close()
-            self.logError("[NanoporeRead:open] ERROR opening {filename}, {e}".format(filename=self.filename, e=e), parent_job)
+            self.logError("[NanoporeRead:open] ERROR opening {filename}, {e}".format(filename=self.filename, e=e))
             return False
 
     def close(self):
@@ -106,11 +106,14 @@ class NanoporeRead(object):
             print("[NanoporeRead:get_latest_basecall_edition] could not find {} in {}".format(address, self.filename), file=sys.stderr)
             return False
 
-    def Initialize(self, call_events=None, call_nucleotides=None, parent_job=None):
-        if not self.open(parent_job): return False
+    def Initialize(self):
+        if not self.open(): return False
 
         ok = self._initialize_metadata()
         ok &= self._initialize()
+
+        if not ok: self.close()
+
         return ok
 
     def _initialize_metadata(self):
@@ -149,7 +152,7 @@ class NanoporeRead(object):
             oned_root_address = self.get_latest_basecall_edition(self.event_table)
             if not oned_root_address:
                 print("[SignalAlignment.run] Resegmenting read", file=sys.stderr)
-                resegment_reads(self.filename, speedy=False, overwrite=True, analysis_path=RESEGMENT_KEY)
+                resegment_reads(self.filename, speedy=False, overwrite=True, analysis_path=self.event_table)
                 oned_root_address = self.get_latest_basecall_edition(self.event_table)
 
         elif self.rna:

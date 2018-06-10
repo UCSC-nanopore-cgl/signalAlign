@@ -332,24 +332,27 @@ def scrappie_event_detect(fast5_location, temp_fast5_location = None):
         temp_fast5_location = "{}.tmp.fast5".format(fast5_location)
     if os.path.isfile(temp_fast5_location): os.remove(temp_fast5_location)
 
-    # invoke scrappie
-    cmd = ['./scrappie', 'events', '--dump', temp_fast5_location, fast5_location]
-    with open(os.devnull, 'w') as devnull:
-        subprocess.check_call(cmd, stdout=devnull, stderr=devnull)
-
-    # parse event information
+    # get events
     events = None
-    with closing(h5py.File(temp_fast5_location, 'r+')) as fast5:
-        keys = list(fast5.keys())
-        if len(keys) != 1:
-            print("[scrappie_event_detect] found multiple keys in {}: {}".format(temp_fast5_location, keys))
-        else:
-            events = list()
-            for mean, stdev, pos, start in fast5[keys[0]]['mean', 'stdv', 'pos', 'start']:
-                events.append({'mean':mean, 'stdv':stdev, 'pos':pos, 'start':start})
+    try:
+        # invoke scrappie
+        cmd = ['./scrappie', 'events', '--dump', temp_fast5_location, fast5_location]
+        with open(os.devnull, 'w') as devnull:
+            subprocess.check_call(cmd, stdout=devnull, stderr=devnull)
 
-    # cleanup
-    if os.path.isfile(temp_fast5_location): os.remove(temp_fast5_location)
+        # parse event information
+        with closing(h5py.File(temp_fast5_location, 'r+')) as fast5:
+            keys = list(fast5.keys())
+            if len(keys) != 1:
+                print("[scrappie_event_detect] found multiple keys in {}: {}".format(temp_fast5_location, keys))
+            else:
+                events = list()
+                for mean, stdev, pos, start in fast5[keys[0]]['mean', 'stdv', 'pos', 'start']:
+                    events.append({'mean':mean, 'stdv':stdev, 'pos':pos, 'start':start})
+
+    finally:
+        # cleanup
+        if os.path.isfile(temp_fast5_location): os.remove(temp_fast5_location)
 
     return events
 

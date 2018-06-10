@@ -479,7 +479,7 @@ class Fast5(h5py.File):
 
         self._add_event_table(data, self._join_path(path, 'Events'))
 
-    def set_fastq(self, destination_root, data, section=__default_section__):
+    def set_fastq(self, destination_root, data, section=__default_section__, overwrite=False):
         """Write new fasta file to file
 
         :param destination_root: root directory; data will be stored in {destination_root}/Basecalled_{section}/Fastq
@@ -488,8 +488,15 @@ class Fast5(h5py.File):
         """
         check_fastq_line(data)
 
+        # get location and sanity check
         path = self._join_path(destination_root, self.__default_basecall_fastq__.format(section))
+        if path in self:
+            if overwrite:
+                self.delete(path, ignore=True)
+            else:
+                raise Exception("Destination {} already exists in {}".format(path, self.filename))
 
+        # save
         self._add_string_dataset(data, path)
 
     def set_event_table(self, destination_root, data, meta, section=__default_section__, scale=False, overwrite=False):
@@ -506,9 +513,6 @@ class Fast5(h5py.File):
         self.assert_writable()
         self.test_event_table(data)
 
-        #todo this should be handled elsewhere?
-        if overwrite: self.delete(destination_root, ignore=True)
-
         # modification to data
         if meta:
             #todo add attrs to dest_root or dest_events?
@@ -517,8 +521,15 @@ class Fast5(h5py.File):
             data['start'] *= self.sample_rate
             data['length'] *= self.sample_rate
 
-        # store
+        # get location and sanity check
         destination_events = self._join_path(destination_root, self.__default_basecall_1d_events__.format(section))
+        if destination_events in self:
+            if overwrite:
+                self.delete(destination_events, ignore=True)
+            else:
+                raise Exception("Destination {} already exists in {}".format(destination_events, self.filename))
+
+        # save
         self._add_event_table(data, destination_events)
 
     #todo fix path creation
