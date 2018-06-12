@@ -502,7 +502,8 @@ def event_detection(work_queue, done_queue, alignment_file, event_detection_stra
 
     #catch overall exceptions
     try:
-        for fast5, read_id in iter(work_queue.get, 'STOP'):
+        for tmp in iter(work_queue.get, 'STOP'):
+            fast5, read_id = tmp['fast5']
             # catch exceptions on each element
             try:
                 nucleotide, qualities, hardcode_front, hardcode_back = get_full_nucleotide_read_from_alignment(
@@ -568,9 +569,9 @@ def discover_single_nucleotide_probabilities(args, working_folder, kmer_length, 
 
         # loggit and continue
         print("[info] {}/{} fast5s successfully had events detected".format(total - failure, total))
-
-
-
+        if failure == total:
+            print("[error] all event detection failed!", file=sys.stderr)
+            sys.exit(1)
 
 
     # do alignment and calling for each step

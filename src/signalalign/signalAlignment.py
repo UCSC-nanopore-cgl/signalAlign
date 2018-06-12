@@ -523,12 +523,12 @@ def multithread_signal_alignment(signal_align_arguments, fast5_locations, worker
         samtools_faidx_fasta(signal_align_arguments["backward_reference"], log="multithread_signal_alignment")
 
     # bwa_reference and alignment_file must be specified
-    assert not ('bwa_reference' not in signal_align_arguments or
-                signal_align_arguments["bwa_reference"] is None) and ('alignment_file' not in signal_align_arguments or
-                signal_align_arguments['alignment_file'] is None), "Must specify bwa_reference or alignment_file"
+    assert ('bwa_reference'  in signal_align_arguments and signal_align_arguments["bwa_reference"]  is not None) or \
+           ('alignment_file' in signal_align_arguments and signal_align_arguments['alignment_file'] is not None), \
+        "Must specify bwa_reference or alignment_file"
 
     # if we didn't get an alignment file then check for index file
-    if not ('alignment_file' in signal_align_arguments and signal_align_arguments['alignment_file']):
+    if 'alignment_file' not in signal_align_arguments or not signal_align_arguments['alignment_file']:
         # ensure alignments can be generated (either from bwa on the reference or by an alignment file)
             bwa_reference = buildBwaIndex(signal_align_arguments["bwa_reference"],
                                           os.path.dirname(signal_align_arguments["bwa_reference"]),
