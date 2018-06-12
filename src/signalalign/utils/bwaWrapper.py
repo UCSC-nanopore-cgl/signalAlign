@@ -65,11 +65,14 @@ class Bwa(object):
         self.target = target
         self.db_handle = ''
 
-    def build_index(self, destination, output=None):
-        self.db_handle = os.path.join(destination, 'temp_bwaIndex.{}'.format(os.path.basename(self.target)))
+    def build_index(self, destination, output=None, log=None):
+        self.db_handle = os.path.join(destination, self.target)
         # is this a directory and are all bwa files present? we can return early
         if False not in set(map(os.path.isfile, ["{}{}".format(self.db_handle, suffix) for suffix in self.suffixes()])):
             return self.db_handle
+
+        if log:
+            print("[{}] creating BWA index for {}".format(log, self.db_handle))
 
         cmd = "bwa index -p {0} {1}".format(self.db_handle, self.target)
         if output is None:
@@ -89,12 +92,19 @@ class Bwa(object):
         return [".amb", ".ann", ".bwt", ".pac", ".sa"]
 
     @staticmethod
-    def align(bwa_index, query, output_sam_path, outerr=None):
+    def align(reference_fasta, query, output_sam_path, outerr=None):
+        """Generate alignment to a reference sequence.
+
+        :param reference_fasta: path reference fasta
+        :param query: fasta file to align to reference
+        :param output_sam_path: path to place sam file
+        :param outerr: another option to write stderr from subprocess command to get alignment
+        """
         for suff in Bwa.suffixes():
-            assert os.path.exists(bwa_index + suff),\
-                "[Bwa:align] Didn't find index files {}".format(bwa_index + suff)
+            assert os.path.exists(reference_fasta + suff),\
+                "[Bwa:align] Didn't find index files {}".format(reference_fasta + suff)
         assert os.path.exists(query), "[Bwa::align] Didn't find query file {}".format(query)
-        cmd = "bwa mem -x ont2d {idx} {query}".format(idx=bwa_index, query=query)
+        cmd = "bwa mem -x ont2d {idx} {query}".format(idx=reference_fasta, query=query)
         if outerr is None:
             outerr = open(os.devnull, 'w')
         else:
@@ -110,10 +120,20 @@ class Bwa(object):
             return False
 
 
-def getBwaIndex(reference, dest, output=None):
-    bwa = Bwa(reference)
-    index_location = bwa.build_index(dest, output=output)
-    return index_location
+def buildBwaIndex(reference, dest, output=None, log=None):
+    """Create BWA index for fasta file
+
+    :param reference: path to fasta reference file
+    :param dest: directory to place bwt file
+    :param output: file handle to write stdout and stderr. If None output is not captured
+    :param log: notation for logging
+    """
+    assert os.path.isfile(reference), "Reference sequence does not exist: {}".format(reference)
+    # check to see if bwt already exists in original ref dir
+    if False in set(map(os.path.isfile, ["{}{}".format(reference, suffix) for suffix in Bwa.suffixes()])):
+        bwa = Bwa(reference)
+        reference = bwa.build_index(dest, output=output, log=log)
+    return reference
 
 
 def getGuideAlignmentFromAlignmentFile(alignment_location, read_name=None, target_regions=None):
@@ -208,7 +228,7 @@ def getInfoFromCigarFile(cigar_file):
 
 
 
-def generateGuideAlignment(bwa_index, query, temp_sam_path, target_regions=None):
+def generateGuideAlignment(reference_fasta, query, temp_sam_path, target_regions=None):
     # type: (string, string, string, TargetRegions) -> GuideAlignment
     """Aligns the read sequnece with BWA to get the guide alignment,
     returns the CIGAR (in exonerate format), the strand (plus or minus) and the
@@ -218,7 +238,7 @@ def generateGuideAlignment(bwa_index, query, temp_sam_path, target_regions=None)
     """
 
     # align with bwa
-    ok = Bwa.align(bwa_index=bwa_index, query=query, output_sam_path=temp_sam_path)
+    ok = Bwa.align(reference_fasta=reference_fasta, query=query, output_sam_path=temp_sam_path)
     if not ok:  # Bwa alignment fail
         return None
 

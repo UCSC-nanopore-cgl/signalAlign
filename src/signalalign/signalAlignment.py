@@ -14,8 +14,9 @@ from signalalign import defaultModelFromVersion
 from signalalign.nanoporeRead import NanoporeRead
 from signalalign.utils.bwaWrapper import *
 from signalalign.utils.fileHandlers import FolderHandler
-from signalalign.utils.sequenceTools import fastaWrite
+from signalalign.utils.sequenceTools import fastaWrite, samtools_faidx_fasta
 from signalalign.mea_algorithm import mea_alignment_from_signal_align, match_events_with_signalalign
+
 
 class SignalAlignment(object):
     def __init__(self,
@@ -34,7 +35,7 @@ class SignalAlignment(object):
                  backward_reference=None,
                  # one of these needs to be set
                  alignment_file=None,
-                 bwa_index = None,
+                 bwa_reference=None,
                  # reasonable defaults
                  twoD_chemistry=False,
                  target_regions=None,
@@ -42,11 +43,12 @@ class SignalAlignment(object):
                  embed=False,
                  event_table=False,
                  check_for_temp_file_existance=True,
-                 track_memory_usage=False):
+                 track_memory_usage=False,
+                 get_expectations=False):
         self.in_fast5 = in_fast5  # fast5 file to align
         self.destination = destination  # place where the alignments go, should already exist
         self.stateMachineType = stateMachineType  # flag for signalMachine
-        self.bwa_index = bwa_index  # index of reference sequence
+        self.bwa_reference = bwa_reference  # path to reference sequence to generate guide alignment
         self.threshold = threshold  # min posterior probability to keep
         self.diagonal_expansion = diagonal_expansion  # alignment algorithm param
         self.constraint_trim = constraint_trim  # alignment algorithm param
@@ -61,14 +63,15 @@ class SignalAlignment(object):
         self.event_table = event_table  # specify which event table to use to generate alignments
         self.backward_reference = backward_reference  # fasta path to backward reference if modified bases are used
         self.forward_reference = forward_reference  # fasta path to forward reference
-        self.alignment_file = alignment_file # guide aligments will be gotten from here if set
-        self.check_for_temp_file_existance = check_for_temp_file_existance # don't recreate if files exist
-        self.track_memory_usage = track_memory_usage # has the 'time' program append mem usage stats to output
+        self.alignment_file = alignment_file  # guide aligments will be gotten from here if set
+        self.check_for_temp_file_existance = check_for_temp_file_existance  # don't recreate if files exist
+        self.track_memory_usage = track_memory_usage  # has the 'time' program append mem usage stats to output
         self.max_memory_usage_kb = None
         self.read_label = None
+        self.get_expectations = get_expectations  # option to gather expectations of transitions and emissions
 
-        assert self.bwa_index is not None or self.alignment_file is not None, \
-            "either 'bwa_index' or 'alignment_file' argument is needed to generate cigar strings"
+        assert self.bwa_reference is not None or self.alignment_file is not None, \
+            "either 'bwa_reference' or 'alignment_file' argument is needed to generate cigar strings"
 
         if (in_templateHmm is not None) and os.path.isfile(in_templateHmm):
             self.in_templateHmm = in_templateHmm
@@ -89,11 +92,9 @@ class SignalAlignment(object):
         else:
             self.in_complementHdp = None
 
-    def run(self, get_expectations=False):
+    def run(self):
         print("[SignalAlignment.run] INFO: Starting on {read}".format(read=self.in_fast5))
-
-        # sanity checks
-        if get_expectations:
+        if self.get_expectations:
             assert self.in_templateHmm is not None, "Need template HMM files for model training"
             if self.twoD_chemistry:
                 assert self.in_complementHmm is not None, "Need compement HMM files for model training"
@@ -145,9 +146,11 @@ class SignalAlignment(object):
                     print("[SignalAlignment.run] read {} not found in {}".format(read_label, self.alignment_file))
 
             # get from bwa
-            if guide_alignment is None and self.bwa_index is not None:
-                guide_alignment = generateGuideAlignment(bwa_index=self.bwa_index, query=read_fasta_,
-                                                         temp_sam_path=temp_samfile_, target_regions=self.target_regions)
+            if guide_alignment is None and self.bwa_reference is not None:
+                guide_alignment = generateGuideAlignment(reference_fasta=self.bwa_reference,
+                                                         query=read_fasta_,
+                                                         temp_sam_path=temp_samfile_,
+                                                         target_regions=self.target_regions)
                 if guide_alignment is None:
                     print("[SignalAlignment.run] read {} could not be aligned with BWA".format(read_label))
 
@@ -188,7 +191,6 @@ class SignalAlignment(object):
             stateMachineType_flag = ""
 
         # next section makes the output file name with the format: /directory/for/files/file.model.orientation.tsv
-        posteriors_file_path = ''
         # forward strand
         if strand == "+":
             if self.output_format == "full":
@@ -294,7 +296,7 @@ class SignalAlignment(object):
             twoD_flag = ""
 
         # commands
-        if get_expectations:
+        if self.get_expectations:
             template_expectations_file_path = self.destination + read_label + ".template.expectations"
             complement_expectations_file_path = self.destination + read_label + ".complement.expectations"
 
@@ -335,7 +337,7 @@ class SignalAlignment(object):
                 mem_command.extend(command)
                 command = mem_command
 
-            output = subprocess.check_output(command, stderr= subprocess.STDOUT)
+            output = subprocess.check_output(command, stderr=subprocess.STDOUT)
             output = str(output).split("\\n")
             for line in output:
                 print("[SignalAlignment.run]    {}: {}".format(read_label, line))
@@ -463,7 +465,7 @@ def signal_alignment_service(work_queue, done_queue, service_name="signal_alignm
     failure_count = 0
     mem_usages = list()
 
-    #catch overall exceptions
+    # catch overall exceptions
     try:
         for f in iter(work_queue.get, 'STOP'):
             # catch exceptions on each element
@@ -501,43 +503,46 @@ def signal_alignment_service(work_queue, done_queue, service_name="signal_alignm
             done_queue.put("{}:{}".format(multithread.MEM_USAGE_KEY, ",".join(map(str, mem_usages))))
 
 
-def multithread_signal_alignment(signal_align_arguments, fast5_locations, worker_count, reference_location,
-                                 backward_reference_location=None):
+def multithread_signal_alignment(signal_align_arguments, fast5_locations, worker_count, forward_reference=None):
+    """Multiprocess SignalAlignment for a list of fast5 files given a set of alignment arguments.
+
+    :param signal_align_arguments: signalAlignment arguments besides 'in_fast5'
+    :param fast5_locations: paths to fast5 files
+    :param worker_count: number of workers
+    :param forward_reference: path to forward reference for signalAlign alignment
+    """
     # don't modify the signal_align_arguments
     signal_align_arguments = dict(**signal_align_arguments)
+    if not forward_reference:
+        assert "forward_reference" in signal_align_arguments, "Must specify forward_reference path"
+        forward_reference = signal_align_arguments['forward_reference']
 
-    # ensure reference is indexed
-    def ensure_reference_index(ref):
-        assert os.path.isfile(ref), "Reference does not exist: {}".format(ref)
-        if not os.path.isfile("{}.fai".format(ref)):
-            print("[multithread_signal_alignment] indexing reference {}".format(ref))
-            subprocess.check_call(["samtools", "faidx", ref])
-            assert os.path.isfile("{}.fai".format(ref)), "Error creating FAIDX file for: {}".format(ref)
+    # Samtools Index reference files for quick access
+    samtools_faidx_fasta(forward_reference, log="multithread_signal_alignment")
+    if "backward_reference" in signal_align_arguments and signal_align_arguments["backward_reference"]:
+        samtools_faidx_fasta(signal_align_arguments["backward_reference"], log="multithread_signal_alignment")
 
-    # ensure it for references
-    ensure_reference_index(reference_location)
-    if 'forward_reference' not in signal_align_arguments:
-        signal_align_arguments['forward_reference'] = reference_location
-    if backward_reference_location is not None:
-        ensure_reference_index(backward_reference_location)
-        if 'backward_reference' not in signal_align_arguments:
-            signal_align_arguments['backward_reference'] = backward_reference_location
+    # bwa_reference and alignment_file must be specified
+    assert not ('bwa_reference' not in signal_align_arguments or
+                signal_align_arguments["bwa_reference"] is None) and ('alignment_file' not in signal_align_arguments or
+                signal_align_arguments['alignment_file'] is None), "Must specify bwa_reference or alignment_file"
 
-    # ensure alignments can be generated (either from bwa on the reference or by an alignment file)
-    if ('bwa_index' not in signal_align_arguments or signal_align_arguments['bwa_index'] is None) and \
-            ('alignment_file' not in signal_align_arguments or signal_align_arguments['alignment_file'] is None):
-        print("[multithread_signal_alignment] creating BWA index for {}".format(reference_location))
-        bwa_index = getBwaIndex(reference_location, os.path.dirname(reference_location))
-        assert bwa_index is not None, "Error creating BWA index for: {}".format(reference_location)
-        signal_align_arguments['bwa_index'] = bwa_index
+    # if we didn't get an alignment file then check for index file
+    if not ('alignment_file' in signal_align_arguments and signal_align_arguments['alignment_file']):
+        # ensure alignments can be generated (either from bwa on the reference or by an alignment file)
+            bwa_reference = buildBwaIndex(signal_align_arguments["bwa_reference"],
+                                          os.path.dirname(signal_align_arguments["bwa_reference"]),
+                                          log='multithread_signal_alignment')
+            signal_align_arguments["bwa_reference"] = bwa_reference
+            assert os.path.exists(bwa_reference+".bwt"), "Error creating BWA index for: {}".format(bwa_reference)
 
     # ensure required arguments are in signal_align_argments
     required_arguments = {'destination', 'stateMachineType', 'in_templateHmm', 'in_complementHmm',
                           'in_templateHdp', 'in_complementHdp', 'threshold', 'diagonal_expansion', 'constraint_trim',
-                          'degenerate', 'forward_reference', }
-    optional_arguments = {'backward_reference', 'alignment_file', 'bwa_index', 'twoD_chemistry',
+                          'degenerate', 'forward_reference'}
+    optional_arguments = {'backward_reference', 'alignment_file', 'bwa_reference', 'twoD_chemistry',
                           'target_regions', 'output_format', 'embed', 'event_table', 'check_for_temp_file_existance',
-                          'track_memory_usage', }
+                          'track_memory_usage', 'get_expectations'}
     missing_arguments = list(filter(lambda x: x not in signal_align_arguments.keys(), required_arguments))
     unexpected_arguments = list(filter(lambda x: x not in required_arguments and x not in optional_arguments,
                                        signal_align_arguments.keys()))

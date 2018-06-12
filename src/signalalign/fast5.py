@@ -181,6 +181,20 @@ class Fast5(h5py.File):
     def _join_path(self, *args):
         return '/'.join(args)
 
+    @staticmethod
+    def bytes_to_string(string):
+        """Check string. If bytes, convert to string and return string
+
+        :param string: string or bytes
+        """
+        if string is None or type(string) == str:
+            return string
+        elif 'bytes' in str(type(string)):
+            return string.decode()
+        else:
+            raise AssertionError("String needs to be bytes or string ")
+
+
     @property
     def writable(self):
         """Can we write to the file."""
@@ -265,7 +279,7 @@ class Fast5(h5py.File):
         path_tmp = '{}.tmp'.format(path)
         mode = self.mode
         self.close()
-        subprocess.call(['h5repack', path, path_tmp])
+        subprocess.check_call(['h5repack', path, path_tmp], stderr=subprocess.STDOUT, shell=False)
         shutil.move(path_tmp, path)
         return Fast5(path, mode)
 
@@ -275,7 +289,7 @@ class Fast5(h5py.File):
         path_tmp = copy_path
         mode = self.mode
         self.close()
-        subprocess.call(['h5repack', path, path_tmp])
+        subprocess.check_call(['h5repack', path, path_tmp], stderr=subprocess.STDOUT, shell=False)
         return Fast5(path_tmp, mode)
 
     ###
@@ -1068,7 +1082,7 @@ class Fast5(h5py.File):
                 self.get_analysis_latest(analysis), self.__default_basecall_fastq__.format(section)
             )
         try:
-            return self[location][()]
+            return self.bytes_to_string(self[location][()])
         except:
             # Did we get given section != 2D and no analysis, that's
             #    more than likely incorrect. Try alternative analysis
@@ -1078,7 +1092,7 @@ class Fast5(h5py.File):
                     self.__default_basecall_fastq__.format(section)
                 )
                 try:
-                    return self[location][()]
+                    return self.bytes_to_string(self[location][()])
                 except:
                     raise ValueError(err_msg.format(location))
             else:
@@ -1141,14 +1155,14 @@ class Fast5(h5py.File):
         # check both experiment type and kit slots for "rna"
         exp_type, exp_kit = None, None
         try:
-            exp_type = bytes.decode(self['UniqueGlobalKey/context_tags'].attrs[
+            exp_type = self.bytes_to_string(self['UniqueGlobalKey/context_tags'].attrs[
                                         'experiment_type'])
             # remove the word internal since it contains rna.
             exp_type = exp_type.replace('internal', '')
         except:
             pass
         try:
-            exp_kit = bytes.decode(self['UniqueGlobalKey/context_tags'].attrs[
+            exp_kit = self.bytes_to_string(self['UniqueGlobalKey/context_tags'].attrs[
                                        'experiment_kit'])
             # remove the word internal since it contains rna.
             exp_kit = exp_kit.replace('internal', '')

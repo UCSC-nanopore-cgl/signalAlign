@@ -4,16 +4,43 @@
 from __future__ import print_function
 import sys
 import os
-
-
-
 import numpy as np
-
-
+from scipy.stats import norm, invgauss
 # Globals
 NORM_DIST_PARAMS = 2
 NB_MODEL_PARAMS = 5
 
+#emissions_signal_strawManGetKmerEventMatchProbWithDescaling
+
+# int64_t kmerIndex = kmer_id(kmer_i, self->model.alphabet, self->model.alphabetSize, self->model.kmerLength);
+#
+# double *eventModel = match ? self->model.EMISSION_MATCH_MATRIX : self->model.EMISSION_GAP_Y_MATRIX;
+# // get the µ and σ for the level and noise for the model
+# double levelMean = emissions_signal_getModelLevelMean(eventModel, kmerIndex);
+# double levelStdDev = emissions_signal_getModelLevelSd(eventModel, kmerIndex);
+# eventMean = emissions_signal_descaleEventMean_JordanStyle(eventMean, levelMean, self->model.scale,
+#                                                                                       self->model.shift, self->model.var);
+#
+# double noiseMean = emissions_signal_getModelFluctuationMean(eventModel, kmerIndex);
+# //double noiseStdDev = emissions_signal_getModelFluctuationSd(eventModel, kmerIndex);
+#
+# double modelNoiseLambda = emissions_signal_getModelFluctuationLambda(eventModel, kmerIndex);
+#
+# double l_probEventMean = emissions_signal_logGaussPdf(eventMean, levelMean, levelStdDev);
+#
+# //double l_probEventNoise = emissions_signal_logGaussPdf(eventNoise, noiseMean, noiseStdDev);
+# double l_probEventNoise = emissions_signal_logInvGaussPdf(eventNoise, noiseMean, modelNoiseLambda);
+#
+# // clean
+# free(kmer_i);
+#
+# // debugging
+# //double prob = l_probEventMean + l_probEventNoise;
+# //st_uglyf("MATCHING--x_i:%s (index: %lld), e_j mean: %f, \n modelMean: %f, modelLsd: %f probEvent: %f probNoise: %f, combined: %f\n",
+#   //         kmer_i, kmerIndex, eventMean, levelMean, levelStdDev, l_probEventMean, l_probEventNoise, prob);
+#
+# return l_probEventMean + l_probEventNoise;
+# }
 
 class SignalHmm(object):
     def __init__(self, model_type):
@@ -30,7 +57,7 @@ class SignalHmm(object):
         self.kmer_length = 0
         self.has_model = False
         self.normalized = False
-
+        self.kmer_index = dict()
         # event model for describing normal distributions for each kmer
         self.event_model = {"means": np.zeros(self.symbol_set_size),
                             "SDs": np.zeros(self.symbol_set_size),
@@ -94,42 +121,42 @@ class SignalHmm(object):
         # line 2: [level_mean] [level_sd] [noise_mean] [noise_sd] [noise_lambda ](.../kmer) \n
         assert os.path.exists(model_file), "signalHmm.load_model - didn't find model here{}?".format(model_file)
 
-        fH = open(model_file, 'r')
+        with open(model_file, 'r') as fH:
 
-        line = fH.readline().split()
-        # check for correct header length
-        assert len(line) == 4, "signalHmm.load_model - incorrect line length line:{}".format(''.join(line))
-        # check stateNumber
-        assert int(line[0]) == self.state_number, "signalHmm.load_model - incorrect stateNumber got {got} should be {exp}" \
-                                                  "".format(got=int(line[0]), exp=self.state_number)
-        # load model parameters
-        self.alphabet_size = int(line[1])
-        self.alphabet = line[2]
-        self.kmer_length = int(line[3])
-        self.symbol_set_size = self.alphabet_size**self.kmer_length
-        assert self.symbol_set_size > 0, "signalHmm.load_model - Got 0 for symbol_set_size"
-        assert self.symbol_set_size <= 6**6, "signalHmm.load_model - Got more than 6^6 for symbol_set_size got {}" \
-                                             "".format(self.symbol_set_size)
+            line = fH.readline().split()
+            # check for correct header length
+            assert len(line) == 4, "signalHmm.load_model - incorrect line length line:{}".format(''.join(line))
+            # check stateNumber
+            assert int(line[0]) == self.state_number, "signalHmm.load_model - incorrect stateNumber got {got} should be {exp}" \
+                                                      "".format(got=int(line[0]), exp=self.state_number)
+            # load model parameters
+            self.alphabet_size = int(line[1])
+            self.alphabet = line[2]
+            self.kmer_length = int(line[3])
+            self.symbol_set_size = self.alphabet_size**self.kmer_length
+            assert self.symbol_set_size > 0, "signalHmm.load_model - Got 0 for symbol_set_size"
+            assert self.symbol_set_size <= 6**6, "signalHmm.load_model - Got more than 6^6 for symbol_set_size got {}" \
+                                                 "".format(self.symbol_set_size)
 
-        line = list(map(float, fH.readline().split()))
-        assert len(line) == len(self.transitions) + 1, "signalHmm.load_model incorrect transitions line"
-        self.transitions = line[:-1]
-        self.likelihood = line[-1]
+            line = list(map(float, fH.readline().split()))
+            assert len(line) == len(self.transitions) + 1, "signalHmm.load_model incorrect transitions line"
+            self.transitions = line[:-1]
+            self.likelihood = line[-1]
 
-        line = list(map(float, fH.readline().split()))
-        assert len(line) == self.symbol_set_size * NB_MODEL_PARAMS, \
-            "signalHmm.load_model incorrect event model line"
-        self.event_model["means"] = line[::NB_MODEL_PARAMS]
-        self.event_model["SDs"] = line[1::NB_MODEL_PARAMS]
-        self.event_model["noise_means"] = line[2::NB_MODEL_PARAMS]
-        self.event_model["noise_SDs"] = line[3::NB_MODEL_PARAMS]
-        self.event_model["noise_lambdas"] = line[4::NB_MODEL_PARAMS]
+            line = list(map(float, fH.readline().split()))
+            assert len(line) == self.symbol_set_size * NB_MODEL_PARAMS, \
+                "signalHmm.load_model incorrect event model line"
+            self.event_model["means"] = line[::NB_MODEL_PARAMS]
+            self.event_model["SDs"] = line[1::NB_MODEL_PARAMS]
+            self.event_model["noise_means"] = line[2::NB_MODEL_PARAMS]
+            self.event_model["noise_SDs"] = line[3::NB_MODEL_PARAMS]
+            self.event_model["noise_lambdas"] = line[4::NB_MODEL_PARAMS]
 
-        assert not np.any(self.event_model["means"] == 0.0), "signalHmm.load_model, this model has 0 E_means"
-        assert not np.any(self.event_model["SDs"] == 0.0), "signalHmm.load_model, this model has 0 E_means"
-        assert not np.any(self.event_model["noise_means"] == 0.0), "signalHmm.load_model, this model has 0 E_noise_means"
-        assert not np.any(self.event_model["noise_SDs"] == 0.0), "signalHmm.load_model, this model has 0 E_noise_SDs"
-        self.has_model = True
+            assert not np.any(self.event_model["means"] == 0.0), "signalHmm.load_model, this model has 0 E_means"
+            assert not np.any(self.event_model["SDs"] == 0.0), "signalHmm.load_model, this model has 0 E_means"
+            assert not np.any(self.event_model["noise_means"] == 0.0), "signalHmm.load_model, this model has 0 E_noise_means"
+            assert not np.any(self.event_model["noise_SDs"] == 0.0), "signalHmm.load_model, this model has 0 E_noise_SDs"
+            self.has_model = True
 
     def write(self, out_file):
         # the model file has the format:
@@ -162,6 +189,63 @@ class SignalHmm(object):
         f.write("\n")
 
         f.close()
+
+    def get_kmer_index(self, kmer):
+        """Get the model index for a given kmer
+
+        ex: get_kmer_index(AAAAA) = 0
+        :param kmer: nucleotide sequence
+        """
+        assert set(kmer).issubset(set(self.alphabet)) is True, "Nucleotide not found in model alphabet: kmer={}, " \
+                                                               "alphabet={}".format(kmer, self.alphabet)
+        assert len(kmer) == self.kmer_length, "Kmer length does not match model kmer length"
+
+        alphabet_dict = {base: index for index, base in enumerate(sorted(self.alphabet))}
+        kmer_index = 0
+        for index, nuc in enumerate(kmer):
+            kmer_index += alphabet_dict[nuc]*(self.alphabet_size**(self.kmer_length-index-1))
+        return kmer_index
+
+    def get_event_mean_gaussian_parameters(self, kmer):
+        """Get the model's Normal distribution parameters to model the mean of a specific kmer
+
+        :param kmer: kmer that can fit in model
+        """
+        kmer_index = self.get_kmer_index(kmer)
+        normal_mean = self.event_model["means"][kmer_index]
+        normal_sd = self.event_model["SDs"][kmer_index]
+
+        return normal_mean, normal_sd
+
+    def get_event_sd_inv_gaussian_parameters(self, kmer):
+        """Get the model's inverse gaussian distribution parameters to model the mean of a specific kmer
+
+        :param kmer: kmer that can fit in model
+        """
+        kmer_index = self.get_kmer_index(kmer)
+        inv_gauss_mean = self.event_model["noise_means"][kmer_index]
+        inv_gauss_lambda = self.event_model["noise_lambdas"][kmer_index]
+        return inv_gauss_mean, inv_gauss_lambda
+
+    def log_event_mean_gaussian_probability_match(self, event_mean, kmer):
+        """Get the probability of the event_mean coming from the model's kmer gaussian/normal distribution
+        :param event_mean: mean of event
+        :param kmer: nucleotide sequence to check
+        """
+        normal_mean, normal_sd = self.get_event_mean_gaussian_parameters(kmer)
+        return norm.logpdf(event_mean, normal_mean, normal_sd)
+
+    def log_event_sd_inv_gaussian_probability_match(self, event_sd, kmer):
+        """Get the probability of the event_sd coming from the model's kmer inv-gaussian distribution
+        :param event_sd: sd of event
+        :param kmer: kmer for model distribution selection
+        """
+        inv_gauss_mean, inv_gauss_lambda = self.get_event_sd_inv_gaussian_parameters(kmer)
+        return invgauss(inv_gauss_mean/inv_gauss_lambda, scale=inv_gauss_lambda).logpdf(event_sd)
+
+    # def get_event_probability(self, mean, stdev, kmer):
+    #     """Get probability of an event aligning to a specific kmer"""
+
 
 
 class ContinuousPairHmm(SignalHmm):

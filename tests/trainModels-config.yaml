@@ -1,26 +1,26 @@
 # SignalAlign model training config file
 output_dir: signalAlign_unittest/
 samples: [{
-    fast5_dir: ../tests/minion_test_reads/C/,
+    fast5_dir: ../tests/minion_test_reads/canonical_ecoli_R9/,
     fofn:,
     positions_file:,
     motif:,
     label:,
 }]
-reference: ../tests/test_sequences/zymo_sequence.fasta
+bwa_reference: ../tests/test_sequences/E.coli_K12.fasta
 bwt:
 stateMachineType: threeState
-in_T_Hmm: ../models/testModelR73_acegot_template.model
-in_C_Hmm: ../models/testModelR73_acegot_complement.model
+in_T_Hmm: ../models/testModelR9_5mer_acgt_template.model
+in_C_Hmm: ../models/testModelR9_5mer_acgt_complement.model
 templateHdp:
 complementHdp:
 iterations: 3
 training_bases: 10000
-job_count: 4
+job_count: 2
 diagonal_expansion:
 constraint_trim:
 twoD: true
-
+alignment_file:
 DEBUG:
-TEST: true
+test:
 

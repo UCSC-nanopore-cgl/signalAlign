@@ -23,9 +23,9 @@ class TrainSignalAlignTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         super(TrainSignalAlignTest, cls).setUpClass()
-        cls.HOME = '/'.join(os.path.abspath(__file__).split("/")[:-2])
-        # cls.reference = os.path.join(cls.HOME, "tests/test_sequences/pUC19_SspI_Zymo.fa")
-        cls.reference = "/Users/andrewbailey/CLionProjects/nanopore-RNN/submodules/signalAlign/tests/test_sequences/pUC19_SspI_Zymo.fa"
+        cls.HOME = '/'.join(os.path.abspath(__file__).split("/")[:-4])
+        cls.reference = os.path.join(cls.HOME, "tests/test_sequences/pUC19_SspI_Zymo.fa")
+        # cls.reference = "/Users/andrewbailey/CLionProjects/nanopore-RNN/submodules/signalAlign/tests/test_sequences/pUC19_SspI_Zymo.fa"
 
     # def test_make_positions_file(self):
     #     with tempfile.TemporaryDirectory() as tempdir:
@@ -42,15 +42,14 @@ class TrainSignalAlignTest(unittest.TestCase):
     def test_make_gatc_position_file(self):
         # with tempfile.TemporaryDirectory() as tempdir:
             # path = os.path.join(tempdir, "test.positions")
-        path = "/Users/andrewbailey/CLionProjects/nanopore-RNN/submodules/signalAlign/src/signalalign/tests/test.adenosine.positions"
+        path = os.path.join(self.HOME, "src/signalalign/tests/test.adenosine.positions")
 
         positions_file = make_gatc_position_file(fasta=self.reference,
                                                  outfile=path)
-        print(positions_file)
-            # os.remove(path)
+        os.remove(path)
 
-    def test_find_gatc_motifs(self):
-        find_gatc_motifs(seq, )
+    # def test_find_gatc_motifs(self):
+    #     find_gatc_motifs(seq, )
 
 
 if __name__ == '__main__':

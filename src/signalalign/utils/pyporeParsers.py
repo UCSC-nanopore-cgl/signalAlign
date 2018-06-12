@@ -18,11 +18,11 @@ try:
     from PyQt4 import QtCore as Qc
 except:
     pass
-from signalalign.utils.core import *
+from signalalign.core import *
 
-# import pyximport
-# pyximport.install(setup_args={'include_dirs': np.get_include()})
-# from signalalign.cparsers import FastStatSplit
+import pyximport
+pyximport.install(setup_args={'include_dirs': [np.get_include(), './']})
+from signalalign.cparsers import FastStatSplit
 
 import json
 

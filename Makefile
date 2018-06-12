@@ -4,27 +4,32 @@ include ./include.mk
 libSources = impl/*.c
 libHeaders = inc/*.h
 libTests = tests/*.c
+scrappie_c = scrappie/*.c
+scrappie_h = scrappie/*.h
 
 signalAlignDependencies =  ${basicLibsDependencies}
 signalAlignLib = ${basicLibs}
 
-test_directory = ${rootPath}/src/tests/
+test_directory = ${rootPath}/src/signalalign/tests/
 
 htsLib = -L././htslib -lhts
 
-all : sL bD hs python-utils ${libPath}/signalAlignLib.a ${signalAlignBin}/signalAlignLibTests index_fasta \
+all : sL bD hs python-utils ${libPath}/signalAlignLib.a ${signalAlignBin}/signalAlignLibTests \
 	  ${signalAlignBin}/compareDistributions \
 	  ${signalAlignBin}/signalMachine ${signalAlignBin}/runSignalAlign \
 	  ${signalAlignBin}/variantCallingLib.py ${signalAlignBin}/alignmentAnalysisLib.py \
-	  ${signalAlignBin}/buildHdpUtil ${signalAlignBin}/trainModels ${signalAlignBin}/hdp_pipeline ${signalAlignBin}/test_SignalAlign.py \
+	  ${signalAlignBin}/buildHdpUtil ${signalAlignBin}/trainModels ${signalAlignBin}/hdp_pipeline all_tests \
 	  externals nanoporeParams python_setup  \
 
 python-utils :
 	cd python_utils && python3 setup.py install
 
 
-index_fasta : hs ${libPath}/signalAlignLib.a ${signalAlignDependencies}
-	${cxx} ${cflags} -I inc -I${libPath} -I${htsLibRootPath} -o ${signalAlignBin}/index_fasta index_fasta.c ${libPath}/signalAlignLib.a ${signalAlignLib} ${htsLib}
+scrappie :
+	${cxx} ${cflags} -I inc -I${libPath}
+
+debugging : hs ${libPath}/signalAlignLib.a ${signalAlignDependencies}
+	${cxx} ${cflags} -I inc -I${libPath} -I${htsLibRootPath} -o ${signalAlignBin}/debugging debugging.c ${libPath}/signalAlignLib.a ${signalAlignLib} ${htsLib}
 
 core : sL bD ${libPath}/signalAlignLib.a ${signalAlignBin}/signalAlignLibTests ${signalAlignBin}/signalMachine
 
@@ -43,7 +48,7 @@ clean :
 python_setup :
 	python3 setup.py install
 
-pip_install :
+pip_install : .FORCE
 	pip3 install -e .
 
 signalAlignLib : ${libPath}/signalAlignLib.a
@@ -57,18 +62,23 @@ bD :
 externals :
 	cd externalTools && make all
 
-scrappie :
-	cd scrappie && make
+test_files := $(shell find $(test_directory) -name '*.py')
 
 test :
-	cd ${signalAlignBin} && ./test_SignalAlign.py
-	cd ${binPath} && ./sonLibTests
+	for i in ${test_files}; do \
+		python $$i; \
+		if [ $$? -ne 0 ]; then\
+		exit -1;\
+		fi;\
+	done
+#	cd ${binPath} && ./sonLibTests
 	cd python_utils && pytest
+# //		exit "$$?"; \
 
 ${signalAlignBin}/compareDistributions : compareDistributions.c ${libPath}/signalAlignLib.a ${signalAlignDependencies}
 	${cxx} ${cflags}  -I inc -I${libPath} -o ${signalAlignBin}/compareDistributions compareDistributions.c ${libPath}/signalAlignLib.a ${signalAlignLib}
 
-${signalAlignBin}/signalAlignLibTests : ${libTests} tests/*.h ${libPath}/signalAlignLib.a ${signalAlignDependencies}
+${signalAlignBin}/signalAlignLibTests : ${libTests} tests/*.h ${libPath}/signalAlignLib.a ${signalAlignDependencies} .FORCE
 	${cxx} ${cflags}  -I inc -I${libPath} -I${htsLibRootPath} -I${htsLibPath} -Wno-error -o ${signalAlignBin}/signalAlignLibTests ${libTests} ${libPath}/signalAlignLib.a ${signalAlignLib}  ${htsLib}
 
 ${signalAlignBin}/signalMachine : signalMachine.c ${libPath}/signalAlignLib.a ${signalAlignDependencies}
@@ -86,24 +96,17 @@ ${signalAlignBin}/runSignalAlign : ${rootPath}src/signalalign/scripts/runSignalA
 	cp ${rootPath}src/signalalign/scripts/runSignalAlign.py ${signalAlignBin}/runSignalAlign
 	chmod +x ${signalAlignBin}/runSignalAlign
 
-${signalAlignBin}/trainModels : ${rootPath}src/signalalign/scripts/trainModels.py
-	cp ${rootPath}src/signalalign/scripts/trainModels.py ${signalAlignBin}/trainModels
+${signalAlignBin}/trainModels : ${rootPath}src/signalalign/train/trainModels.py
+	cp ${rootPath}src/signalalign/train/trainModels.py ${signalAlignBin}/trainModels
 	chmod +x ${signalAlignBin}/trainModels
 
 ${signalAlignBin}/hdp_pipeline : ${rootPath}src/signalalign/scripts/hdp_pipeline.py
 	cp ${rootPath}src/signalalign/scripts/hdp_pipeline.py ${signalAlignBin}/hdp_pipeline
 	chmod +x ${signalAlignBin}/hdp_pipeline
 
-${signalAlignBin}/test_SignalAlign.py : .FORCE
-	cp ${rootPath}src/signalalign/tests/test_SignalAlign.py ${signalAlignBin}/test_SignalAlign.py
-	cp ${rootPath}src/signalalign/tests/event_detection_test.py ${signalAlignBin}/event_detection_test.py
-	cp ${rootPath}src/signalalign/tests/mea_algorithm_test.py ${signalAlignBin}/mea_algorithm_test.py
-	cp ${rootPath}src/signalalign/tests/fast5_test.py ${signalAlignBin}/fast5_test.py
+all_tests : .FORCE
 
-	chmod +x ${signalAlignBin}/test_SignalAlign.py
-	chmod +x ${signalAlignBin}/fast5_test.py
-	chmod +x ${signalAlignBin}/mea_algorithm_test.py
-	chmod +x ${signalAlignBin}/event_detection_test.py
+	chmod +x ${test_directory}/*
 
 ${signalAlignBin}/zayante : ${rootPath}src/signalalign/scripts/zayante.py
 	cp ${rootPath}src/signalalign/scripts/zayante.py ${signalAlignBin}/zayante
@@ -129,5 +132,14 @@ ${libPath}/signalAlignLib.a : ${libSources} ${libHeaders} ${stBarDependencies}
 
 hs :
 	cd htslib && make
+
+#	echo DIR
+#	cd ${test_directory} && \
+#	for i in 1 2 3; do \
+#		python $$i; \
+#		[[ $$? != 0 ]] && exit -1; \
+#	    echo 'done'; \
+#	done
+
 
 .FORCE:

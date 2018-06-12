@@ -42,5 +42,5 @@ setup(name="signalAlign",
                         "pandas>=0.18.1",
                         "sonLib>=1.1.0",
                         "PyYAML>=3.12",
-                        "scipy>=0.19.1"]
+                        "Cython>=0.26"]
       )

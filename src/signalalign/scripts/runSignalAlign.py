@@ -2,23 +2,23 @@
 """Main driver script for running an ionic current-to-sequence alignment on a single machine.
 """
 
-
 from __future__ import print_function
 import sys
 import os
 
-#import pysam
+# import pysam
 
 from argparse import ArgumentParser
 from random import shuffle
 from multiprocessing import Process, current_process, Manager
 
-from signalalign.signalAlignment import SignalAlignment
+from signalalign.signalAlignment import multithread_signal_alignment
 from signalalign.utils import processReferenceFasta, parseFofn
 from signalalign.utils.fileHandlers import FolderHandler
-from signalalign.utils.bwaWrapper import getBwaIndex
+from signalalign.utils.bwaWrapper import buildBwaIndex
 from signalalign.motif import getDegenerateEnum
 from py3helpers.utils import time_it
+
 
 def signalAlignSourceDir():
     return "/".join(os.path.abspath(__file__).split("/")[:-1])  # returns path without runSignalAlign
@@ -39,15 +39,23 @@ def parse_args():
     parser.add_argument('--file_directory', '-d', action='store',
                         dest='files_dir', required=True, type=str, default=None,
                         help="directory with MinION fast5 reads to align")
-    parser.add_argument('--ref', '-r', action='store',
-                        dest='ref', required=True, type=str,
-                        help="reference sequence to align to, in FASTA")
+    parser.add_argument('--forward_ref', action='store',
+                        dest='forward_ref', required=False, type=str,
+                        help="forward reference sequence for SignalAlignment align to, in FASTA")
+    parser.add_argument('--backward_ref', action='store',
+                        dest='backward_ref', required=False, type=str,
+                        help="backward reference sequence for SignalAlignment align to, in FASTA")
+    parser.add_argument('--bwa_reference', '-r', action='store',
+                        dest='bwa_reference', required=True, type=str,
+                        help="Reference sequence required for generating guide alignment")
+
+    parser.add_argument("--bwt", action='store', dest="bwt", default=None,
+                        help="path to BWT files. example: ../ref.fasta")
     parser.add_argument('--output_location', '-o', action='store', dest='out',
                         required=True, type=str, default=None,
                         help="directory to put the alignments")
     # optional arguments
     parser.add_argument("--2d", action='store_true', dest="twoD", default=False, help="flag, specify if using 2D reads")
-    parser.add_argument("--bwt", action='store', dest="bwt", default=None, help="path to BWT files. example: ../ref.fasta")
     parser.add_argument('--in_template_hmm', '-T', action='store', dest='in_T_Hmm',
                         required=False, type=str, default=None,
                         help="input HMM for template events, if you don't want the default")
@@ -119,16 +127,17 @@ def main(args):
     print("Command Line: {cmdLine}\n".format(cmdLine=command_line), file=sys.stderr)
 
     # get absolute paths to inputs
-    args.files_dir           = resolvePath(args.files_dir)
-    args.ref                 = resolvePath(args.ref)
-    args.out                 = resolvePath(args.out)
-    args.bwt                 = resolvePath(args.bwt)
-    args.in_T_Hmm            = resolvePath(args.in_T_Hmm)
-    args.in_C_Hmm            = resolvePath(args.in_C_Hmm)
-    args.templateHDP         = resolvePath(args.templateHDP)
-    args.complementHDP       = resolvePath(args.complementHDP)
-    args.fofn                = resolvePath(args.fofn)
-    args.target_regions      = resolvePath(args.target_regions)
+    args.files_dir = resolvePath(args.files_dir)
+    args.forward_reference = resolvePath(args.forward_ref)
+    args.backward_reference = resolvePath(args.backward_ref)
+    args.out = resolvePath(args.out)
+    args.bwa_reference = resolvePath(args.bwa_reference)
+    args.in_T_Hmm = resolvePath(args.in_T_Hmm)
+    args.in_C_Hmm = resolvePath(args.in_C_Hmm)
+    args.templateHDP = resolvePath(args.templateHDP)
+    args.complementHDP = resolvePath(args.complementHDP)
+    args.fofn = resolvePath(args.fofn)
+    args.target_regions = resolvePath(args.target_regions)
     args.ambiguity_positions = resolvePath(args.ambiguity_positions)
     start_message = """
 #   Starting Signal Align
@@ -142,7 +151,7 @@ def main(args):
 #   Non-default complement HMM: {inChmm}
 #   Template HDP: {tHdp}
 #   Complement HDP: {cHdp}
-    """.format(fileDir=args.files_dir, reference=args.ref, nbFiles=args.nb_files,
+    """.format(fileDir=args.files_dir, reference=args.bwa_reference, nbFiles=args.nb_files,
                inThmm=args.in_T_Hmm, inChmm=args.in_C_Hmm, model=args.stateMachineType, regions=args.target_regions,
                tHdp=args.templateHDP, cHdp=args.complementHDP)
 
@@ -152,34 +161,31 @@ def main(args):
         print("Need to provide directory with .fast5 files of fofn", file=sys.stderr)
         sys.exit(1)
 
-    if not os.path.isfile(args.ref):
-        print("Did not find valid reference file, looked for it {here}".format(here=args.ref), file=sys.stderr)
+    if not os.path.isfile(args.bwa_reference):
+        print("Did not find valid reference file, looked for it {here}".format(here=args.bwa_reference),
+              file=sys.stderr)
         sys.exit(1)
 
     # make directory to put temporary files
     temp_folder = FolderHandler()
     temp_dir_path = temp_folder.open_folder(args.out + "/tempFiles_alignment")
     #
-    forward_reference, backward_reference = processReferenceFasta(fasta=args.ref,
-                                                                      motif_key=args.motif_key,
-                                                                      work_folder=temp_folder,
-                                                                      sub_char=args.ambig_char,
-                                                                      positions_file=args.ambiguity_positions)
+    if not args.forward_reference or not args.backward_reference:
+        args.forward_reference, args.backward_reference = processReferenceFasta(fasta=args.bwa_reference,
+                                                                                motif_key=args.motif_key,
+                                                                                work_folder=temp_folder,
+                                                                                sub_char=args.ambig_char,
+                                                                                positions_file=args.ambiguity_positions)
 
     # index the reference for bwa
-    if args.bwt is not None:
-        print("[RunSignalAlign]NOTICE - using provided BWT %s" % args.bwt)
-        bwa_ref_index = args.bwt
-    else:
-        print("signalAlign - indexing reference", file=sys.stderr)
-        bwa_ref_index = getBwaIndex(args.ref, temp_dir_path)
-        print("signalAlign - indexing reference, done", file=sys.stderr)
-
-    # setup workers for multiprocessing
-    workers = args.nb_jobs
-    work_queue = Manager().Queue()
-    done_queue = Manager().Queue()
-    jobs = []
+    # if args.bwt is not None:
+    #     print("[RunSignalAlign]NOTICE - using provided BWT %s" % args.bwt)
+    #     bwa_ref_index = args.bwt
+    # else:
+    #     print("signalAlign - indexing reference", file=sys.stderr)
+    #     bwa_ref_index = getBwaIndex(args.ref, temp_dir_path)
+    #     print("signalAlign - indexing reference, done", file=sys.stderr)
+    #
 
     # list of read files
     if args.fofn is not None:
@@ -194,47 +200,71 @@ def main(args):
 
     # change paths to the source directory
     os.chdir(signalAlignSourceDir())
-
+    alignment_args = {
+        "destination": temp_dir_path,
+        "stateMachineType": args.stateMachineType,
+        "bwa_reference": args.bwa_reference,
+        "in_templateHmm": args.in_T_Hmm,
+        "in_complementHmm": args.in_C_Hmm,
+        "in_templateHdp": args.templateHDP,
+        "in_complementHdp": args.complementHDP,
+        "output_format": args.outFmt,
+        "threshold": args.threshold,
+        "diagonal_expansion": args.diag_expansion,
+        "constraint_trim": args.constraint_trim,
+        "degenerate": getDegenerateEnum(args.degenerate),
+        "twoD_chemistry": args.twoD,
+        "target_regions": args.target_regions,
+        "embed": args.embed,
+        "event_table": args.event_table,
+        "backward_reference": args.backward_reference,
+        "forward_reference": args.forward_reference,
+        "alignment_file": None,
+        "check_for_temp_file_existance": True,
+        "track_memory_usage": False,
+        "get_expectations": False,
+    }
     print("[runSignalAlign]:NOTICE: Got {} files to align".format(len(fast5s)), file=sys.stdout)
-    for fast5 in fast5s:
-        print(fast5)
-        alignment_args = {
-            "destination": temp_dir_path,
-            "stateMachineType": args.stateMachineType,
-            "bwa_index": bwa_ref_index,
-            "in_templateHmm": args.in_T_Hmm,
-            "in_complementHmm": args.in_C_Hmm,
-            "in_templateHdp": args.templateHDP,
-            "in_complementHdp": args.complementHDP,
-            "output_format": args.outFmt,
-            "in_fast5": fast5,
-            "threshold": args.threshold,
-            "diagonal_expansion": args.diag_expansion,
-            "constraint_trim": args.constraint_trim,
-            "degenerate": getDegenerateEnum(args.degenerate),
-            "twoD_chemistry": args.twoD,
-            "target_regions": args.target_regions,
-            "embed": args.embed,
-            "event_table": args.event_table,
-            "backward_reference": backward_reference,
-            "forward_reference": forward_reference
-        }
-        if args.DEBUG:
-            alignment = SignalAlignment(**alignment_args)
-            alignment.run()
-        else:
-            work_queue.put(alignment_args)
-
-    for w in range(workers):
-        p = Process(target=aligner, args=(work_queue, done_queue))
-        p.start()
-        jobs.append(p)
-        work_queue.put('STOP')
-
-    for p in jobs:
-        p.join()
-
-    done_queue.put('STOP')
+    # setup workers for multiprocessing
+    multithread_signal_alignment(alignment_args, fast5s, args.nb_jobs)
+    # for fast5 in fast5s:
+    #     alignment_args = {
+    #         "destination": temp_dir_path,
+    #         "stateMachineType": args.stateMachineType,
+    #         "bwa_reference": bwa_ref_index,
+    #         "in_templateHmm": args.in_T_Hmm,
+    #         "in_complementHmm": args.in_C_Hmm,
+    #         "in_templateHdp": args.templateHDP,
+    #         "in_complementHdp": args.complementHDP,
+    #         "output_format": args.outFmt,
+    #         "in_fast5": fast5,
+    #         "threshold": args.threshold,
+    #         "diagonal_expansion": args.diag_expansion,
+    #         "constraint_trim": args.constraint_trim,
+    #         "degenerate": getDegenerateEnum(args.degenerate),
+    #         "twoD_chemistry": args.twoD,
+    #         "target_regions": args.target_regions,
+    #         "embed": args.embed,
+    #         "event_table": args.event_table,
+    #         "backward_reference": backward_reference,
+    #         "forward_reference": forward_reference
+    #     }
+    #     if args.DEBUG:
+    #         alignment = SignalAlignment(**alignment_args)
+    #         alignment.run()
+    #     else:
+    #         work_queue.put(alignment_args)
+    #
+    # for w in range(workers):
+    #     p = Process(target=aligner, args=(work_queue, done_queue))
+    #     p.start()
+    #     jobs.append(p)
+    #     work_queue.put('STOP')
+    #
+    # for p in jobs:
+    #     p.join()
+    #
+    # done_queue.put('STOP')
     print("\n#  signalAlign - finished alignments\n", file=sys.stderr)
     print("\n#  signalAlign - finished alignments\n", file=sys.stdout)
 

@@ -237,7 +237,7 @@ def replace_motif_reference_positions(reference_location, sub_fasta_path, motifs
     return sub_fasta_path
 
 
-def samtools_faidx_fasta(fasta_path):
+def samtools_faidx_fasta(fasta_path, log=None):
     """Index fasta using samtools faidx
 
     note: samtools must be in PATH
@@ -248,6 +248,8 @@ def samtools_faidx_fasta(fasta_path):
     assert os.path.isfile(fasta_path), "Path to fasta file does not exist"
     index_path = "{}.fai".format(fasta_path)
     if not os.path.exists(index_path):
+        if log:
+            print("[{}] indexing reference {}".format(log, fasta_path))
         args = ["samtools", "faidx", fasta_path]
         subprocess.check_call(args)
     assert os.path.isfile(index_path), "Error creating FAIDX file for: {}".format(fasta_path)
