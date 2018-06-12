@@ -19,7 +19,11 @@ notifications: # set notification options
 #  except:
 #    - train_rna2
 #    - train_rna
+git:
+  submodules: false
+
 before_install:
+- git submodule update --init
 - sudo apt-get update -qq
 - sudo apt-get install libhdf5-serial-dev
 - sudo apt-get install zlib1g-dev
