@@ -370,7 +370,7 @@ def resegment_reads(fast5_path, params=None, speedy=False, overwrite=True, analy
     fastq = create_fastq_line(read_id+" :", sequence, quality_scores)
 
     # set fastq
-    f5fh.set_fastq(destination, fastq)
+    f5fh.set_fastq(destination, fastq, overwrite=overwrite)
     return f5fh
 
 
