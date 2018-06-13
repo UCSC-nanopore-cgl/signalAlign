@@ -1,17 +1,10 @@
 #!/usr/bin/env python3
 
 from __future__ import print_function
-import os
-import sys
-import csv
-import numpy as np
-import pysam
-import subprocess
-# from sonLib.bioio import fastaWrite
 
 import signalalign.utils.multithread as multithread
 from signalalign import defaultModelFromVersion
-from signalalign.nanoporeRead import NanoporeRead
+from signalalign.nanoporeRead import NanoporeRead, NanoporeRead2D
 from signalalign.utils.bwaWrapper import *
 from signalalign.utils.fileHandlers import FolderHandler
 from signalalign.utils.sequenceTools import fastaWrite, samtools_faidx_fasta
@@ -104,8 +97,10 @@ class SignalAlignment(object):
 
         # prep
         self.openTempFolder("tempFiles_%s" % self.read_name)
-        npRead = NanoporeRead(fast_five_file=self.in_fast5, twoD=self.twoD_chemistry, event_table=self.event_table,
-                              initialize=True)
+        if self.twoD_chemistry:
+            npRead = NanoporeRead2D(fast_five_file=self.in_fast5, event_table=self.event_table, initialize=True)
+        else:
+            npRead = NanoporeRead(fast_five_file=self.in_fast5, event_table=self.event_table, initialize=True)
         #todo need to validate / generate events and nucleotide read
 
         # read label
