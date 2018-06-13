@@ -357,7 +357,7 @@ def resegment_reads(fast5_path, params=None, speedy=False, overwrite=True, analy
 
     # get destination in fast5
     #todo find latest location? ie: save_event_table_and_fastq(..)
-    destination = analysis_path
+    destination = f5fh._join_path(f5fh.__base_analysis__, analysis_path)
 
     f5fh.set_event_table(destination, new_event_table, attributes, overwrite=overwrite)
 
