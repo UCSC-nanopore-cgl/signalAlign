@@ -6,29 +6,11 @@ import pandas as pd
 import numpy as np
 from collections import Counter
 from signalalign.utils.parsers import read_fasta
-from signalalign.utils.sequenceTools import reverse_complement
-from signalalign.utils import kmer_iterator
+from signalalign.utils import reverse_complement
 
 
-def get_all_sequence_kmers(seq, k=5):
-    kmers = Counter()
-    for kmer in kmer_iterator(seq, k):
-        kmers[kmer] += 1
-        kmers[reverse_complement(kmer, reverse=True, complement=True)] += 1
-    return kmers
 
 
-def parse_alignment_file(alignment_file):
-    data = pd.read_table(alignment_file, usecols=(1, 4, 5, 9, 12, 13),
-                         dtype={'ref_pos': np.int64,
-                                'strand': np.str,
-                                'event_index': np.int64,
-                                'kmer': np.str,
-                                'posterior_prob': np.float64,
-                                'event_mean': np.float64},
-                         header=None,
-                         names=['ref_pos', 'strand', 'event_index', 'kmer', 'posterior_prob', 'event_mean'])
-    return data
 
 
 def get_first_seq(fasta_file):

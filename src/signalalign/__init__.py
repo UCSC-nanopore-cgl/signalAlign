@@ -4,22 +4,20 @@ import re
 
 ALLOWED_FLAGS = (0, 16)
 
-DEFAULT_TRAINMODELS_OPTIONS = {
-    "fofn": None,
-    "fast5_dir": None,
-    "positions_file": None,
-    "motif": None,
-    "label": None,
-    "edited_fw_reference": None,
-    "edited_bw_reference": None
-}
-
 
 def parseFofn(fofn_file):
+    """Creates a list of paths given a text file where each line is a path. If path does not exist, it will not add it
+    to the list and will not return an empty list.
+
+    :param fofn_file: path to text file where each line is a path to a fast5 file
+    """
+    assert os.path.isfile(fofn_file), "Path to fofn.txt file does not exist: {}".format(fofn_file)
     files = []
     with open(fofn_file, "r") as fH:
         for l in fH:
-            files.append(l.strip())
+            # make sure that the path exists
+            if os.path.exists(l.strip()):
+                files.append(l.strip())
     assert len(files) > 0, "parse_fofn: error, didn't find any files in file of files {}".format(fofn_file)
     return files
 

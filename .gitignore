@@ -125,7 +125,9 @@ src/signalalign/utils/parsers.py.bak
 src/signalalign/utils/parsers.pyc
 src/signalalign/utils/sequenceTools.py.bak
 src/signalalign/utils/sequenceTools.pyc
-/tests/test_sequences/
+/tests/test_sequences/*.fasta*
+/tests/test_sequences/*.fa.*
+
 /tests/test_hdp/test_copy.hdp
 /tests/test_hdp/test.hdp
 cmake-build-debug/

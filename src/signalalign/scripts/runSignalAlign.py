@@ -13,11 +13,12 @@ from random import shuffle
 from multiprocessing import Process, current_process, Manager
 
 from signalalign.signalAlignment import multithread_signal_alignment
-from signalalign.utils import processReferenceFasta, parseFofn
+from signalalign.utils import processReferenceFasta
 from signalalign.utils.fileHandlers import FolderHandler
 from signalalign.utils.bwaWrapper import buildBwaIndex
 from signalalign.motif import getDegenerateEnum
 from py3helpers.utils import time_it
+from signalalign import parseFofn
 
 
 def signalAlignSourceDir():
@@ -177,16 +178,6 @@ def main(args):
                                                                                 sub_char=args.ambig_char,
                                                                                 positions_file=args.ambiguity_positions)
 
-    # index the reference for bwa
-    # if args.bwt is not None:
-    #     print("[RunSignalAlign]NOTICE - using provided BWT %s" % args.bwt)
-    #     bwa_ref_index = args.bwt
-    # else:
-    #     print("signalAlign - indexing reference", file=sys.stderr)
-    #     bwa_ref_index = getBwaIndex(args.ref, temp_dir_path)
-    #     print("signalAlign - indexing reference, done", file=sys.stderr)
-    #
-
     # list of read files
     if args.fofn is not None:
         fast5s = [x for x in parseFofn(args.fofn) if x.endswith(".fast5")]
@@ -227,44 +218,7 @@ def main(args):
     print("[runSignalAlign]:NOTICE: Got {} files to align".format(len(fast5s)), file=sys.stdout)
     # setup workers for multiprocessing
     multithread_signal_alignment(alignment_args, fast5s, args.nb_jobs)
-    # for fast5 in fast5s:
-    #     alignment_args = {
-    #         "destination": temp_dir_path,
-    #         "stateMachineType": args.stateMachineType,
-    #         "bwa_reference": bwa_ref_index,
-    #         "in_templateHmm": args.in_T_Hmm,
-    #         "in_complementHmm": args.in_C_Hmm,
-    #         "in_templateHdp": args.templateHDP,
-    #         "in_complementHdp": args.complementHDP,
-    #         "output_format": args.outFmt,
-    #         "in_fast5": fast5,
-    #         "threshold": args.threshold,
-    #         "diagonal_expansion": args.diag_expansion,
-    #         "constraint_trim": args.constraint_trim,
-    #         "degenerate": getDegenerateEnum(args.degenerate),
-    #         "twoD_chemistry": args.twoD,
-    #         "target_regions": args.target_regions,
-    #         "embed": args.embed,
-    #         "event_table": args.event_table,
-    #         "backward_reference": backward_reference,
-    #         "forward_reference": forward_reference
-    #     }
-    #     if args.DEBUG:
-    #         alignment = SignalAlignment(**alignment_args)
-    #         alignment.run()
-    #     else:
-    #         work_queue.put(alignment_args)
-    #
-    # for w in range(workers):
-    #     p = Process(target=aligner, args=(work_queue, done_queue))
-    #     p.start()
-    #     jobs.append(p)
-    #     work_queue.put('STOP')
-    #
-    # for p in jobs:
-    #     p.join()
-    #
-    # done_queue.put('STOP')
+
     print("\n#  signalAlign - finished alignments\n", file=sys.stderr)
     print("\n#  signalAlign - finished alignments\n", file=sys.stdout)
 

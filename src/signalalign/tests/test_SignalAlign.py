@@ -221,7 +221,7 @@ def main():
     # testSuite.addTest(SignalAlignAlignmentTest('test_zymo_reads'))
 
     testRunner = unittest.TextTestRunner(verbosity=2)
-    testRunner.run(testSuite)
+    sys.exit(not testRunner.run(testSuite).wasSuccessful())
 
 
 if __name__ == '__main__':

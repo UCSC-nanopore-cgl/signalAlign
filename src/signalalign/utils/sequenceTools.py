@@ -15,27 +15,8 @@ import array
 import subprocess
 from collections import Counter
 from signalalign.utils.parsers import read_fasta
-
-
-def find_substring_indices(main_string, sub_string, offset=0, overlap=True):
-    """Generator that finds start positions of specific substring in a string, including overlapping substrings
-
-    :param main_string: main_string to search
-    :param sub_string: string to find instances of within the main_string
-    :param offset: if you are searching for the index of an internal character of the substring we will add the
-                    offset to the index. Default: 0
-    :param overlap: boolean option if you want to find overlap eg.                Default: True
-                    find_substring_indices("AAAA", "AA", overlap=True) = [0,1,2]
-                    find_substring_indices("AAAA", "AA", overlap=False) = [0,2]
-
-    :return: generator yielding (substring_start_index + offset)
-    """
-    if overlap:
-        sub = '(?=(' + sub_string + "))"
-    else:
-        sub = sub_string
-    for m in re.finditer(sub, main_string):
-        yield m.start()+offset
+from py3helpers.utils import find_substring_indices, all_string_permutations
+from signalalign.utils import kmer_iterator, reverse_complement
 
 
 def find_gatc_motifs(sequence):
@@ -147,7 +128,8 @@ def replace_motifs_sequence_positions(sequence, motifs, overlap=False):
     already_repaced_indexes = set()
     # gather motifs
     for motif_pair in motifs:
-        assert len(motif_pair) == 2 and type(motif_pair) is list, "Motifs must be structured as list of lists, even for one motif find and replace"
+        assert len(motif_pair) == 2 and type(
+            motif_pair) is list, "Motifs must be structured as list of lists, even for one motif find and replace"
         # find edit character and offset
         offset, old_char, substitution_char = find_modification_index_and_character(motif_pair[0], motif_pair[1])
         for index in find_substring_indices(sequence, motif_pair[0], offset=offset, overlap=overlap):
@@ -204,8 +186,9 @@ def replace_periodic_reference_positions(reference_location, sub_fasta_path, ste
         with open(sub_fasta_path, 'w') as outfasta:
             for header, comment, sequence in read_fasta(reference_location):
                 subst_sequence = replace_periodic_sequence_positions(sequence, step, offset, substitution_char)
-                print(">%s %s\n%s" % (header, "substituted:{},step:{},offset:{}".format(substitution_char, step, offset),
-                                      subst_sequence), file=outfasta)
+                print(
+                    ">%s %s\n%s" % (header, "substituted:{},step:{},offset:{}".format(substitution_char, step, offset),
+                                    subst_sequence), file=outfasta)
 
     return sub_fasta_path
 
@@ -252,6 +235,105 @@ def samtools_faidx_fasta(fasta_path, log=None):
     assert os.path.isfile(index_path), "Error creating FAIDX file for: {}".format(fasta_path)
     return index_path
 
+
+def count_all_sequence_kmers(seq, k=5, rev_comp=False):
+    """Count all the 5'-3' kmers of a nucleotide sequence, rev_comp counts rev_comp seq IN ADDITION to given sequence
+
+    :param seq: nucleotide sequence
+    :param k: size of kmer
+    :param rev_comp: boolean option to count reverse complement kmers as well
+    :return: dictionary of kmers with counts as values
+    """
+    # loop through kmers
+    kmers = Counter()
+    for kmer in kmer_iterator(seq, k):
+        kmers[kmer] += 1
+    if rev_comp:
+        # loop through rev_comp kmers
+        seq1 = reverse_complement(seq, reverse=True, complement=True)
+        for kmer in kmer_iterator(seq1, k):
+            kmers[kmer] += 1
+
+    return kmers
+
+
+def get_sequence_kmers(seq, k=5, rev_comp=False):
+    """Get the set of all kmers from a sequence.
+
+    :param seq: nucleotide sequence
+    :param k: size of kmer
+    :param rev_comp: boolean option to count reverse complement kmers as well
+    :return: set of kmers
+    """
+    return set(count_all_sequence_kmers(seq, k=k, rev_comp=rev_comp).keys())
+
+
+def get_motif_kmers(motif_pair, k, alphabet="ATGC"):
+    """Given a motif pair, create a list of all kmers which contain modification"""
+    assert len(motif_pair) == 2, "Motif pair must be a list of length 2. len(motif_pair) = {}".format(len(motif_pair))
+    canonical = motif_pair[0]
+    modified = motif_pair[1]
+    motif_len = len(canonical)
+    # get mod index and chars
+    mod_index, old_char, new_char = find_modification_index_and_character(canonical, modified)
+    bases_after = motif_len - mod_index - 1
+
+    # get overlaps for front and back of kmer
+    front_overlap, back_overlap = get_front_back_kmer_overlap(k, motif_len, mod_index)
+    # pre-compute kmers
+    kmer_set_dict = dict()
+    for i in range(1, max(front_overlap, back_overlap)+1):
+        kmer_set_dict[i] = [x for x in all_string_permutations(alphabet, i)]
+    kmer_set_dict[0] = ['']
+
+    motif_kmers = []
+    for i in range(k):
+        # get prepend kmers and index for front of motif
+        if i >= front_overlap:
+            front_index = i - front_overlap
+            prepend_kmers = ['']
+        else:
+            prepend_kmers = kmer_set_dict[front_overlap-i]
+            front_index = 0
+        # get append kmers and index for back of motif
+        if i > bases_after:
+            append_kmers = kmer_set_dict[i - bases_after]
+            back_index = motif_len
+        else:
+            back_index = mod_index+i+1
+            append_kmers = ['']
+
+        kmer = modified[front_index:back_index]
+        motif_kmers.extend([front+kmer+back for front in prepend_kmers for back in append_kmers if front+kmer+back is not ''])
+
+    return set(motif_kmers)
+
+
+def get_front_back_kmer_overlap(k, motif_len, mod_index):
+    """Get the largest number of bases overlap at front and back of motif
+
+    eg: k=3 , motif_len = 2, mod_index = 1
+        motif = GE
+
+        X G E X
+        _ _ _       max front_overlap = 1
+          _ _ _     max back_overlap = 1
+
+    :param k: length of kmer
+    :param motif_len: length of motif
+    :param mod_index: index position of modification
+    :return: largest overlap in the front and back of a generated kmer
+    """
+    assert k >= 1, "k cannot be less than 1. k: {}".format(k)
+    front_overlap = k - mod_index - 1
+    back_overlap = k - (motif_len - mod_index)
+    return front_overlap, back_overlap
+
+
+# def wrapper(func, *args, **kwargs):
+#     def wrapped():
+#         return func(*args, **kwargs)
+#     return wrapped
 
 
 # def get_methyl_char(degenerate):
@@ -568,55 +650,15 @@ def samtools_faidx_fasta(fasta_path, log=None):
 #     return outfile
 #
 
-def reverse_complement(dna, reverse=True, complement=True):
-    """ 
-    Make the reverse complement of a DNA sequence. You can also just make the
-    complement or the reverse strand (see options). 
-    
-    Input: A DNA sequence containing 'ATGC' base pairs and wild card letters
-    
-    Output: DNA sequence as a string. 
-    
-    Options: Specify reverse and/or complement as False to get the complement or
-             reverse of the input DNA.  If both are False, input is returned. 
-
-    """
-    
-    # Make translation table
-    trans_table = str.maketrans('ATGCatgc', 'TACGtacg')
-    
-    # Make complement to DNA
-    comp_dna = dna.translate(trans_table)
-    
-    # Output all as strings
-    if reverse and complement:
-        return comp_dna[::-1]
-    if reverse and not complement:
-        return dna[::-1]
-    if complement and not reverse:
-        return comp_dna
-    if not complement and not reverse:
-        return dna
-
-
-def count_kmers(dna, k):
-    """count the kmers of length k in a string"""
-    kmer_count = Counter()
-    for i in range(len(dna)):
-        kmer = dna[i:(i+k)]
-        if len(kmer) == k:
-            kmer_count[kmer] += 1
-    return kmer_count
-
-
+# TODO write these tests ya dig
 def getFastaDictionary(fastaFile):
     """Returns a dictionary of the first words of fasta headers to their corresponding
     fasta sequence
     """
     namesAndSequences = [(x[0].split()[0], x[1]) for x in fastaRead(open(fastaFile, 'r'))]
     names = [x[0] for x in namesAndSequences]
-    assert len(names) == len(set(names)) #Check all the names are unique
-    return dict(namesAndSequences) #Hash of names to sequences
+    assert len(names) == len(set(names))  # Check all the names are unique
+    return dict(namesAndSequences)  # Hash of names to sequences
 
 
 def fastaRead(fileHandleOrFile):
@@ -672,7 +714,7 @@ def fastaWrite(fileHandleOrFile, name, seq, mode="w"):
     fileHandle.write(">%s\n" % name)
     chunkSize = 100
     for i in range(0, len(seq), chunkSize):
-        fileHandle.write("%s\n" % seq[i:i+chunkSize])
+        fileHandle.write("%s\n" % seq[i:i + chunkSize])
     if isinstance(fileHandleOrFile, "".__class__):
         fileHandle.close()
 
@@ -683,5 +725,5 @@ def getFastaDictionary(fastaFile):
     """
     namesAndSequences = [(x[0].split()[0], x[1]) for x in fastaRead(open(fastaFile, 'r'))]
     names = [x[0] for x in namesAndSequences]
-    assert len(names) == len(set(names)) #Check all the names are unique
-    return dict(namesAndSequences) #Hash of names to sequences
+    assert len(names) == len(set(names))  # Check all the names are unique
+    return dict(namesAndSequences)  # Hash of names to sequences

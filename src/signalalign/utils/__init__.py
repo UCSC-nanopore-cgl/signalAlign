@@ -11,31 +11,19 @@ from signalalign.motif import getMotif
 from signalalign.utils.parsers import read_fasta
 
 
-def parse_substitution_file(substitution_file):
-    fH = open(substitution_file, 'r')
-    line = fH.readline().split()
-    forward_sub = line[0]
-    forward_pos = list(map(np.int64, line[1:]))
-    line = fH.readline().split()
-    backward_sub = line[0]
-    backward_pos = list(map(np.int64, line[1:]))
-    return (forward_sub, forward_pos), (backward_sub, backward_pos)
-
-
 def kmer_iterator(dna, k):
+    """Generates kmers of length k from a string with one step between kmers
+
+    :param dna: string to generate kmers from
+    :param k: size of kmer to generate
+    """
+    assert len(dna) >= 1, "You must select a substring with len(dna) >= 1: {}".format(dna)
+    assert k >= 1, "You must select a main_string with k >= 1: {}".format(k)
+
     for i in range(len(dna)):
         kmer = dna[i:(i + k)]
         if len(kmer) == k:
             yield kmer
-
-
-def parseFofn(fofn_file):
-    files = []
-    with open(fofn_file, "r") as fH:
-        for l in fH:
-            files.append(l.strip())
-    assert len(files) > 0, "parse_fofn: error, didn't find any files in file of files {}".format(fofn_file)
-    return files
 
 
 def reverse_complement(dna, reverse=True, complement=True):
@@ -69,7 +57,13 @@ def reverse_complement(dna, reverse=True, complement=True):
 
 
 def count_kmers(dna, k):
-    """count the kmers of length k in a string"""
+    """Count all kmers of length k in a string
+
+    :param dna: string to search and count kmers
+    :param k: size of kmer
+    """
+    assert len(dna) >= 1, "You must select a substring with len(dna) >= 1: {}".format(dna)
+    assert k >= 1, "You must select a main_string with k >= 1: {}".format(k)
     kmer_count = Counter()
     for i in range(len(dna)):
         kmer = dna[i:(i + k)]
@@ -78,14 +72,37 @@ def count_kmers(dna, k):
     return kmer_count
 
 
+def parse_full_alignment_file(alignment_file):
+    data = pd.read_table(alignment_file, usecols=(1, 4, 5, 9, 12, 13),
+                         dtype={'ref_pos': np.int64,
+                                'strand': np.str,
+                                'event_index': np.int64,
+                                'kmer': np.str,
+                                'posterior_prob': np.float64,
+                                'event_mean': np.float64},
+                         header=None,
+                         names=['ref_pos', 'strand', 'event_index', 'kmer', 'posterior_prob', 'event_mean'])
+    return data
+
+
+
 class CustomAmbiguityPositions(object):
     def __init__(self, ambig_filepath):
+        """Deal with ambiguous positions from a tsv ambiguity position file with the format of
+        contig  position            strand  change_from change_to
+        'name'  0 indexed position   +/-    C           E
+
+
+        :param ambig_filepath: path to ambiguity position file"""
+
         self.ambig_df = self.parseAmbiguityFile(ambig_filepath)
 
     @staticmethod
     def parseAmbiguityFile(ambig_filepath):
         """Parses a 'ambiguity position file' that should have the format:
             contig  position    strand  change_from change_to
+
+        :param ambig_filepath: path to ambiguity position file
         """
         return pd.read_table(ambig_filepath,
                              usecols=(0, 1, 2, 3, 4),
@@ -97,13 +114,29 @@ class CustomAmbiguityPositions(object):
                                     "change_to"   : np.str})
 
     def getForwardSequence(self, contig, raw_sequence):
+        """Edit 'raw_sequence' given a ambiguity positions file. Assumes raw_sequence is forward direction( 5'-3')
+        :param contig: which contig the sequence belongs (aka header)
+        :param raw_sequence: raw nucleotide sequence
+        :return: edited nucleotide sequence
+        """
         return self._get_substituted_sequence(contig, raw_sequence, "+")
 
     def getBackwardSequence(self, contig, raw_sequence):
+        """Edit 'raw_sequence' given a ambiguity positions file, Assumes raw_sequence is forward direction( 5'-3')
+        :param contig: which contig the sequence belongs (aka header)
+        :param raw_sequence: raw nucleotide sequence
+        :return: edited nucleotide sequence
+        """
         raw_sequence = reverse_complement(raw_sequence, reverse=False, complement=True)
         return self._get_substituted_sequence(contig, raw_sequence, "-")
 
     def _get_substituted_sequence(self, contig, raw_sequence, strand):
+        """Change the given raw nucleotide sequence using the edits defined in the positions file
+
+        :param contig: name of contig to find
+        :param raw_sequence: nucleotide sequence (note: this is note edited in this function)
+        :param strand: '+' or '-' to indicate strand
+        """
         contif_df = self._get_contig_positions(contig, strand)
         raw_sequence = list(raw_sequence)
         for _, row in contif_df.iterrows():
@@ -114,13 +147,28 @@ class CustomAmbiguityPositions(object):
         return "".join(raw_sequence)
 
     def _get_contig_positions(self, contig, strand):
-        return self.ambig_df.ix[(self.ambig_df["contig"] == contig) & (self.ambig_df["strand"] == strand)]
+        """Get all unique locations within the positions file
+
+        :param contig: name of contig to find
+        :param strand: '+' or '-' to indicate strand
+        """
+        df = self.ambig_df.loc[(self.ambig_df["contig"] == contig) & (self.ambig_df["strand"] == strand)].drop_duplicates()
+        assert len(df['position']) == len(set(df['position'])), "Multiple different changes for a single position. {}"\
+            .format(df['position'])
+        return df
 
 
 def processReferenceFasta(fasta, work_folder, motif_key=None, sub_char=None, positions_file=None):
     """loops over all of the contigs in the reference file, writes the forward and backward sequences
     as flat files (no headers or anything) for signalMachine, returns a dict that has the sequence
     names as keys and the paths to the processed sequence as keys
+
+    :param fasta: path to un-edited fasta file
+    :param work_folder: FolderHandler object
+    :param motif_key:
+    :param sub_char:
+    :param positions_file: ambiguous positions file which can be processed via CustomAmbiguityPositions
+    :return: paths to possibly edited forward reference sequence and backward reference sequence
     """
     # argument sanitization
     if positions_file is not None and motif_key is not None:
@@ -149,6 +197,7 @@ def processReferenceFasta(fasta, work_folder, motif_key=None, sub_char=None, pos
             # motif_lab = "" if motif_key is None else "%s." % motif_key
             # these are the paths to the flat files that have the references
             # signalAlign likes uppercase
+            # TODO make motifs work the way I built them in SequenceTools.py
             if motif_key is not None:
                 motif, ok = getMotif(motif_key, sequence)
                 if not ok:

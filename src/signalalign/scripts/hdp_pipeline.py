@@ -86,24 +86,24 @@ def get_set_of_hdp_types(request):
 
 
 def get_hdp_type(requested_type):
-        hdp_types = {
-            "singleLevelFixed": 0,
-            "singleLevelPrior": 1,
-            "multisetFixed": 2,
-            "multisetPrior": 3,
-            "compFixed": 4,
-            "compPrior": 5,
-            "middleNtsFixed": 6,
-            "middleNtsPrior": 7,
-            "groupMultisetFixed": 8,
-            "groupMultisetPrior": 9,
-            "singleLevelPrior2": 10,
-            "multisetPrior2": 11,
-            "multisetPriorEcoli": 12,
-            "singleLevelPriorEcoli": 13
-        }
-        assert (requested_type in list(hdp_types.keys())), "Requested HDP type is invalid, got {}".format(requested_type)
-        return hdp_types[requested_type]
+    hdp_types = {
+        "singleLevelFixed": 0,
+        "singleLevelPrior": 1,
+        "multisetFixed": 2,
+        "multisetPrior": 3,
+        "compFixed": 4,
+        "compPrior": 5,
+        "middleNtsFixed": 6,
+        "middleNtsPrior": 7,
+        "groupMultisetFixed": 8,
+        "groupMultisetPrior": 9,
+        "singleLevelPrior2": 10,
+        "multisetPrior2": 11,
+        "multisetPriorEcoli": 12,
+        "singleLevelPriorEcoli": 13
+    }
+    assert (requested_type in list(hdp_types.keys())), "Requested HDP type is invalid, got {}".format(requested_type)
+    return hdp_types[requested_type]
 
 
 def count_lines_in_build_alignment(build_alignment_path):

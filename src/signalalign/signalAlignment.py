@@ -7,15 +7,57 @@ import csv
 import numpy as np
 import pysam
 import subprocess
-# from sonLib.bioio import fastaWrite
+import h5py
+import glob
+from random import shuffle
 
 import signalalign.utils.multithread as multithread
-from signalalign import defaultModelFromVersion
+from signalalign import defaultModelFromVersion, parseFofn
 from signalalign.nanoporeRead import NanoporeRead
 from signalalign.utils.bwaWrapper import *
 from signalalign.utils.fileHandlers import FolderHandler
 from signalalign.utils.sequenceTools import fastaWrite, samtools_faidx_fasta
 from signalalign.mea_algorithm import mea_alignment_from_signal_align, match_events_with_signalalign
+from signalalign.utils import processReferenceFasta
+
+
+def create_signalAlignment_args(backward_reference=None, forward_reference=None, destination=None,
+                                stateMachineType="threeState", in_templateHmm=None,
+                                in_complementHmm=None, in_templateHdp=None, in_complementHdp=None, threshold=0.01,
+                                diagonal_expansion=None,
+                                constraint_trim=None, target_regions=None, degenerate=None, twoD_chemistry=False,
+                                alignment_file=None, bwa_reference=None,
+                                track_memory_usage=False, get_expectations=False, output_format='full', embed=False,
+                                event_table=False,
+                                check_for_temp_file_existance=True,
+                                path_to_bin='./signalMachine'):
+    """Create alignment arguments for SignalAlign. Parameters are explained in SignalAlignment"""
+    alignment_args = {
+        "backward_reference": backward_reference,
+        "forward_reference": forward_reference,
+        "destination": destination,
+        "stateMachineType": stateMachineType,
+        "in_templateHmm": in_templateHmm,
+        "in_complementHmm": in_complementHmm,
+        "in_templateHdp": in_templateHdp,
+        "in_complementHdp": in_complementHdp,
+        "threshold": threshold,
+        "diagonal_expansion": diagonal_expansion,
+        "constraint_trim": constraint_trim,
+        "target_regions": target_regions,
+        "degenerate": degenerate,
+        "twoD_chemistry": twoD_chemistry,
+        "alignment_file": alignment_file,
+        "bwa_reference": bwa_reference,
+        'track_memory_usage': track_memory_usage,
+        'get_expectations': get_expectations,
+        'output_format': output_format,
+        'embed': embed,
+        'event_table': event_table,
+        'check_for_temp_file_existance': check_for_temp_file_existance,
+        'path_to_bin': path_to_bin}
+
+    return alignment_args
 
 
 class SignalAlignment(object):
@@ -44,7 +86,8 @@ class SignalAlignment(object):
                  event_table=False,
                  check_for_temp_file_existance=True,
                  track_memory_usage=False,
-                 get_expectations=False):
+                 get_expectations=False,
+                 path_to_bin=''):
         self.in_fast5 = in_fast5  # fast5 file to align
         self.destination = destination  # place where the alignments go, should already exist
         self.stateMachineType = stateMachineType  # flag for signalMachine
@@ -69,7 +112,9 @@ class SignalAlignment(object):
         self.max_memory_usage_kb = None
         self.read_label = None
         self.get_expectations = get_expectations  # option to gather expectations of transitions and emissions
+        self.path_to_signalMachine = os.path.join(path_to_bin, "signalMachine")  # path to signalMachine
 
+        assert os.path.exists(self.path_to_signalMachine), "Path to signalMachine does not exist"
         assert self.bwa_reference is not None or self.alignment_file is not None, \
             "either 'bwa_reference' or 'alignment_file' argument is needed to generate cigar strings"
 
@@ -91,6 +136,8 @@ class SignalAlignment(object):
             self.in_complementHdp = in_complementHdp
         else:
             self.in_complementHdp = None
+        assert os.path.exists(self.destination), \
+            "Destination path does not exist: {}".format(self.destination)
 
     def run(self):
         print("[SignalAlignment.run] INFO: Starting on {read}".format(read=self.in_fast5))
@@ -174,7 +221,6 @@ class SignalAlignment(object):
         else:
             strand, reference_name = getInfoFromCigarFile(cigar_file_)
 
-
         # add an indicator for the model being used
         if self.stateMachineType == "threeState":
             model_label = ".sm"
@@ -194,28 +240,25 @@ class SignalAlignment(object):
         # forward strand
         if strand == "+":
             if self.output_format == "full":
-                posteriors_file_path = self.destination + read_label + model_label + ".forward.tsv"
+                posteriors_file_path = os.path.join(self.destination, read_label + model_label + ".forward.tsv")
             elif self.output_format == "variantCaller":
-                posteriors_file_path = self.destination + read_label + model_label + ".tsv"
+                posteriors_file_path = os.path.join(self.destination, read_label + model_label + ".tsv")
             else:
-                posteriors_file_path = self.destination + read_label + model_label + ".assignments"
+                posteriors_file_path = os.path.join(self.destination, read_label + model_label + ".assignments.tsv")
 
         # backward strand
         elif strand == "-":
             if self.output_format == "full":
-                posteriors_file_path = self.destination + read_label + model_label + ".backward.tsv"
+                posteriors_file_path = os.path.join(self.destination, read_label + model_label + ".backward.tsv")
             elif self.output_format == "variantCaller":
-                posteriors_file_path = self.destination + read_label + model_label + ".tsv"
+                posteriors_file_path = os.path.join(self.destination, read_label + model_label + ".tsv")
             else:
-                posteriors_file_path = self.destination + read_label + model_label + ".assignments"
+                posteriors_file_path = os.path.join(self.destination, read_label + model_label + ".assignments.tsv")
 
         # sanity check
         else:
             self.failStop("[SignalAlignment.run] ERROR Unexpected strand {}".format(strand), npRead)
             return False
-
-        # Alignment/Expectations routine
-        path_to_signalAlign = "./signalMachine"
 
         # flags
 
@@ -295,14 +338,14 @@ class SignalAlignment(object):
             twoD_flag = ""
         # commands
         if self.get_expectations:
-            template_expectations_file_path = self.destination + read_label + ".template.expectations"
-            complement_expectations_file_path = self.destination + read_label + ".complement.expectations"
-
+            template_expectations_file_path = os.path.join(self.destination, read_label + ".template.expectations.tsv")
+            complement_expectations_file_path = os.path.join(self.destination,
+                                                             read_label + ".complement.expectations.tsv")
             command = \
                 "{vA} {td} {degen}{sparse}{model} -q {npRead} " \
                 "{t_model}{c_model}{thresh}{expansion}{trim} {hdp}-L {readLabel} -p {cigarFile} " \
                 "-t {templateExpectations} -c {complementExpectations} -n {seq_name} {f_ref_fa} {b_ref_fa}" \
-                    .format(vA=path_to_signalAlign, model=stateMachineType_flag,
+                    .format(vA=self.path_to_signalMachine, model=stateMachineType_flag,
                             cigarFile=cigar_file_,
                             npRead=npRead_, readLabel=read_label, td=twoD_flag,
                             templateExpectations=template_expectations_file_path, hdp=hdp_flags,
@@ -315,14 +358,13 @@ class SignalAlignment(object):
                 "{vA} {td} {degen}{sparse}{model} -q {npRead} " \
                 "{t_model}{c_model}{thresh}{expansion}{trim} -p {cigarFile} " \
                 "-u {posteriors} {hdp}-L {readLabel} -n {seq_name} {f_ref_fa} {b_ref_fa}" \
-                    .format(vA=path_to_signalAlign, model=stateMachineType_flag, sparse=out_fmt,
+                    .format(vA=self.path_to_signalMachine, model=stateMachineType_flag, sparse=out_fmt,
                             cigarFile=cigar_file_,
                             readLabel=read_label, npRead=npRead_, td=twoD_flag,
                             t_model=template_model_flag, c_model=complement_model_flag,
                             posteriors=posteriors_file_path, thresh=threshold_flag, expansion=diag_expansion_flag,
                             trim=trim_flag, hdp=hdp_flags, degen=degenerate_flag, seq_name=reference_name,
                             f_ref_fa=forward_ref_flag, b_ref_fa=backward_ref_flag)
-
 
         # run
         print("[SignalAlignment.run] running command: ", command, end="\n")
@@ -419,7 +461,7 @@ class SignalAlignment(object):
         return True, version, pop1_complement
 
     def openTempFolder(self, temp_dir):
-        self.temp_folder.open_folder("%s%s" % (self.destination, temp_dir))
+        self.temp_folder.open_folder(os.path.join(self.destination, temp_dir))
 
     def addTempFilePath(self, path_to_add):
         return self.temp_folder.add_file_path(path_to_add)
@@ -530,18 +572,19 @@ def multithread_signal_alignment(signal_align_arguments, fast5_locations, worker
         samtools_faidx_fasta(signal_align_arguments["backward_reference"], log="multithread_signal_alignment")
 
     # bwa_reference and alignment_file must be specified
-    assert not ('bwa_reference' not in signal_align_arguments or
+    assert not (('bwa_reference' not in signal_align_arguments or
                 signal_align_arguments["bwa_reference"] is None) and ('alignment_file' not in signal_align_arguments or
-                signal_align_arguments['alignment_file'] is None), "Must specify bwa_reference or alignment_file"
+                                                                      signal_align_arguments[
+                                                                          'alignment_file'] is None)), "Must specify bwa_reference or alignment_file"
 
     # if we didn't get an alignment file then check for index file
     if not ('alignment_file' in signal_align_arguments and signal_align_arguments['alignment_file']):
         # ensure alignments can be generated (either from bwa on the reference or by an alignment file)
-            bwa_reference = buildBwaIndex(signal_align_arguments["bwa_reference"],
-                                          os.path.dirname(signal_align_arguments["bwa_reference"]),
-                                          log='multithread_signal_alignment')
-            signal_align_arguments["bwa_reference"] = bwa_reference
-            assert os.path.exists(bwa_reference+".bwt"), "Error creating BWA index for: {}".format(bwa_reference)
+        bwa_reference = buildBwaIndex(signal_align_arguments["bwa_reference"],
+                                      os.path.dirname(signal_align_arguments["bwa_reference"]),
+                                      log='multithread_signal_alignment')
+        signal_align_arguments["bwa_reference"] = bwa_reference
+        assert os.path.exists(bwa_reference + ".bwt"), "Error creating BWA index for: {}".format(bwa_reference)
 
     # ensure required arguments are in signal_align_argments
     required_arguments = {'destination', 'stateMachineType', 'in_templateHmm', 'in_complementHmm',
@@ -549,13 +592,14 @@ def multithread_signal_alignment(signal_align_arguments, fast5_locations, worker
                           'degenerate', 'forward_reference'}
     optional_arguments = {'backward_reference', 'alignment_file', 'bwa_reference', 'twoD_chemistry',
                           'target_regions', 'output_format', 'embed', 'event_table', 'check_for_temp_file_existance',
-                          'track_memory_usage', 'get_expectations'}
+                          'track_memory_usage', 'get_expectations', 'path_to_bin'}
     missing_arguments = list(filter(lambda x: x not in signal_align_arguments.keys(), required_arguments))
     unexpected_arguments = list(filter(lambda x: x not in required_arguments and x not in optional_arguments,
                                        signal_align_arguments.keys()))
     assert len(missing_arguments) == 0 and len(unexpected_arguments) == 0, \
         "Invalid arguments to signal_align.  Missing: {}, Invalid: {}".format(missing_arguments, unexpected_arguments)
-
+    assert os.path.exists(signal_align_arguments['destination']), \
+        "Destination path does not exist: {}".format(signal_align_arguments['destination'])
     # run the signal_align_service
     print("[multithread_signal_alignment] running signal_alignment on {} fast5s with {} workers".format(
         len(fast5_locations), worker_count))
@@ -575,3 +619,219 @@ def multithread_signal_alignment(signal_align_arguments, fast5_locations, worker
 
     # fin
     print("[multithread_signal_alignment] fin")
+    return [x for x in glob.glob(os.path.join(signal_align_arguments["destination"], "*.tsv")) if
+            os.stat(x).st_size != 0]
+
+
+def create_sa_sample_args(fofns=[], fast5_dirs=[], positions_file=None, motifs=None, alignment_file=None,
+                          bwa_reference=None, fw_reference=None, bw_reference=None, name=None,
+                          number_of_kmer_assignments=10, probability_threshold=0.8, kmers_from_reference=False):
+    """Create sample arguments for SignalAlignSample. Parameters are explained in SignalAlignmentSample"""
+    sample_args = {
+        "fofns": fofns,
+        "fast5_dirs": fast5_dirs,
+        "positions_file": positions_file,
+        "motifs": motifs,
+        "bwa_reference": bwa_reference,
+        "fw_reference": fw_reference,
+        "bw_reference": bw_reference,
+        "name": name,
+        "number_of_kmer_assignments": number_of_kmer_assignments,
+        "probability_threshold": probability_threshold,
+        "kmers_from_reference": kmers_from_reference,
+        'alignment_file': alignment_file
+    }
+    return sample_args
+
+
+class SignalAlignSample(object):
+    def __init__(self, working_folder, fofns, fast5_dirs, positions_file, motifs, bwa_reference, fw_reference,
+                 bw_reference, name, number_of_kmer_assignments, probability_threshold, kmers_from_reference,
+                 alignment_file):
+        """Prepare sample for processing via signalAlign.
+
+        :param working_folder: FolderHandler() object with a working directory already created
+        :param fofns: list of fofns aka 'File Of File Names'
+        :param fast5_dirs: list of fast5 directories
+        :param positions_file: a path to tsv file. format: [contig  position    strand  change_from change_to]
+        :param motifs: list of motifs to process canonical guide reference fasta
+        :param bwa_reference: canoncial reference genome fasta. (preferably bwa indexed already)
+        :param fw_reference: path to the forward signalAlign reference (edited if looking for ambiguous positions or motifs)
+        :param bw_reference: path to the backward signalAlign reference (edited if looking for ambiguous positions or motifs)
+        :param name: name of sample
+        :param alignment_file: path to bam file to get alignments
+
+        ###### Sample specific HDP Training Parameters #######
+        :param number_of_kmer_assignments: max number of assignments for each kmer
+        :param probability_threshold: minimum probability required to use for training
+        :param kmers_from_reference: extract training kmers from reference sequence.
+
+        """
+        self.motifs = motifs
+        self.bwa_reference = bwa_reference
+        self.alignment_file = alignment_file
+        self.fw_fasta_path = fw_reference
+        self.bw_fasta_path = bw_reference
+        self.positions_file = positions_file
+        self.fast5_dirs = fast5_dirs
+        self.fofns = fofns
+        self.name = name
+        self.number_of_kmer_assignments = number_of_kmer_assignments
+        self.probability_threshold = probability_threshold
+        self.kmers_from_reference = kmers_from_reference
+        self.working_folder = working_folder
+
+        assert self.name is not None, "Must specify a name for your sample. name: {}".format(self.name)
+        assert isinstance(self.fast5_dirs, list), "fast5_dirs needs to be a list. fast5_dirs: {}".format(
+            self.fast5_dirs)
+        assert isinstance(self.fofns, list), "fofns needs to be a list. fofns: {}".format(self.fofns)
+        assert len(self.fast5_dirs) + len(self.fofns) >= 1, "must specifcy at least one fofn and one fast5_dir. " \
+                                                            "fofns: {}, fast5_dirs: {}".format(self.fofns,
+                                                                                               self.fast5_dirs)
+        # container for analysis files
+        self.analysis_files = None
+        self.files = []
+        self._find_fast5_files()
+        self.process_references()
+
+    def _find_fast5_files(self):
+        """Get all fasta paths via fofn.txt files and fast5_dirs"""
+        # gather all files in fast5 directories
+        for fast5_dir in self.fast5_dirs:
+            assert os.path.isdir(fast5_dir), "Fast5 directory does not exist. dir: {}".format(fast5_dir)
+            self.files.extend(
+                [os.path.abspath(os.path.join(fast5_dir, x)) for x in os.listdir(fast5_dir) if x.endswith(".fast5")])
+        # gather files from fofn.txt files
+        for fofn in self.fofns:
+            self.files.extend(parseFofn(fofn))
+        assert len(self.files) > 0, "Found no files in fast5_dirs or fofns. files: " \
+                                    "{}, fofns: {}, fast5_dirs: {}".format(self.files, self.fofns, self.fast5_dirs)
+
+    def getFiles(self):
+        return self.files
+
+    def getReferences(self):
+        return self.fw_fasta_path, self.bw_fasta_path
+
+    def process_references(self):
+        """Process a set of Fast5 files. Creates edited reference sequences if needed"""
+        if self.fw_fasta_path is None:
+            assert os.path.isfile(
+                self.bwa_reference), "Must specify a bwa_reference in order to create signalAlignments. {}" \
+                                     "".format(self.bwa_reference)
+            self.fw_fasta_path, self.bw_fasta_path = processReferenceFasta(fasta=self.bwa_reference,
+                                                                           work_folder=self.working_folder,
+                                                                           motif_key=self.motifs,
+                                                                           positions_file=self.positions_file)
+
+
+# TODO use Fast5 object
+def get_2d_length(fast5, verbose=False):
+    """Get 2d Read length. Searches only in one location
+
+   :param fast5: path to fast5 file
+   :param verbose: bool option to print update info
+    """
+    read = h5py.File(fast5, 'r')
+    twoD_read_sequence_address = "/Analyses/Basecall_2D_000/BaseCalled_2D/Fastq"
+    if not (twoD_read_sequence_address in read):
+        if verbose:
+            print("This read didn't have a 2D read", fast5, end='\n', file=sys.stderr)
+        read.close()
+        return 0
+    else:
+        read_length = len(read[twoD_read_sequence_address][()].split()[2])
+        if verbose:
+            print("read %s has %s bases" % (fast5, read_length))
+        read.close()
+        return read_length
+
+
+# TODO use Fast5 object
+def get_1d_length(fast5, verbose=False):
+    """Get 1D Read length. Searches only in one location
+
+    :param fast5: path to fast5 file
+    :param verbose: bool option to print update info
+    """
+    read = h5py.File(fast5, "r")
+    template_fastq_address = "/Analyses/Basecall_1D_000/BaseCalled_template/Fastq"
+    if not (template_fastq_address in read):
+        if verbose:
+            print("Read %s has not been basecalled" % fast5)
+        read.close()
+        return 0
+    else:
+        read_length = len(read[template_fastq_address][()].split()[2])
+        if verbose:
+            print("read %s has %s bases" % (fast5, read_length))
+        read.close()
+        return read_length
+
+
+def trim_num_files_in_sample(sample, max_bases, twoD, verbose=True):
+    """Trim the number of fast5 files based on sequence length
+    :param sample: "AbstractSamples" samples
+    :param max_bases: max number of nucelotides to analyze
+    :param twoD: boolean option to include twoD length
+    :param verbose: boolean option to report trimming stats
+    """
+    shuffle(sample.getFiles())
+    total_amount = 0
+    file_count = 0
+    get_seq_len_fcn = get_2d_length if twoD else get_1d_length
+    # loop over files and add them to training list, break when we have enough bases to complete a batch
+    # collect paths to fast5 files
+    list_of_fast5s = []
+    for f in sample.getFiles():
+        total_amount += get_seq_len_fcn(f)
+        if total_amount >= max_bases:
+            if len(list_of_fast5s) == 0:
+                total_amount = 0
+                continue
+            else:
+                break
+        # yield f, sample.fw_fasta_path, sample.bw_fasta_path
+        list_of_fast5s.append(f)
+        # training_files.append((f, sample.fw_fasta_path, sample.bw_fasta_path))
+        file_count += 1
+        if verbose:
+            print("[Trim_Sample] Culled {file_count} training files, for {bases} from {sample}."
+                  .format(file_count=file_count, bases=total_amount, sample=sample.name, end="\n", file=sys.stderr))
+    assert len(list_of_fast5s) > 0, "All fast5 files have sequence lengths greater than max_bases: {}".format(max_bases)
+    return list_of_fast5s
+
+
+def multithread_signal_alignment_samples(samples, signal_align_arguments, worker_count, trim=None):
+    """Multiprocess SignalAlignment for a list of fast5 files given a set of alignment arguments.
+
+    :param samples: list of "process_sample" samples
+    :param signal_align_arguments: signalAlignment arguments besides 'in_fast5'
+    :param worker_count: number of workers
+    :param trim: number of bases to analyze for each sample
+    """
+    original_destination = signal_align_arguments["destination"]
+    names = [sample.name for sample in samples]
+    assert len(names) == len(set(names)), "Cannot have same name for multiple samples: sample.name {}" \
+                                          "".format(names)
+    for sample in samples:
+        # process sample
+        if trim:
+            assert type(trim) is int, "Trim must be an integer"
+            list_of_fast5s = trim_num_files_in_sample(sample, trim, signal_align_arguments["twoD_chemistry"],
+                                                      verbose=True)
+        else:
+            list_of_fast5s = sample.getFiles()
+        # correct signal align arguments
+        signal_align_arguments["alignment_file"] = sample.alignment_file
+        signal_align_arguments["bwa_reference"] = sample.bwa_reference
+        signal_align_arguments["backward_reference"] = sample.bw_fasta_path
+        signal_align_arguments["forward_reference"] = sample.fw_fasta_path
+        signal_align_arguments["destination"] = os.path.join(original_destination, sample.name)
+        if not os.path.exists(signal_align_arguments["destination"]):
+            os.mkdir(signal_align_arguments["destination"])
+        # run signal align
+        output_files = multithread_signal_alignment(signal_align_arguments, list_of_fast5s, worker_count)
+        sample.analysis_files = output_files
+
+    return samples

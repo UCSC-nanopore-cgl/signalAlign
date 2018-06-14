@@ -18,18 +18,6 @@ import datetime
 #         break
 #     return input_sequence
 
-def parse_alignment_file(alignment_file):
-    data = pd.read_table(alignment_file, usecols=(1, 4, 5, 9, 12, 13),
-                         dtype={'ref_pos': np.int64,
-                                'strand': np.str,
-                                'event_index': np.int64,
-                                'kmer': np.str,
-                                'posterior_prob': np.float64,
-                                'event_mean': np.float64},
-                         header=None,
-                         names=['ref_pos', 'strand', 'event_index', 'kmer', 'posterior_prob', 'event_mean'])
-    return data
-
 
 # def randomly_select_alignments(path_to_alignments):
 #     files = os.listdir(path_to_alignments)
