@@ -708,6 +708,9 @@ class NanoporeRead2D(NanoporeRead):
 
         super(NanoporeRead2D, self).init_event_map()
 
+        assert self.get_complement_events(), "Complement event table not present at {} in {}".format(
+            self.complement_event_table_address, self.filename)
+
         self.complement_strand_event_map = self.make_event_map(self.complement_events, self.kmer_length)
         assert len(self.complement_strand_event_map) == len(self.complement_read), \
             "Complement read and event map lengths do not match {} != {}".format(len(self.complement_read),

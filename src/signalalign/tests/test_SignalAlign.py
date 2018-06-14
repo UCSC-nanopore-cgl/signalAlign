@@ -99,7 +99,6 @@ class SignalAlignAlignmentTest(unittest.TestCase):
             alignment_file = alignment.split("/")[-1]
             expected = parse_alignment_full(os.path.join(true_alignments, alignment_file))
             obs = parse_alignment_full(alignment)
-            self.assertEqual(len(obs), len(expected))
             for row in obs.itertuples():
                 ref_pos = row[1]
                 obs_kmer = row[2]
@@ -111,6 +110,8 @@ class SignalAlignAlignmentTest(unittest.TestCase):
                                                                                   obs=obs_kmer,
                                                                                   exp=exp_kmer,
                                                                                   f=alignment))
+            # assertign this at the end gives a better explanation of what's wrong
+            self.assertEqual(len(obs), len(expected))
 
     # def test_zymo_reads(self):
     #     zymo_true_alignments = os.path.join(SIGNALALIGN_ROOT,
