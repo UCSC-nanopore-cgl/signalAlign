@@ -83,8 +83,8 @@ def main():
     testSuite = unittest.TestSuite()
     testSuite.addTest(SingleNuclProbsTest('test_1D_reads'))
     testRunner = unittest.TextTestRunner(verbosity=2)
-    testRunner.run(testSuite)
+    return testRunner.run(testSuite).wasSuccessful()
 
 
 if __name__ == '__main__':
-    main()
+    sys.exit(0 if main() else 1)

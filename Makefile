@@ -7,11 +7,8 @@ libTests = tests/*.c
 scrappie_c = scrappie/*.c
 scrappie_h = scrappie/*.h
 
-
 signalAlignDependencies =  ${basicLibsDependencies}
 signalAlignLib = ${basicLibs}
-
-#coverage = -lgcov -coverage
 
 test_directory = ${rootPath}/src/signalalign/tests/
 
@@ -23,12 +20,8 @@ all : sL bD hs python-utils ${libPath}/signalAlignLib.a ${signalAlignBin}/signal
 	  ${signalAlignBin}/variantCallingLib.py ${signalAlignBin}/alignmentAnalysisLib.py \
 	  ${signalAlignBin}/buildHdpUtil ${signalAlignBin}/trainModels ${signalAlignBin}/hdp_pipeline all_tests \
 	  externals nanoporeParams python_setup  \
-#	  ${signalAlignBin}/signalAlignLib.py \
-	  #${signalAlignBin}/zayante ${signalAlignBin}/bonnyDoon \
-	  #${signalAlignBin}/empire ${signalAlignBin}/jamison \
 
 python-utils :
-#	echo "NOT PYPORE MAN"
 	cd python_utils && python3 setup.py install
 
 
@@ -38,8 +31,6 @@ scrappie :
 debugging : hs ${libPath}/signalAlignLib.a ${signalAlignDependencies}
 	${cxx} ${cflags} -I inc -I${libPath} -I${htsLibRootPath} -o ${signalAlignBin}/debugging debugging.c ${libPath}/signalAlignLib.a ${signalAlignLib} ${htsLib}
 
-# -I${htsLibPath}  -I${htsLibRootPath}
-#_curl_easy_init
 core : sL bD ${libPath}/signalAlignLib.a ${signalAlignBin}/signalAlignLibTests ${signalAlignBin}/signalMachine
 
 install: all pip_install
@@ -50,9 +41,9 @@ clean_light:
 
 clean :
 	if [ -d ${signalAlignBin} ]; then rm -r ${signalAlignBin}; fi
-	#rm -r ${signalAlignBin}
 	rm -f ${libPath}/signalAlignLib.a
 	cd externalTools && make clean
+	cd scrappie && make clean
 
 python_setup :
 	python3 setup.py install
@@ -121,20 +112,9 @@ ${signalAlignBin}/zayante : ${rootPath}src/signalalign/scripts/zayante.py
 	cp ${rootPath}src/signalalign/scripts/zayante.py ${signalAlignBin}/zayante
 	chmod +x ${signalAlignBin}/zayante
 
-${signalAlignBin}/bonnyDoon : ${rootPath}src/signalalign/scripts/bonnyDoon.py
-	cp ${rootPath}src/signalalign/scripts/bonnyDoon.py ${signalAlignBin}/bonnyDoon
-	chmod +x ${signalAlignBin}/bonnyDoon
-
 ${signalAlignBin}/empire : ${rootPath}src/signalalign/scripts/empire.py
 	cp ${rootPath}src/signalalign/scripts/empire.py ${signalAlignBin}/empire
 	chmod +x ${signalAlignBin}/empire
-
-${signalAlignBin}/jamison : ${rootPath}src/signalalign/scripts/jamison.py
-	cp ${rootPath}src/signalalign/scripts/jamison.py ${signalAlignBin}/jamison
-	chmod +x ${signalAlignBin}/jamison
-
-#${signalAlignBin}/signalAlignLib.py : ${rootPath}src/signalalign/scripts/signalAlignLib.py
-#	cp ${rootPath}src/signalalign/scripts/signalAlignLib.py ${signalAlignBin}/signalAlignLib.py
 
 ${signalAlignBin}/variantCallingLib.py : ${rootPath}src/signalalign/scripts/variantCallingLib.py
 	cp ${rootPath}src/signalalign/scripts/variantCallingLib.py ${signalAlignBin}/variantCallingLib.py
@@ -149,7 +129,6 @@ ${libPath}/signalAlignLib.a : ${libSources} ${libHeaders} ${stBarDependencies}
 	rm *.o
 	mv signalAlignLib.a ${libPath}/
 	cp ${libHeaders} ${libPath}/
-
 
 hs :
 	cd htslib && make

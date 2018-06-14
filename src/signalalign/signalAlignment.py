@@ -1,17 +1,10 @@
 #!/usr/bin/env python3
 
 from __future__ import print_function
-import os
-import sys
-import csv
-import numpy as np
-import pysam
-import subprocess
-# from sonLib.bioio import fastaWrite
 
 import signalalign.utils.multithread as multithread
 from signalalign import defaultModelFromVersion
-from signalalign.nanoporeRead import NanoporeRead
+from signalalign.nanoporeRead import NanoporeRead, NanoporeRead2D
 from signalalign.utils.bwaWrapper import *
 from signalalign.utils.fileHandlers import FolderHandler
 from signalalign.utils.sequenceTools import fastaWrite, samtools_faidx_fasta
@@ -98,35 +91,38 @@ class SignalAlignment(object):
             assert self.in_templateHmm is not None, "Need template HMM files for model training"
             if self.twoD_chemistry:
                 assert self.in_complementHmm is not None, "Need compement HMM files for model training"
-        # file checks
-        if os.path.isfile(self.in_fast5) is False:
+        if not os.path.isfile(self.in_fast5):
             print("[SignalAlignment.run] ERROR: Did not find .fast5 at{file}".format(file=self.in_fast5))
             return False
 
         # prep
         self.openTempFolder("tempFiles_%s" % self.read_name)
-        npRead = NanoporeRead(fast_five_file=self.in_fast5, twoD=self.twoD_chemistry, event_table=self.event_table,
-                              initialize=True)
+        if self.twoD_chemistry:
+            npRead = NanoporeRead2D(fast_five_file=self.in_fast5, event_table=self.event_table, initialize=True)
+        else:
+            npRead = NanoporeRead(fast_five_file=self.in_fast5, event_table=self.event_table, initialize=True)
+        #todo need to validate / generate events and nucleotide read
+
+        # read label
         read_label = npRead.read_label  # use this to identify the read throughout
         self.read_label = read_label
 
-        # np read
+        # nanopore read (event table, etc)
         npRead_ = self.addTempFilePath("temp_%s.npRead" % self.read_name)
         if not (self.check_for_temp_file_existance and os.path.isfile(npRead_)):
             # TODO is this totally fucked for RNA because of 3'-5' mapping?
             fH = open(npRead_, "w")
-            ok = npRead.Write(parent_job=None, out_file=fH, initialize=True)
+            ok = npRead.Write(out_file=fH, initialize=True)
             fH.close()
             if not ok:
                 self.failStop("[SignalAlignment.run] File: %s did not pass initial checks" % self.read_name, npRead)
                 return False
-        # read info
+
+        # nucleotide read
         read_fasta_ = self.addTempFilePath("temp_seq_%s.fa" % read_label)
-        if self.twoD_chemistry:
-            ok, version, pop1_complement = self.prepare_twod(nanopore_read=npRead, twod_read_path=read_fasta_)
-        else:
-            ok, version, _ = self.prepare_oned(nanopore_read=npRead, oned_read_path=read_fasta_)
-            pop1_complement = None
+        ok = self.write_nucleotide_read(npRead, read_fasta_)
+        if not ok:
+            print("[SignalAlignment.run] Failed to write nucleotide read.  Continuing execution.")
 
         # alignment info
         cigar_file_ = self.addTempFilePath("temp_cigar_%s.txt" % read_label)
@@ -174,7 +170,6 @@ class SignalAlignment(object):
         else:
             strand, reference_name = getInfoFromCigarFile(cigar_file_)
 
-
         # add an indicator for the model being used
         if self.stateMachineType == "threeState":
             model_label = ".sm"
@@ -221,11 +216,11 @@ class SignalAlignment(object):
 
         # input (match) models
         if self.in_templateHmm is None:
-            self.in_templateHmm = defaultModelFromVersion(strand="template", version=version)
-        if self.twoD_chemistry:
-            if self.in_complementHmm is None:
-                self.in_complementHmm = defaultModelFromVersion(strand="complement", version=version,
-                                                                pop1_complement=pop1_complement)
+            self.in_templateHmm = defaultModelFromVersion(strand="template", version=npRead.version)
+        if self.twoD_chemistry and self.in_complementHmm is None:
+            pop1_complement = npRead.complement_model_id == "complement_median68pA_pop1.model"
+            self.in_complementHmm = defaultModelFromVersion(strand="complement", version=npRead.version,
+                                                            pop1_complement=pop1_complement)
 
         assert self.in_templateHmm is not None
         if self.twoD_chemistry:
@@ -289,10 +284,12 @@ class SignalAlignment(object):
         else:
             degenerate_flag = ""
 
+        # twoD flag
         if self.twoD_chemistry:
             twoD_flag = "--twoD"
         else:
             twoD_flag = ""
+
         # commands
         if self.get_expectations:
             template_expectations_file_path = self.destination + read_label + ".template.expectations"
@@ -386,37 +383,28 @@ class SignalAlignment(object):
         # self.temp_folder.remove_folder()
         return True
 
-    def prepare_oned(self, nanopore_read, oned_read_path):
+    def write_nucleotide_read(self, nanopore_read, file_path):
         try:
-            read_file = open(oned_read_path, "w")
-            fastaWrite(fileHandleOrFile=read_file,
-                       name=nanopore_read.read_label,
-                       seq=nanopore_read.template_read)
+            with open(file_path, "w") as read_file:
+                # get appropriate read
+                if self.twoD_chemistry:
+                    # check for table to make 'assembled' 2D alignment table fasta with
+                    if not nanopore_read.has2D_alignment_table:
+                        nanopore_read.close()
+                        return False
+                    nucleotide_read = nanopore_read.alignment_table_sequence
+                else:
+                    nucleotide_read = nanopore_read.template_read
 
-            version = nanopore_read.version
-            read_file.close()
+                # write read
+                fastaWrite(fileHandleOrFile=read_file,
+                           name=nanopore_read.read_label,
+                           seq=nucleotide_read)
 
-            return True, version, False
+            return True
         except Exception as e:
-            return False, None, False
-
-    def prepare_twod(self, nanopore_read, twod_read_path):
-        # check for table to make 'assembled' 2D alignment table fasta with
-        if nanopore_read.has2D_alignment_table is False:
-            nanopore_read.close()
-            return False, None, False
-        fasta_handle = open(twod_read_path, "w")
-        fastaWrite(fileHandleOrFile=fasta_handle,
-                   name=nanopore_read.read_label,
-                   seq=nanopore_read.alignment_table_sequence)
-        if nanopore_read.complement_model_id == "complement_median68pA_pop1.model":
-            pop1_complement = True
-        else:
-            pop1_complement = False
-        version = nanopore_read.version
-        fasta_handle.close()
-        nanopore_read.close()
-        return True, version, pop1_complement
+            print('[SignalAlignment.write_nucleotide_read] {} exception: {}'.format(type(e), str(e)), file=sys.stderr)
+            return False
 
     def openTempFolder(self, temp_dir):
         self.temp_folder.open_folder("%s%s" % (self.destination, temp_dir))
@@ -530,12 +518,12 @@ def multithread_signal_alignment(signal_align_arguments, fast5_locations, worker
         samtools_faidx_fasta(signal_align_arguments["backward_reference"], log="multithread_signal_alignment")
 
     # bwa_reference and alignment_file must be specified
-    assert not ('bwa_reference' not in signal_align_arguments or
-                signal_align_arguments["bwa_reference"] is None) and ('alignment_file' not in signal_align_arguments or
-                signal_align_arguments['alignment_file'] is None), "Must specify bwa_reference or alignment_file"
+    assert ('bwa_reference'  in signal_align_arguments and signal_align_arguments["bwa_reference"]  is not None) or \
+           ('alignment_file' in signal_align_arguments and signal_align_arguments['alignment_file'] is not None), \
+        "Must specify bwa_reference or alignment_file"
 
     # if we didn't get an alignment file then check for index file
-    if not ('alignment_file' in signal_align_arguments and signal_align_arguments['alignment_file']):
+    if 'alignment_file' not in signal_align_arguments or not signal_align_arguments['alignment_file']:
         # ensure alignments can be generated (either from bwa on the reference or by an alignment file)
             bwa_reference = buildBwaIndex(signal_align_arguments["bwa_reference"],
                                           os.path.dirname(signal_align_arguments["bwa_reference"]),

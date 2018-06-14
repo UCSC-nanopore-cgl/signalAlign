@@ -404,8 +404,10 @@ class EventDetectTests(unittest.TestCase):
             resegment_reads(self.dna_file, speedy_params, speedy=False, overwrite=True)
 
         for fast5_file in [self.dna_file, self.rna_file]:
-            resegment_reads(fast5_file, minknow_params, speedy=False, overwrite=True)
-            fasthandle = resegment_reads(fast5_file, speedy_params, speedy=True, overwrite=True)
+            resegment_reads(fast5_file, params=minknow_params, speedy=False, overwrite=True,
+                            analysis_path="ReSegmentBasecall_000")
+            fasthandle = resegment_reads(fast5_file, params=speedy_params, speedy=True, overwrite=True,
+                                         analysis_path="ReSegmentBasecall_000")
             # TODO make sure this is working with test files
             fasthandle.delete("Analyses/ReSegmentBasecall_000")
 

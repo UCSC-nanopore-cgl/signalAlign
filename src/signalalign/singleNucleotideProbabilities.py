@@ -14,13 +14,13 @@ from argparse import ArgumentParser
 from random import shuffle
 from contextlib import closing
 from signalalign.nanoporeRead import NanoporeRead
-from signalalign.signalAlignment import SignalAlignment, multithread_signal_alignment
+from signalalign.signalAlignment import multithread_signal_alignment
 from signalalign.scripts.alignmentAnalysisLib import CallMethylation
 from signalalign.utils.fileHandlers import FolderHandler
-from signalalign.utils.sequenceTools import reverse_complement, replace_periodic_reference_positions
-from signalalign.utils.parsers import read_fasta
+from signalalign.utils.sequenceTools import get_full_nucleotide_read_from_alignment, replace_periodic_reference_positions
 from signalalign.utils.multithread import *
 from signalalign.motif import getDegenerateEnum
+from signalalign.event_detection import generate_events_and_alignment
 
 
 READ_NAME_KEY = "read_name"
@@ -105,15 +105,23 @@ def resolvePath(p):
         return os.path.abspath(p)
 
 
-def build_fast5_to_read_id_dict(fast5_locations):
+def organize_fast5s(fast5_locations):
+    # gathered data
     fast5_to_read_id = dict()
+    requires_event_calling = list()
+
+    # examine each fast5
     for fast5 in fast5_locations:
         npr = NanoporeRead(fast5)
-        npr.Initialize()
+        success = npr.Initialize()
         read_id = npr.read_label
         fast5_id = os.path.basename(fast5)[:-6]
         fast5_to_read_id[fast5_id] = read_id
-    return fast5_to_read_id
+        if not success:
+            requires_event_calling.append((fast5, read_id))
+        npr.close()
+
+    return fast5_to_read_id, requires_event_calling
 
 
 def get_reference_sequence(ref_location, contig, start_pos, end_pos):
@@ -447,50 +455,6 @@ def get_read_identities_from_sam(alignment_location, reference_location):
     return read_to_identity
 
 
-
-def aligner(work_queue, done_queue, service_name="aligner"):
-    # prep
-    total_handled = 0
-    failure_count = 0
-    mem_usages = list()
-
-    #catch overall exceptions
-    try:
-        for f in iter(work_queue.get, 'STOP'):
-            # catch exceptions on each element
-            try:
-                f['track_memory_usage'] = True
-                alignment = SignalAlignment(**f)
-                alignment.run()
-                if alignment.max_memory_usage_kb is not None:
-                    mem_usages.append(alignment.max_memory_usage_kb)
-            except Exception as e:
-                # get error and log it
-                message = "{}:{}".format(type(e), str(e))
-                error = "{} '{}' failed with: {}".format(service_name, current_process().name, message)
-                print("[{}] ".format(service_name) + error)
-                done_queue.put(error)
-                failure_count += 1
-
-            # increment total handling
-            total_handled += 1
-
-    except Exception as e:
-        # get error and log it
-        message = "{}:{}".format(type(e), str(e))
-        error = "{} '{}' critically failed with: {}".format(service_name, current_process().name, message)
-        print("[{}] ".format(service_name) + error)
-        done_queue.put(error)
-
-    finally:
-        # logging and final reporting
-        print("[%s] '%s' completed %d calls with %d failures"
-              % (service_name, current_process().name, total_handled, failure_count))
-        done_queue.put("{}:{}".format(TOTAL_KEY, total_handled))
-        done_queue.put("{}:{}".format(FAILURE_KEY, failure_count))
-        done_queue.put("{}:{}".format(MEM_USAGES, ",".join(map(str, mem_usages))))
-
-
 def variant_caller(work_queue, done_queue, service_name="variant_caller"):
     # prep
     total_handled = 0
@@ -530,13 +494,85 @@ def variant_caller(work_queue, done_queue, service_name="variant_caller"):
         done_queue.put("{}:{}".format(FAILURE_KEY, failure_count))
 
 
-def discover_single_nucleotide_probabilities(working_folder, kmer_length, reference_location,
+def event_detection(work_queue, done_queue, alignment_file, event_detection_strategy=None, event_detection_params=None,
+                    service_name="event_detection"):
+    # prep
+    total_handled = 0
+    failure_count = 0
+
+    #catch overall exceptions
+    try:
+        for tmp in iter(work_queue.get, 'STOP'):
+            fast5, read_id = tmp['fast5']
+            # catch exceptions on each element
+            try:
+                nucleotide, qualities, hardcode_front, hardcode_back = get_full_nucleotide_read_from_alignment(
+                    alignment_file, read_id)
+                success, _, _ = generate_events_and_alignment(fast5, nucleotide, nucleotide_qualities=qualities,
+                                                              save_to_fast5=False, overwrite=False)
+                if not success:
+                    failure_count += 1
+
+            except Exception as e:
+                # get error and log it
+                message = "{}:{}".format(type(e), str(e))
+                error = "{} '{}' failed with: {}".format(service_name, current_process().name, message)
+                print("[{}] ".format(service_name) + error)
+                done_queue.put(error)
+                failure_count += 1
+
+            # increment total handling
+            total_handled += 1
+
+    except Exception as e:
+        # get error and log it
+        message = "{}:{}".format(type(e), str(e))
+        error = "{} '{}' critically failed with: {}".format(service_name, current_process().name, message)
+        print("[{}] ".format(service_name) + error)
+        done_queue.put(error)
+
+    finally:
+        # logging and final reporting
+        print("[%s] '%s' completed %d calls with %d failures"
+              % (service_name, current_process().name, total_handled, failure_count))
+        done_queue.put("{}:{}".format(TOTAL_KEY, total_handled))
+        done_queue.put("{}:{}".format(FAILURE_KEY, failure_count))
+
+
+def discover_single_nucleotide_probabilities(args, working_folder, kmer_length, reference_location,
                                              list_of_fast5s, alignment_args, workers, step_size,
                                              output_directory=None, use_saved_alignments=True, save_alignments=True):
 
     # read fast5s and extract read ids
-    fast5_to_read = build_fast5_to_read_id_dict(list_of_fast5s)
+    fast5_to_read, requires_event_calling = organize_fast5s(list_of_fast5s)
     print("[info] built map of fast5 identifiers to read ids with {} elements".format(len(fast5_to_read)))
+
+    # promethION fast5s do not come with events, need to do event calling
+    if len(requires_event_calling) > 0:
+        # log and error checking
+        print("[info] {}/{} fast5s need event detection and read alignment".format(
+            len(requires_event_calling), len(fast5_to_read)))
+        if args.alignment_file is None:
+            print("[error] Cannot perform event detection without alignmentfile", file=sys.stderr)
+            sys.exit(1)
+
+        # prep for event detection
+        event_detection_service_args = {
+            'alignment_file': args.alignment_file,
+            'event_detection_strategy': None,
+            'event_detection_params': None
+        }
+
+        # do event detection
+        total, failure, messages = run_service(event_detection, requires_event_calling, {}, 'fast5', workers,
+                                               service_arguments=event_detection_service_args)
+
+        # loggit and continue
+        print("[info] {}/{} fast5s successfully had events detected".format(total - failure, total))
+        if failure == total:
+            print("[error] all event detection failed!", file=sys.stderr)
+            sys.exit(1)
+
 
     # do alignment and calling for each step
     for s in range(step_size):
@@ -673,6 +709,7 @@ def discover_single_nucleotide_probabilities(working_folder, kmer_length, refere
           .format(len(output_files), len(fast5_to_read), output_directory))
     return output_files
 
+
 def main(args):
     # parse args
     args = parse_args(args)
@@ -742,7 +779,6 @@ def main(args):
         shuffle(fast5s)
         fast5s = fast5s[:args.nb_files]
 
-
     # get the (input) reference sequence
     if not os.path.isfile(args.ref):
         print("[singleNucleotideProbabilities] Did not find valid reference file", file=sys.stderr)
@@ -774,7 +810,7 @@ def main(args):
 
     # get the sites that have proposed edits
     print("\n\n[singleNucleotideProbabilities] scanning for proposals with %d fast5s" % len(fast5s))
-    output_files = discover_single_nucleotide_probabilities(temp_folder, args.kmer_size, args.ref, fast5s, alignment_args,
+    output_files = discover_single_nucleotide_probabilities(args, temp_folder, args.kmer_size, args.ref, fast5s, alignment_args,
                                                             args.nb_jobs, args.step_size, output_directory=args.out)
     print("\n[singleNucleotideProbabilities] got {} output files:".format(len(output_files)))
     i = 0
