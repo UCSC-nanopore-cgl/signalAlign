@@ -10,6 +10,7 @@ class FolderHandler(object):
         self.filenames = []  # place to hold paths to temp files
 
     def open_folder(self, path):
+        path = os.path.abspath(path)
         self.path = os.path.expanduser(path)
 
         if not self.path.endswith("/"):
@@ -18,7 +19,7 @@ class FolderHandler(object):
         # if the folder already exists, make sure wr keep track so that we don't remove anything we
         # didn't want to
         if not os.path.isdir(path):
-            os.system("mkdir {dir}".format(dir=self.path))
+            os.makedirs(self.path)
             self.already_exists = False
         else:
             self.already_exists = True

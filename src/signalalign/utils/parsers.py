@@ -62,6 +62,7 @@ of a problem.  If there is no sequence data, these entries will propagate as
 empty entries. 
 """
 
+from __future__ import print_function
 import sys
 import re
 from math import log10
@@ -88,34 +89,33 @@ def read_fasta(fasta_file, ignore_case=True):
     URL: https://www.biostars.org/p/710/
     """ 
     
-    file = open(fasta_file, 'r')
 #    file=fasta_file
-    
-    # fasta_iter groups each line from the input fasta file by whether or not
-    # the line starts with '>' , returning a tuple (bool, line) where bool
-    # indicates if the line started with '>' and line is a string from the 
-    # file.
-    fasta_iter = (x[1] for x in groupby(file, 
-                                        lambda line: line.startswith(">"))
-                                        )
-    # This for-loop takes the two groups of line(s) from fasta_iter. The ID
-    # lines are seperated into the 'title' and the 'comment' The following group
-    # of lines (the sequence) is joined into a single line and assigned to the
-    # variable 'seq'. 'title', 'comment', and 'seq' are yielded as a tuple in
-    # that order. 
-    for lgroup in fasta_iter:
-        lgroup = lgroup.__next__()[1:].strip()
-        lgroup = lgroup.split(' ', 1)
-        title = lgroup[0]
-        comment = ''
-        if len(lgroup) > 1:
-            comment = lgroup[1]
-        seq = "".join(s.strip() for s in next(fasta_iter))
-        seq = seq.replace(" ", "")
-        if ignore_case:
-            seq = seq.upper()
-        fasta = (title, comment, seq)
-        yield fasta
+    with open(fasta_file, 'r') as file:
+        # fasta_iter groups each line from the input fasta file by whether or not
+        # the line starts with '>' , returning a tuple (bool, line) where bool
+        # indicates if the line started with '>' and line is a string from the
+        # file.
+        fasta_iter = (x[1] for x in groupby(file,
+                                            lambda line: line.startswith(">"))
+                                            )
+        # This for-loop takes the two groups of line(s) from fasta_iter. The ID
+        # lines are seperated into the 'title' and the 'comment' The following group
+        # of lines (the sequence) is joined into a single line and assigned to the
+        # variable 'seq'. 'title', 'comment', and 'seq' are yielded as a tuple in
+        # that order.
+        for lgroup in fasta_iter:
+            lgroup = lgroup.__next__()[1:].strip()
+            lgroup = lgroup.split(' ', 1)
+            title = lgroup[0]
+            comment = ''
+            if len(lgroup) > 1:
+                comment = lgroup[1]
+            seq = "".join(s.strip() for s in next(fasta_iter))
+            seq = seq.replace(" ", "")
+            if ignore_case:
+                seq = seq.upper()
+            fasta = (title, comment, seq)
+            yield fasta
 
 def read_fasta_with_quality(fasta_file, qual_file):
     """

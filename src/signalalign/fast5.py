@@ -65,7 +65,9 @@ class Fast5(h5py.File):
     __default_alignment_analysis__ = 'Alignment'
 
     __default_hairpin_split_analysis__ = 'Hairpin_Split'
-    __default_section__ = 'template'
+    __template_section__ = 'template'
+    __complement_section__ = 'complement'
+    __default_section__ = __template_section__
 
     __default_mapping_analysis__ = 'Squiggle_Map'
     __default_mapping_events__ = 'SquiggleMapped_{}/Events'
@@ -80,6 +82,7 @@ class Fast5(h5py.File):
     __default_basecall_mapping_summary__ = '/Summary/current_space_map_{}/'  # under AlignToRef analysis
     __default_basecall_alignment_summary__ = '/Summary/genome_mapping_{}/'  # under Alignment analysis
 
+    #todo fix the form of these
     __default_corrected_genome__ = '/Analyses/RawGenomeCorrected_000/BaseCalled_template'  # nanoraw
     __default_signalalign_events__ = '/Analyses/SignalAlign_00{}'  # signalalign events
     __default_resegment_basecall__ = '/Analyses/ReSegmentBasecall_00{}'
@@ -178,6 +181,20 @@ class Fast5(h5py.File):
     def _join_path(self, *args):
         return '/'.join(args)
 
+    @staticmethod
+    def bytes_to_string(string):
+        """Check string. If bytes, convert to string and return string
+
+        :param string: string or bytes
+        """
+        if string is None or type(string) == str:
+            return string
+        elif 'bytes' in str(type(string)):
+            return string.decode()
+        else:
+            raise AssertionError("String needs to be bytes or string ")
+
+
     @property
     def writable(self):
         """Can we write to the file."""
@@ -262,7 +279,7 @@ class Fast5(h5py.File):
         path_tmp = '{}.tmp'.format(path)
         mode = self.mode
         self.close()
-        subprocess.call(['h5repack', path, path_tmp])
+        subprocess.check_call(['h5repack', path, path_tmp], stderr=subprocess.STDOUT, shell=False)
         shutil.move(path_tmp, path)
         return Fast5(path, mode)
 
@@ -272,7 +289,7 @@ class Fast5(h5py.File):
         path_tmp = copy_path
         mode = self.mode
         self.close()
-        subprocess.call(['h5repack', path, path_tmp])
+        subprocess.check_call(['h5repack', path, path_tmp], stderr=subprocess.STDOUT, shell=False)
         return Fast5(path_tmp, mode)
 
     ###
@@ -333,6 +350,7 @@ class Fast5(h5py.File):
             raise KeyError('Read does not contain required fields: {}'.format(self.__default_corrected_genome__))
         return np.asarray(events), corr_start_rel_to_raw
 
+    #todo fix path creation
     def get_signalalign_events(self, mea=False, sam=False):
         """Get signal align events, sam or mea alignment"""
         assert (not mea or not sam), "Both mea and sam cannot be set to True"
@@ -350,9 +368,10 @@ class Fast5(h5py.File):
             raise KeyError('Read does not contain required fields: {}'.format(path))
         return events
 
-    def get_eventalign_events(self, section='template'):
+    #todo fix path creation
+    def get_eventalign_events(self, section=__default_section__):
         """Get signal align events, sam or mea alignment"""
-        assert section == 'template' or section == 'complement', \
+        assert section in [self.__template_section__, self.__complement_section__], \
             "Section must be template or complement: {}".format(section)
         try:
             path = self.check_path(self.__default_eventalign_events__, latest=True)
@@ -363,6 +382,7 @@ class Fast5(h5py.File):
             raise KeyError('Read does not contain required fields: {}'.format(path))
         return events
 
+    #todo fix path creation
     def get_resegment_basecall(self, number=None):
         """Get most recent resegmented basecall events table
 
@@ -441,6 +461,7 @@ class Fast5(h5py.File):
             data = (data + meta['offset']) * raw_unit
         return data
 
+    #todo fix path creation
     def set_read(self, data, meta, scale=True):
         """Write event data to file
 
@@ -472,22 +493,30 @@ class Fast5(h5py.File):
 
         self._add_event_table(data, self._join_path(path, 'Events'))
 
-    def set_fastq(self, path, data, section='template'):
+    def set_fastq(self, destination_root, data, section=__default_section__, overwrite=False):
         """Write new fasta file to file
 
-        :param path: path to fasta file
+        :param destination_root: root directory; data will be stored in {destination_root}/Basecalled_{section}/Fastq
         :param data: fastq file
         :param section: name of basecall analysis default (template)
         """
         check_fastq_line(data)
-        path = self._join_path(self.__base_analysis__, path, "BaseCalled_{}".format(section))
-        path = self.check_path(path, latest=True)
-        self._add_string_dataset(data, self._join_path(path, 'Fastq'))
 
-    def set_new_event_table(self, path, data, meta, section='template', scale=False, overwrite=False):
+        # get location and sanity check
+        path = self._join_path(destination_root, self.__default_basecall_fastq__.format(section))
+        if path in self:
+            if overwrite:
+                self.delete(path, ignore=True)
+            else:
+                raise Exception("Destination {} already exists in {}".format(path, self.filename))
+
+        # save
+        self._add_string_dataset(data, path)
+
+    def set_event_table(self, destination_root, data, meta, section=__default_section__, scale=False, overwrite=False):
         """Write new event data to file
 
-        :param path: path to Events table
+        :param destination_root: root directory; data will be stored in {destination_root}/Basecalled_{section}/Events
         :param data: event data
         :param meta: meta data to attach to read
         :param section: name of basecall analysis default (template)
@@ -496,29 +525,28 @@ class Fast5(h5py.File):
         """
 
         self.assert_writable()
-        # req_fields = [
-        #     'start_time', 'duration', 'read_number',
-        #     'start_mux', 'read_id', 'scaling_used'
-        # ]
-        # if not set(req_fields).issubset(meta.keys()):
-        #     raise KeyError(
-        #         'Read meta does not contain required fields: {}, got {}'.format(
-        #             req_fields, meta.keys()
-        #         )
-        #     )
         self.test_event_table(data)
 
-        path = self._join_path(self.__base_analysis__, path)
-        path = self.check_path(path, latest=overwrite)
-        if overwrite:
-            self.delete(path, ignore=True)
+        # modification to data
         if meta:
-            self._add_attrs(meta, path)
+            #todo add attrs to dest_root or dest_events?
+            self._add_attrs(meta, destination_root)
         if scale:
             data['start'] *= self.sample_rate
             data['length'] *= self.sample_rate
-        self._add_event_table(data, self._join_path(path, "BaseCalled_{}".format(section), 'Events'))
 
+        # get location and sanity check
+        destination_events = self._join_path(destination_root, self.__default_basecall_1d_events__.format(section))
+        if destination_events in self:
+            if overwrite:
+                self.delete(destination_events, ignore=True)
+            else:
+                raise Exception("Destination {} already exists in {}".format(destination_events, self.filename))
+
+        # save
+        self._add_event_table(data, destination_events)
+
+    #todo fix path creation
     def set_eventalign_table(self, template, complement, meta, overwrite=False):
         """Write eventalign table to fast5 file
 
@@ -548,6 +576,7 @@ class Fast5(h5py.File):
 
         return True
 
+    #todo change to look like get_analysis_latest
     def check_path(self, path, latest=False):
         """Check if path exists, if it does increment numbering
 
@@ -815,6 +844,22 @@ class Fast5(h5py.File):
     ###
     # 1D Basecalling data
 
+
+    def has_basecall_data(self, section=__default_section__, analysis=__default_basecall_1d_analysis__):
+        """
+        Determines whether events table exists
+
+        :param section: String to use in paths, e.g. 'template' or 'complement'.
+        :param analysis: Base analysis name (under {})
+        """
+
+        try:
+            self.get_basecall_data(section=section, analysis=analysis)
+            return True
+        except:
+            return False
+
+
     def get_basecall_data(self, section=__default_section__, analysis=__default_basecall_1d_analysis__):
         """Read the annotated basecall_1D events from the fast5 file.
 
@@ -1037,17 +1082,17 @@ class Fast5(h5py.File):
                 self.get_analysis_latest(analysis), self.__default_basecall_fastq__.format(section)
             )
         try:
-            return self[location][()]
+            return self.bytes_to_string(self[location][()])
         except:
             # Did we get given section != 2D and no analysis, that's
             #    more than likely incorrect. Try alternative analysis
             if section != self.__default_seq_section__ and analysis == self.__default_basecall_2d_analysis__:
                 location = self._join_path(
-                    self.get_analysis_latest(__default_basecall_1d_analysis__),
-                    __default_basecall_fastq__.format(section)
+                    self.get_analysis_latest(self.__default_basecall_1d_analysis__),
+                    self.__default_basecall_fastq__.format(section)
                 )
                 try:
-                    return self[location][()]
+                    return self.bytes_to_string(self[location][()])
                 except:
                     raise ValueError(err_msg.format(location))
             else:
@@ -1110,14 +1155,14 @@ class Fast5(h5py.File):
         # check both experiment type and kit slots for "rna"
         exp_type, exp_kit = None, None
         try:
-            exp_type = bytes.decode(self['UniqueGlobalKey/context_tags'].attrs[
+            exp_type = self.bytes_to_string(self['UniqueGlobalKey/context_tags'].attrs[
                                         'experiment_type'])
             # remove the word internal since it contains rna.
             exp_type = exp_type.replace('internal', '')
         except:
             pass
         try:
-            exp_kit = bytes.decode(self['UniqueGlobalKey/context_tags'].attrs[
+            exp_kit = self.bytes_to_string(self['UniqueGlobalKey/context_tags'].attrs[
                                        'experiment_kit'])
             # remove the word internal since it contains rna.
             exp_kit = exp_kit.replace('internal', '')

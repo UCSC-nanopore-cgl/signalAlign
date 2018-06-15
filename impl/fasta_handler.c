@@ -17,14 +17,11 @@ char *fastaHandler_getSubSequence(char *fastaReferencePath, int64_t start, int64
                                 const char *sequence_name) {
     // index reference
     faidx_t *fasta_index = fai_load(fastaReferencePath);
+    int length;
 
     if (strand) {
-        //    need pointer to length for fetching the sequence
 
-        int length = end - start;
-        int *l = &length;
-
-        char *sequence = faidx_fetch_seq(fasta_index, sequence_name, start, end-1, l);
+        char *sequence = faidx_fetch_seq(fasta_index, sequence_name, start, end-1, &length);
         if (length == -2) {
             st_errAbort("[signalMachine] ERROR %d: sequence name: %s is not in reference fasta: %s \n",
                         length, sequence_name, fastaReferencePath);
@@ -33,10 +30,8 @@ char *fastaHandler_getSubSequence(char *fastaReferencePath, int64_t start, int64
         return sequence;
 
     }
-    int length = start - end;
-    int *l = &length;
 
-    char *sequence = faidx_fetch_seq(fasta_index, sequence_name, end, start-1, l);
+    char *sequence = faidx_fetch_seq(fasta_index, sequence_name, end, start-1, &length);
     if (length == -2) {
         st_errAbort("[signalMachine] ERROR %d: sequence name: %s is not in reference fasta: %s \n",
                     length, sequence_name, fastaReferencePath);
@@ -91,7 +86,7 @@ ReferenceSequence *fastaHandler_ReferenceSequenceConstructFull(char *forward_fas
 void build_fai_index_file() {
 //    int bugs = 100;
 //    double bug_rate = 1.2;
-    char fast_path[] = "/Users/andrewbailey/CLionProjects/nanopore-RNN/signalAlign/tests/test_sequences/fake_rna_reversed.fa";
+    char fast_path[] = "/Users/andrewbailey/CLionProjects/nanopore-RNN/submodules/signalAlign/tests/test_sequences/fake_rna_reversed.fa";
 //    fprintf(stdout, "You have %d bugs at the imaginary rate of %f.\n", bugs, bug_rate);
     fprintf(stdout, "fasta path: %s. \n", fast_path);
 //    int success = fai_build(fast_path);

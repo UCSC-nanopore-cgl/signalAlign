@@ -18,8 +18,6 @@
 #define M_PI 3.14159265358979323846264338
 #endif
 
-typedef struct Factor Factor;
-typedef struct DirichletProcess DirichletProcess;
 
 typedef enum FactorType {
     BASE,
@@ -56,6 +54,10 @@ struct DirichletProcess {
     
     bool observed;
 };
+
+typedef struct Factor Factor;
+typedef struct DirichletProcess DirichletProcess;
+
 
 struct HierarchicalDirichletProcess {
     bool finalized;

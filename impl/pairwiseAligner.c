@@ -373,7 +373,7 @@ Sequence *sequence_constructKmerSequence(int64_t length, void *elements,
         st_errAbort("sequence_constructKmerSequence: can only make reference sequence from kmer sequence\n");
     }
     Sequence *self = sequence_construct2(length, elements, getFcn, sliceFcn, type);
-    char *degenerateBases = (char *)st_malloc(sizeof(char) * nbOptions);
+    char *degenerateBases = (char *)st_malloc(sizeof(char) * nbOptions + 1);
     memcpy(degenerateBases, nucleotideOptions, sizeof(char) * nbOptions + 1);
     self->sliceFcn = sliceFcn;
     self->degenerateBases = degenerateBases;
@@ -1318,7 +1318,6 @@ void getPosteriorProbsWithBanding(StateMachine *sM,
 
     while (1) { //Loop that moves through the matrix forward
         Diagonal diagonal = bandIterator_getNext(forwardBandIterator);
-//        printf("One Loop in while");
         //Forward calculation
         dpDiagonal_zeroValues(dpMatrix_createDiagonal(forwardDpMatrix, diagonal, sX));
         diagonalCalculationForward(sM, diagonal_getXay(diagonal), forwardDpMatrix, sX, sY);
@@ -1824,7 +1823,6 @@ void getPosteriorProbsWithBandingSplittingAlignmentsByLargeGaps(
             j++;
         }
 
-//        printf("One Loop");
         //Make the alignments
         getPosteriorProbsWithBanding(sM, subListOfAnchorPoints, sX3, sY3, p,
                                      (alignmentHasRaggedLeftEnd || i > 0),

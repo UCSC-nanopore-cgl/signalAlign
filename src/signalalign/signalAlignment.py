@@ -1,16 +1,13 @@
 #!/usr/bin/env python3
 
-import os
-import sys
-import csv
-import numpy as np
-import pysam
-# from sonLib.bioio import fastaWrite
+from __future__ import print_function
+
+import signalalign.utils.multithread as multithread
 from signalalign import defaultModelFromVersion
-from signalalign.nanoporeRead import NanoporeRead
-from signalalign.utils.bwaWrapper import generateGuideAlignment
+from signalalign.nanoporeRead import NanoporeRead, NanoporeRead2D
+from signalalign.utils.bwaWrapper import *
 from signalalign.utils.fileHandlers import FolderHandler
-from signalalign.utils.sequenceTools import fastaWrite
+from signalalign.utils.sequenceTools import fastaWrite, samtools_faidx_fasta
 from signalalign.mea_algorithm import mea_alignment_from_signal_align, match_events_with_signalalign
 
 
@@ -19,7 +16,6 @@ class SignalAlignment(object):
                  in_fast5,
                  destination,
                  stateMachineType,
-                 bwa_index,
                  in_templateHmm,
                  in_complementHmm,
                  in_templateHdp,
@@ -28,17 +24,24 @@ class SignalAlignment(object):
                  diagonal_expansion,
                  constraint_trim,
                  degenerate,
-                 twoD_chemistry,
                  forward_reference,
                  backward_reference=None,
+                 # one of these needs to be set
+                 alignment_file=None,
+                 bwa_reference=None,
+                 # reasonable defaults
+                 twoD_chemistry=False,
                  target_regions=None,
                  output_format="full",
                  embed=False,
-                 event_table=False):
+                 event_table=False,
+                 check_for_temp_file_existance=True,
+                 track_memory_usage=False,
+                 get_expectations=False):
         self.in_fast5 = in_fast5  # fast5 file to align
         self.destination = destination  # place where the alignments go, should already exist
         self.stateMachineType = stateMachineType  # flag for signalMachine
-        self.bwa_index = bwa_index  # index of reference sequence
+        self.bwa_reference = bwa_reference  # path to reference sequence to generate guide alignment
         self.threshold = threshold  # min posterior probability to keep
         self.diagonal_expansion = diagonal_expansion  # alignment algorithm param
         self.constraint_trim = constraint_trim  # alignment algorithm param
@@ -53,7 +56,15 @@ class SignalAlignment(object):
         self.event_table = event_table  # specify which event table to use to generate alignments
         self.backward_reference = backward_reference  # fasta path to backward reference if modified bases are used
         self.forward_reference = forward_reference  # fasta path to forward reference
+        self.alignment_file = alignment_file  # guide aligments will be gotten from here if set
+        self.check_for_temp_file_existance = check_for_temp_file_existance  # don't recreate if files exist
+        self.track_memory_usage = track_memory_usage  # has the 'time' program append mem usage stats to output
+        self.max_memory_usage_kb = None
+        self.read_label = None
+        self.get_expectations = get_expectations  # option to gather expectations of transitions and emissions
 
+        assert self.bwa_reference is not None or self.alignment_file is not None, \
+            "either 'bwa_reference' or 'alignment_file' argument is needed to generate cigar strings"
 
         if (in_templateHmm is not None) and os.path.isfile(in_templateHmm):
             self.in_templateHmm = in_templateHmm
@@ -74,36 +85,91 @@ class SignalAlignment(object):
         else:
             self.in_complementHdp = None
 
-    def run(self, get_expectations=False):
-        print("[SignalAlignment.run]INFO: Starting on {read}".format(read=self.in_fast5), file=sys.stderr)
-        if get_expectations:
-            assert self.in_templateHmm is not None and self.in_complementHmm is not None, \
-                "Need HMM files for model training"
-        # file checks
-        if os.path.isfile(self.in_fast5) is False:
-            print("[SignalAlignment.run]ERROR: Did not find .fast5 at{file}".format(file=self.in_fast5))
+    def run(self):
+        print("[SignalAlignment.run] INFO: Starting on {read}".format(read=self.in_fast5))
+        if self.get_expectations:
+            assert self.in_templateHmm is not None, "Need template HMM files for model training"
+            if self.twoD_chemistry:
+                assert self.in_complementHmm is not None, "Need compement HMM files for model training"
+        if not os.path.isfile(self.in_fast5):
+            print("[SignalAlignment.run] ERROR: Did not find .fast5 at{file}".format(file=self.in_fast5))
             return False
 
+        # prep
         self.openTempFolder("tempFiles_%s" % self.read_name)
-        npRead_ = self.addTempFilePath("temp_%s.npRead" % self.read_name)
-        # TODO is this totally fucked for RNA because of 3'-5' mapping?
-        npRead = NanoporeRead(fast_five_file=self.in_fast5, twoD=self.twoD_chemistry, event_table=self.event_table)
-        fH = open(npRead_, "w")
-        ok = npRead.Write(parent_job=None, out_file=fH, initialize=True)
-        fH.close()
-        if not ok:
-            self.failStop("[SignalAlignment.run]File: %s did not pass initial checks" % self.read_name, npRead)
-            return False
-
-        read_label = npRead.read_label  # use this to identify the read throughout
-        read_fasta_ = self.addTempFilePath("temp_seq_%s.fa" % read_label)
-        temp_samfile_ = self.addTempFilePath("temp_sam_file_%s.sam" % read_label)
-        cigar_file_ = self.addTempFilePath("temp_cigar_%s.txt" % read_label)
         if self.twoD_chemistry:
-            ok, version, pop1_complement = self.prepare_twod(nanopore_read=npRead, twod_read_path=read_fasta_)
+            npRead = NanoporeRead2D(fast_five_file=self.in_fast5, event_table=self.event_table, initialize=True)
         else:
-            ok, version, _ = self.prepare_oned(nanopore_read=npRead, oned_read_path=read_fasta_)
-            pop1_complement = None
+            npRead = NanoporeRead(fast_five_file=self.in_fast5, event_table=self.event_table, initialize=True)
+        #todo need to validate / generate events and nucleotide read
+
+        # read label
+        read_label = npRead.read_label  # use this to identify the read throughout
+        self.read_label = read_label
+
+        # nanopore read (event table, etc)
+        npRead_ = self.addTempFilePath("temp_%s.npRead" % self.read_name)
+        if not (self.check_for_temp_file_existance and os.path.isfile(npRead_)):
+            # TODO is this totally fucked for RNA because of 3'-5' mapping?
+            fH = open(npRead_, "w")
+            ok = npRead.Write(out_file=fH, initialize=True)
+            fH.close()
+            if not ok:
+                self.failStop("[SignalAlignment.run] File: %s did not pass initial checks" % self.read_name, npRead)
+                return False
+
+        # nucleotide read
+        read_fasta_ = self.addTempFilePath("temp_seq_%s.fa" % read_label)
+        ok = self.write_nucleotide_read(npRead, read_fasta_)
+        if not ok:
+            print("[SignalAlignment.run] Failed to write nucleotide read.  Continuing execution.")
+
+        # alignment info
+        cigar_file_ = self.addTempFilePath("temp_cigar_%s.txt" % read_label)
+        temp_samfile_ = self.addTempFilePath("temp_sam_file_%s.sam" % read_label)
+        strand = None
+        reference_name = None
+        if not (self.check_for_temp_file_existance and os.path.isfile(cigar_file_)):
+
+            # need guide alignment to generate cigar file
+            guide_alignment = None
+
+            # get from alignment file
+            if self.alignment_file is not None:
+                guide_alignment = getGuideAlignmentFromAlignmentFile(self.alignment_file, read_name=read_label)
+                if guide_alignment is None:
+                    print("[SignalAlignment.run] read {} not found in {}".format(read_label, self.alignment_file))
+
+            # get from bwa
+            if guide_alignment is None and self.bwa_reference is not None:
+                guide_alignment = generateGuideAlignment(reference_fasta=self.bwa_reference,
+                                                         query=read_fasta_,
+                                                         temp_sam_path=temp_samfile_,
+                                                         target_regions=self.target_regions)
+                if guide_alignment is None:
+                    print("[SignalAlignment.run] read {} could not be aligned with BWA".format(read_label))
+
+            # could not map
+            if guide_alignment is None:
+                self.failStop("[SignalAlignment.run] ERROR getting guide alignment", npRead)
+                return False
+
+            # ensure valid
+            if not guide_alignment.validate():
+                self.failStop("[SignalAlignment.run] ERROR invalid guide alignment", npRead)
+                return False
+            strand = guide_alignment.strand
+            reference_name = guide_alignment.reference_name
+
+            # write cigar to file
+            cig_handle = open(cigar_file_, "w")
+            cig_handle.write(guide_alignment.cigar + "\n")
+            cig_handle.close()
+
+        # otherwise, get strand from file
+        else:
+            strand, reference_name = getInfoFromCigarFile(cigar_file_)
+
         # add an indicator for the model being used
         if self.stateMachineType == "threeState":
             model_label = ".sm"
@@ -119,24 +185,9 @@ class SignalAlignment(object):
             model_label = ".sm"
             stateMachineType_flag = ""
 
-        guide_alignment = generateGuideAlignment(bwa_index=self.bwa_index, query=read_fasta_,
-                                                 temp_sam_path=temp_samfile_,
-                                                 target_regions=self.target_regions)
-        # ok = guide_alignment.validate(list(self.reference_map.keys()))
-        ok = guide_alignment.validate()
-
-        if not ok:
-            self.failStop("[SignalAlignment.run]ERROR getting guide alignment", npRead)
-            return False
-
-        cig_handle = open(cigar_file_, "w")
-        cig_handle.write(guide_alignment.cigar + "\n")
-        cig_handle.close()
-
         # next section makes the output file name with the format: /directory/for/files/file.model.orientation.tsv
-        posteriors_file_path = ''
         # forward strand
-        if guide_alignment.strand == "+":
+        if strand == "+":
             if self.output_format == "full":
                 posteriors_file_path = self.destination + read_label + model_label + ".forward.tsv"
             elif self.output_format == "variantCaller":
@@ -145,13 +196,18 @@ class SignalAlignment(object):
                 posteriors_file_path = self.destination + read_label + model_label + ".assignments"
 
         # backward strand
-        if guide_alignment.strand == "-":
+        elif strand == "-":
             if self.output_format == "full":
                 posteriors_file_path = self.destination + read_label + model_label + ".backward.tsv"
             elif self.output_format == "variantCaller":
                 posteriors_file_path = self.destination + read_label + model_label + ".tsv"
             else:
                 posteriors_file_path = self.destination + read_label + model_label + ".assignments"
+
+        # sanity check
+        else:
+            self.failStop("[SignalAlignment.run] ERROR Unexpected strand {}".format(strand), npRead)
+            return False
 
         # Alignment/Expectations routine
         path_to_signalAlign = "./signalMachine"
@@ -160,16 +216,16 @@ class SignalAlignment(object):
 
         # input (match) models
         if self.in_templateHmm is None:
-            self.in_templateHmm = defaultModelFromVersion(strand="template", version=version)
-        if self.twoD_chemistry:
-            if self.in_complementHmm is None:
-                self.in_complementHmm = defaultModelFromVersion(strand="complement", version=version,
-                                                                pop1_complement=pop1_complement)
+            self.in_templateHmm = defaultModelFromVersion(strand="template", version=npRead.version)
+        if self.twoD_chemistry and self.in_complementHmm is None:
+            pop1_complement = npRead.complement_model_id == "complement_median68pA_pop1.model"
+            self.in_complementHmm = defaultModelFromVersion(strand="complement", version=npRead.version,
+                                                            pop1_complement=pop1_complement)
 
         assert self.in_templateHmm is not None
         if self.twoD_chemistry:
             if self.in_complementHmm is None:
-                self.failStop("[SignalAlignment.run]ERROR Need to have complement HMM for 2D analysis", npRead)
+                self.failStop("[SignalAlignment.run] ERROR Need to have complement HMM for 2D analysis", npRead)
                 return False
 
         template_model_flag = "-T {} ".format(self.in_templateHmm)
@@ -178,8 +234,8 @@ class SignalAlignment(object):
         else:
             complement_model_flag = ""
 
-        print("[SignalALignment.run]NOTICE: template model {t} complement model {c}"
-              "".format(t=self.in_templateHmm, c=self.in_complementHmm), file=sys.stderr)
+        print("[SignalAlignment.run] NOTICE: template model {t} complement model {c}"
+              "".format(t=self.in_templateHmm, c=self.in_complementHmm))
 
         # reference sequences
         assert os.path.isfile(self.forward_reference)
@@ -218,7 +274,7 @@ class SignalAlignment(object):
 
         # output format
         if self.output_format not in list(self.output_formats.keys()):
-            self.failStop("[SignalAlignment.run]ERROR illegal output format selected %s" % self.output_format)
+            self.failStop("[SignalAlignment.run] ERROR illegal output format selected %s" % self.output_format)
             return False
         out_fmt = "-s {fmt} ".format(fmt=self.output_formats[self.output_format])
 
@@ -228,12 +284,14 @@ class SignalAlignment(object):
         else:
             degenerate_flag = ""
 
+        # twoD flag
         if self.twoD_chemistry:
             twoD_flag = "--twoD"
         else:
             twoD_flag = ""
+
         # commands
-        if get_expectations:
+        if self.get_expectations:
             template_expectations_file_path = self.destination + read_label + ".template.expectations"
             complement_expectations_file_path = self.destination + read_label + ".complement.expectations"
 
@@ -247,7 +305,7 @@ class SignalAlignment(object):
                             templateExpectations=template_expectations_file_path, hdp=hdp_flags,
                             complementExpectations=complement_expectations_file_path, t_model=template_model_flag,
                             c_model=complement_model_flag, thresh=threshold_flag, expansion=diag_expansion_flag,
-                            trim=trim_flag, degen=degenerate_flag, sparse=out_fmt, seq_name=guide_alignment.reference_name,
+                            trim=trim_flag, degen=degenerate_flag, sparse=out_fmt, seq_name=reference_name,
                             f_ref_fa=forward_ref_flag, b_ref_fa=backward_ref_flag)
         else:
             command = \
@@ -259,15 +317,35 @@ class SignalAlignment(object):
                             readLabel=read_label, npRead=npRead_, td=twoD_flag,
                             t_model=template_model_flag, c_model=complement_model_flag,
                             posteriors=posteriors_file_path, thresh=threshold_flag, expansion=diag_expansion_flag,
-                            trim=trim_flag, hdp=hdp_flags, degen=degenerate_flag, seq_name=guide_alignment.reference_name,
+                            trim=trim_flag, hdp=hdp_flags, degen=degenerate_flag, seq_name=reference_name,
                             f_ref_fa=forward_ref_flag, b_ref_fa=backward_ref_flag)
 
 
         # run
-        print("signalAlign - running command: ", command, end="\n", file=sys.stderr)
-        os.system(command)
+        print("[SignalAlignment.run] running command: ", command, end="\n")
+        try:
+            command = command.split()
+
+            if self.track_memory_usage:
+                mem_command = ['/usr/bin/time', '-f', '\\nDEBUG_MAX_MEM:%M\\n']
+                print("[SignalAlignment.run] Prepending command to track mem usage: {}".format(mem_command))
+                mem_command.extend(command)
+                command = mem_command
+
+            output = subprocess.check_output(command, stderr=subprocess.STDOUT)
+            output = str(output).split("\\n")
+            for line in output:
+                print("[SignalAlignment.run]    {}: {}".format(read_label, line))
+                if line.startswith("DEBUG_MAX_MEM"):
+                    self.max_memory_usage_kb = int(line.split(":")[1])
+
+        except Exception as e:
+            print("[SignalAlignment.run] exception ({}) running signalAlign: {}".format(type(e), e))
+            raise e
+
+        # save to fast5 file (if appropriate)
         if self.embed:
-            print("signalAlign - embedding into Fast5 ", file=sys.stderr)
+            print("[SignalAlignment.run] embedding into Fast5 ")
 
             data = self.read_in_signal_align_tsv(posteriors_file_path, file_type=self.output_format)
             npRead = NanoporeRead(fast_five_file=self.in_fast5, twoD=self.twoD_chemistry, event_table=self.event_table)
@@ -279,12 +357,12 @@ class SignalAlignment(object):
 
             # Todo add attributes to signalalign output
             if self.output_format == "full":
-                print("signalAlign - writing maximum expected alignment ", file=sys.stderr)
+                print("[SignalAlignment.run] writing maximum expected alignment ")
                 alignment = mea_alignment_from_signal_align(None, events=data)
                 mae_path = npRead._join_path(signal_align_path, "MEA_alignment_labels")
                 events = npRead.get_template_events()
                 if events:
-                    if guide_alignment.strand == "-":
+                    if strand == "-":
                         minus = True
                     else:
                         minus = False
@@ -294,9 +372,10 @@ class SignalAlignment(object):
                                                            rna=npRead.is_read_rna())
                     npRead.write_data(labels, mae_path)
                     sam_string = str()
-                    with open(temp_samfile_, 'r') as test:
-                        for line in test:
-                            sam_string += line
+                    if os.path.isfile(temp_samfile_):
+                        with open(temp_samfile_, 'r') as test:
+                            for line in test:
+                                sam_string += line
                     sam_path = npRead._join_path(signal_align_path, "sam")
                     # print(sam_string)
                     npRead.write_data(data=sam_string, location=sam_path, compression=None)
@@ -304,37 +383,28 @@ class SignalAlignment(object):
         # self.temp_folder.remove_folder()
         return True
 
-    def prepare_oned(self, nanopore_read, oned_read_path):
+    def write_nucleotide_read(self, nanopore_read, file_path):
         try:
-            read_file = open(oned_read_path, "w")
-            fastaWrite(fileHandleOrFile=read_file,
-                       name=nanopore_read.read_label,
-                       seq=nanopore_read.template_read)
+            with open(file_path, "w") as read_file:
+                # get appropriate read
+                if self.twoD_chemistry:
+                    # check for table to make 'assembled' 2D alignment table fasta with
+                    if not nanopore_read.has2D_alignment_table:
+                        nanopore_read.close()
+                        return False
+                    nucleotide_read = nanopore_read.alignment_table_sequence
+                else:
+                    nucleotide_read = nanopore_read.template_read
 
-            version = nanopore_read.version
-            read_file.close()
+                # write read
+                fastaWrite(fileHandleOrFile=read_file,
+                           name=nanopore_read.read_label,
+                           seq=nucleotide_read)
 
-            return True, version, False
+            return True
         except Exception as e:
-            return False, None, False
-
-    def prepare_twod(self, nanopore_read, twod_read_path):
-        # check for table to make 'assembled' 2D alignment table fasta with
-        if nanopore_read.has2D_alignment_table is False:
-            nanopore_read.close()
-            return False, None, False
-        fasta_handle = open(twod_read_path, "w")
-        fastaWrite(fileHandleOrFile=fasta_handle,
-                   name=nanopore_read.read_label,
-                   seq=nanopore_read.alignment_table_sequence)
-        if nanopore_read.complement_model_id == "complement_median68pA_pop1.model":
-            pop1_complement = True
-        else:
-            pop1_complement = False
-        version = nanopore_read.version
-        fasta_handle.close()
-        nanopore_read.close()
-        return True, version, pop1_complement
+            print('[SignalAlignment.write_nucleotide_read] {} exception: {}'.format(type(e), str(e)), file=sys.stderr)
+            return False
 
     def openTempFolder(self, temp_dir):
         self.temp_folder.open_folder("%s%s" % (self.destination, temp_dir))
@@ -346,7 +416,7 @@ class SignalAlignment(object):
         self.temp_folder.remove_folder()
         if nanopore_read is not None:
             nanopore_read.close()
-        print(message, file=sys.stderr)
+        print(message)
 
     def read_in_signal_align_tsv(self, tsv_path, file_type):
         """Read in tsv file"""
@@ -382,3 +452,114 @@ class SignalAlignment(object):
             event_table = remove_field_name(event_table, "read_file")
 
         return event_table
+
+
+def signal_alignment_service(work_queue, done_queue, service_name="signal_alignment"):
+    # prep
+    total_handled = 0
+    failure_count = 0
+    mem_usages = list()
+
+    # catch overall exceptions
+    try:
+        for f in iter(work_queue.get, 'STOP'):
+            # catch exceptions on each element
+            try:
+                alignment = SignalAlignment(**f)
+                success = alignment.run()
+                if alignment.max_memory_usage_kb is not None:
+                    mem_usages.append(alignment.max_memory_usage_kb)
+                if not success: failure_count += 1
+            except Exception as e:
+                # get error and log it
+                message = "{}:{}".format(type(e), str(e))
+                error = "{} '{}' failed with: {}".format(service_name, multithread.current_process().name, message)
+                print("[{}] ".format(service_name) + error)
+                done_queue.put(error)
+                failure_count += 1
+
+            # increment total handling
+            total_handled += 1
+
+    except Exception as e:
+        # get error and log it
+        message = "{}:{}".format(type(e), str(e))
+        error = "{} '{}' critically failed with: {}".format(service_name, multithread.current_process().name, message)
+        print("[{}] ".format(service_name) + error)
+        done_queue.put(error)
+
+    finally:
+        # logging and final reporting
+        print("[%s] '%s' completed %d calls with %d failures"
+              % (service_name, multithread.current_process().name, total_handled, failure_count))
+        done_queue.put("{}:{}".format(multithread.TOTAL_KEY, total_handled))
+        done_queue.put("{}:{}".format(multithread.FAILURE_KEY, failure_count))
+        if len(mem_usages) > 0:
+            done_queue.put("{}:{}".format(multithread.MEM_USAGE_KEY, ",".join(map(str, mem_usages))))
+
+
+def multithread_signal_alignment(signal_align_arguments, fast5_locations, worker_count, forward_reference=None):
+    """Multiprocess SignalAlignment for a list of fast5 files given a set of alignment arguments.
+
+    :param signal_align_arguments: signalAlignment arguments besides 'in_fast5'
+    :param fast5_locations: paths to fast5 files
+    :param worker_count: number of workers
+    :param forward_reference: path to forward reference for signalAlign alignment
+    """
+    # don't modify the signal_align_arguments
+    signal_align_arguments = dict(**signal_align_arguments)
+    if not forward_reference:
+        assert "forward_reference" in signal_align_arguments, "Must specify forward_reference path"
+        forward_reference = signal_align_arguments['forward_reference']
+
+    # Samtools Index reference files for quick access
+    samtools_faidx_fasta(forward_reference, log="multithread_signal_alignment")
+    if "backward_reference" in signal_align_arguments and signal_align_arguments["backward_reference"]:
+        samtools_faidx_fasta(signal_align_arguments["backward_reference"], log="multithread_signal_alignment")
+
+    # bwa_reference and alignment_file must be specified
+    assert ('bwa_reference'  in signal_align_arguments and signal_align_arguments["bwa_reference"]  is not None) or \
+           ('alignment_file' in signal_align_arguments and signal_align_arguments['alignment_file'] is not None), \
+        "Must specify bwa_reference or alignment_file"
+
+    # if we didn't get an alignment file then check for index file
+    if 'alignment_file' not in signal_align_arguments or not signal_align_arguments['alignment_file']:
+        # ensure alignments can be generated (either from bwa on the reference or by an alignment file)
+            bwa_reference = buildBwaIndex(signal_align_arguments["bwa_reference"],
+                                          os.path.dirname(signal_align_arguments["bwa_reference"]),
+                                          log='multithread_signal_alignment')
+            signal_align_arguments["bwa_reference"] = bwa_reference
+            assert os.path.exists(bwa_reference+".bwt"), "Error creating BWA index for: {}".format(bwa_reference)
+
+    # ensure required arguments are in signal_align_argments
+    required_arguments = {'destination', 'stateMachineType', 'in_templateHmm', 'in_complementHmm',
+                          'in_templateHdp', 'in_complementHdp', 'threshold', 'diagonal_expansion', 'constraint_trim',
+                          'degenerate', 'forward_reference'}
+    optional_arguments = {'backward_reference', 'alignment_file', 'bwa_reference', 'twoD_chemistry',
+                          'target_regions', 'output_format', 'embed', 'event_table', 'check_for_temp_file_existance',
+                          'track_memory_usage', 'get_expectations'}
+    missing_arguments = list(filter(lambda x: x not in signal_align_arguments.keys(), required_arguments))
+    unexpected_arguments = list(filter(lambda x: x not in required_arguments and x not in optional_arguments,
+                                       signal_align_arguments.keys()))
+    assert len(missing_arguments) == 0 and len(unexpected_arguments) == 0, \
+        "Invalid arguments to signal_align.  Missing: {}, Invalid: {}".format(missing_arguments, unexpected_arguments)
+
+    # run the signal_align_service
+    print("[multithread_signal_alignment] running signal_alignment on {} fast5s with {} workers".format(
+        len(fast5_locations), worker_count))
+    total, failure, messages = multithread.run_service(
+        signal_alignment_service, fast5_locations, signal_align_arguments, 'in_fast5', worker_count)
+
+    # report memory usage
+    memory_stats = list()
+    for message in messages:
+        if message.startswith(multithread.MEM_USAGE_KEY):
+            memory_stats.extend(map(int, message.split(":")[1].split(",")))
+    if len(memory_stats) > 0:
+        kb_to_gb = lambda x: float(x) / (1 << 20)
+        print("[multithread_signal_alignment] memory avg: %3f Gb" % (kb_to_gb(np.mean(memory_stats))))
+        print("[multithread_signal_alignment] memory std: %3f Gb" % (kb_to_gb(np.std(memory_stats))))
+        print("[multithread_signal_alignment] memory max: %3f Gb" % (kb_to_gb(max(memory_stats))))
+
+    # fin
+    print("[multithread_signal_alignment] fin")

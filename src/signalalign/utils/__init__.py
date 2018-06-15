@@ -1,3 +1,5 @@
+
+from __future__ import print_function
 import os
 
 from collections import Counter
@@ -7,6 +9,24 @@ import pandas as pd
 
 from signalalign.motif import getMotif
 from signalalign.utils.parsers import read_fasta
+
+
+def parse_substitution_file(substitution_file):
+    fH = open(substitution_file, 'r')
+    line = fH.readline().split()
+    forward_sub = line[0]
+    forward_pos = list(map(np.int64, line[1:]))
+    line = fH.readline().split()
+    backward_sub = line[0]
+    backward_pos = list(map(np.int64, line[1:]))
+    return (forward_sub, forward_pos), (backward_sub, backward_pos)
+
+
+def kmer_iterator(dna, k):
+    for i in range(len(dna)):
+        kmer = dna[i:(i + k)]
+        if len(kmer) == k:
+            yield kmer
 
 
 def parseFofn(fofn_file):
@@ -102,45 +122,47 @@ def processReferenceFasta(fasta, work_folder, motif_key=None, sub_char=None, pos
     as flat files (no headers or anything) for signalMachine, returns a dict that has the sequence
     names as keys and the paths to the processed sequence as keys
     """
+    # argument sanitization
     if positions_file is not None and motif_key is not None:
-        raise RuntimeError("[processReferenceFasta]Cannot specify motif key and ambiguity position file")
+        raise RuntimeError("[processReferenceFasta] Cannot specify motif key and ambiguity position file")
     if positions_file is not None and sub_char is not None:
-        raise RuntimeError("[processReferenceFasta]Cannot specify a substitution character and a ambiguity position file")
+        raise RuntimeError("[processReferenceFasta] Cannot specify a substitution character and an ambiguity position file")
 
+    # get positions object (if appropriate)
     if positions_file is not None:
         if not os.path.exists(positions_file):
-            raise RuntimeError("[processReferenceFasta]Did not find ambiguity position file here: %s" %
+            raise RuntimeError("[processReferenceFasta] Did not find ambiguity position file here: %s" %
                                positions_file)
         positions = CustomAmbiguityPositions(positions_file)
     else:
         positions = None
-    if motif_key is None and sub_char is None and positions_file is None:
-        return fasta, None
-    else:
-        fw_fasta_path = work_folder.add_file_path("forward.{}".format(os.path.basename(fasta)))
-        bw_fasta_path = work_folder.add_file_path("backward.{}".format(os.path.basename(fasta)))
-        if not os.path.exists(fw_fasta_path) and not os.path.exists(bw_fasta_path):
-            print("[SignalALignment.run]NOTICE: Creating forward and backward fasta files.")
-            with open(bw_fasta_path, 'w') as bw_outfasta, open(fw_fasta_path, 'w') as fw_outfasta:
-                for header, comment, sequence in read_fasta(fasta):
-                    # the motif label allows us to make multiple copies of the reference with unique file names
-                    # motif_lab = "" if motif_key is None else "%s." % motif_key
-                    # these are the paths to the flat files that have the references
-                    # signalAlign likes uppercase
-                    if motif_key is not None:
-                        motif, ok = getMotif(motif_key, sequence)
-                        if not ok:
-                            raise RuntimeError("[processReferenceFasta]Illegal motif key %s" % motif_key)
-                        fw_sequence = motif.forwardSubstitutedSequence(sub_char)
-                        bw_sequence = motif.complementSubstitutedSequence(sub_char)
-                    elif positions is not None:
-                        fw_sequence = positions.getForwardSequence(contig=header, raw_sequence=sequence.upper())
-                        bw_sequence = positions.getBackwardSequence(contig=header, raw_sequence=sequence.upper())
-                    else:
-                        fw_sequence = sequence.upper()
-                        bw_sequence = reverse_complement(fw_sequence, reverse=False, complement=True)
 
-                    print(">%s %s\n%s" % (header, "backward", bw_sequence), file=bw_outfasta)
-                    print(">%s %s\n%s" % (header, "forward", fw_sequence), file=fw_outfasta)
+    if positions_file is None and motif_key is None and sub_char is None:
+        return fasta, None
+    # process fasta
+    fw_fasta_path = work_folder.add_file_path("forward.{}".format(os.path.basename(fasta)))
+    bw_fasta_path = work_folder.add_file_path("backward.{}".format(os.path.basename(fasta)))
+    print("[SignalAlignment.run] NOTICE: Creating forward and backward fasta files.")
+    with open(bw_fasta_path, 'w') as bw_outfasta, open(fw_fasta_path, 'w') as fw_outfasta:
+        for header, comment, sequence in read_fasta(fasta):
+            # the motif label allows us to make multiple copies of the reference with unique file names
+            # motif_lab = "" if motif_key is None else "%s." % motif_key
+            # these are the paths to the flat files that have the references
+            # signalAlign likes uppercase
+            if motif_key is not None:
+                motif, ok = getMotif(motif_key, sequence)
+                if not ok:
+                    raise RuntimeError("[processReferenceFasta]Illegal motif key %s" % motif_key)
+                fw_sequence = motif.forwardSubstitutedSequence(sub_char).upper()
+                bw_sequence = motif.complementSubstitutedSequence(sub_char).upper()
+            elif positions is not None:
+                fw_sequence = positions.getForwardSequence(contig=header, raw_sequence=sequence.upper())
+                bw_sequence = positions.getBackwardSequence(contig=header, raw_sequence=sequence.upper())
+            else:
+                fw_sequence = sequence.upper()
+                bw_sequence = reverse_complement(fw_sequence, reverse=False, complement=True).upper()
+
+            print(">%s %s\n%s" % (header, "backward", bw_sequence), file=bw_outfasta)
+            print(">%s %s\n%s" % (header, "forward", fw_sequence), file=fw_outfasta)
 
     return fw_fasta_path, bw_fasta_path

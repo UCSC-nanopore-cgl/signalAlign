@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.8)
+cmake_minimum_required(VERSION 3.7)
 project(signalAlign)
 
 set(CMAKE_C_STANDARD 99)
@@ -63,24 +63,27 @@ set(estimateNanoporeParams estimateNanoporeParams.c)
 
 
 set(SOURCE_FILES
-            impl/stateMachine.c
-            impl/signalMachineUtils.c
-            impl/nanopore.c
-            impl/continuousHmm.c
-            impl/discreteHmm.c
-            impl/hdp.c
-            impl/hdp_math_utils.c
-            impl/multipleAligner.c
-            impl/nanopore.c
-            impl/nanopore_hdp.c
-            impl/pairwiseAligner.c
-            impl/ranlib.c
-            impl/rnglib.c
-            impl/signalMachineUtils.c
-            impl/fasta_handler.c)
+        impl/stateMachine.c
+        impl/signalMachineUtils.c
+        impl/nanopore.c
+        impl/continuousHmm.c
+        impl/discreteHmm.c
+        impl/hdp.c
+        impl/hdp_math_utils.c
+        impl/multipleAligner.c
+        impl/nanopore.c
+        impl/nanopore_hdp.c
+        impl/pairwiseAligner.c
+        impl/ranlib.c
+        impl/rnglib.c
+        impl/signalMachineUtils.c
+        impl/fasta_handler.c
+        impl/banded_alignment.c
+        impl/
+        /Users/andrewbailey/CLionProjects/nanopore-RNN/submodules/signalAlign/tests/allTests.c)
 
 set(SIGNAL_MACHINE signalMachine.c)
-set(INDEX_FASTA index_fasta.c)
+set(DEBUGGING debugging.c)
 
 set(EVENTDETECT eventdetection/filters.c)
 
@@ -114,7 +117,7 @@ add_custom_target(
 
 #add_executable(estimateNanoporeParams ${estimateNanoporeParams})
 add_executable(signalMachine ${SOURCE_FILES} ${SIGNAL_MACHINE})
-target_link_libraries(signalMachine  -L${CMAKE_CURRENT_SOURCE_DIR}/htslib hts
+target_link_libraries(signalMachine -lpthread -lrt -lm -L${CMAKE_CURRENT_SOURCE_DIR}/htslib hts
         ${CMAKE_CURRENT_SOURCE_DIR}/sonLib/lib/sonLib.a
         ${CMAKE_CURRENT_SOURCE_DIR}/sonLib/lib/signalAlignLib.a
         ${CMAKE_CURRENT_SOURCE_DIR}/sonLib/lib/cuTest.a
@@ -124,13 +127,13 @@ add_dependencies(signalMachine signalAlign)
 
 
 
-add_executable(index_fasta ${SOURCE_FILES} ${INDEX_FASTA})
-target_link_libraries(index_fasta)
-target_link_libraries(index_fasta -L${CMAKE_CURRENT_SOURCE_DIR}/htslib hts ${CMAKE_CURRENT_SOURCE_DIR}/htslib/libhts.a
+add_executable(debugging ${SOURCE_FILES} ${DEBUGGING})
+target_link_libraries(debugging)
+target_link_libraries(debugging -L${CMAKE_CURRENT_SOURCE_DIR}/htslib hts ${CMAKE_CURRENT_SOURCE_DIR}/htslib/libhts.a
         ${CMAKE_CURRENT_SOURCE_DIR}/sonLib/lib/sonLib.a
 
         ${CMAKE_CURRENT_SOURCE_DIR}/sonLib/lib/cuTest.a)
-add_dependencies(index_fasta signalAlign)
+add_dependencies(debugging signalAlign)
 
 
 

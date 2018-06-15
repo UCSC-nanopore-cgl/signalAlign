@@ -17,8 +17,13 @@ notifications: # set notification options
 
 #branches:
 #  except:
-#    - rojin
+#    - train_rna2
+#    - train_rna
+git:
+  submodules: false
+
 before_install:
+- git submodule update --init
 - sudo apt-get update -qq
 - sudo apt-get install libhdf5-serial-dev
 - sudo apt-get install zlib1g-dev
@@ -55,6 +60,9 @@ install:
 - conda install pytest
 - conda install numpy
 - conda install hdf5
+- conda install scipy
+- conda config --add channels bioconda
+- conda install samtools
 #- conda env create -f requirements35.yml
 #- source activate nanotensor3.5
 #- pip install google-compute-engine
@@ -74,8 +82,9 @@ install:
 script:
 - export PATH=$PATH:$PWD/bin
 - export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$PWD/htslib
-- cd bin
-- pytest
+- make test
+#- cd src/signalalign/tests
+#- python *
 #- gcov-4.9 bin/signalMachine.c
 
 #- cd bin
@@ -90,4 +99,3 @@ script:
 #  - bash <(curl -s https://codecov.io/bash)
 #
 #  - codecov -t abf16a83-0e8f-4834-b033-3d8c7b4b7e63
-

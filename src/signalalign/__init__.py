@@ -10,6 +10,8 @@ DEFAULT_TRAINMODELS_OPTIONS = {
     "positions_file": None,
     "motif": None,
     "label": None,
+    "edited_fw_reference": None,
+    "edited_bw_reference": None
 }
 
 
@@ -22,7 +24,7 @@ def parseFofn(fofn_file):
     return files
 
 
-def _parseCigar(cigar_string, ref_start):
+def _parseCigar(cigar_string, ref_start, forward=True):
     assert(cigar_string is not None), "ERROR got cigar {}".format(cigar_string)
     assert(ref_start is not None)
     # use a regular expression to parse the string into operations and lengths
@@ -37,6 +39,10 @@ def _parseCigar(cigar_string, ref_start):
     query_end = 0
     reference_start = ref_start - 1  # fence posts adjustment
     reference_end = 0
+
+    # reverse for strand
+    if not forward:
+        cigar_tuples.reverse()
 
     exonerated_cigar = " ".join(["%s %i" % (operation, int(length)) for length, operation in
                                  cigar_tuples if operation in alignment_operations])
