@@ -8,12 +8,11 @@ samples: [{
     motifs:,
     fw_reference:,
     bw_reference:,
-    motifs:,
     name: canonical,
     number_of_kmer_assignments: 10,
     probability_threshold: 0.8,
     kmers_from_reference: false,
-    bam_file: None
+    alignment_file:
 }]
 stateMachineType: threeState
 in_T_Hmm: ../models/testModelR9_5mer_acgt_template.model
@@ -29,5 +28,5 @@ twoD: true
 alignment_file:
 DEBUG:
 test:
-path_to_signalMachine: ./signalMachine
+path_to_bin: ./
 
