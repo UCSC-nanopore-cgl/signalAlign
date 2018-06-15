@@ -21,7 +21,6 @@ from scipy import sparse
 from signalalign.utils.sequenceTools import *
 from signalalign.utils import CustomAmbiguityPositions
 from signalalign.utils.fileHandlers import FolderHandler
-from signalalign.train.BuildModels import ccwgg_kmers
 
 class TestMakePositionsFiles(unittest.TestCase):
 
