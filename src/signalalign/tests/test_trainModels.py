@@ -72,6 +72,8 @@ class TrainSignalAlignTest(unittest.TestCase):
 
         cls.config_file = os.path.join(cls.HOME, "tests/trainModels-config.json")
         cls.default_args = create_dot_dict(load_json(cls.config_file))
+        cls.default_args.path_to_bin = cls.path_to_bin
+
         cls.one_file_dir = os.path.join(cls.HOME, "tests/minion_test_reads/one_R9_canonical_ecoli")
 
     def test_parse_assignment_file(self):
@@ -319,10 +321,8 @@ class TrainSignalAlignTest(unittest.TestCase):
             fake_args.hdp_args.gibbs_samples = 100
             fake_args.hdp_args.burnin_multiplier = 0
             fake_args.hdp_args.number_of_assignments = 1
-
-            with captured_output() as (out, err):
-                # Test EM training 3 rounds
-                TrainSignalAlign(fake_args).expectation_maximization_training()
+            # Test EM training 3 rounds
+            TrainSignalAlign(fake_args).expectation_maximization_training()
 
     def test_hdp_and_transition_training(self):
         with tempfile.TemporaryDirectory() as tempdir:
@@ -338,21 +338,21 @@ class TrainSignalAlignTest(unittest.TestCase):
             fake_args.hdp_args.burnin_multiplier = 0
             fake_args.hdp_args.number_of_assignments = 1
             # Test hdp AND transition training worked
-            with captured_output() as (out, err):
-                TrainSignalAlign(fake_args).expectation_maximization_training()
+            TrainSignalAlign(fake_args).expectation_maximization_training()
 
     def test_transition_training(self):
         with tempfile.TemporaryDirectory() as tempdir:
             fake_args = create_dot_dict(self.default_args.copy())
             fake_args.output_dir = tempdir
             fake_args.samples[0].fast5_dirs = [self.one_file_dir]
+            fake_args.path_to_bin = self.path_to_bin
             fake_args.training.transitions = True
             fake_args.training.normal_emissions = True
             fake_args.training.hdp_emissions = False
             fake_args.training.expectation_maximization = False
-            with captured_output() as (out, err):
-                # Test transitions training worked
-                TrainSignalAlign(fake_args).expectation_maximization_training()
+            # with captured_output() as (out, err):
+            # Test transitions training worked
+            TrainSignalAlign(fake_args).expectation_maximization_training()
 
     def test_hdp_training(self):
         with tempfile.TemporaryDirectory() as tempdir:
@@ -368,13 +368,11 @@ class TrainSignalAlignTest(unittest.TestCase):
             fake_args.hdp_args.burnin_multiplier = 0
             fake_args.hdp_args.number_of_assignments = 1
             # Test hdp training worked
-            with captured_output() as (out, err):
-                TrainSignalAlign(fake_args).expectation_maximization_training()
+            TrainSignalAlign(fake_args).expectation_maximization_training()
 
             fake_args.training.hdp_emissions = False
             # raise error when no training is selected
             self.assertRaises(AssertionError, TrainSignalAlign(fake_args).expectation_maximization_training)
-
 
 
 if __name__ == '__main__':
