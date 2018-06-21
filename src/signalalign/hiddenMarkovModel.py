@@ -10,56 +10,12 @@ from scipy.stats import norm, invgauss
 NORM_DIST_PARAMS = 2
 NB_MODEL_PARAMS = 5
 
-#emissions_signal_strawManGetKmerEventMatchProbWithDescaling
 
-# int64_t kmerIndex = kmer_id(kmer_i, self->model.alphabet, self->model.alphabetSize, self->model.kmerLength);
-#
-# double *eventModel = match ? self->model.EMISSION_MATCH_MATRIX : self->model.EMISSION_GAP_Y_MATRIX;
-# // get the µ and σ for the level and noise for the model
-# double levelMean = emissions_signal_getModelLevelMean(eventModel, kmerIndex);
-# double levelStdDev = emissions_signal_getModelLevelSd(eventModel, kmerIndex);
-# eventMean = emissions_signal_descaleEventMean_JordanStyle(eventMean, levelMean, self->model.scale,
-#                                                                                       self->model.shift, self->model.var);
-#
-# double noiseMean = emissions_signal_getModelFluctuationMean(eventModel, kmerIndex);
-# //double noiseStdDev = emissions_signal_getModelFluctuationSd(eventModel, kmerIndex);
-#
-# double modelNoiseLambda = emissions_signal_getModelFluctuationLambda(eventModel, kmerIndex);
-#
-# double l_probEventMean = emissions_signal_logGaussPdf(eventMean, levelMean, levelStdDev);
-#
-# //double l_probEventNoise = emissions_signal_logGaussPdf(eventNoise, noiseMean, noiseStdDev);
-# double l_probEventNoise = emissions_signal_logInvGaussPdf(eventNoise, noiseMean, modelNoiseLambda);
-#
-# // clean
-# free(kmer_i);
-#
-# // debugging
-# //double prob = l_probEventMean + l_probEventNoise;
-# //st_uglyf("MATCHING--x_i:%s (index: %lld), e_j mean: %f, \n modelMean: %f, modelLsd: %f probEvent: %f probNoise: %f, combined: %f\n",
-#   //         kmer_i, kmerIndex, eventMean, levelMean, levelStdDev, l_probEventMean, l_probEventNoise, prob);
-#
-# return l_probEventMean + l_probEventNoise;
-# }
-
-
-def get_model(model_type, model_file):
-    """Create a SignalHmm model from a model file and a model type
-    :param model_type: either "threeState" or "threeStateHdp"
-    :param model_file: path to model file
-    :return: a SignalHmm class object, either ContinuousPairHmm or HdpSignalHmm
-    """
-    assert (model_type in ["threeState", "threeStateHdp"]), "Unsupported StateMachine type"
-    assert model_file is not None, "Need to have starting lookup table for {} HMM".format(model_type)
-    model = SignalHmm(model_type=model_type, model_file=model_file)
-    return model
-
-
-class SignalHmm(object):
-    def __init__(self, model_type, model_file):
+class HmmModel(object):
+    def __init__(self, model_file):
+        # TODO Need to create docs here
         self.match_model_params = 5  # level_mean, level_sd, noise_mean, noise_sd, noise_lambda
-        self.model_type = model_type  # ID of model type
-        self.state_number = {"threeState": 3, "threeStateHdp": 3}[self.model_type]
+        self.state_number = 3
         self.transitions = np.zeros(self.state_number**2)
         self.transitions_expectations = np.zeros(self.state_number**2)
         self.likelihood = 0.0
@@ -150,7 +106,7 @@ class SignalHmm(object):
 
         :param model_file: path to model file
         """
-        assert os.path.exists(model_file), "signalHmm.load_model - didn't find model here{}?".format(model_file)
+        assert os.path.exists(model_file), "signalHmm.load_model - didn't find model here: {}".format(model_file)
 
         with open(model_file, 'r') as fH:
 
@@ -306,39 +262,37 @@ class SignalHmm(object):
             # check if valid
             line = list(map(float, fH.readline().split()))
             assert len(line) == (len(self.transitions) + 1), \
-                "{model_type}.add_expectations_file - problem with file {f} " \
-                "transitions line {l}, incorrect length".format(model_type=self.model_type, f=expectations_file, l=''.join(line))
+                "HMM.add_expectations_file - problem with file {f} " \
+                "transitions line {l}, incorrect length".format(f=expectations_file, l=''.join(line))
 
             self.likelihood += line[-1]
             self.transitions_expectations = [sum(x) for x in zip(self.transitions_expectations, line[0:-1])]
 
-            # line 2: event model
-            line = list(map(float, fH.readline().split()))
-            assert len(line) == self.symbol_set_size * NB_MODEL_PARAMS, "{model_type}.add_expectations_file - problem with " \
-                                                                        "event model in file {ef}".format(model_type=self.model_type, ef=expectations_file)
-
-            # line 3 event expectations [E_mean, E_sd]
-            line = list(map(float, fH.readline().split()))
-            assert len(line) == self.symbol_set_size * NORM_DIST_PARAMS, \
-                '{}: check_file - bad file (event expectations): {}'.format(self.model_type, expectations_file)
-
-            self.event_assignments += line
-            if self.model_type == 'threeState':
-                self.mean_expectations = [i + j for i, j in zip(self.mean_expectations, line[::NORM_DIST_PARAMS])]
-                self.sd_expectations = [i + j for i, j in zip(self.sd_expectations, line[1::NORM_DIST_PARAMS])]
-
-            # line 4, posteriors
-            line = list(map(float, fH.readline().split()))
-            assert len(line) == self.symbol_set_size, "{}: check_file - bad file (posteriors): {}".format(self.model_type, expectations_file)
-
-            self.kmer_assignments += line
-
-            if self.model_type == 'threeState':
-                # line 5, probabilities
-                self.posteriors = [sum(x) for x in zip(self.posteriors, line)]
-                line = list(map(bool, fH.readline().split()))
-                assert len(line) == self.symbol_set_size, "{}: check_file - bad file (observations): {}".format(self.model_type, expectations_file)
-                self.observed = [any(b) for b in zip(self.observed, line)]
+            # # line 2: event model
+            # line = list(map(float, fH.readline().split()))
+            # assert len(line) == self.symbol_set_size * NB_MODEL_PARAMS, "HMM.add_expectations_file - problem with " \
+            #                                                             "event model in file {ef}".format(ef=expectations_file)
+            #
+            # # line 3 event expectations [E_mean, E_sd]
+            # line = list(map(float, fH.readline().split()))
+            # assert len(line) == self.symbol_set_size * NORM_DIST_PARAMS, \
+            #     'HMM: check_file - bad file (event expectations): {}'.format(expectations_file)
+            #
+            # self.event_assignments += line
+            # self.mean_expectations = [i + j for i, j in zip(self.mean_expectations, line[::NORM_DIST_PARAMS])]
+            # self.sd_expectations = [i + j for i, j in zip(self.sd_expectations, line[1::NORM_DIST_PARAMS])]
+            #
+            # # line 4, posteriors
+            # line = list(map(float, fH.readline().split()))
+            # assert len(line) == self.symbol_set_size, "HMM: check_file - bad file (posteriors): {}".format(expectations_file)
+            #
+            # self.kmer_assignments += line
+            #
+            # # line 5, probabilities
+            # self.posteriors = [sum(x) for x in zip(self.posteriors, line)]
+            # line = list(map(bool, fH.readline().split()))
+            # assert len(line) == self.symbol_set_size, "HMM: check_file - bad file (observations): {}".format(expectations_file)
+            # self.observed = [any(b) for b in zip(self.observed, line)]
             return True
 
     def normalize(self, update_transitions, update_emissions):
@@ -355,7 +309,7 @@ class SignalHmm(object):
                     self.transitions[i] = self.transitions_expectations[i]
 
         # calculate the new expected mean and standard deviation for the kmer normal distributions
-        if update_emissions and self.model_type == 'threeState':
+        if update_emissions:
             # print(self.observed)
             for k in range(self.symbol_set_size):  # TODO implement learning rate
                 # print(k)
@@ -395,19 +349,19 @@ class SignalHmm(object):
                 success = self.add_expectations_file(f)
                 if success:
                     files_added_successfully += 1
+                    os.remove(f)
+
                 else:
                     files_with_problems += 1
             except Exception as e:
                 files_with_problems += 1
-                print("Problem adding expectations file {file} got error {e}".format(file=path + f, e=e),
+                print("Problem adding expectations file {file} got error {e}".format(file=f, e=e),
                       file=sys.stderr)
-            os.remove(f)
 
         # normalize, write and keep track of running likelihood
         self.normalize(update_transitions=update_transitions, update_emissions=update_emissions)
         self.write(hmm_file)
         self.running_likelihoods.append(self.likelihood)
-        if self.model_type is 'threeStateHdp':
-            self.reset_assignments()
+        self.reset_assignments()
         print("[trainModels] NOTICE: Added {success} expectations files successfully, {problem} files had problems\n"
               "".format(success=files_added_successfully, problem=files_with_problems), file=sys.stderr)

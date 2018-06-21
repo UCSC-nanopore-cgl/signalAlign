@@ -32,7 +32,7 @@ class HiddenMarkovTests(unittest.TestCase):
         cls.model_file = os.path.join(cls.HOME, "models/testModelR9p4_5mer_acgt_RNA.model")
         cls.r9_model_file = os.path.join(cls.HOME, "models/testModelR9_acegt_complement.model")
 
-        cls.model = get_model(model_type="threeState", model_file=cls.model_file)
+        cls.model = HmmModel(model_file=cls.model_file)
         cls.expectation_file = os.path.join(cls.HOME,
                                             "tests/test_expectation_files/4f9a316c-8bb3-410a-8cfc-026061f7e8db.template.expectations.tsv")
 
@@ -87,18 +87,18 @@ class HiddenMarkovTests(unittest.TestCase):
         self.assertEqual(self.model.event_model["noise_means"][-1], mean)
         self.assertEqual(self.model.event_model["noise_lambdas"][-1], lambda1)
 
-    def test_get_model(self):
+    def test_HmmModel(self):
         hdp_model_file = os.path.join(self.HOME, "models/testModelR9p4_5mer_acgt_RNA.model")
-        model = get_model(model_type="threeStateHdp", model_file=hdp_model_file)
-        self.assertIsInstance(model, SignalHmm)
+        model = HmmModel(model_file=hdp_model_file)
+        self.assertIsInstance(model, HmmModel)
 
-        model = get_model(model_type="threeState", model_file=self.model_file)
-        self.assertIsInstance(model, SignalHmm)
+        model = HmmModel(model_file=self.model_file)
+        self.assertIsInstance(model, HmmModel)
 
     def test_add_expectations_file(self):
-        model = get_model(model_type="threeStateHdp", model_file=self.r9_model_file)
+        model = HmmModel(model_file=self.r9_model_file)
         model.add_expectations_file(self.expectation_file)
-        model = get_model(model_type="threeState", model_file=self.r9_model_file)
+        model = HmmModel(model_file=self.r9_model_file)
         model.add_expectations_file(self.expectation_file)
         self.assertRaises(AssertionError, self.model.add_expectations_file, self.expectation_file)
 
@@ -112,12 +112,12 @@ class HiddenMarkovTests(unittest.TestCase):
             test_expecations_file = os.path.join(tempdir, "fake.expectations.tsv")
             copyfile(self.expectation_file, test_expecations_file)
             files = [test_expecations_file]
-            model = get_model(model_type="threeStateHdp", model_file=self.r9_model_file)
+            model = HmmModel(model_file=self.r9_model_file)
             model.add_and_normalize_expectations(files, os.path.join(tempdir, "fake.hmm"))
 
     def test_normalize_transitions_expectations(self):
         hdp_model_file = os.path.join(self.HOME, "models/testModelR9_acegt_complement.model")
-        model = get_model(model_type="threeStateHdp", model_file=hdp_model_file)
+        model = HmmModel(model_file=hdp_model_file)
         model.add_expectations_file(self.expectation_file)
         model.add_expectations_file(self.expectation_file)
         model.add_expectations_file(self.expectation_file)
@@ -126,21 +126,16 @@ class HiddenMarkovTests(unittest.TestCase):
             i = model.state_number * from_state
             self.assertAlmostEqual(sum(model.transitions_expectations[i:i + model.state_number]), 1)
 
-    def test_load_model(self):
-        model = SignalHmm(model_type="threeState", model_file=self.model_file)
-        self.assertRaises(KeyError, SignalHmm, "treestate", self.model_file)
-        self.assertRaises(AssertionError, SignalHmm, 'threeState', "path to nowhere")
-
     def test_write(self):
         with tempfile.TemporaryDirectory() as tempdir:
             test_hmm_file = os.path.join(tempdir, "fake.model.hmm")
-            model = SignalHmm(model_type="threeState", model_file=self.model_file)
+            model = HmmModel(model_file=self.model_file)
             self.assertRaises(AssertionError, model.write, test_hmm_file)
             model.normalized = True
             model.write(test_hmm_file)
 
     def test_normalise(self):
-        model = get_model(model_type="threeState", model_file=self.r9_model_file)
+        model = HmmModel(model_file=self.r9_model_file)
         model.add_expectations_file(self.expectation_file)
         model.add_expectations_file(self.expectation_file)
         model.add_expectations_file(self.expectation_file)
@@ -149,7 +144,7 @@ class HiddenMarkovTests(unittest.TestCase):
         self.assertTrue(model.normalized)
 
     def test_reset_assignments(self):
-        model = get_model(model_type="threeState", model_file=self.r9_model_file)
+        model = HmmModel(model_file=self.r9_model_file)
         model.add_expectations_file(self.expectation_file)
         model.reset_assignments()
         self.assertSequenceEqual(model.event_assignments, [])

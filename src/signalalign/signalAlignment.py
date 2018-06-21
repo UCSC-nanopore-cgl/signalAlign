@@ -30,7 +30,7 @@ def create_signalAlignment_args(backward_reference=None, forward_reference=None,
                                 track_memory_usage=False, get_expectations=False, output_format='full', embed=False,
                                 event_table=False,
                                 check_for_temp_file_existance=True,
-                                path_to_bin='./signalMachine'):
+                                path_to_bin=''):
     """Create alignment arguments for SignalAlign. Parameters are explained in SignalAlignment"""
     alignment_args = {
         "backward_reference": backward_reference,

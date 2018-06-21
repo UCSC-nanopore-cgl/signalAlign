@@ -18,7 +18,7 @@ from shutil import copyfile
 from collections import defaultdict
 from scipy import sparse
 from signalalign.signalAlignment import *
-from signalalign.train.trainModels import trainHMM
+from signalalign.train.trainModels import HmmModel
 from signalalign import parseFofn
 from signalalign.utils.fileHandlers import FolderHandler
 from py3helpers.utils import captured_output
@@ -178,47 +178,6 @@ class SignalAlignmentTest(unittest.TestCase):
             working_folder = FolderHandler()
             working_folder.open_folder(os.path.join(tempdir, "test_dir"))
             sample = SignalAlignSample(working_folder=working_folder, **test_args)
-
-    def test_trainHMM(self):
-        with tempfile.TemporaryDirectory() as tempdir:
-            # create fast5 dir
-            test_fast5 = os.path.join(tempdir, "test.fast5")
-            copyfile(self.fast5_paths[0], test_fast5)
-            # create fofn
-            test_out = os.path.join(tempdir, "test.fofn")
-            with open(test_out, 'w+') as fofn_file:
-                print(test_fast5, file=fofn_file)
-
-            test_args = create_sa_sample_args(fast5_dirs=[tempdir],
-                                              name="some_name",
-                                              fw_reference=self.ecoli_reference,
-                                              bwa_reference=self.ecoli_reference)
-            working_folder = FolderHandler()
-            working_folder.open_folder(os.path.join(tempdir, "test_dir"))
-            sample = SignalAlignSample(working_folder=working_folder, **test_args)
-            train_transitions_config = {
-                "output_dir": working_folder.path,
-                "in_T_Hmm": self.template_hmm,
-                "in_C_Hmm": None,
-                "templateHdp": None,
-                "complementHdp": None,
-                "twoD": False,
-                "alignment_file": None,
-                "stateMachineType": 'threeState',
-                "training_bases": 10000,
-                "job_count": 2,
-                "iterations": 2,
-                "diagonal_expansion": None,
-                "constraint_trim": None,
-                "test": True,
-                "debug": True,
-                "path_to_bin": './signalMachine'}
-
-            with captured_output() as (out, err):
-                self.assertRaises(AssertionError, trainHMM, [sample], working_folder, train_transitions_config,
-                                  transitions=True)
-                train_transitions_config['path_to_bin'] = self.path_to_bin
-                trainHMM([sample], working_folder, train_transitions_config, transitions=True)
 
 
 if __name__ == '__main__':
