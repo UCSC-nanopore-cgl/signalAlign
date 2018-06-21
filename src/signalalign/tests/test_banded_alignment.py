@@ -28,8 +28,8 @@ class BandedAlignmentTests(unittest.TestCase):
         cls.HOME = '/'.join(os.path.abspath(__file__).split("/")[:-4])
         cls.rna_model_file = os.path.join(cls.HOME, "models/testModelR9p4_5mer_acgt_RNA.model")
         cls.dna_template_model_file = os.path.join(cls.HOME, "models/testModelR9p4_5mer_acegt_template.model")
-        cls.rna_model = get_model(model_type="threeState", model_file=cls.rna_model_file)
-        cls.dna_model = get_model(model_type="threeState", model_file=cls.dna_template_model_file)
+        cls.rna_model = HmmModel(model_file=cls.rna_model_file)
+        cls.dna_model = HmmModel(model_file=cls.dna_template_model_file)
 
         cls.dna_fast5_path = os.path.join(cls.HOME,
                                           "tests/minion_test_reads/1D/LomanLabz_PC_20161025_FNFAB42699_MN17633_sequencing_run_20161025_E_coli_native_450bps_82361_ch112_read108_strand.fast5")

@@ -100,7 +100,7 @@ class CreateHdpTrainingData(object):
         self.complement = complement
         self.verbose = verbose
         self.master_assignment_table = \
-            make_master_assignment_table(merge_lists([sample.analysis_files for sample in self.samples]))
+            make_master_assignment_table(sorted(merge_lists([sample.analysis_files for sample in self.samples])))
         self.k = len(self.master_assignment_table.iloc[0]['kmer'])
         self.n_assignments = len(self.master_assignment_table)
 
@@ -143,9 +143,9 @@ class CreateHdpTrainingData(object):
         # if motifs is present, process for all motifs with modified base
         if sample.motifs:
             for motif in sample.motifs:
-                kmers |= get_motif_kmers(motif, self.k, alphabet=self.canoncial)
+                kmers |= get_motif_kmers(motif, self.k, alphabet=self.canonical)
         # if we want to limit kmers which were seen in reference sequence
-        elif sample.kmers_from_reference:
+        if sample.kmers_from_reference:
             for _, _, sequence in read_fasta(sample.bwa_reference):
                 kmers |= get_sequence_kmers(sequence, k=self.k, rev_comp=True)
         else:
@@ -687,23 +687,17 @@ def main():
         run_parser = subparsers.add_parser("run", help="runs full workflow ")
         run_parser.add_argument('--config', default='trainModels-config.yaml', type=str,
                                 help='Path to the (filled in) config file, generated with "generate".')
-        subparsers.add_parser("generate", help="generates a config file for your run, do this first")
         return parser.parse_args()
 
     args = parse_args()
-    if args.command == "generate":
-        try:
-            config_path = os.path.join(os.getcwd(), "trainModels-config.yaml")
-            generateConfig(config_path)
-        except RuntimeError:
-            print("Using existing config file {}".format(config_path))
-            pass
-    elif args.command == "run":
+    if args.command == "run":
         if not os.path.exists(args.config):
-            print("{config} not found run generate-config".format(config=args.config))
+            print("{config} not found".format(config=args.config))
             exit(1)
         # run training
         TrainSignalAlign(args.config).expectation_maximization_training()
+    else:
+        print("Error, try: `trainModels run --config path/to/config.json`")
 
 
 if __name__ == "__main__":

@@ -134,7 +134,8 @@ class TrainSignalAlignTest(unittest.TestCase):
                                               fw_reference=self.ecoli_reference,
                                               bwa_reference=self.ecoli_reference,
                                               number_of_kmer_assignments=1,
-                                              probability_threshold=0)
+                                              probability_threshold=0,
+                                              kmers_from_reference=False)
             working_folder = FolderHandler()
             working_folder.open_folder(os.path.join(tempdir, "test_dir"))
             sample = SignalAlignSample(working_folder=working_folder, **test_args)
@@ -142,9 +143,66 @@ class TrainSignalAlignTest(unittest.TestCase):
             out_path = CreateHdpTrainingData([sample], test_out, template=True, complement=False, verbose=False).write_hdp_training_file()
             n_lines = count_lines_in_file(out_path)
             self.assertEqual(n_lines, 3182)
-            copyfile(out_path, self.test_hdp_training_data)
             with open(out_path, 'r') as fh1, open(self.test_hdp_training_data, 'r') as fh2:
-                self.assertEqual(fh1.readline(), fh2.readline())
+                self.assertEqual(sorted(list(fh1)), sorted(list(fh2)))
+
+    def test_get_sample_kmers(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            # create fast5 dir
+            test_fast5 = os.path.join(tempdir, "test.fast5")
+            copyfile(self.fast5_paths[0], test_fast5)
+            # create fofn
+            test_out = os.path.join(tempdir, "test.hdp.tsv")
+            test_args = create_sa_sample_args(fast5_dirs=[tempdir],
+                                              name="some_name",
+                                              fw_reference=self.ecoli_reference,
+                                              bwa_reference=self.ecoli_reference,
+                                              number_of_kmer_assignments=1,
+                                              probability_threshold=0,
+                                              kmers_from_reference=False)
+            working_folder = FolderHandler()
+            working_folder.open_folder(os.path.join(tempdir, "test_dir"))
+            sample = SignalAlignSample(working_folder=working_folder, **test_args)
+            sample.analysis_files = [self.assignment_file, self.assignment_file]
+            hdp_data_handle = CreateHdpTrainingData([sample], test_out, template=True, complement=False, verbose=False)
+            kmers = hdp_data_handle.get_sample_kmers(sample)
+            self.assertEqual(kmers, {x for x in all_string_permutations("ATGC", length=6)})
+            test_args = create_sa_sample_args(fast5_dirs=[tempdir],
+                                              name="some_name",
+                                              fw_reference=self.ecoli_reference,
+                                              bwa_reference=self.ecoli_reference,
+                                              number_of_kmer_assignments=1,
+                                              probability_threshold=0,
+                                              kmers_from_reference=False,
+                                              motifs=[["ATGC", "ETGC"]])
+            working_folder = FolderHandler()
+            working_folder.open_folder(os.path.join(tempdir, "test_dir"))
+            sample = SignalAlignSample(working_folder=working_folder, **test_args)
+            sample.analysis_files = [self.assignment_file, self.assignment_file]
+            hdp_data_handle = CreateHdpTrainingData([sample], test_out, template=True, complement=False, verbose=False)
+            kmers = hdp_data_handle.get_sample_kmers(sample)
+            self.assertEqual(kmers, get_motif_kmers(["ATGC", "ETGC"], 6, alphabet="ATGC") |
+                             {x for x in all_string_permutations("ATGC", length=6)})
+            test_args = create_sa_sample_args(fast5_dirs=[tempdir],
+                                              name="some_name",
+                                              fw_reference=self.ecoli_reference,
+                                              bwa_reference=self.ecoli_reference,
+                                              number_of_kmer_assignments=1,
+                                              probability_threshold=0,
+                                              kmers_from_reference=True,
+                                              motifs=[["ATGC", "ETGC"]])
+            working_folder = FolderHandler()
+            working_folder.open_folder(os.path.join(tempdir, "test_dir"))
+            sample = SignalAlignSample(working_folder=working_folder, **test_args)
+            sample.analysis_files = [self.assignment_file, self.assignment_file]
+            hdp_data_handle = CreateHdpTrainingData([sample], test_out, template=True, complement=False, verbose=False)
+            kmers = hdp_data_handle.get_sample_kmers(sample)
+            expected_kmers = set()
+            for _, _, sequence in read_fasta(self.ecoli_reference):
+                expected_kmers |= get_sequence_kmers(sequence, k=6, rev_comp=True)
+
+            self.assertEqual(kmers, get_motif_kmers(["ATGC", "ETGC"], 6, alphabet="ATGC") | expected_kmers)
+
 
     def test_get_hdp_type(self):
         for type, integer in self.hdp_types.items():
@@ -246,76 +304,76 @@ class TrainSignalAlignTest(unittest.TestCase):
         fake_args.job_count = self.r9_template_model_file
         fake_args.training.transitions = True
         self.assertRaises(AssertionError, TrainSignalAlign, fake_args)
-    #
-    # def test_canonical_expectation_maximization_training(self):
-    #     with tempfile.TemporaryDirectory() as tempdir:
-    #         fake_args = create_dot_dict(self.default_args.copy())
-    #         fake_args.output_dir = tempdir
-    #         fake_args.samples[0].fast5_dirs = [self.one_file_dir]
-    #         fake_args.job_count = 1
-    #         fake_args.training.transitions = True
-    #         fake_args.training.normal_emissions = True
-    #         fake_args.training.hdp_emissions = True
-    #         fake_args.training.expectation_maximization = True
-    #         fake_args.training.em_iterations = 3
-    #         fake_args.hdp_args.gibbs_samples = 100
-    #         fake_args.hdp_args.burnin_multiplier = 0
-    #         fake_args.hdp_args.number_of_assignments = 1
-    #
-    #         with captured_output() as (out, err):
-    #             # Test EM training 3 rounds
-    #             TrainSignalAlign(fake_args).expectation_maximization_training()
-    #
-    # def test_hdp_and_transition_training(self):
-    #     with tempfile.TemporaryDirectory() as tempdir:
-    #         fake_args = create_dot_dict(self.default_args.copy())
-    #         fake_args.output_dir = tempdir
-    #         fake_args.samples[0].fast5_dirs = [self.one_file_dir]
-    #         fake_args.training.transitions = True
-    #         fake_args.training.normal_emissions = True
-    #         fake_args.training.hdp_emissions = True
-    #         fake_args.training.expectation_maximization = False
-    #         fake_args.training.em_iterations = 3
-    #         fake_args.hdp_args.gibbs_samples = 100
-    #         fake_args.hdp_args.burnin_multiplier = 0
-    #         fake_args.hdp_args.number_of_assignments = 1
-    #         # Test hdp AND transition training worked
-    #         with captured_output() as (out, err):
-    #             TrainSignalAlign(fake_args).expectation_maximization_training()
-    #
-    # def test_transition_training(self):
-    #     with tempfile.TemporaryDirectory() as tempdir:
-    #         fake_args = create_dot_dict(self.default_args.copy())
-    #         fake_args.output_dir = tempdir
-    #         fake_args.samples[0].fast5_dirs = [self.one_file_dir]
-    #         fake_args.training.transitions = True
-    #         fake_args.training.normal_emissions = True
-    #         fake_args.training.hdp_emissions = False
-    #         fake_args.training.expectation_maximization = False
-    #         with captured_output() as (out, err):
-    #             # Test transitions training worked
-    #             TrainSignalAlign(fake_args).expectation_maximization_training()
-    #
-    # def test_hdp_training(self):
-    #     with tempfile.TemporaryDirectory() as tempdir:
-    #         fake_args = create_dot_dict(self.default_args.copy())
-    #         fake_args.output_dir = tempdir
-    #         fake_args.samples[0].fast5_dirs = [self.one_file_dir]
-    #         fake_args.training.transitions = False
-    #         fake_args.training.normal_emissions = True
-    #         fake_args.training.hdp_emissions = True
-    #         fake_args.training.expectation_maximization = False
-    #         fake_args.training.em_iterations = 3
-    #         fake_args.hdp_args.gibbs_samples = 100
-    #         fake_args.hdp_args.burnin_multiplier = 0
-    #         fake_args.hdp_args.number_of_assignments = 1
-    #         # Test hdp training worked
-    #         with captured_output() as (out, err):
-    #             TrainSignalAlign(fake_args).expectation_maximization_training()
-    #
-    #         fake_args.training.hdp_emissions = False
-    #         # raise error when no training is selected
-    #         self.assertRaises(AssertionError, TrainSignalAlign(fake_args).expectation_maximization_training)
+
+    def test_canonical_expectation_maximization_training(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            fake_args = create_dot_dict(self.default_args.copy())
+            fake_args.output_dir = tempdir
+            fake_args.samples[0].fast5_dirs = [self.one_file_dir]
+            fake_args.job_count = 1
+            fake_args.training.transitions = True
+            fake_args.training.normal_emissions = True
+            fake_args.training.hdp_emissions = True
+            fake_args.training.expectation_maximization = True
+            fake_args.training.em_iterations = 3
+            fake_args.hdp_args.gibbs_samples = 100
+            fake_args.hdp_args.burnin_multiplier = 0
+            fake_args.hdp_args.number_of_assignments = 1
+
+            with captured_output() as (out, err):
+                # Test EM training 3 rounds
+                TrainSignalAlign(fake_args).expectation_maximization_training()
+
+    def test_hdp_and_transition_training(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            fake_args = create_dot_dict(self.default_args.copy())
+            fake_args.output_dir = tempdir
+            fake_args.samples[0].fast5_dirs = [self.one_file_dir]
+            fake_args.training.transitions = True
+            fake_args.training.normal_emissions = True
+            fake_args.training.hdp_emissions = True
+            fake_args.training.expectation_maximization = False
+            fake_args.training.em_iterations = 3
+            fake_args.hdp_args.gibbs_samples = 100
+            fake_args.hdp_args.burnin_multiplier = 0
+            fake_args.hdp_args.number_of_assignments = 1
+            # Test hdp AND transition training worked
+            with captured_output() as (out, err):
+                TrainSignalAlign(fake_args).expectation_maximization_training()
+
+    def test_transition_training(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            fake_args = create_dot_dict(self.default_args.copy())
+            fake_args.output_dir = tempdir
+            fake_args.samples[0].fast5_dirs = [self.one_file_dir]
+            fake_args.training.transitions = True
+            fake_args.training.normal_emissions = True
+            fake_args.training.hdp_emissions = False
+            fake_args.training.expectation_maximization = False
+            with captured_output() as (out, err):
+                # Test transitions training worked
+                TrainSignalAlign(fake_args).expectation_maximization_training()
+
+    def test_hdp_training(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            fake_args = create_dot_dict(self.default_args.copy())
+            fake_args.output_dir = tempdir
+            fake_args.samples[0].fast5_dirs = [self.one_file_dir]
+            fake_args.training.transitions = False
+            fake_args.training.normal_emissions = True
+            fake_args.training.hdp_emissions = True
+            fake_args.training.expectation_maximization = False
+            fake_args.training.em_iterations = 3
+            fake_args.hdp_args.gibbs_samples = 100
+            fake_args.hdp_args.burnin_multiplier = 0
+            fake_args.hdp_args.number_of_assignments = 1
+            # Test hdp training worked
+            with captured_output() as (out, err):
+                TrainSignalAlign(fake_args).expectation_maximization_training()
+
+            fake_args.training.hdp_emissions = False
+            # raise error when no training is selected
+            self.assertRaises(AssertionError, TrainSignalAlign(fake_args).expectation_maximization_training)
 
 
 

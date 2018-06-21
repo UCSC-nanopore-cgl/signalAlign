@@ -9,8 +9,8 @@
   "samples": [
     {
       "positions_file": null,
-      "fast5_dirs": ["../../../tests/minion_test_reads/one_R9_canonical_ecoli"],
-      "bwa_reference": "../../../tests/test_sequences/E.coli_K12.fasta",
+      "fast5_dirs": ["./tests/minion_test_reads/one_R9_canonical_ecoli"],
+      "bwa_reference": "./tests/test_sequences/E.coli_K12.fasta",
       "fofns": [],
       "fw_reference": null,
       "bw_reference": null,
@@ -59,15 +59,15 @@
     "expectation_maximization": false,
     "em_iterations": 3
   },
-  "path_to_bin": "../../../bin",
+  "path_to_bin": "./bin",
   "complement_hdp_model": null,
   "template_hdp_model": null,
-  "complement_hmm_model": "../../../models/testModelR9_5mer_acgt_complement.model",
-  "template_hmm_model": "../../../models/testModelR9_5mer_acgt_template.model",
+  "complement_hmm_model": "./models/testModelR9_5mer_acgt_complement.model",
+  "template_hmm_model": "./models/testModelR9_5mer_acgt_template.model",
   "job_count": 2,
   "debug": false,
   "two_d": false,
-  "output_dir": "../../../src/signalalign/tests/",
+  "output_dir": "./src/signalalign/tests/",
   "constraint_trim": null,
   "diagonal_expansion": null
 }
