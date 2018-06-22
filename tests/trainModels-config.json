@@ -67,7 +67,7 @@
   "job_count": 2,
   "debug": false,
   "two_d": false,
-  "output_dir": "./src/signalalign/tests/",
+  "output_dir": "./",
   "constraint_trim": null,
   "diagonal_expansion": null
 }

@@ -16,9 +16,8 @@ from signalalign import defaultModelFromVersion, parseFofn
 from signalalign.nanoporeRead import NanoporeRead
 from signalalign.utils.bwaWrapper import *
 from signalalign.utils.fileHandlers import FolderHandler
-from signalalign.utils.sequenceTools import fastaWrite, samtools_faidx_fasta
+from signalalign.utils.sequenceTools import fastaWrite, samtools_faidx_fasta, processReferenceFasta
 from signalalign.mea_algorithm import mea_alignment_from_signal_align, match_events_with_signalalign
-from signalalign.utils import processReferenceFasta
 
 
 def create_signalAlignment_args(backward_reference=None, forward_reference=None, destination=None,
@@ -721,7 +720,7 @@ class SignalAlignSample(object):
                                      "".format(self.bwa_reference)
             self.fw_fasta_path, self.bw_fasta_path = processReferenceFasta(fasta=self.bwa_reference,
                                                                            work_folder=self.working_folder,
-                                                                           motif_key=self.motifs,
+                                                                           motifs=self.motifs,
                                                                            positions_file=self.positions_file)
 
 
