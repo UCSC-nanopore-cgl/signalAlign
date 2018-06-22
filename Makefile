@@ -4,8 +4,8 @@ include ./include.mk
 libSources = impl/*.c
 libHeaders = inc/*.h
 libTests = tests/*.c
-scrappie_c = scrappie/*.c
-scrappie_h = scrappie/*.h
+#scrappie_c = scrappie/*.c
+#scrappie_h = scrappie/*.h
 
 signalAlignDependencies =  ${basicLibsDependencies}
 signalAlignLib = ${basicLibs}
@@ -19,14 +19,14 @@ all : sL bD hs python-utils ${libPath}/signalAlignLib.a ${signalAlignBin}/signal
 	  ${signalAlignBin}/signalMachine ${signalAlignBin}/runSignalAlign \
 	  ${signalAlignBin}/variantCallingLib.py ${signalAlignBin}/alignmentAnalysisLib.py \
 	  ${signalAlignBin}/buildHdpUtil ${signalAlignBin}/trainModels all_tests \
-	  externals nanoporeParams python_setup  \
+	  externals nanoporeParams python_setup \
 
 python-utils :
 	cd python_utils && python3 setup.py install
 
 
 scrappie :
-	${cxx} ${cflags} -I inc -I${libPath}
+	cd scrappie && mkdir build && cd build && cmake .. && make
 
 debugging : hs ${libPath}/signalAlignLib.a ${signalAlignDependencies}
 	${cxx} ${cflags} -I inc -I${libPath} -I${htsLibRootPath} -o ${signalAlignBin}/debugging debugging.c ${libPath}/signalAlignLib.a ${signalAlignLib} ${htsLib}

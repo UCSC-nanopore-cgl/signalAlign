@@ -434,7 +434,8 @@ class EventDetectTests(unittest.TestCase):
         # get input data
         sampling_freq = self.rna_handle.sample_rate
         start_time = self.rna_handle.raw_attributes['start_time']
-        event_table = self.rna_handle.get_basecall_data()
+        event_table = self.rna_handle.get_basecall_data(analysis="Basecall_1D")
+        print(event_table.dtype)
         # run method
         new_table = index_to_time(event_table, sampling_freq=sampling_freq, start_time=start_time)
         start = event_table["start"] / sampling_freq + (start_time / sampling_freq)
@@ -509,6 +510,12 @@ class EventDetectTests(unittest.TestCase):
             passing = check_numpy_table(events, req_fields=('start', 'length', 'mean', 'stdv', 'model_state', 'move', 'p_model_state'))
             self.assertTrue(passing)
             self.assertIsInstance(f5handle, Fast5)
+
+    def test_create_scrappie_event_table(self):
+        pass
+
+    def test_scrappie_event_detect(self):
+        pass
 
     @classmethod
     def tearDownClass(cls):
