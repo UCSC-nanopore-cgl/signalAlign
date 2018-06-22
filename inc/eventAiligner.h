@@ -1,0 +1,11 @@
+//
+// Created by Andrew Bailey on 6/8/18.
+//
+
+#ifndef NANOPORE_RNN_EVENTAILIGNER_H
+#define NANOPORE_RNN_EVENTAILIGNER_H
+
+
+
+
+#endif //NANOPORE_RNN_EVENTAILIGNER_H

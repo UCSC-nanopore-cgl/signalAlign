@@ -4,7 +4,10 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include "fasta_handler.h"
+#include "eventAiligner.h"
+#include <hdf5.h>
+
+
 
 
 
@@ -12,5 +15,6 @@
 int main(int argc, char *argv[]) {
 //    int bugs = 100;
 //    double bug_rate = 1.2;
-    build_fai_index_file();
+//    build_fai_index_file();
+
 }

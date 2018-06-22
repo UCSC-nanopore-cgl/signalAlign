@@ -685,7 +685,7 @@ class Fast5(h5py.File):
             return self._join_path(
                 self.__base_analysis__,
                 sorted(filter(
-                    lambda x: name in x, self[self.__base_analysis__].keys()
+                    lambda x: x.startswith(name), self[self.__base_analysis__].keys()
                 ))[-1]
             )
         except (IndexError, KeyError):

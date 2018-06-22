@@ -28,6 +28,7 @@ EVENT_DETECT_SPEEDY = "speedy"
 EVENT_DETECT_MINKNOW = "minknow"
 EVENT_DETECT_SCRAPPIE = "scrappie"
 
+
 def create_speedy_event_table(signal, sampling_freq, start_time, min_width=5, max_width=80, min_gain_per_sample=0.008,
                               window_width=800):
     """Create new event table using SpeedyStatSplit Event detection
@@ -96,14 +97,14 @@ def create_minknow_event_table(signal, sampling_freq, start_time,
 
 
 def create_scrappie_event_table(fast5_location, sampling_freq):
-    """Create new event table using minknow_event_detect event detection
+    """Create new event table using scrappie event detection via subprocess call to scrappie
 
-    :param signal: list or array of signal in pA for finding events
+    :param fast5_location: path to
     :param sampling_freq: sampling frequency of ADC in Hz
     :return: Table of events without model state or move information
     """
     events = scrappie_event_detect(fast5_location)
-    assert events is not None and len(events)>0, "Could not use scrappie to detect events in {}".format(fast5_location)
+    assert events is not None and len(events) > 0, "Could not use scrappie to detect events in {}".format(fast5_location)
     num_events = len(events)
     event_table = get_empty_event_table(num_events - 1)
 
