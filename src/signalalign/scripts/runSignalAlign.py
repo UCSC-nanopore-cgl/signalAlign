@@ -13,7 +13,7 @@ from random import shuffle
 from multiprocessing import Process, current_process, Manager
 
 from signalalign.signalAlignment import multithread_signal_alignment
-from signalalign.utils import processReferenceFasta
+from signalalign.utils.sequenceTools import processReferenceFasta
 from signalalign.utils.fileHandlers import FolderHandler
 from signalalign.utils.bwaWrapper import buildBwaIndex
 from signalalign.motif import getDegenerateEnum
@@ -83,15 +83,17 @@ def parse_args():
                         required=False, default=None, help='amount to remove from an anchor constraint')
     parser.add_argument('--target_regions', '-q', action='store', dest='target_regions', type=str,
                         required=False, default=None, help="tab separated table with regions to align to")
-    parser.add_argument("--motif", action="store", dest="motif_key", default=None)
+    parser.add_argument("--motifs", action="store", dest="motifs", default=None, help="Motif find and replace "
+                                                                                      "must be in specific list within "
+                                                                                      "a list format. eg: "
+                                                                                      "[['CCAGG', 'CEAGG'], "
+                                                                                      "['CCTGG', 'CETGG']]")
     parser.add_argument('--ambiguity_positions', '-p', action='store', required=False, default=None,
                         dest='ambiguity_positions', help="Ambiguity positions")
     parser.add_argument('--jobs', '-j', action='store', dest='nb_jobs', required=False,
                         default=4, type=int, help="number of jobs to run in parallel")
     parser.add_argument('--nb_files', '-n', action='store', dest='nb_files', required=False,
                         default=500, type=int, help="maximum number of reads to align")
-    parser.add_argument('--ambig_char', '-X', action='store', required=False, default=None, type=str, dest='ambig_char',
-                        help="")
     parser.add_argument('--output_format', '-f', action='store', default="full", dest='outFmt',
                         help="output format: full, variantCaller, or assignments. Default: full")
     parser.add_argument('--debug', action='store_true', dest="DEBUG", default=False,
@@ -173,9 +175,8 @@ def main(args):
     #
     if not args.forward_reference or not args.backward_reference:
         args.forward_reference, args.backward_reference = processReferenceFasta(fasta=args.bwa_reference,
-                                                                                motif_key=args.motif_key,
+                                                                                motifs=args.motifs,
                                                                                 work_folder=temp_folder,
-                                                                                sub_char=args.ambig_char,
                                                                                 positions_file=args.ambiguity_positions)
 
     # list of read files
