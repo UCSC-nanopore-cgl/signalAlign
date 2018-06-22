@@ -1,21 +1,24 @@
 
 from __future__ import print_function
 import sys
-import h5py
+import os
 import re
+from signalalign.fast5 import Fast5
 
 from itertools import islice
-from signalalign.event_detection import resegment_reads
+from signalalign.event_detection import resegment_reads, EVENT_DETECT_MINKNOW, EVENT_DETECT_SCRAPPIE, EVENT_DETECT_SPEEDY
 
 
-TEMPLATE_BASECALL_KEY   = "/Analyses/Basecall_1D_00{}"
-RESEGMENT_KEY           = "/Analyses/ReSegmentBasecall_00{}"
-TWOD_BASECALL_KEY       = "/Analyses/Basecall_2D_00{}"
-TWOD_BASECALL_KEY_0     = "/Analyses/Basecall_2D_000"
-METADATA_PATH_KEY       = "/UniqueGlobalKey/tracking_id"
-READS_KEY               = "/Raw/Reads/"
+TEMPLATE_BASECALL_KEY   = Fast5.__default_basecall_1d_analysis__ #"/Analyses/Basecall_1D_00{}"
+RESEGMENT_KEY           = "SignalAlign_Basecall_1D_000" #"/Analyses/ReSegmentBasecall_00{}"
+TWOD_BASECALL_KEY       = Fast5.__default_basecall_2d_analysis__ #"/Analyses/Basecall_2D_00{}"
+TWOD_BASECALL_KEY_0     = os.path.join(Fast5.__base_analysis__, TWOD_BASECALL_KEY + "_000") #"/Analyses/Basecall_2D_000"
+METADATA_PATH_KEY       = Fast5.__tracking_id_path__ #"/UniqueGlobalKey/tracking_id"
+READS_KEY               = Fast5.__raw_path__ #"/Raw/Reads/"
 VERSION_KEY             = ("version", "dragonet version", "nanotensor version")
 SUPPORTED_1D_VERSIONS   = ("1.0.1", "1.2.1", "1.2.4", "1.23.0", "1.22.4", "2.1.0", "0.2.0")
+
+RESEGMENT_STRAGEGIES     = [EVENT_DETECT_MINKNOW, EVENT_DETECT_SCRAPPIE, EVENT_DETECT_SPEEDY]
 
 # promethion read_name: self.fast5['PreviousReadInfo'].attrs['previous_read_id'].decode()
 
@@ -52,77 +55,68 @@ class NanoporeRead(object):
         self.complement_var = 1                #
         self.complement_scale_sd = 1           #
         self.complement_var_sd = 1             #
-        self.twoD = twoD                       # 2D read flag, necessary right now, and the client should know
         self.event_table = event_table         # if we look for alternative events table
+
+        # determination of 2D reads
+        self.twoD = twoD                       # 2D read flag, necessary right now, and the client should know
+        if type(self) == NanoporeRead:
+            if twoD:
+                raise Exception("The 'twoD' initialization flag is deprecated for NanoporeRead.  "
+                                "Use 'NanoporeRead2D' object instead.")
+            self.twoD = False
+        elif type(self) == NanoporeRead2D:
+            self.twoD = True
+
+        # determination of RNA read
         self.rna = False
         if self.is_read_rna():
             self.rna = True
             assert self.twoD is False, "Cannot perform 2D analysis when using RNA data"
+
+        # initialize if appropriate
         if initialize:
             self.Initialize()
 
-    def open(self, parent_job=None):
+    def open(self):
         if self.is_open: return True
         try:
-            self.fastFive = h5py.File(self.filename, 'r+')
+            self.fastFive = Fast5(self.filename, 'r+')
             self.is_open = True
             return True
         except Exception as e:
             self.close()
-            self.logError("[NanoporeRead:open] ERROR opening {filename}, {e}".format(filename=self.filename, e=e), parent_job)
+            self.logError("[NanoporeRead:open] ERROR opening {filename}, {e}".format(filename=self.filename, e=e))
             return False
 
+    def close(self):
+        self.is_open = False
+        if self.fastFive is None: return
+        self.fastFive.close()
+
     def get_latest_basecall_edition(self, address, new=False):
-        """Check if path exists, if it does increment numbering
+        if address.startswith(Fast5.__base_analysis__):
+            address = address.replace(Fast5.__base_analysis__, "").lstrip("/")
 
-        :param address: path to fast5 object. Needs to have a field where string.format can work!
-        :param new: get one more than most recent address
-        """
-
-        highest = 0
-        while(highest < 30):
-            if address.format(highest) in self.fastFive:
-                highest += 1
-                continue
+        try:
+            if new:
+                return self.fastFive.get_analysis_new(address)
             else:
-                if new:
-                    # print(address.format(highest))
-                    return address.format(highest)  # the last base-called version we saw
-                else:
-                    if highest > 0:
-                        return address.format(max(0, highest - 1))  # the last base-called version we saw
-                    else:
-                        return False  # didn't find the version
-        # print("highest", highest)
-        return False
+                return self.fastFive.get_analysis_latest(address)
+        except (ValueError, IndexError) as e:
+            print("[NanoporeRead:get_latest_basecall_edition] could not find {} in {}".format(address, self.filename), file=sys.stderr)
+            return False
 
-    # def check_path(self, path, latest=False):
-    #     """Check if path exists, if it does increment numbering
-    #
-    #     :param path: path to fast5 object. Needs to have a field where string.format can work! """
-    #     highest = 0
-    #     while highest < 10:
-    #         if path.format(highest) in self:
-    #             highest += 1
-    #             continue
-    #         else:
-    #             if latest and highest > 0:
-    #                 return path.format(highest-1)  # the last base-called version we saw
-    #             else:
-    #                 return path.format(highest)  # the new base-called version
+    def Initialize(self):
+        if not self.open(): return False
 
-    def Initialize(self, parent_job=None):
-        if not self.open(parent_job): return False
+        ok = self._initialize_metadata()
+        ok &= self._initialize()
 
-        ok = self._initialize_metadata(parent_job)
+        if not ok: self.close()
 
-        if self.twoD:
-            ok &= self._initialize_twoD(parent_job)
-        else:
-            ok &= self._initialize(parent_job)
         return ok
 
-    def _initialize_metadata(self, parent_job=None):
+    def _initialize_metadata(self):
         if not self.open(): return False
 
         path_locations = [METADATA_PATH_KEY, READS_KEY]
@@ -130,7 +124,7 @@ class NanoporeRead(object):
 
         if len(missing_paths) > 0:
             self.logError("[NanoporeRead:Initialize] ERROR keys are missing from {}: {}"
-                          .format(self.filename, missing_paths), parent_job)
+                          .format(self.filename, missing_paths))
             self.close()
             return False
 
@@ -138,36 +132,27 @@ class NanoporeRead(object):
         reads = list(self.fastFive[READS_KEY])
         if len(reads) != 1:
             self.logError("[NanoporeRead:Initialize] ERROR expected 1 read in {} ({}): got {}"
-                          .format(self.filename, READS_KEY, reads), parent_job)
+                          .format(self.filename, READS_KEY, reads))
             self.close()
             return False
-        read_loc = READS_KEY + reads[0]
+        read_loc = os.path.join(READS_KEY, reads[0])
 
         self.read_label = self.bytes_to_string(self.fastFive[read_loc].attrs.get('read_id'))
 
         return self.run_id is not None and self.read_label is not None
 
-
-    def _initialize(self, parent_job=None):
+    def _initialize(self):
         """Routine setup 1D NanoporeReads, returns false if basecalled with upsupported
         version or is not base-called
         """
         if not self.open(): return False
-
-        # if not any(x in self.fastFive for x in TEMPLATE_BASECALL_KEY_0):
-        #     self.logError("[NanoporeRead:_initialize]ERROR %s not basecalled" % self.filename, parent_job)
-        #     self.close()
-        #     return False
-
-        # make sure that this version is supported
 
         # get oneD directory and check if the table location exists in the fast5file
         if self.event_table:
             oned_root_address = self.get_latest_basecall_edition(self.event_table)
             if not oned_root_address:
                 print("[SignalAlignment.run] Resegmenting read", file=sys.stderr)
-                MINKNOW = dict(window_lengths=(5, 10), thresholds=(2.0, 1.1), peak_height=1.2)
-                resegment_reads(self.filename, MINKNOW, speedy=False, overwrite=True)
+                resegment_reads(self.filename, speedy=False, overwrite=True, analysis_path=self.event_table)
                 oned_root_address = self.get_latest_basecall_edition(self.event_table)
 
         elif self.rna:
@@ -178,11 +163,8 @@ class NanoporeRead(object):
                 # MINKNOW = dict(window_lengths=(5, 10), thresholds=(2.0, 1.1), peak_height=1.2)
                 DNAMINKNOW = dict(window_lengths=(3, 6), thresholds=(1.4, 9.0), peak_height=0.2)
                 RNAMINKNOW = dict(window_lengths=(7, 14), thresholds=(2.5, 9.0), peak_height=1.0)
-
                 # SPEEDY = dict(min_width=5, max_width=80, min_gain_per_sample=0.008, window_width=800)
-                # resegment_reads(self.filename, SPEEDY, speedy=True, overwrite=True)
-                # print("Resegmenttwice")
-                resegment_reads(self.filename, RNAMINKNOW, speedy=False, overwrite=True)
+                resegment_reads(self.filename, params=RNAMINKNOW, speedy=False, overwrite=True, analysis_path=RESEGMENT_KEY)
                 oned_root_address = self.get_latest_basecall_edition(RESEGMENT_KEY)
         else:
             oned_root_address = self.get_latest_basecall_edition(TEMPLATE_BASECALL_KEY)
@@ -190,13 +172,13 @@ class NanoporeRead(object):
         # sanity check
         if not oned_root_address:
             self.logError("[NanoporeRead:_initialize] ERROR could not find 1D root address in {}"
-                          .format(self.filename), parent_job)
+                          .format(self.filename))
             self.close()
             return False
 
         # get basecall version
         if not any(x in self.fastFive[oned_root_address].attrs.keys() for x in VERSION_KEY):
-            self.logError("[NanoporeRead:_initialize] ERROR %s missing version" % self.filename, parent_job)
+            self.logError("[NanoporeRead:_initialize] ERROR %s missing version" % self.filename)
             self.close()
             return False
         if "version" in self.fastFive[oned_root_address].attrs.keys():
@@ -206,18 +188,17 @@ class NanoporeRead(object):
         else:
             self.version = self.fastFive[oned_root_address].attrs["nanotensor version"]
         if self.version not in SUPPORTED_1D_VERSIONS:
-            self.logError("[NanoporeRead:_initialize] ERROR %s unsupported version %s " % (self.filename, self.version),
-                          parent_job)
+            self.logError("[NanoporeRead:_initialize] ERROR %s unsupported version %s " % (self.filename, self.version))
             self.close()
             return False
 
-        self.template_event_table_address = "%s/BaseCalled_template/Events" % oned_root_address
-        self.template_model_address       = "%s/BaseCalled_template/Model" % oned_root_address
+        self.template_event_table_address = os.path.join(oned_root_address, "BaseCalled_template/Events")
+        self.template_model_address       = os.path.join(oned_root_address, "BaseCalled_template/Model")
         self.template_model_id            = None
 
-        fastq_sequence_address = "%s/BaseCalled_template/Fastq" % oned_root_address
+        fastq_sequence_address = os.path.join(oned_root_address, "BaseCalled_template/Fastq")
         if fastq_sequence_address not in self.fastFive:
-            self.logError("[NanoporeRead:_initialize]ERROR %s missing fastq" % self.filename, parent_job)
+            self.logError("[NanoporeRead:_initialize]ERROR %s missing fastq" % self.filename)
             self.close()
             return False
 
@@ -231,11 +212,251 @@ class NanoporeRead(object):
         if self.template_read_length <= 0 or self.kmer_length <= 0:
             self.logError("[NanoporeRead:_initialize] ERROR illegal read parameters "
                           "template_read_length: %s, kmer_length: %s"
-                          % (self.template_read_length, self.kmer_length), parent_job)
+                          % (self.template_read_length, self.kmer_length))
             self.close()
             return False
 
         return True
+
+
+    @staticmethod
+    def make_event_map(events, kmer_length):
+        event_map = [0]
+        previous_prob = 0
+        for i, line in islice(enumerate(events), 1, None):
+            move = line['move']
+            this_prob = line['p_model_state']
+            if move == 1:
+                event_map.append(i)
+            if move > 1:
+                for skip in range(move - 1):
+                    event_map.append(i - 1)
+                event_map.append(i)
+            if move == 0:
+                if this_prob > previous_prob:
+                    event_map[-1] = i
+            previous_prob = this_prob
+        final_event_index = [event_map[-1]]
+        padding = final_event_index * (kmer_length - 1)
+        event_map = event_map + padding
+        return event_map
+
+    def init_event_map(self):
+        """Maps the events from the template and complement strands to their base called kmers. The map
+        generated by this function is called the "strand_event_map" because it only works for mapping the
+        strand read (1D read) to to it's events. Uses the same fields as 'get_twoD_event_map' below.
+        """
+
+        self.template_strand_event_map = self.make_event_map(self.template_events, self.kmer_length)
+        assert len(self.template_strand_event_map) == len(self.template_read), \
+            "Read and event map lengths do not match {} != {}".format(len(self.template_read),
+                                                                      len(self.template_strand_event_map))
+        # if self.rna:
+        #     self.template_strand_event_map = self.template_strand_event_map[::-1]
+
+        return True
+
+    def sequence_from_events(self, events):
+        """Get new read from event table"""
+        bases = []
+        for i, event in enumerate(events):
+            if i == 0:
+                bases.extend([chr(x) for x in event['model_state']])
+
+            else:
+                if event['move'] > 0:
+                    bases.append(bytes.decode
+                                 (event['model_state'][-event['move']:]))
+        sequence = ''.join(bases)
+        return sequence
+
+    def _join_path(self, *args):
+        return '/'.join(args)
+
+    def get_template_events(self):
+        if self.template_event_table_address in self.fastFive:
+            self.template_events = self.fastFive[self.template_event_table_address]
+            return True
+        return False
+
+    def get_model_adjustments(self):
+        if self.template_model_address in self.fastFive:
+            self.has_template_model = True
+            self.template_scale = self.fastFive[self.template_model_address].attrs["scale"]
+            self.template_shift = self.fastFive[self.template_model_address].attrs["shift"]
+            self.template_drift = self.fastFive[self.template_model_address].attrs["drift"]
+            self.template_var = self.fastFive[self.template_model_address].attrs["var"]
+            self.template_scale_sd = self.fastFive[self.template_model_address].attrs["scale_sd"]
+            self.template_var_sd = self.fastFive[self.template_model_address].attrs["var_sd"]
+
+        if self.template_model_address not in self.fastFive:
+            self.has_template_model = False
+        return
+
+    def get_model_id(self, address):
+        if address in self.fastFive:
+            model_name = bytes.decode(self.fastFive[address].attrs["model_file"])
+            model_name = model_name.split('/')[-1]
+            return model_name
+        else:
+            return None
+
+    def write_data(self, data, location, compression=True):
+        """Write numpy data to fast5 file"""
+        try:
+            del self.fastFive[location]
+        except KeyError:
+            pass
+        self.fastFive.create_dataset(location, data=data, compression=compression)
+
+    def assert_events_and_event_map(self):
+        template_events_check = self.get_template_events()
+        oneD_event_map_check  = self.init_event_map()
+
+        ok = False not in [template_events_check, oneD_event_map_check]
+        return ok
+
+    def Write(self, out_file, initialize=True):
+        if initialize:
+            ok = self.Initialize()
+            if not ok:
+                self.close()
+                return False
+
+        ok = self.assert_events_and_event_map()
+        if not ok:
+            self.close()
+            return False
+
+        # get model params
+        self.get_model_adjustments()
+
+        # Make the npRead
+        # line 1 parameters
+        print(len(self.alignment_table_sequence), end=' ', file=out_file)  # 0alignment read length
+        print(len(self.template_events), end=' ', file=out_file)           # 1nb of template events
+        print(len(self.complement_events), end=' ', file=out_file)         # 2nb of complement events
+        print(len(self.template_read), end=' ', file=out_file)             # 3length of template read
+        print(len(self.complement_read), end=' ', file=out_file)           # 4length of complement read
+        print(self.template_scale, end=' ', file=out_file)                 # 5template scale
+        print(self.template_shift, end=' ', file=out_file)                 # 6template shift
+        print(self.template_var, end=' ', file=out_file)                   # 7template var
+        print(self.template_scale_sd, end=' ', file=out_file)              # 8template scale_sd
+        print(self.template_var_sd, end=' ', file=out_file)                # 9template var_sd
+        print(self.template_drift, end=' ', file=out_file)                 # 0template_drift
+        print(self.complement_scale, end=' ', file=out_file)               # 1complement scale
+        print(self.complement_shift, end=' ', file=out_file)               # 2complement shift
+        print(self.complement_var, end=' ', file=out_file)                 # 3complement var
+        print(self.complement_scale_sd, end=' ', file=out_file)            # 4complement scale_sd
+        print(self.complement_var_sd, end=' ', file=out_file)              # 5complement var_sd
+        print(self.complement_drift, end=' ', file=out_file)               # 6complement_drift
+        print((1 if self.twoD else 0), end='\n', file=out_file)            # has 2D
+
+        # line 2 alignment table sequence
+        print(self.alignment_table_sequence, end='\n', file=out_file)
+
+        # line 3 template read
+        print(self.template_read, end='\n', file=out_file)
+
+        # line 4 template strand map
+        for _ in self.template_strand_event_map:
+            print(_, end=' ', file=out_file)
+        print("", end="\n", file=out_file)
+
+        # line 5 complement read
+        print(self.complement_read, end='\n', file=out_file)
+
+        # line 6 complement strand map
+        for _ in self.complement_strand_event_map:
+            print(_, end=' ', file=out_file)
+        print("", end="\n", file=out_file)
+
+        # line 7 template 2D event map
+        for _ in self.template_event_map:
+            print(_, end=' ', file=out_file)
+        print("", end="\n", file=out_file)
+
+        # line 8 template events
+        template_start_time = self.template_events[0]['start']
+        for mean, stdev, length, start in self.template_events['mean', 'stdv', 'length', 'start']:
+            print(mean, stdev, length, (start - template_start_time), sep=' ', end=' ', file=out_file)
+        print("", end="\n", file=out_file)
+
+        # line 9 complement 2D event map
+        for _ in self.complement_event_map[::-1]:
+            print(_, end=' ', file=out_file)
+        print("", end="\n", file=out_file)
+
+        # line 10 complement events
+        if self.twoD:
+            complement_start_time = self.complement_events[0]['start']
+            for mean, stdev, length, start in self.complement_events['mean', 'stdv', 'length', 'start']:
+                print(mean, stdev, length, (start - complement_start_time), sep=' ', end=' ', file=out_file)
+        else:
+            pass
+        print("", end="\n", file=out_file)
+
+        # line 11 model_state (template)
+        for _ in self.template_events['model_state']:
+            print(bytes.decode(_), sep=' ', end=' ', file=out_file)
+        print("", end="\n", file=out_file)
+
+        # line 12 p(model) (template)
+        for _ in self.template_events['p_model_state']:
+            print(_, sep=' ', end=' ', file=out_file)
+        print("", end="\n", file=out_file)
+
+        # line 13 model_state (complement)
+        if self.twoD:
+            for _ in self.complement_events['model_state']:
+                print(bytes.decode(_), sep=' ', end=' ', file=out_file)
+        print("", end="\n", file=out_file)
+
+        # line 14 p(model) (complement)
+        if self.twoD:
+            for _ in self.complement_events['p_model_state']:
+                print(_, sep=' ', end=' ', file=out_file)
+        print("", end="\n", file=out_file)
+
+        return True
+
+    def is_read_rna(self):
+        """
+        Determine if a read is RNA or DNA
+        source: https://github.com/nanoporetech/tombo/blob/master/tombo/tombo_helper.py
+        """
+        # check both experiment type and kit slots for "rna"
+        exp_type, exp_kit = None, None
+        try:
+            exp_type = bytes.decode(self.fastFive['UniqueGlobalKey/context_tags'].attrs[
+                'experiment_type'])
+            # remove the word internal since it contains rna.
+            exp_type = exp_type.replace('internal', '')
+        except:
+            pass
+        try:
+            exp_kit = bytes.decode(self.fastFive['UniqueGlobalKey/context_tags'].attrs[
+                'experiment_kit'])
+            # remove the word internal since it contains rna.
+            exp_kit = exp_kit.replace('internal', '')
+        except:
+            pass
+
+        if exp_type is None and exp_kit is None:
+            rna = False
+        else:
+            rna = (
+                (exp_type is not None and re.search('rna', exp_type) is not None) or
+                (exp_kit is not None and re.search('rna', exp_kit) is not None))
+
+        return rna
+
+    @staticmethod
+    def logError(message, parent_job=None):
+        if parent_job is None:
+            print(message, file=sys.stderr)
+        else:
+            parent_job.fileStore.logToMaster(message)
 
     @staticmethod
     def bytes_to_string(string):
@@ -250,7 +471,14 @@ class NanoporeRead(object):
         else:
             raise AssertionError("String needs to be bytes or string ")
 
-    def _initialize_twoD(self, parent_job=None):
+
+class NanoporeRead2D(NanoporeRead):
+
+    def _initialize(self):
+        """
+        Separate initialization routine for 2D reads
+        :return:
+        """
 
         if not self.open(): return False
 
@@ -259,14 +487,13 @@ class NanoporeRead(object):
 
         if TWOD_BASECALL_KEY_0 not in self.fastFive:
             self.logError("[NanoporeRead::initialize_twoD] Didn't find twoD address, looked here {}"
-                          .format(TWOD_BASECALL_KEY_0), parent_job)
+                          .format(TWOD_BASECALL_KEY_0))
             self.close()
             return False
 
         twoD_address = self.get_latest_basecall_edition(TWOD_BASECALL_KEY)
         if twoD_address not in self.fastFive:
-            self.logError("[NanoporeRead::initialize_twoD] Didn't find twoD address, looked here %s "%twoD_address,
-                          parent_job)
+            self.logError("[NanoporeRead::initialize_twoD] Didn't find twoD address, looked here %s "%twoD_address)
             self.close()
             return False
 
@@ -275,7 +502,7 @@ class NanoporeRead(object):
         supported_versions = ["1.15.0", "1.19.0", "1.20.0", "1.22.2", "1.22.4", "1.23.0"]
         if self.version not in supported_versions:
             self.logError("[NanoporeRead::initialize_twoD]Unsupported Version {} (1.15.0, 1.19.0, 1.20.0, "
-                          "1.22.2, 1.22.4, 1.23.0 supported)".format(self.version), parent_job)
+                          "1.22.2, 1.22.4, 1.23.0 supported)".format(self.version))
             self.close()
             return False
 
@@ -333,7 +560,7 @@ class NanoporeRead(object):
             self.complement_read = bytes.decode(self.fastFive[oneD_address + "/BaseCalled_complement/Fastq"][()].split()[2])
             return True
         else:
-            self.logError("Unsupported Version (1.15.0, 1.19.0, 1.20.0, 1.22.2, 1.22.4 supported)", parent_job)
+            self.logError("Unsupported Version (1.15.0, 1.19.0, 1.20.0, 1.22.2, 1.22.4 supported)")
             return False
 
     def assemble_2d_sequence_from_table(self):
@@ -374,61 +601,6 @@ class NanoporeRead(object):
                 continue
         self.alignment_table_sequence = bytes.decode(self.alignment_table_sequence)
         return
-
-    def init_1d_event_maps(self):
-        """Maps the events from the template and complement strands to their base called kmers. The map
-        generated by this function is called the "strand_event_map" because it only works for mapping the
-        strand read (1D read) to to it's events. Uses the same fields as 'get_twoD_event_map' below.
-        """
-        def make_map(events):
-            event_map = [0]
-            previous_prob = 0
-            for i, line in islice(enumerate(events), 1, None):
-                move = line['move']
-                this_prob = line['p_model_state']
-                if move == 1:
-                    event_map.append(i)
-                if move > 1:
-                    for skip in range(move - 1):
-                        event_map.append(i - 1)
-                    event_map.append(i)
-                if move == 0:
-                    if this_prob > previous_prob:
-                        event_map[-1] = i
-                previous_prob = this_prob
-            final_event_index = [event_map[-1]]
-            padding = final_event_index * (self.kmer_length - 1)
-            event_map = event_map + padding
-            return event_map
-
-        self.template_strand_event_map = make_map(self.template_events)
-        assert len(self.template_strand_event_map) == len(self.template_read), \
-            "Read and event map lengths do not match {} != {}".format(len(self.template_read),
-                                                                      len(self.template_strand_event_map))
-        # if self.rna:
-        #     self.template_strand_event_map = self.template_strand_event_map[::-1]
-        if self.twoD:
-            self.complement_strand_event_map = make_map(self.complement_events)
-            assert len(self.complement_strand_event_map) == len(self.complement_read)
-
-        return True
-
-    def sequence_from_events(self, events):
-        """Get new read from event table"""
-        bases = []
-        for i, event in enumerate(events):
-            if i == 0:
-                bases.extend([chr(x) for x in event['model_state']])
-
-            else:
-                if event['move'] > 0:
-                    bases.append(bytes.decode
-                                 (event['model_state'][-event['move']:]))
-        sequence = ''.join(bases)
-        return sequence
-
-    def _join_path(self, *args):
-        return '/'.join(args)
 
     def get_twoD_event_map(self):
         """Maps the kmers in the alignment table sequence read to events in the template and complement strand reads
@@ -528,11 +700,22 @@ class NanoporeRead(object):
         assert(len(self.complement_event_map) == len(self.alignment_table_sequence))
         return True
 
-    def get_template_events(self):
-        if self.template_event_table_address in self.fastFive:
-            self.template_events = self.fastFive[self.template_event_table_address]
-            return True
-        return False
+    def init_event_map(self):
+        """Maps the events from the template and complement strands to their base called kmers. The map
+        generated by this function is called the "strand_event_map" because it only works for mapping the
+        strand read (1D read) to to it's events. Uses the same fields as 'get_twoD_event_map' below.
+        """
+
+        super(NanoporeRead2D, self).init_event_map()
+
+        assert self.get_complement_events(), "Complement event table not present at {} in {}".format(
+            self.complement_event_table_address, self.filename)
+
+        self.complement_strand_event_map = self.make_event_map(self.complement_events, self.kmer_length)
+        assert len(self.complement_strand_event_map) == len(self.complement_read), \
+            "Complement read and event map lengths do not match {} != {}".format(len(self.complement_read),
+                                                                                 len(self.complement_strand_event_map))
+        return True
 
     def get_complement_events(self):
         if self.complement_event_table_address in self.fastFive:
@@ -540,21 +723,10 @@ class NanoporeRead(object):
             return True
         return False
 
-    def get_template_model_adjustments(self):
-        if self.template_model_address in self.fastFive:
-            self.has_template_model = True
-            self.template_scale = self.fastFive[self.template_model_address].attrs["scale"]
-            self.template_shift = self.fastFive[self.template_model_address].attrs["shift"]
-            self.template_drift = self.fastFive[self.template_model_address].attrs["drift"]
-            self.template_var = self.fastFive[self.template_model_address].attrs["var"]
-            self.template_scale_sd = self.fastFive[self.template_model_address].attrs["scale_sd"]
-            self.template_var_sd = self.fastFive[self.template_model_address].attrs["var_sd"]
+    def get_model_adjustments(self):
 
-        if self.template_model_address not in self.fastFive:
-            self.has_template_model = False
-        return
+        super(NanoporeRead2D, self).get_model_adjustments()
 
-    def get_complement_model_adjustments(self):
         if self.complement_model_address in self.fastFive:
             self.has_complement_model = True
             self.complement_scale = self.fastFive[self.complement_model_address].attrs["scale"]
@@ -568,177 +740,11 @@ class NanoporeRead(object):
             self.has_complement_model = False
         return
 
-    def get_model_id(self, address):
-        if address in self.fastFive:
-            model_name = bytes.decode(self.fastFive[address].attrs["model_file"])
-            model_name = model_name.split('/')[-1]
-            return model_name
-        else:
-            return None
+    def assert_events_and_event_map(self):
 
-    def write_data(self, data, location, compression=True):
-        """Write numpy data to fast5 file"""
-        try:
-            del self.fastFive[location]
-        except KeyError:
-            pass
-        self.fastFive.create_dataset(location, data=data, compression=compression)
+        oneD_check = super(NanoporeRead2D, self).assert_events_and_event_map()
+        twoD_map_check = self.get_twoD_event_map()
+        complement_events_check = self.get_complement_events()
 
-    def Write(self, parent_job, out_file, initialize=True):
-        if initialize:
-            ok = self.Initialize(parent_job)
-            if not ok:
-                self.close()
-                return False
-
-        if self.twoD:
-            twoD_map_check          = self.get_twoD_event_map()
-            complement_events_check = self.get_complement_events()
-        else:
-            twoD_map_check          = True
-            complement_events_check = True
-
-        template_events_check = self.get_template_events()
-        oneD_event_map_check  = self.init_1d_event_maps()
-
-        ok = False not in [twoD_map_check, template_events_check, complement_events_check, oneD_event_map_check]
-        if not ok:
-            self.close()
-            return False
-
-        # get model params
-        self.get_template_model_adjustments()
-        if self.twoD:
-            self.get_complement_model_adjustments()
-
-        # Make the npRead
-        # line 1 parameters
-        print(len(self.alignment_table_sequence), end=' ', file=out_file)  # 0alignment read length
-        print(len(self.template_events), end=' ', file=out_file)           # 1nb of template events
-        print(len(self.complement_events), end=' ', file=out_file)         # 2nb of complement events
-        print(len(self.template_read), end=' ', file=out_file)             # 3length of template read
-        print(len(self.complement_read), end=' ', file=out_file)           # 4length of complement read
-        print(self.template_scale, end=' ', file=out_file)                 # 5template scale
-        print(self.template_shift, end=' ', file=out_file)                 # 6template shift
-        print(self.template_var, end=' ', file=out_file)                   # 7template var
-        print(self.template_scale_sd, end=' ', file=out_file)              # 8template scale_sd
-        print(self.template_var_sd, end=' ', file=out_file)                # 9template var_sd
-        print(self.template_drift, end=' ', file=out_file)                 # 0template_drift
-        print(self.complement_scale, end=' ', file=out_file)               # 1complement scale
-        print(self.complement_shift, end=' ', file=out_file)               # 2complement shift
-        print(self.complement_var, end=' ', file=out_file)                 # 3complement var
-        print(self.complement_scale_sd, end=' ', file=out_file)            # 4complement scale_sd
-        print(self.complement_var_sd, end=' ', file=out_file)              # 5complement var_sd
-        print(self.complement_drift, end=' ', file=out_file)               # 6complement_drift
-        print((1 if self.twoD else 0), end='\n', file=out_file)            # has 2D
-
-        # line 2 alignment table sequence
-        print(self.alignment_table_sequence, end='\n', file=out_file)
-
-        # line 3 template read
-        print(self.template_read, end='\n', file=out_file)
-
-        # line 4 template strand map
-        for _ in self.template_strand_event_map:
-            print(_, end=' ', file=out_file)
-        print("", end="\n", file=out_file)
-
-        # line 5 complement read
-        print(self.complement_read, end='\n', file=out_file)
-
-        # line 6 complement strand map
-        for _ in self.complement_strand_event_map:
-            print(_, end=' ', file=out_file)
-        print("", end="\n", file=out_file)
-
-        # line 7 template 2D event map
-        for _ in self.template_event_map:
-            print(_, end=' ', file=out_file)
-        print("", end="\n", file=out_file)
-
-        # line 8 template events
-        template_start_time = self.template_events[0]['start']
-        for mean, stdev, length, start in self.template_events['mean', 'stdv', 'length', 'start']:
-            print(mean, stdev, length, (start - template_start_time), sep=' ', end=' ', file=out_file)
-        print("", end="\n", file=out_file)
-
-        # line 9 complement 2D event map
-        for _ in self.complement_event_map[::-1]:
-            print(_, end=' ', file=out_file)
-        print("", end="\n", file=out_file)
-
-        # line 10 complement events
-        if self.twoD:
-            complement_start_time = self.complement_events[0]['start']
-            for mean, stdev, length, start in self.complement_events['mean', 'stdv', 'length', 'start']:
-                print(mean, stdev, length, (start - complement_start_time), sep=' ', end=' ', file=out_file)
-        else:
-            pass
-        print("", end="\n", file=out_file)
-
-        # line 11 model_state (template)
-        for _ in self.template_events['model_state']:
-            print(bytes.decode(_), sep=' ', end=' ', file=out_file)
-        print("", end="\n", file=out_file)
-
-        # line 12 p(model) (template)
-        for _ in self.template_events['p_model_state']:
-            print(_, sep=' ', end=' ', file=out_file)
-        print("", end="\n", file=out_file)
-
-        # line 13 model_state (complement)
-        if self.twoD:
-            for _ in self.complement_events['model_state']:
-                print(bytes.decode(_), sep=' ', end=' ', file=out_file)
-        print("", end="\n", file=out_file)
-
-        # line 14 p(model) (complement)
-        if self.twoD:
-            for _ in self.complement_events['p_model_state']:
-                print(_, sep=' ', end=' ', file=out_file)
-        print("", end="\n", file=out_file)
-
-        return True
-
-    def close(self):
-        self.is_open = False
-        if self.fastFive is None: return
-        self.fastFive.close()
-
-    @staticmethod
-    def logError(message, parent_job=None):
-        if parent_job is None:
-            print(message, file=sys.stderr)
-        else:
-            parent_job.fileStore.logToMaster(message)
-
-    def is_read_rna(self):
-        """
-        Determine if a read is RNA or DNA
-        source: https://github.com/nanoporetech/tombo/blob/master/tombo/tombo_helper.py
-        """
-        # check both experiment type and kit slots for "rna"
-        exp_type, exp_kit = None, None
-        try:
-            exp_type = bytes.decode(self.fastFive['UniqueGlobalKey/context_tags'].attrs[
-                'experiment_type'])
-            # remove the word internal since it contains rna.
-            exp_type = exp_type.replace('internal', '')
-        except:
-            pass
-        try:
-            exp_kit = bytes.decode(self.fastFive['UniqueGlobalKey/context_tags'].attrs[
-                'experiment_kit'])
-            # remove the word internal since it contains rna.
-            exp_kit = exp_kit.replace('internal', '')
-        except:
-            pass
-
-        if exp_type is None and exp_kit is None:
-            rna = False
-        else:
-            rna = (
-                (exp_type is not None and re.search('rna', exp_type) is not None) or
-                (exp_kit is not None and re.search('rna', exp_kit) is not None))
-
-        return rna
+        ok = False not in [oneD_check, twoD_map_check, complement_events_check]
+        return ok

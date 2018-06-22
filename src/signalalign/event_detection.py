@@ -20,10 +20,13 @@ from collections import defaultdict
 from timeit import default_timer as timer
 from signalalign.utils.pyporeParsers import SpeedyStatSplit
 from signalalign.fast5 import Fast5
-from signalalign.utils.filters import minknow_event_detect
+from signalalign.utils.filters import minknow_event_detect, scrappie_event_detect
 from py3helpers.utils import check_numpy_table, list_dir, TimeStamp, change_np_field_type, merge_dicts
 from py3helpers.seq_tools import create_fastq_line, check_fastq_line, ReverseComplement, pairwise_alignment_accuracy
 
+EVENT_DETECT_SPEEDY = "speedy"
+EVENT_DETECT_MINKNOW = "minknow"
+EVENT_DETECT_SCRAPPIE = "scrappie"
 
 def create_speedy_event_table(signal, sampling_freq, start_time, min_width=5, max_width=80, min_gain_per_sample=0.008,
                               window_width=800):
@@ -31,7 +34,7 @@ def create_speedy_event_table(signal, sampling_freq, start_time, min_width=5, ma
 
     :param signal: list or array of signal in pA for finding events
     :param sampling_freq: sampling frequency of ADC in Hz
-    :param start_time: start time from fast5 file (time in seconds * sampling frequency
+    :param start_time: start time from fast5 file (time in seconds * sampling frequency)
     :param min_width: param for SpeedyStatSplit
     :param max_width: param for SpeedyStatSplit
     :param min_gain_per_sample: param for SpeedyStatSplit
@@ -49,11 +52,7 @@ def create_speedy_event_table(signal, sampling_freq, start_time, min_width=5, ma
     events = parser.parse(np.asarray(signal, dtype=np.float64))
     num_events = len(events)
     # create empty event table
-    event_table = np.empty(num_events, dtype=[('start', float), ('length', float),
-                                              ('mean', float), ('stdv', float),
-                                              ('model_state', 'S5'), ('move', '<i4'),
-                                              ('raw_start', int), ('raw_length', int),
-                                              ('p_model_state', float)])
+    event_table = get_empty_event_table(num_events)
     # set events into event table
     for i, event in enumerate(events):
         event_table['start'][i] = event.start / sampling_freq + (start_time / sampling_freq)
@@ -72,7 +71,7 @@ def create_minknow_event_table(signal, sampling_freq, start_time,
 
     :param signal: list or array of signal in pA for finding events
     :param sampling_freq: sampling frequency of ADC in Hz
-    :param start_time: start time from fast5 file (time in seconds * sampling frequency
+    :param start_time: start time from fast5 file (time in seconds * sampling frequency)
     :param window_lengths: t-test windows for minknow_event_detect
     :param thresholds: t-test thresholds for minknow_event_detect
     :param peak_height: peak height param for minknow_event_detect
@@ -84,11 +83,7 @@ def create_minknow_event_table(signal, sampling_freq, start_time,
                                   get_peaks=False, window_lengths=window_lengths,
                                   thresholds=thresholds, peak_height=peak_height)
     num_events = len(events)
-    event_table = np.empty(num_events, dtype=[('start', float), ('length', float),
-                                              ('mean', float), ('stdv', float),
-                                              ('model_state', 'S5'), ('move', '<i4'),
-                                              ('raw_start', int), ('raw_length', int),
-                                              ('p_model_state', float)])
+    event_table = get_empty_event_table(num_events)
     for i, event in enumerate(events):
         event_table['start'][i] = event["start"] + (start_time / sampling_freq)
         event_table['length'][i] = event["length"]
@@ -98,6 +93,49 @@ def create_minknow_event_table(signal, sampling_freq, start_time,
         event_table['raw_length'][i] = np.round(event["length"] * sampling_freq)
 
     return event_table
+
+
+def create_scrappie_event_table(fast5_location, sampling_freq):
+    """Create new event table using minknow_event_detect event detection
+
+    :param signal: list or array of signal in pA for finding events
+    :param sampling_freq: sampling frequency of ADC in Hz
+    :return: Table of events without model state or move information
+    """
+    events = scrappie_event_detect(fast5_location)
+    assert events is not None and len(events)>0, "Could not use scrappie to detect events in {}".format(fast5_location)
+    num_events = len(events)
+    event_table = get_empty_event_table(num_events - 1)
+
+    for i, event in enumerate(events):
+        # drop last event (cannot compute length without "next" event)
+        if i == num_events - 1: break
+
+        event_table['start'][i] = event["start"] / sampling_freq
+        event_table['length'][i] = 0.0
+        event_table['mean'][i] = event["mean"]
+        event_table['stdv'][i] = event["stdv"]
+        event_table['raw_start'][i] = np.round(event["start"])
+        event_table['raw_length'][i] = 0
+
+        if i != 0:
+            event_table['length'][i-1] = event_table['start'][i] - event_table['start'][i - 1]
+            event_table['raw_length'][i-1] = event_table['raw_start'][i] - event_table['raw_start'][i - 1]
+
+    return event_table
+
+
+def get_empty_event_table(num_events):
+    """
+    Gets default event table returned by create_XXX_event_table
+    :param num_events: number of events to initialize
+    :return: empty numpy array with appropriate columns
+    """
+    return np.empty(num_events, dtype=[('start', float), ('length', float),
+                                              ('mean', float), ('stdv', float),
+                                              ('model_state', 'S5'), ('move', '<i4'),
+                                              ('raw_start', int), ('raw_length', int),
+                                              ('p_model_state', float)])
 
 
 def create_anchor_kmers(new_events, old_events):
@@ -271,28 +309,35 @@ def check_event_table_time(event_table):
     return True
 
 
-def resegment_reads(fast5_path, params, speedy=False, overwrite=False):
+def resegment_reads(fast5_path, params=None, speedy=False, overwrite=True, analysis_path="ReSegmentBasecall_000"):
     """Re-segment and create anchor alignment from previously base-called fast5 file
     :param fast5_path: path to fast5 file
     :param params: event detection parameters
     :param speedy: boolean option for speedyStatSplit or minknow
     :param overwrite: overwrite a previous event re-segmented event table
-    :param name: name of key where events table will be placed (Analyses/'name'/Events)
+    :param analysis_path: name of key where events table will be placed (Analyses/'name'/Events)
     :return True when completed
     """
     assert os.path.isfile(fast5_path), "File does not exist: {}".format(fast5_path)
-    name = "ReSegmentBasecall_00{}"
-    # create Fast5 object
+    # create Fast5 object and sanity check
     f5fh = Fast5(fast5_path, read='r+')
+    if not f5fh.has_basecall_data():
+        f5fh.close()
+        return None
+
     # gather previous event detection
     old_event_table = f5fh.get_basecall_data()
-    # assert check_event_table_time(old_event_table), "Old event is not consistent"
+
     read_id = bytes.decode(f5fh.raw_attributes['read_id'])
     sampling_freq = f5fh.sample_rate
     start_time = f5fh.raw_attributes['start_time']
+
+    # get params
+    if params is None: params = get_default_event_detection_params(
+        EVENT_DETECT_SPEEDY if speedy else EVENT_DETECT_MINKNOW)
+
     # pick event detection algorithm
     signal = f5fh.get_read(raw=True, scale=True)
-
     if speedy:
         event_table = create_speedy_event_table(signal, sampling_freq, start_time, **params)
         params = merge_dicts([params, {"event_detection": "speedy_stat_split"}])
@@ -300,14 +345,22 @@ def resegment_reads(fast5_path, params, speedy=False, overwrite=False):
         event_table = create_minknow_event_table(signal, sampling_freq, start_time, **params)
         params = merge_dicts([params, {"event_detection": "minknow_event_detect"}])
 
+    # metadata
     keys = ["nanotensor version", "time_stamp"]
     values = ["0.2.0", TimeStamp().posix_date()]
     attributes = merge_dicts([params, dict(zip(keys, values)), f5fh.raw_attributes])
+
+    # do resegmentation
     if f5fh.is_read_rna():
         old_event_table = index_to_time(old_event_table, sampling_freq=sampling_freq, start_time=start_time)
-    # set event table
     new_event_table = create_anchor_kmers(new_events=event_table, old_events=old_event_table)
-    f5fh.set_new_event_table(name, new_event_table, attributes, overwrite=overwrite)
+
+    # get destination in fast5
+    #todo find latest location? ie: save_event_table_and_fastq(..)
+    destination = f5fh._join_path(f5fh.__base_analysis__, analysis_path)
+
+    f5fh.set_event_table(destination, new_event_table, attributes, overwrite=overwrite)
+
     # gather new sequence
     sequence = sequence_from_events(new_event_table)
     if f5fh.is_read_rna():
@@ -315,9 +368,106 @@ def resegment_reads(fast5_path, params, speedy=False, overwrite=False):
         sequence = sequence.replace("T", "U")
     quality_scores = '!'*len(sequence)
     fastq = create_fastq_line(read_id+" :", sequence, quality_scores)
+
     # set fastq
-    f5fh.set_fastq(name, fastq)
+    f5fh.set_fastq(destination, fastq, overwrite=overwrite)
     return f5fh
+
+
+def get_default_event_detection_params(event_detection_strategy):
+    if event_detection_strategy == EVENT_DETECT_SPEEDY:
+        return dict(min_width=5, max_width=80, min_gain_per_sample=0.008, window_width=800)
+    elif event_detection_strategy == EVENT_DETECT_MINKNOW:
+        return dict(window_lengths=(5, 10), thresholds=(2.0, 1.1), peak_height=1.2)
+    elif event_detection_strategy == EVENT_DETECT_SCRAPPIE:
+        return {}
+    else:
+        return None
+
+
+def generate_events_and_alignment(fast5_path, nucleotide_sequence, nucleotide_qualities=None,
+                                  event_detection_params=None, event_detection_strategy=None,
+                                  save_to_fast5=True, overwrite=False,
+                                  analysis_identifier=Fast5.__default_basecall_1d_analysis__, ):
+
+    assert os.path.isfile(fast5_path), "File does not exist: {}".format(fast5_path)
+
+    # create Fast5 object
+    f5fh = Fast5(fast5_path, read='r+')
+    read_id = bytes.decode(f5fh.raw_attributes['read_id'])
+    sampling_freq = f5fh.sample_rate
+    start_time = f5fh.raw_attributes['start_time']
+    success = False
+
+    # event detection prep
+    if event_detection_strategy is None:
+        event_detection_strategy = EVENT_DETECT_MINKNOW
+    if event_detection_params is None:
+        event_detection_params = get_default_event_detection_params(event_detection_strategy)
+
+    # detect events
+    if event_detection_strategy == EVENT_DETECT_SPEEDY:
+        signal = f5fh.get_read(raw=True, scale=True)
+        event_table = create_speedy_event_table(signal, sampling_freq, start_time, **event_detection_params)
+        event_detection_params = merge_dicts([event_detection_params, {"event_detection": "speedy_stat_split"}])
+    elif event_detection_strategy == EVENT_DETECT_MINKNOW:
+        signal = f5fh.get_read(raw=True, scale=True)
+        event_table = create_minknow_event_table(signal, sampling_freq, start_time, **event_detection_params)
+        event_detection_params = merge_dicts([event_detection_params, {"event_detection": "minknow_event_detect"}])
+    elif event_detection_strategy == EVENT_DETECT_SCRAPPIE:
+        event_table = create_scrappie_event_table(fast5_path, sampling_freq)
+        event_detection_params = merge_dicts([event_detection_params, {"event_detection": "scrappie_event_detect"}])
+    else:
+        raise Exception("PROGRAMMER ERROR: unknown resegment strat {}: expected {}"
+                        .format(event_detection_strategy, [EVENT_DETECT_SPEEDY, EVENT_DETECT_MINKNOW, EVENT_DETECT_SCRAPPIE]))
+
+    # gather attributes
+    keys = ["nanotensor version", "time_stamp"]
+    values = ["0.2.0", TimeStamp().posix_date()]
+    attributes = merge_dicts([event_detection_params, dict(zip(keys, values)), f5fh.raw_attributes])
+
+    # do the alignment
+    # todo do_alignment(events, nucleotide_sequence)
+    # success = evaluate_success()
+
+    # save to fast5 (if appropriate)
+    saved_location = None
+    if save_to_fast5:
+        fastq = create_fastq_line(read_id, nucleotide_sequence,
+                                  "*" if nucleotide_qualities is None else nucleotide_qualities)
+        saved_location = save_event_table_and_fastq(f5fh, event_table, fastq, attributes=attributes,
+                                                    overwrite=overwrite, analysis_identifier=analysis_identifier)
+
+    # close
+    f5fh.close()
+
+    return success, event_table, saved_location
+
+
+def save_event_table_and_fastq(f5fh, event_table, fastq_line, attributes=None, overwrite=False,
+                                    analysis_identifier=Fast5.__default_basecall_1d_analysis__):
+    # get destination root
+    if overwrite:
+        try:
+            # get current identifier
+            destination = f5fh.get_analysis_latest(analysis_identifier)
+            f5fh.delete(destination, ignore=True)
+        except IndexError:
+            # doesn't exist, get initial location (ie Basecall_000)
+            destination = f5fh.get_analysis_new(analysis_identifier)
+    else:
+        # get incremented directory for identifier
+        destination = f5fh.get_analysis_new(analysis_identifier)
+
+    # set event table (if present)
+    if event_table is not None:
+        f5fh.set_event_table(destination, event_table, attributes)
+
+    # set nucleotide sequence (if present)
+    if fastq_line is not None:
+        f5fh.set_fastq(destination, fastq_line)
+
+    return destination
 
 
 def index_to_time(basecall_events, sampling_freq=0, start_time=0):
@@ -473,4 +623,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
     raise SystemExit

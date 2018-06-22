@@ -135,3 +135,4 @@ cmake-build-debug/
 .cache/
 *.pyc
 venv
+*.so
