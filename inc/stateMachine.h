@@ -12,6 +12,8 @@
 #include "nanopore.h"
 #include "nanopore_hdp.h"
 
+#define CANONICAL_NUBMER 4
+#define CANONICAL_ALPHA "ACGT"
 #define SYMBOL_NUMBER 5 // todo depreciate
 #define SYMBOL_NUMBER_NO_N 6
 #define SYMBOL_NUMBER_EPIGENETIC_C 6

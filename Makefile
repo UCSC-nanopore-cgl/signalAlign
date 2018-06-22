@@ -18,7 +18,7 @@ all : sL bD hs python-utils ${libPath}/signalAlignLib.a ${signalAlignBin}/signal
 	  ${signalAlignBin}/compareDistributions \
 	  ${signalAlignBin}/signalMachine ${signalAlignBin}/runSignalAlign \
 	  ${signalAlignBin}/variantCallingLib.py ${signalAlignBin}/alignmentAnalysisLib.py \
-	  ${signalAlignBin}/buildHdpUtil ${signalAlignBin}/trainModels ${signalAlignBin}/hdp_pipeline all_tests \
+	  ${signalAlignBin}/buildHdpUtil ${signalAlignBin}/trainModels all_tests \
 	  externals nanoporeParams python_setup  \
 
 python-utils :
@@ -99,10 +99,6 @@ ${signalAlignBin}/runSignalAlign : ${rootPath}src/signalalign/scripts/runSignalA
 ${signalAlignBin}/trainModels : ${rootPath}src/signalalign/train/trainModels.py
 	cp ${rootPath}src/signalalign/train/trainModels.py ${signalAlignBin}/trainModels
 	chmod +x ${signalAlignBin}/trainModels
-
-${signalAlignBin}/hdp_pipeline : ${rootPath}src/signalalign/scripts/hdp_pipeline.py
-	cp ${rootPath}src/signalalign/scripts/hdp_pipeline.py ${signalAlignBin}/hdp_pipeline
-	chmod +x ${signalAlignBin}/hdp_pipeline
 
 all_tests : .FORCE
 

@@ -16,19 +16,18 @@ from collections import namedtuple
 from py3helpers.utils import check_numpy_table, TimeStamp, merge_dicts
 from signalalign.fast5 import Fast5
 from signalalign.event_detection import create_minknow_events_from_fast5
-from signalalign.train.trainModels import get_model
-from signalalign.hiddenMarkovModel import SignalHmm
+from signalalign.hiddenMarkovModel import HmmModel
 
 
 def simple_banded_event_align(events, model, nucleotide_seq):
     """Generate a banded alignment between events and a nucleotide sequence
 
     :param events: event table with required fields: ('start', 'length', 'mean', 'stdv', 'model_state', 'move', 'p_model_state')
-    :param model: SignalHmm model
+    :param model: HmmModel model
     :param nucleotide_seq: nucleotide sequence to match up
     """
     check_numpy_table(events, req_fields=('start', 'length', 'mean', 'stdv', 'model_state', 'move', 'p_model_state'))
-    assert isinstance(model, SignalHmm), "Input model needs to be SignalHmm"
+    assert isinstance(model, HmmModel), "Input model needs to be HmmModel"
     k = model.kmer_length
 
     FROM_D = 0
@@ -215,7 +214,7 @@ def adaptive_banded_simple_event_align(events, model, nucleotide_seq, debug=Fals
     source: https://www.biorxiv.org/content/biorxiv/early/2017/04/25/130633.full.pdf /  nanopolish
 
     :param events: event table with required fields: ('start', 'length', 'mean', 'stdv', 'model_state', 'move', 'p_model_state')
-    :param model: SignalHmm model
+    :param model: HmmModel model
     :param nucleotide_seq: nucleotide sequence to match up
     :param debug: boolean debug option
     """
@@ -252,7 +251,7 @@ def adaptive_banded_simple_event_align(events, model, nucleotide_seq, debug=Fals
         return band_lower_left[bi].kmer_idx + offset1
 
     check_numpy_table(events, req_fields=('start', 'length', 'mean', 'stdv', 'model_state', 'move', 'p_model_state'))
-    assert isinstance(model, SignalHmm), "Input model needs to be SignalHmm"
+    assert isinstance(model, HmmModel), "Input model needs to be HmmModel"
     k = model.kmer_length
     # strand_idx = 0
     # how to deal with 2d?
@@ -540,7 +539,7 @@ def main():
     # sequence = fastq.split()[1]
     #
     # model_types = ["threeState", "threeStateHdp"]
-    # model = get_model(model_types[0], model_file)
+    # model = HmmModel(model_types[0], model_file)
     # create events
     # events, sum_emission = simple_banded_event_align(event_table, model, nucleotide_seq_3_to_5)
     # events, sum_emission = simple_banded_event_align(event_table, model, nucleotide_seq_3_to_5)
@@ -556,7 +555,7 @@ def main():
     #DNA
     model_file = "/Users/andrewbailey/CLionProjects/nanopore-RNN/submodules/signalAlign/models/testModelR9_5mer_acgt_template.model"
     model_types = ["threeState", "threeStateHdp"]
-    model = get_model(model_types[0], model_file)
+    model = HmmModel(model_file)
 
     fast5_path = "/Users/andrewbailey/CLionProjects/nanopore-RNN/submodules/signalAlign/tests/minion_test_reads/1D/LomanLabz_PC_20161025_FNFAB42699_MN17633_sequencing_run_20161025_E_coli_native_450bps_82361_ch92_read1108_strand.fast5"
     event_table, f5fh = create_minknow_events_from_fast5(fast5_path)

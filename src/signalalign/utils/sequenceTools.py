@@ -14,31 +14,16 @@ import sys
 import string
 import array
 import subprocess
+import numpy as np
+import pandas as pd
+
 from collections import Counter
+
+from signalalign.motif import getMotif
 from signalalign.utils.parsers import read_fasta
+from py3helpers.utils import find_substring_indices, all_string_permutations
 from contextlib import closing
 import pysam
-
-
-def find_substring_indices(main_string, sub_string, offset=0, overlap=True):
-    """Generator that finds start positions of specific substring in a string, including overlapping substrings
-
-    :param main_string: main_string to search
-    :param sub_string: string to find instances of within the main_string
-    :param offset: if you are searching for the index of an internal character of the substring we will add the
-                    offset to the index. Default: 0
-    :param overlap: boolean option if you want to find overlap eg.                Default: True
-                    find_substring_indices("AAAA", "AA", overlap=True) = [0,1,2]
-                    find_substring_indices("AAAA", "AA", overlap=False) = [0,2]
-
-    :return: generator yielding (substring_start_index + offset)
-    """
-    if overlap:
-        sub = '(?=(' + sub_string + "))"
-    else:
-        sub = sub_string
-    for m in re.finditer(sub, main_string):
-        yield m.start()+offset
 
 
 def find_gatc_motifs(sequence):
@@ -150,7 +135,8 @@ def replace_motifs_sequence_positions(sequence, motifs, overlap=False):
     already_repaced_indexes = set()
     # gather motifs
     for motif_pair in motifs:
-        assert len(motif_pair) == 2 and type(motif_pair) is list, "Motifs must be structured as list of lists, even for one motif find and replace"
+        assert len(motif_pair) == 2 and type(
+            motif_pair) is list, "Motifs must be structured as list of lists, even for one motif find and replace"
         # find edit character and offset
         offset, old_char, substitution_char = find_modification_index_and_character(motif_pair[0], motif_pair[1])
         for index in find_substring_indices(sequence, motif_pair[0], offset=offset, overlap=overlap):
@@ -207,8 +193,9 @@ def replace_periodic_reference_positions(reference_location, sub_fasta_path, ste
         with open(sub_fasta_path, 'w') as outfasta:
             for header, comment, sequence in read_fasta(reference_location):
                 subst_sequence = replace_periodic_sequence_positions(sequence, step, offset, substitution_char)
-                print(">%s %s\n%s" % (header, "substituted:{},step:{},offset:{}".format(substitution_char, step, offset),
-                                      subst_sequence), file=outfasta)
+                print(
+                    ">%s %s\n%s" % (header, "substituted:{},step:{},offset:{}".format(substitution_char, step, offset),
+                                    subst_sequence), file=outfasta)
 
     return sub_fasta_path
 
@@ -256,370 +243,112 @@ def samtools_faidx_fasta(fasta_path, log=None):
     return index_path
 
 
+def count_all_sequence_kmers(seq, k=5, rev_comp=False):
+    """Count all the 5'-3' kmers of a nucleotide sequence, rev_comp counts rev_comp seq IN ADDITION to given sequence
 
-# def get_methyl_char(degenerate):
-#     if degenerate == "adenosine":
-#         return "I"
-#     else:
-#         return "E"
-#
-#
-# def make_positions_file(fasta, degenerate, outfile):
-#     if degenerate == "adenosine":
-#         return make_gatc_position_file(fasta, outfile)
-#     else:
-#         return make_CCWGG_positions_file(fasta, outfile)
-#
-#
-# def gatc_kmers(sequence_kmers, kmerlength):
-#     assert kmerlength == 5 or kmerlength == 6, "only works with kmer lengths 5 and 6"
-#     # NNNNGATCNNN
-#     methyl_core = "GITC"
-#     normal_core = "GATC"
-#     nucleotides = "ACGT"
-#
-#     fourmers = [''.join(x) for x in product(nucleotides, repeat=4)]
-#     threemers = [''.join(x) for x in product(nucleotides, repeat=3)]
-#     twomers = [''.join(x) for x in product(nucleotides, repeat=2)]
-#
-#     labeled_kmers = []
-#
-#     # add NNNNGA*
-#     if kmerlength == 6:
-#         for fourmer in fourmers:
-#             labeled_kmer = (fourmer + methyl_core)[:kmerlength]
-#             normal_kmer = (fourmer + normal_core)[:kmerlength]
-#             if normal_kmer in sequence_kmers:
-#                 labeled_kmers.append(labeled_kmer)
-#     # add NNNGA*T and NNNGA*
-#     for threemer in threemers:
-#         labeled_kmer = (threemer + methyl_core)[:kmerlength]
-#         normal_kmer = (threemer + normal_core)[:kmerlength]
-#         if normal_kmer in sequence_kmers:
-#             labeled_kmers.append(labeled_kmer)
-#         # A*TCNNN
-#         if kmerlength == 6:
-#             labeled_kmer = (methyl_core + threemer)[1:]
-#             normal_kmer = (normal_core + threemer)[1:]
-#             if normal_kmer in sequence_kmers:
-#                 labeled_kmers.append(labeled_kmer)
-#     # add NNGA*TC and NNGA*T
-#     for twomer in twomers:
-#         labeled_kmer = (twomer + methyl_core)[:kmerlength]
-#         normal_kmer = (twomer + normal_core)[:kmerlength]
-#         if normal_kmer in sequence_kmers:
-#             labeled_kmers.append(labeled_kmer)
-#         # A*TCNN
-#         if kmerlength == 5:
-#             labeled_kmer = (methyl_core + twomer)[1:]
-#             normal_kmer = (normal_core + twomer)[1:]
-#             if normal_kmer in sequence_kmers:
-#                 labeled_kmers.append(labeled_kmer)
-#         # NGA*TCN
-#         if kmerlength == 6:
-#             labeled_kmer = (twomer[0] + methyl_core + twomer[1])
-#             normal_kmer = (twomer[0] + normal_core + twomer[1])
-#             if normal_kmer in sequence_kmers:
-#                 labeled_kmers.append(labeled_kmer)
-#             # TODO forgot GA*TCNN for 6mers!
-#             labeled_kmer = (methyl_core + twomer)
-#             normal_kmer = (normal_core + twomer)
-#             if normal_kmer in sequence_kmers:
-#                 labeled_kmers.append(labeled_kmer)
-#     if kmerlength == 5:
-#         for onemer in "ACTG":
-#             labeled_kmer = onemer + methyl_core
-#             normal_kmer = onemer + normal_core
-#             if normal_kmer in sequence_kmers:
-#                 labeled_kmers.append(labeled_kmer)
-#             labeled_kmer = methyl_core + onemer
-#             normal_kmer = normal_core + onemer
-#             if normal_kmer in sequence_kmers:
-#                 labeled_kmers.append(labeled_kmer)
-#     return set(labeled_kmers)
-#
-#
-# def ctag_kmers(sequence_kmers, kmerlength):
-#     assert kmerlength == 5 or kmerlength == 6, "only works with kmer lengths 5 and 6"
-#     # NNNCTAGNNNN
-#     methyl_core = "CTIG"
-#     normal_core = "CTAG"
-#     nucleotides = "ACGT"
-#
-#     fourmers = [''.join(x) for x in product(nucleotides, repeat=4)]
-#     threemers = [''.join(x) for x in product(nucleotides, repeat=3)]
-#     twomers = [''.join(x) for x in product(nucleotides, repeat=2)]
-#
-#     labeled_kmers = []
-#
-#     # add A*GNNNN
-#     if kmerlength == 6:
-#         for fourmer in fourmers:
-#             labeled_kmer = (methyl_core + fourmer)[2:]
-#             normal_kmer = (normal_core + fourmer)[2:]
-#             if normal_kmer in sequence_kmers:
-#                 labeled_kmers.append(labeled_kmer)
-#     # add NNNCTA*
-#     for threemer in threemers:
-#         if kmerlength == 6:
-#             labeled_kmer = (threemer + methyl_core)[:kmerlength]
-#             normal_kmer = (threemer + normal_core)[:kmerlength]
-#             if normal_kmer in sequence_kmers:
-#                 labeled_kmers.append(labeled_kmer)
-#             labeled_kmer = (methyl_core + threemer)[1:]
-#             normal_kmer = (normal_core + threemer)[1:]
-#             if normal_kmer in sequence_kmers:
-#                 labeled_kmers.append(labeled_kmer)
-#         # A*GNNN
-#         if kmerlength == 5:
-#             labeled_kmer = (methyl_core + threemer)[2:]
-#             normal_kmer = (normal_core + threemer)[2:]
-#             if normal_kmer in sequence_kmers:
-#                 labeled_kmers.append(labeled_kmer)
-#
-#     # add NNCTA*G and NNCTA*
-#     for twomer in twomers:
-#         labeled_kmer = (twomer + methyl_core)[:kmerlength]
-#         normal_kmer = (twomer + normal_core)[:kmerlength]
-#         if normal_kmer in sequence_kmers:
-#             labeled_kmers.append(labeled_kmer)
-#         # CTA*GNN
-#         if kmerlength == 6:
-#             labeled_kmer = (methyl_core + twomer)[:kmerlength]
-#             normal_kmer = (normal_core + twomer)[:kmerlength]
-#             if normal_kmer in sequence_kmers:
-#                 labeled_kmers.append(labeled_kmer)
-#         # TA*GNN
-#         if kmerlength == 5:
-#             labeled_kmer = (methyl_core + twomer)[1:]
-#             normal_kmer = (normal_core + twomer)[1:]
-#             if normal_kmer in sequence_kmers:
-#                 labeled_kmers.append(labeled_kmer)
-#
-#     if kmerlength == 5:
-#         for onemer in nucleotides:
-#             labeled_kmer = onemer + methyl_core
-#             normal_kmer = onemer + normal_core
-#             if normal_kmer in sequence_kmers:
-#                 labeled_kmers.append(labeled_kmer)
-#             labeled_kmer = methyl_core + onemer
-#             normal_kmer = normal_core + onemer
-#             if normal_kmer in sequence_kmers:
-#                 labeled_kmers.append(labeled_kmer)
-#     return set(labeled_kmers)
-#
-#
-# def ccwgg_kmers(sequence_kmers, kmer_length):
-#     def check_and_add(methyl_kmer):
-#         normal_kmer = string.translate(methyl_kmer, demethylate)
-#         if normal_kmer in sequence_kmers:
-#             labeled_kmers.append(methyl_kmer)
-#
-#     labeled_kmers = []
-#
-#     methyl_core1 = "CEAGG"
-#     methyl_core2 = "CETGG"
-#     demethylate = string.maketrans("E", "C")
-#
-#     nucleotides = "ACGT"
-#     fourmers = [''.join(x) for x in product(nucleotides, repeat=4)]
-#     threemers = [''.join(x) for x in product(nucleotides, repeat=3)]
-#     twomers = [''.join(x) for x in product(nucleotides, repeat=2)]
-#     # NNNNCC*WGGNN
-#
-#     # NNNNCC*
-#     if kmer_length == 6:
-#         for fourmer in fourmers:
-#             labeled_kmer1 = (fourmer + methyl_core1)[:kmer_length]
-#             labeled_kmer2 = (fourmer + methyl_core2)[:kmer_length]
-#             check_and_add(labeled_kmer1)
-#             check_and_add(labeled_kmer2)
-#
-#     # NNNCC*W and NNNCC*
-#     for threemer in threemers:
-#         labeled_kmer1 = (threemer + methyl_core1)[:kmer_length]
-#         labeled_kmer2 = (threemer + methyl_core2)[:kmer_length]
-#         check_and_add(labeled_kmer1)
-#         check_and_add(labeled_kmer2)
-#
-#     # NNCC*WG and NNCC*W
-#     for twomer in twomers:
-#         labeled_kmer1 = (twomer + methyl_core1)[:kmer_length]
-#         labeled_kmer2 = (twomer + methyl_core2)[:kmer_length]
-#         check_and_add(labeled_kmer1)
-#         check_and_add(labeled_kmer2)
-#         # C*WGGNN
-#         if kmer_length == 6:
-#             labeled_kmer1 = (methyl_core1 + twomer)[1:]
-#             labeled_kmer2 = (methyl_core2 + twomer)[1:]
-#             check_and_add(labeled_kmer1)
-#             check_and_add(labeled_kmer2)
-#
-#     for onemer in nucleotides:
-#         # CC*WGGN and C*WGGN
-#         labeled_kmer1 = methyl_core1 + onemer
-#         labeled_kmer2 = methyl_core2 + onemer
-#         if kmer_length == 6:
-#             check_and_add(labeled_kmer1)
-#             check_and_add(labeled_kmer2)
-#         if kmer_length == 5:
-#             check_and_add(labeled_kmer1[1:])
-#             check_and_add(labeled_kmer2[1:])
-#         labeled_kmer1 = (onemer + methyl_core1)[:kmer_length]
-#         labeled_kmer2 = (onemer + methyl_core2)[:kmer_length]
-#         check_and_add(labeled_kmer1)
-#         check_and_add(labeled_kmer2)
-#
-#     if kmer_length == 5:
-#         check_and_add(methyl_core1)
-#         check_and_add(methyl_core2)
-#
-#     return set(labeled_kmers)
-#
-#
-# def ggwcc_kmers(sequence_kmers, kmer_length):
-#     def check_and_add(methyl_kmer):
-#         normal_kmer = string.translate(methyl_kmer, demethylate)
-#         if normal_kmer in sequence_kmers:
-#             labeled_kmers.append(methyl_kmer)
-#
-#     labeled_kmers = []
-#
-#     methyl_core1 = "GGAEC"
-#     methyl_core2 = "GGTEC"
-#     demethylate = string.maketrans("E", "C")
-#
-#     nucleotides = "ACGT"
-#     fourmers = [''.join(x) for x in product(nucleotides, repeat=4)]
-#     threemers = [''.join(x) for x in product(nucleotides, repeat=3)]
-#     twomers = [''.join(x) for x in product(nucleotides, repeat=2)]
-#
-#     # NNGGWC*CNNN
-#
-#     # C*CNNNN
-#     for fourmer in fourmers:
-#         labeled_kmer1 = (methyl_core1 + fourmer)[3:]
-#         labeled_kmer2 = (methyl_core2 + fourmer)[3:]
-#         check_and_add(labeled_kmer1)
-#         check_and_add(labeled_kmer2)
-#
-#     # WC*CNNN and C*CNNN
-#     for threemer in threemers:
-#         labeled_kmer1 = (methyl_core1 + threemer)[2:] if kmer_length == 6 else (methyl_core1 + threemer)[3:]
-#         labeled_kmer2 = (methyl_core2 + threemer)[2:] if kmer_length == 6 else (methyl_core2 + threemer)[3:]
-#         check_and_add(labeled_kmer1)
-#         check_and_add(labeled_kmer2)
-#
-#     # GWC*CNN and WC*CNN
-#     for twomer in twomers:
-#         labeled_kmer1 = (methyl_core1 + twomer)[1:] if kmer_length == 6 else (methyl_core1 + twomer)[2:]
-#         labeled_kmer2 = (methyl_core2 + twomer)[1:] if kmer_length == 6 else (methyl_core2 + twomer)[2:]
-#         check_and_add(labeled_kmer1)
-#         check_and_add(labeled_kmer2)
-#         # NNGGWC*
-#         if kmer_length == 6:
-#             labeled_kmer1 = (twomer + methyl_core1)[:kmer_length]
-#             labeled_kmer2 = (twomer + methyl_core2)[:kmer_length]
-#             check_and_add(labeled_kmer1)
-#             check_and_add(labeled_kmer2)
-#
-#     for onemer in nucleotides:
-#         # NGGWC* and NGGWC*C
-#         labeled_kmer1 = (onemer + methyl_core1)[:kmer_length]
-#         labeled_kmer2 = (onemer + methyl_core2)[:kmer_length]
-#         check_and_add(labeled_kmer1)
-#         check_and_add(labeled_kmer2)
-#         # GGWC*CN GWC*CN
-#         labeled_kmer1 = methyl_core1 + onemer if kmer_length == 6 else (methyl_core1 + onemer)[1:]
-#         labeled_kmer2 = methyl_core2 + onemer if kmer_length == 6 else (methyl_core2 + onemer)[1:]
-#         check_and_add(labeled_kmer1)
-#         check_and_add(labeled_kmer2)
-#
-#     if kmer_length == 5:
-#         check_and_add(methyl_core1)
-#         check_and_add(methyl_core2)
-#
-#     return set(labeled_kmers)
-#
-#
-# def motif_kmers(core, kmer_length=5, multiplier=5):
-#     motifs = []
-#     repeat = kmer_length - len(core)
-#     if repeat == 0:
-#         return [core] * multiplier
-#     else:
-#         for k in product("ACGT", repeat=repeat):
-#             fix = ''.join(k)
-#             motifs.append(fix + core)
-#             motifs.append(core + fix)
-#         return motifs * multiplier
-#
-#
+    :param seq: nucleotide sequence
+    :param k: size of kmer
+    :param rev_comp: boolean option to count reverse complement kmers as well
+    :return: dictionary of kmers with counts as values
+    """
+    # loop through kmers
+    kmers = Counter()
+    for kmer in kmer_iterator(seq, k):
+        kmers[kmer] += 1
+    if rev_comp:
+        # loop through rev_comp kmers
+        seq1 = reverse_complement(seq, reverse=True, complement=True)
+        for kmer in kmer_iterator(seq1, k):
+            kmers[kmer] += 1
+
+    return kmers
 
 
-#
-#
-# def make_gatc_or_ccwgg_motif_file(fasta, degenerate, outfile):
-#     if degenerate == "adenosine":
-#         motif_finder = find_gatc_motifs
-#     else:
-#         motif_finder = find_ccwgg_motifs
-#     outfile = os.path.abspath(outfile)
-#     seq = get_first_seq(fasta)
-#     positions = [x for x in motif_finder(seq)]
-#     make_motif_file(positions, seq, outfile)
-#     return outfile
-#
+def get_sequence_kmers(seq, k=5, rev_comp=False):
+    """Get the set of all kmers from a sequence.
 
-def reverse_complement(dna, reverse=True, complement=True):
-    """ 
-    Make the reverse complement of a DNA sequence. You can also just make the
-    complement or the reverse strand (see options). 
-    
-    Input: A DNA sequence containing 'ATGC' base pairs and wild card letters
-    
-    Output: DNA sequence as a string. 
-    
-    Options: Specify reverse and/or complement as False to get the complement or
-             reverse of the input DNA.  If both are False, input is returned. 
+    :param seq: nucleotide sequence
+    :param k: size of kmer
+    :param rev_comp: boolean option to count reverse complement kmers as well
+    :return: set of kmers
+    """
+    return set(count_all_sequence_kmers(seq, k=k, rev_comp=rev_comp).keys())
+
+
+def get_motif_kmers(motif_pair, k, alphabet="ATGC"):
+    """Given a motif pair, create a list of all kmers which contain modification
+
 
     """
-    
-    # Make translation table
-    trans_table = str.maketrans('ATGCatgc', 'TACGtacg')
-    
-    # Make complement to DNA
-    comp_dna = dna.translate(trans_table)
-    
-    # Output all as strings
-    if reverse and complement:
-        return comp_dna[::-1]
-    if reverse and not complement:
-        return dna[::-1]
-    if complement and not reverse:
-        return comp_dna
-    if not complement and not reverse:
-        return dna
+    assert len(motif_pair) == 2, "Motif pair must be a list of length 2. len(motif_pair) = {}".format(len(motif_pair))
+    canonical = motif_pair[0]
+    modified = motif_pair[1]
+    motif_len = len(canonical)
+    # get mod index and chars
+    mod_index, old_char, new_char = find_modification_index_and_character(canonical, modified)
+    bases_after = motif_len - mod_index - 1
+
+    # get overlaps for front and back of kmer
+    front_overlap, back_overlap = get_front_back_kmer_overlap(k, motif_len, mod_index)
+    # pre-compute kmers
+    kmer_set_dict = dict()
+    for i in range(1, max(front_overlap, back_overlap)+1):
+        kmer_set_dict[i] = [x for x in all_string_permutations(alphabet, i)]
+    kmer_set_dict[0] = ['']
+
+    motif_kmers = []
+    for i in range(k):
+        # get prepend kmers and index for front of motif
+        if i >= front_overlap:
+            front_index = i - front_overlap
+            prepend_kmers = ['']
+        else:
+            prepend_kmers = kmer_set_dict[front_overlap-i]
+            front_index = 0
+        # get append kmers and index for back of motif
+        if i > bases_after:
+            append_kmers = kmer_set_dict[i - bases_after]
+            back_index = motif_len
+        else:
+            back_index = mod_index+i+1
+            append_kmers = ['']
+
+        kmer = modified[front_index:back_index]
+        motif_kmers.extend([front+kmer+back for front in prepend_kmers for back in append_kmers if front+kmer+back is not ''])
+
+    return set(motif_kmers)
 
 
-def count_kmers(dna, k):
-    """count the kmers of length k in a string"""
-    kmer_count = Counter()
-    for i in range(len(dna)):
-        kmer = dna[i:(i+k)]
-        if len(kmer) == k:
-            kmer_count[kmer] += 1
-    return kmer_count
+def get_front_back_kmer_overlap(k, motif_len, mod_index):
+    """Get the largest number of bases overlap at front and back of motif
+
+    eg: k=3 , motif_len = 2, mod_index = 1
+        motif = GE
+
+        X G E X
+        _ _ _       max front_overlap = 1
+          _ _ _     max back_overlap = 1
+
+    :param k: length of kmer
+    :param motif_len: length of motif
+    :param mod_index: index position of modification
+    :return: largest overlap in the front and back of a generated kmer
+    """
+    assert k >= 1, "k cannot be less than 1. k: {}".format(k)
+    front_overlap = k - mod_index - 1
+    back_overlap = k - (motif_len - mod_index)
+    return front_overlap, back_overlap
 
 
+# TODO write these tests ya dig
 def getFastaDictionary(fastaFile):
     """Returns a dictionary of the first words of fasta headers to their corresponding
     fasta sequence
     """
     namesAndSequences = [(x[0].split()[0], x[1]) for x in fastaRead(open(fastaFile, 'r'))]
     names = [x[0] for x in namesAndSequences]
-    assert len(names) == len(set(names)) #Check all the names are unique
-    return dict(namesAndSequences) #Hash of names to sequences
+    assert len(names) == len(set(names))  # Check all the names are unique
+    return dict(namesAndSequences)  # Hash of names to sequences
 
 
 def fastaRead(fileHandleOrFile):
@@ -675,7 +404,7 @@ def fastaWrite(fileHandleOrFile, name, seq, mode="w"):
     fileHandle.write(">%s\n" % name)
     chunkSize = 100
     for i in range(0, len(seq), chunkSize):
-        fileHandle.write("%s\n" % seq[i:i+chunkSize])
+        fileHandle.write("%s\n" % seq[i:i + chunkSize])
     if isinstance(fileHandleOrFile, "".__class__):
         fileHandle.close()
 
@@ -686,8 +415,203 @@ def getFastaDictionary(fastaFile):
     """
     namesAndSequences = [(x[0].split()[0], x[1]) for x in fastaRead(open(fastaFile, 'r'))]
     names = [x[0] for x in namesAndSequences]
-    assert len(names) == len(set(names)) #Check all the names are unique
-    return dict(namesAndSequences) #Hash of names to sequences
+    assert len(names) == len(set(names))  # Check all the names are unique
+    return dict(namesAndSequences)  # Hash of names to sequences
+
+
+
+def kmer_iterator(dna, k):
+    """Generates kmers of length k from a string with one step between kmers
+
+    :param dna: string to generate kmers from
+    :param k: size of kmer to generate
+    """
+    assert len(dna) >= 1, "You must select a substring with len(dna) >= 1: {}".format(dna)
+    assert k >= 1, "You must select a main_string with k >= 1: {}".format(k)
+
+    for i in range(len(dna)):
+        kmer = dna[i:(i + k)]
+        if len(kmer) == k:
+            yield kmer
+
+
+def reverse_complement(dna, reverse=True, complement=True):
+    """
+    Make the reverse complement of a DNA sequence. You can also just make the
+    complement or the reverse strand (see options).
+
+    Input: A DNA sequence containing 'ATGC' base pairs and wild card letters
+
+    Output: DNA sequence as a string.
+
+    Options: Specify reverse and/or complement as False to get the complement or
+             reverse of the input DNA.  If both are False, input is returned.
+
+    """
+
+    # Make translation table
+    trans_table = str.maketrans('ACGTMKRYBVDHNacgtmkrybvdhn',
+                                "TGCAKMYRVBHDNtgcakmyrvbhdn")
+    # Make complement to DNA
+    comp_dna = dna.translate(trans_table)
+    # Output all as strings
+    if reverse and complement:
+        return comp_dna[::-1]
+    if reverse and not complement:
+        return dna[::-1]
+    if complement and not reverse:
+        return comp_dna
+    if not complement and not reverse:
+        return dna
+
+
+def count_kmers(dna, k):
+    """Count all kmers of length k in a string
+
+    :param dna: string to search and count kmers
+    :param k: size of kmer
+    """
+    assert len(dna) >= 1, "You must select a substring with len(dna) >= 1: {}".format(dna)
+    assert k >= 1, "You must select a main_string with k >= 1: {}".format(k)
+    kmer_count = Counter()
+    for i in range(len(dna)):
+        kmer = dna[i:(i + k)]
+        if len(kmer) == k:
+            kmer_count[kmer] += 1
+    return kmer_count
+
+
+def parse_full_alignment_file(alignment_file):
+    data = pd.read_table(alignment_file, usecols=(1, 4, 5, 9, 12, 13),
+                         dtype={'ref_pos': np.int64,
+                                'strand': np.str,
+                                'event_index': np.int64,
+                                'kmer': np.str,
+                                'posterior_prob': np.float64,
+                                'event_mean': np.float64},
+                         header=None,
+                         names=['ref_pos', 'strand', 'event_index', 'kmer', 'posterior_prob', 'event_mean'])
+    return data
+
+
+class CustomAmbiguityPositions(object):
+    def __init__(self, ambig_filepath):
+        """Deal with ambiguous positions from a tsv ambiguity position file with the format of
+        contig  position            strand  change_from change_to
+        'name'  0 indexed position   +/-    C           E
+
+
+        :param ambig_filepath: path to ambiguity position file"""
+
+        self.ambig_df = self.parseAmbiguityFile(ambig_filepath)
+
+    @staticmethod
+    def parseAmbiguityFile(ambig_filepath):
+        """Parses a 'ambiguity position file' that should have the format:
+            contig  position    strand  change_from change_to
+
+        :param ambig_filepath: path to ambiguity position file
+        """
+        return pd.read_table(ambig_filepath,
+                             usecols=(0, 1, 2, 3, 4),
+                             names=["contig", "position", "strand", "change_from", "change_to"],
+                             dtype={"contig"      : np.str,
+                                    "position"    : np.int,
+                                    "strand"      : np.str,
+                                    "change_from" : np.str,
+                                    "change_to"   : np.str})
+
+    def getForwardSequence(self, contig, raw_sequence):
+        """Edit 'raw_sequence' given a ambiguity positions file. Assumes raw_sequence is forward direction( 5'-3')
+        :param contig: which contig the sequence belongs (aka header)
+        :param raw_sequence: raw nucleotide sequence
+        :return: edited nucleotide sequence
+        """
+        return self._get_substituted_sequence(contig, raw_sequence, "+")
+
+    def getBackwardSequence(self, contig, raw_sequence):
+        """Edit 'raw_sequence' given a ambiguity positions file, Assumes raw_sequence is forward direction( 5'-3')
+        :param contig: which contig the sequence belongs (aka header)
+        :param raw_sequence: raw nucleotide sequence
+        :return: edited nucleotide sequence
+        """
+        raw_sequence = reverse_complement(raw_sequence, reverse=False, complement=True)
+        return self._get_substituted_sequence(contig, raw_sequence, "-")
+
+    def _get_substituted_sequence(self, contig, raw_sequence, strand):
+        """Change the given raw nucleotide sequence using the edits defined in the positions file
+
+        :param contig: name of contig to find
+        :param raw_sequence: nucleotide sequence (note: this is note edited in this function)
+        :param strand: '+' or '-' to indicate strand
+        """
+        contif_df = self._get_contig_positions(contig, strand)
+        raw_sequence = list(raw_sequence)
+        for _, row in contif_df.iterrows():
+            if raw_sequence[row["position"]] != row["change_from"]:
+                raise RuntimeError("[CustomAmbiguityPositions._get_substituted_sequence]Illegal substitution requesting "
+                                   "change from %s to %s, row: %s" % (raw_sequence[row["position"]], row["change_to"], row))
+            raw_sequence[row["position"]] = row["change_to"]
+        return "".join(raw_sequence)
+
+    def _get_contig_positions(self, contig, strand):
+        """Get all unique locations within the positions file
+
+        :param contig: name of contig to find
+        :param strand: '+' or '-' to indicate strand
+        """
+        df = self.ambig_df.loc[(self.ambig_df["contig"] == contig) & (self.ambig_df["strand"] == strand)].drop_duplicates()
+        assert len(df['position']) == len(set(df['position'])), "Multiple different changes for a single position. {}" \
+            .format(df['position'])
+        return df
+
+
+def processReferenceFasta(fasta, work_folder, motifs=None, positions_file=None):
+    """loops over all of the contigs in the reference file, writes the forward and backward sequences
+    as flat files (no headers or anything) for signalMachine, returns a dict that has the sequence
+    names as keys and the paths to the processed sequence as keys
+
+    :param fasta: path to un-edited fasta file
+    :param work_folder: FolderHandler object
+    :param motifs: list of tuple pairs for motif edits. ex [["CCAGG", "CEAGG"]]
+    :param positions_file: ambiguous positions file which can be processed via CustomAmbiguityPositions
+    :return: paths to possibly edited forward reference sequence and backward reference sequence
+    """
+    positions = None
+    # if no processing needs to happen
+    if positions_file is None and motifs is None:
+        return fasta, None
+    # Cant pass positions file and motifs
+    if positions_file is not None and motifs is not None:
+        raise RuntimeError("[processReferenceFasta] Cannot specify motif key and ambiguity position file")
+    # get positions object (if appropriate)
+    if positions_file:
+        if not os.path.exists(positions_file):
+            raise RuntimeError("[processReferenceFasta] Did not find ambiguity position file here: %s" %
+                               positions_file)
+        positions = CustomAmbiguityPositions(positions_file)
+
+    # process fasta
+    fw_fasta_path = work_folder.add_file_path("forward.{}".format(os.path.basename(fasta)))
+    bw_fasta_path = work_folder.add_file_path("backward.{}".format(os.path.basename(fasta)))
+    print("[SignalAlignment.run] NOTICE: Creating forward and backward fasta files.")
+    with open(bw_fasta_path, 'w') as bw_outfasta, open(fw_fasta_path, 'w') as fw_outfasta:
+        for header, comment, sequence in read_fasta(fasta):
+            # signalAlign likes uppercase
+            if positions is not None:
+                fw_sequence = positions.getForwardSequence(contig=header, raw_sequence=sequence.upper())
+                bw_sequence = positions.getBackwardSequence(contig=header, raw_sequence=sequence.upper())
+            else:
+                fw_sequence = sequence.upper()
+                bw_sequence = reverse_complement(fw_sequence, reverse=False, complement=True).upper()
+                if motifs:
+                    fw_sequence = replace_motifs_sequence_positions(fw_sequence, motifs, True)
+                    bw_sequence = replace_motifs_sequence_positions(bw_sequence, motifs, True)
+
+            print(">%s %s\n%s" % (header, "backward", bw_sequence), file=bw_outfasta)
+            print(">%s %s\n%s" % (header, "forward", fw_sequence), file=fw_outfasta)
+
+    return fw_fasta_path, bw_fasta_path
 
 
 def get_full_nucleotide_read_from_alignment(alignment_location, read_name):

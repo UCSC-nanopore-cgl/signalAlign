@@ -689,7 +689,7 @@ int main(int argc, char *argv[]) {
 
 
         if (sMtype == threeStateHdp) {
-            fprintf(stderr, "signalAlign - got %" PRId64 "template HDP assignments\n",
+            fprintf(stderr, "signalAlign - got %" PRId64 " template HDP assignments\n",
                     hmmContinuous_howManyAssignments(templateExpectations));
         }
 
@@ -760,7 +760,6 @@ int main(int argc, char *argv[]) {
         if (sMtype == threeStateHdp) {
             stateMachine3_setModelToHdpExpectedValues(sMt, nHdpT);
         }
-        // TODO errors get caught here
 
         stList *templateAlignedPairs = performSignalAlignment(sMt, tEventSequence,
                                                               (twoD ? npRead->templateEventMap : npRead->templateStrandEventMap),

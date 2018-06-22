@@ -284,7 +284,7 @@ int main(int argc, char *argv[]) {
                                                   samplingGridStart, samplingGridEnd, samplingGridLength);
             
     } else {
-        if (hdpType != singleLevelPrior2 && hdpType != multisetPrior2) {
+        if (hdpType != singleLevelPrior2 && hdpType != multisetPrior2 && hdpType != singleLevelFixedCanonical) {
             st_errAbort("Invalid HDP type for 1D %i", hdpType);
         }
         NanoporeHdpType type = (NanoporeHdpType) hdpType;

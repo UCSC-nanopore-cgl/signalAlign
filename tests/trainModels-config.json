@@ -1,0 +1,73 @@
+{
+  "signal_alignment_args": {
+    "target_regions": null,
+    "track_memory_usage": false,
+    "threshold": 0.01,
+    "event_table": false,
+    "embed": false
+  },
+  "samples": [
+    {
+      "positions_file": null,
+      "fast5_dirs": ["./tests/minion_test_reads/one_R9_canonical_ecoli"],
+      "bwa_reference": "./tests/test_sequences/E.coli_K12.fasta",
+      "fofns": [],
+      "fw_reference": null,
+      "bw_reference": null,
+      "kmers_from_reference": false,
+      "motifs": null,
+      "name": "canonical",
+      "probability_threshold": 0.8,
+      "number_of_kmer_assignments": 10,
+      "alignment_file": null
+    }
+  ],
+  "hdp_args": {
+    "grid_start": 30.0,
+    "grid_end": 90.0,
+    "grid_length": 1200,
+
+    "base_alpha": 1.0,
+    "base_beta": 1.0,
+    "base_gamma": 1.0,
+
+    "middle_alpha": 1.0,
+    "middle_beta": 1.0,
+    "middle_gamma": 1.0,
+
+    "leaf_alpha": 1.0,
+    "leaf_beta": 1.0,
+    "leaf_gamma": 1.0,
+
+    "thinning": 100,
+    "gibbs_samples": 1000,
+    "burnin_multiplier": 32,
+    "hdp_type": "singleLevelFixedCanonical",
+    "threshold": 0.0,
+    "number_of_assignments": 100,
+    "built_alignments": null
+  },
+  "transitions_args": {
+    "training_bases": 10000,
+    "iterations": 2,
+    "test": false
+  },
+  "training": {
+    "transitions": false,
+    "normal_emissions": true,
+    "hdp_emissions": true,
+    "expectation_maximization": false,
+    "em_iterations": 3
+  },
+  "path_to_bin": "./bin",
+  "complement_hdp_model": null,
+  "template_hdp_model": null,
+  "complement_hmm_model": "./models/testModelR9_5mer_acgt_complement.model",
+  "template_hmm_model": "./models/testModelR9_5mer_acgt_template.model",
+  "job_count": 2,
+  "debug": false,
+  "two_d": false,
+  "output_dir": "./",
+  "constraint_trim": null,
+  "diagonal_expansion": null
+}

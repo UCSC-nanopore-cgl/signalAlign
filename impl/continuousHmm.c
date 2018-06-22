@@ -52,7 +52,7 @@ static void hmmContinuous_loadEventModel(double *stateMachineEventModel, double 
         //hmmEventModel[eventMeanIdx] = stateMachineEventModel[eventMeanIdx];
         //hmmEventModel[eventSdIdx] = stateMachineEventModel[eventSdIdx];
         hmmEventModel[i] = stateMachineEventModel[i];
-        hmmEventModel[i] = stateMachineEventModel[i];
+        hmmEventModel[i+1] = stateMachineEventModel[i+1];
     }
 }
 
