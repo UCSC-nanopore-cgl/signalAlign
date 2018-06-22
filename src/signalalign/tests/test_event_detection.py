@@ -401,15 +401,15 @@ class EventDetectTests(unittest.TestCase):
         with self.assertRaises(AssertionError):
             resegment_reads("fakepath/path", speedy_params, speedy=True, overwrite=True)
         with self.assertRaises(TypeError):
-            resegment_reads(self.dna_file, speedy_params, speedy=False, overwrite=True)
+            resegment_reads("test_dna.fast5", speedy_params, speedy=False, overwrite=True)
 
-        for fast5_file in [self.dna_file, self.rna_file]:
+        for fast5_file in ["test_dna.fast5", "test_rna.fast5"]:
             resegment_reads(fast5_file, params=minknow_params, speedy=False, overwrite=True,
                             analysis_path="ReSegmentBasecall_000")
             fasthandle = resegment_reads(fast5_file, params=speedy_params, speedy=True, overwrite=True,
                                          analysis_path="ReSegmentBasecall_000")
             # TODO make sure this is working with test files
-            fasthandle.delete("Analyses/ReSegmentBasecall_000")
+            # fasthandle.delete("Analyses/ReSegmentBasecall_000")
 
     def test_sequence_from_events(self):
         # """Test sequence from events method"""
@@ -481,8 +481,10 @@ class EventDetectTests(unittest.TestCase):
             time_to_index("Numpy", sampling_freq=sampling_freq, start_time=start_time)
         with self.assertRaises(AssertionError):
             event_table = self.rna_handle.get_basecall_data()
+            # print(event_table.dtype)
+            # print(event_table["start"].dtype)
+            # print(event_table["start"].dtype is not np.dtype('uint64'))
             time_to_index(event_table, sampling_freq=sampling_freq, start_time=start_time)
-
 
     def test_check_event_table_time(self):
         # """test check_event_table_time"""
