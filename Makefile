@@ -11,6 +11,7 @@ signalAlignDependencies =  ${basicLibsDependencies}
 signalAlignLib = ${basicLibs}
 
 test_directory = ${rootPath}/src/signalalign/tests/
+scrappie_build = ${rootPath}/scrappie/build
 
 htsLib = -L././htslib -lhts
 
@@ -19,15 +20,17 @@ all : sL bD hs python-utils ${libPath}/signalAlignLib.a ${signalAlignBin}/signal
 	  ${signalAlignBin}/signalMachine ${signalAlignBin}/runSignalAlign \
 	  ${signalAlignBin}/variantCallingLib.py ${signalAlignBin}/alignmentAnalysisLib.py \
 	  ${signalAlignBin}/buildHdpUtil ${signalAlignBin}/trainModels all_tests \
-	  externals nanoporeParams python_setup scrappie \
+	  externals nanoporeParams python_setup ${scrappie_build}/scrappie \
 
 python-utils :
 	cd python_utils && python3 setup.py install
 
 
-scrappie :
+${scrappie_build}/scrappie :
 	cd scrappie && \
-	mkdir build && \
+    if ! [ -d ${scrappie_build} ]; then \
+        mkdir build; \
+    fi; \
 	cd build && \
 	cmake .. && \
 	make
