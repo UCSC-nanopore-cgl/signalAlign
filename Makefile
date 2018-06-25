@@ -19,14 +19,18 @@ all : sL bD hs python-utils ${libPath}/signalAlignLib.a ${signalAlignBin}/signal
 	  ${signalAlignBin}/signalMachine ${signalAlignBin}/runSignalAlign \
 	  ${signalAlignBin}/variantCallingLib.py ${signalAlignBin}/alignmentAnalysisLib.py \
 	  ${signalAlignBin}/buildHdpUtil ${signalAlignBin}/trainModels all_tests \
-	  externals nanoporeParams python_setup \
+	  externals nanoporeParams python_setup scrappie \
 
 python-utils :
 	cd python_utils && python3 setup.py install
 
 
 scrappie :
-	cd scrappie && mkdir build && cd build && cmake .. && make
+	cd scrappie && \
+	mkdir build && \
+	cd build && \
+	cmake .. && \
+	make
 
 debugging : hs ${libPath}/signalAlignLib.a ${signalAlignDependencies}
 	${cxx} ${cflags} -I inc -I${libPath} -I${htsLibRootPath} -o ${signalAlignBin}/debugging debugging.c ${libPath}/signalAlignLib.a ${signalAlignLib} ${htsLib}
@@ -73,6 +77,8 @@ test :
 	done
 #	cd ${binPath} && ./sonLibTests
 	cd python_utils && pytest
+	cd scrappie && make test
+
 # //		exit "$$?"; \
 
 ${signalAlignBin}/compareDistributions : compareDistributions.c ${libPath}/signalAlignLib.a ${signalAlignDependencies}
@@ -128,14 +134,6 @@ ${libPath}/signalAlignLib.a : ${libSources} ${libHeaders} ${stBarDependencies}
 
 hs :
 	cd htslib && make
-
-#	echo DIR
-#	cd ${test_directory} && \
-#	for i in 1 2 3; do \
-#		python $$i; \
-#		[[ $$? != 0 ]] && exit -1; \
-#	    echo 'done'; \
-#	done
 
 
 .FORCE:

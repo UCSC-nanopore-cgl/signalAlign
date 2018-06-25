@@ -14,19 +14,65 @@ import sys
 import os
 import collections
 import re
+import subprocess
 import numpy as np
+import h5py
 import traceback
+from shutil import which
+from contextlib import closing
 from collections import defaultdict
 from timeit import default_timer as timer
 from signalalign.utils.pyporeParsers import SpeedyStatSplit
 from signalalign.fast5 import Fast5
-from signalalign.utils.filters import minknow_event_detect, scrappie_event_detect
+from signalalign.utils.filters import minknow_event_detect
 from py3helpers.utils import check_numpy_table, list_dir, TimeStamp, change_np_field_type, merge_dicts
 from py3helpers.seq_tools import create_fastq_line, check_fastq_line, ReverseComplement, pairwise_alignment_accuracy
 
 EVENT_DETECT_SPEEDY = "speedy"
 EVENT_DETECT_MINKNOW = "minknow"
 EVENT_DETECT_SCRAPPIE = "scrappie"
+
+
+def scrappie_event_detect(fast5_location, temp_fast5_location=None, path_to_scrappie=None):
+    """Generate events from scrappie.
+    :param fast5_location: path to a fast5 file
+    :param temp_fast5_location: place to store temporary fast5 file
+    :param path_to_scrappie: option to go to scrappie via a path if scrappie is not in PATH
+    :return: list of dictionaries with fields = 'mean', 'stdv', 'pos', 'start'
+    """
+    # get temp location
+    if temp_fast5_location is None:
+        temp_fast5_location = "{}.tmp.fast5".format(fast5_location)
+    if os.path.isfile(temp_fast5_location): os.remove(temp_fast5_location)
+    # check if scrappie exists in PATH
+    if not path_to_scrappie:
+        path_to_scrappie = "./scrappie"
+        assert which("scrappie") is not None, \
+            "Scrappie is not in the PATH. Select a path_to_scrappie or put scrappie in your PATH"
+    # get events
+    events = None
+    try:
+        # invoke scrappie
+        cmd = [path_to_scrappie, 'events', '--dump', temp_fast5_location, fast5_location]
+        with open(os.devnull, 'w') as devnull:
+            subprocess.check_call(cmd, stdout=devnull, stderr=devnull)
+
+        # parse event information
+        with closing(h5py.File(temp_fast5_location, 'r+')) as fast5:
+            keys = list(fast5.keys())
+            if len(keys) != 1:
+                print("[scrappie_event_detect] found multiple keys in {}: {}".format(temp_fast5_location, keys))
+            else:
+                # events = list()
+                #
+                # for mean, stdev, pos, start in fast5[keys[0]]['mean', 'stdv', 'pos', 'start']:
+                #     events.append({'mean': mean, 'stdv': stdev, 'pos': pos, 'start': start})
+                events = np.asanyarray(fast5[keys[0]][()])
+    finally:
+        # cleanup
+        if os.path.isfile(temp_fast5_location): os.remove(temp_fast5_location)
+
+    return events
 
 
 def create_speedy_event_table(signal, sampling_freq, start_time, min_width=5, max_width=80, min_gain_per_sample=0.008,
@@ -96,23 +142,25 @@ def create_minknow_event_table(signal, sampling_freq, start_time,
     return event_table
 
 
-def create_scrappie_event_table(fast5_location, sampling_freq):
+def create_scrappie_event_table(fast5_location, sampling_freq, start_time=0, path_to_scrappie=None):
     """Create new event table using scrappie event detection via subprocess call to scrappie
 
     :param fast5_location: path to
     :param sampling_freq: sampling frequency of ADC in Hz
+    :param start_time: start time from fast5 file (time in seconds * sampling frequency)
+    :param path_to_scrappie: option to go to scrappie via a path if scrappie is not in PATH
     :return: Table of events without model state or move information
     """
-    events = scrappie_event_detect(fast5_location)
-    assert events is not None and len(events) > 0, "Could not use scrappie to detect events in {}".format(fast5_location)
+    events = scrappie_event_detect(fast5_location, path_to_scrappie=path_to_scrappie)
+    assert events is not None and len(events) > 0, "Could not use scrappie to detect events in {}".format(
+        fast5_location)
     num_events = len(events)
     event_table = get_empty_event_table(num_events - 1)
 
     for i, event in enumerate(events):
         # drop last event (cannot compute length without "next" event)
         if i == num_events - 1: break
-
-        event_table['start'][i] = event["start"] / sampling_freq
+        event_table['start'][i] = event["start"] / sampling_freq + (start_time / sampling_freq)
         event_table['length'][i] = 0.0
         event_table['mean'][i] = event["mean"]
         event_table['stdv'][i] = event["stdv"]
@@ -120,8 +168,8 @@ def create_scrappie_event_table(fast5_location, sampling_freq):
         event_table['raw_length'][i] = 0
 
         if i != 0:
-            event_table['length'][i-1] = event_table['start'][i] - event_table['start'][i - 1]
-            event_table['raw_length'][i-1] = event_table['raw_start'][i] - event_table['raw_start'][i - 1]
+            event_table['length'][i - 1] = event_table['start'][i] - event_table['start'][i - 1]
+            event_table['raw_length'][i - 1] = event_table['raw_start'][i] - event_table['raw_start'][i - 1]
 
     return event_table
 
@@ -133,10 +181,10 @@ def get_empty_event_table(num_events):
     :return: empty numpy array with appropriate columns
     """
     return np.empty(num_events, dtype=[('start', float), ('length', float),
-                                              ('mean', float), ('stdv', float),
-                                              ('model_state', 'S5'), ('move', '<i4'),
-                                              ('raw_start', int), ('raw_length', int),
-                                              ('p_model_state', float)])
+                                       ('mean', float), ('stdv', float),
+                                       ('model_state', 'S5'), ('move', '<i4'),
+                                       ('raw_start', int), ('raw_length', int),
+                                       ('p_model_state', float)])
 
 
 def create_anchor_kmers(new_events, old_events):
@@ -150,8 +198,10 @@ def create_anchor_kmers(new_events, old_events):
     :return New event table
     """
     num_old_events = len(old_events)
-    check_numpy_table(new_events, req_fields=('start', 'length', 'mean', 'stdv', 'model_state', 'move', 'p_model_state'))
-    check_numpy_table(old_events, req_fields=('start', 'length', 'mean', 'stdv', 'model_state', 'move', 'p_model_state'))
+    check_numpy_table(new_events,
+                      req_fields=('start', 'length', 'mean', 'stdv', 'model_state', 'move', 'p_model_state'))
+    check_numpy_table(old_events,
+                      req_fields=('start', 'length', 'mean', 'stdv', 'model_state', 'move', 'p_model_state'))
     # index of old events
     old_indx = 0
     # start index to trim new_events for those with data from old_events
@@ -184,10 +234,10 @@ def create_anchor_kmers(new_events, old_events):
                 while round(old_events[old_indx]["start"], 7) < current_event_end and old_indx != num_old_events:
                     # print("INSIDE LOOP", round(old_events[old_indx]["start"], 7), old_events[old_indx]["length"], current_event_end, round(old_events[old_indx]["start"], 7) < current_event_end)
                     # deal with bad event files and final event
-                    if old_indx == num_old_events-1:
+                    if old_indx == num_old_events - 1:
                         old_event_end = round(old_events[old_indx]["start"] + old_events[old_indx]["length"], 7)
                     else:
-                        old_event_end = round(old_events[old_indx+1]["start"], 7)
+                        old_event_end = round(old_events[old_indx + 1]["start"], 7)
                     old_event_start = round(old_events[old_indx]["start"], 7)
                     old_kmer = bytes.decode(old_events[old_indx]["model_state"])
                     # homopolymers or stays should be tracked together
@@ -241,9 +291,9 @@ def create_anchor_kmers(new_events, old_events):
                 best_index = time.index(max(time))
                 # if there are several old events in a new event, track how many
                 if new_check_overlap:
-                    left_over = sum(moves[best_index+1:-1])
+                    left_over = sum(moves[best_index + 1:-1])
                 else:
-                    left_over = sum(moves[best_index+1:])
+                    left_over = sum(moves[best_index + 1:])
             else:
                 # end of possible alignments
                 end_index = i
@@ -258,19 +308,19 @@ def create_anchor_kmers(new_events, old_events):
             elif selected_overlap and best_index != 0 and check_overlap:
                 move = min(5, moves[best_index] + last_left_over)
             else:
-                move = min(5, moves[best_index]+sum(moves[:best_index])+last_left_over)
-                if most_moves < moves[best_index]+sum(moves[:best_index])+last_left_over:
-                    most_moves = moves[best_index]+sum(moves[:best_index])+last_left_over
+                move = min(5, moves[best_index] + sum(moves[:best_index]) + last_left_over)
+                if most_moves < moves[best_index] + sum(moves[:best_index]) + last_left_over:
+                    most_moves = moves[best_index] + sum(moves[:best_index]) + last_left_over
             # print(kmers, moves, left_over, moves[best_index], sum(moves[:best_index]), last_left_over, move)
             # if new overlap
             if new_check_overlap:
                 # new overlapped event will be tracked on next new_event so we drop a left_over count
-                left_over = max(0, left_over-1)
-                if most_moves < left_over-1:
-                    most_moves = left_over-1
+                left_over = max(0, left_over - 1)
+                if most_moves < left_over - 1:
+                    most_moves = left_over - 1
 
                 # check if we currently selected an overlapping old event
-                if best_index == num_kmers-1:
+                if best_index == num_kmers - 1:
                     selected_overlap = True
                 else:
                     selected_overlap = False
@@ -305,7 +355,7 @@ def check_event_table_time(event_table):
     for event in event_table[1:]:
         if prev_end != event["start"]:
             return False
-        prev_end = event["start"]+event["length"]
+        prev_end = event["start"] + event["length"]
 
     return True
 
@@ -357,7 +407,7 @@ def resegment_reads(fast5_path, params=None, speedy=False, overwrite=True, analy
     new_event_table = create_anchor_kmers(new_events=event_table, old_events=old_event_table)
 
     # get destination in fast5
-    #todo find latest location? ie: save_event_table_and_fastq(..)
+    # todo find latest location? ie: save_event_table_and_fastq(..)
     destination = f5fh._join_path(f5fh.__base_analysis__, analysis_path)
 
     f5fh.set_event_table(destination, new_event_table, attributes, overwrite=overwrite)
@@ -367,19 +417,28 @@ def resegment_reads(fast5_path, params=None, speedy=False, overwrite=True, analy
     if f5fh.is_read_rna():
         sequence = ReverseComplement().reverse(sequence)
         sequence = sequence.replace("T", "U")
-    quality_scores = '!'*len(sequence)
-    fastq = create_fastq_line(read_id+" :", sequence, quality_scores)
+    quality_scores = '!' * len(sequence)
+    fastq = create_fastq_line(read_id + " :", sequence, quality_scores)
 
     # set fastq
     f5fh.set_fastq(destination, fastq, overwrite=overwrite)
     return f5fh
 
 
-def get_default_event_detection_params(event_detection_strategy):
+def get_default_event_detection_params(event_detection_strategy, rna=False):
+    """Get the default event detection parameters for each event detection strategy.
+
+    :param event_detection_strategy: must be in {"speedy", "minknow", "scrappie"}
+    :param rna: boolean option to return parameters for rna data
+    :return: dictionary of correct parameters for given event detection
+    """
     if event_detection_strategy == EVENT_DETECT_SPEEDY:
         return dict(min_width=5, max_width=80, min_gain_per_sample=0.008, window_width=800)
     elif event_detection_strategy == EVENT_DETECT_MINKNOW:
-        return dict(window_lengths=(5, 10), thresholds=(2.0, 1.1), peak_height=1.2)
+        if rna:
+            return dict(window_lengths=(7, 14), thresholds=(2.5, 9.0), peak_height=1.0)
+        else:
+            return dict(window_lengths=(3, 6), thresholds=(1.4, 9.0), peak_height=0.2)
     elif event_detection_strategy == EVENT_DETECT_SCRAPPIE:
         return {}
     else:
@@ -390,7 +449,6 @@ def generate_events_and_alignment(fast5_path, nucleotide_sequence, nucleotide_qu
                                   event_detection_params=None, event_detection_strategy=None,
                                   save_to_fast5=True, overwrite=False,
                                   analysis_identifier=Fast5.__default_basecall_1d_analysis__, ):
-
     assert os.path.isfile(fast5_path), "File does not exist: {}".format(fast5_path)
 
     # create Fast5 object
@@ -416,11 +474,12 @@ def generate_events_and_alignment(fast5_path, nucleotide_sequence, nucleotide_qu
         event_table = create_minknow_event_table(signal, sampling_freq, start_time, **event_detection_params)
         event_detection_params = merge_dicts([event_detection_params, {"event_detection": "minknow_event_detect"}])
     elif event_detection_strategy == EVENT_DETECT_SCRAPPIE:
-        event_table = create_scrappie_event_table(fast5_path, sampling_freq)
+        event_table = create_scrappie_event_table(fast5_path, sampling_freq, start_time)
         event_detection_params = merge_dicts([event_detection_params, {"event_detection": "scrappie_event_detect"}])
     else:
         raise Exception("PROGRAMMER ERROR: unknown resegment strat {}: expected {}"
-                        .format(event_detection_strategy, [EVENT_DETECT_SPEEDY, EVENT_DETECT_MINKNOW, EVENT_DETECT_SCRAPPIE]))
+                        .format(event_detection_strategy,
+                                [EVENT_DETECT_SPEEDY, EVENT_DETECT_MINKNOW, EVENT_DETECT_SCRAPPIE]))
 
     # gather attributes
     keys = ["nanotensor version", "time_stamp"]
@@ -446,7 +505,7 @@ def generate_events_and_alignment(fast5_path, nucleotide_sequence, nucleotide_qu
 
 
 def save_event_table_and_fastq(f5fh, event_table, fastq_line, attributes=None, overwrite=False,
-                                    analysis_identifier=Fast5.__default_basecall_1d_analysis__):
+                               analysis_identifier=Fast5.__default_basecall_1d_analysis__):
     # get destination root
     if overwrite:
         try:
@@ -479,7 +538,7 @@ def index_to_time(basecall_events, sampling_freq=0, start_time=0):
     :param start_time: start time of experiment via fasta5 file
     """
     check_numpy_table(basecall_events, req_fields=('start', 'length'))
-    assert basecall_events["start"].dtype is np.dtype('uint64'), "Event start should be np.int32 type: {}"\
+    assert basecall_events["start"].dtype is np.dtype('uint64'), "Event start should be np.int32 type: {}" \
         .format(basecall_events["start"].dtype)
     assert sampling_freq != 0, "Must set sampling frequency"
     assert start_time != 0, "Must set start time"
@@ -586,7 +645,6 @@ def main():
     rna_minknow_params = dict(window_lengths=(5, 10), thresholds=(2.0, 1.1), peak_height=1.2)
     rna_speedy_params = dict(min_width=5, max_width=40, min_gain_per_sample=0.008, window_width=800)
 
-
     rna_minknow_params = dict(window_lengths=(5, 10), thresholds=(1.9, 1.0), peak_height=1.2)
     rna_speedy_params = dict(min_width=5, max_width=40, min_gain_per_sample=0.008, window_width=800)
     dna_minknow_params = dict(window_lengths=(5, 10), thresholds=(2.0, 1.1), peak_height=1.2)
@@ -609,9 +667,9 @@ def main():
 
     print("MAX DNA SKIPS: speedy")
     for fast5_path in dna_files:
-            print(fast5_path)
-            f5fh = resegment_reads(fast5_path, dna_speedy_params, speedy=True, overwrite=True)
-            print(get_resegment_accuracy(f5fh))
+        print(fast5_path)
+        f5fh = resegment_reads(fast5_path, dna_speedy_params, speedy=True, overwrite=True)
+        print(get_resegment_accuracy(f5fh))
     print("MAX DNA SKIPS:Minknow")
     for fast5_path in dna_files:
         f5fh = resegment_reads(fast5_path, dna_minknow_params, speedy=False, overwrite=True)
