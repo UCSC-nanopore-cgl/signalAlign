@@ -79,13 +79,14 @@ class SignalAlignmentTest(unittest.TestCase):
     # TODO use new reads to test
     def test_get_2d_length(self):
         lengths = [397, 9896, 7983, 11457]
-        for i, fast5path in enumerate(self.fast5_paths):
+        for i, fast5path in enumerate(sorted(self.fast5_paths)):
             self.assertEqual(lengths[i], (get_2d_length(fast5path)))
 
     # TODO use new reads to test
     def test_get_1d_length(self):
         lengths = [388, 9616, 9868, 10614]
-        for i, fast5path in enumerate(self.fast5_paths):
+        print(self.fast5_paths)
+        for i, fast5path in enumerate(sorted(self.fast5_paths)):
             self.assertEqual(lengths[i], (get_1d_length(fast5path)))
 
     def test_trim_num_files_in_sample(self):

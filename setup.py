@@ -39,7 +39,7 @@ setup(name="signalAlign",
       install_requires=["numpy>=1.9.2",
                         "h5py>=2.2.1",
                         "pysam>=0.8.2.1",
-                        "pandas>=0.18.1",
+                        "pandas>=0.23.1",
                         "sonLib>=1.1.0",
                         "PyYAML>=3.12",
                         "Cython>=0.26"]
