@@ -14,8 +14,6 @@
 #include "sonLib.h"
 
 
-void build_fai_index_file();
-
 char *fastaHandler_getSubSequence(char *fastaReferencePath, int64_t start, int64_t end, bool strand,
                                 char *sequence_name);
 

@@ -18,6 +18,7 @@ CuSuite *variableOrderPairwiseAlignerTestSuite(void);
 CuSuite *signalPairwiseAlignerTestSuite(void);
 CuSuite *stateMachineAlignmentTestSuite(void);
 CuSuite *fastaHandlerTestSuite(void);
+CuSuite *eventAlignerTestSuite(void);
 // multiple alignment not implemented, yet
 //CuSuite* multipleAlignerTestSuite(void);
 //CuSuite* pairwiseAlignmentLongTestSuite(void);  // legacy to remind myself
@@ -32,6 +33,7 @@ CuSuite *stBaseAlignerRunAllTests(void) {
     CuSuiteAddSuite(suite, variableOrderPairwiseAlignerTestSuite());
     CuSuiteAddSuite(suite, stateMachineAlignmentTestSuite());
     CuSuiteAddSuite(suite, fastaHandlerTestSuite());
+    CuSuiteAddSuite(suite, eventAlignerTestSuite());
 
     // coming soon..
     //CuSuiteAddSuite(suite, multipleAlignerTestSuite());

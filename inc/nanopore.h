@@ -69,6 +69,14 @@ EventKmerTuple *nanopore_eventKmerTupleConstruct(double mean, double sd, double 
 
 NanoporeReadAdjustmentParameters *nanopore_readAdjustmentParametersConstruct();
 
+NanoporeReadAdjustmentParameters set4_NanoporeReadAdjustmentParameters(double _shift, double _scale, double _drift,
+                                                                       double _var);
+
+NanoporeReadAdjustmentParameters set7_NanoporeReadAdjustmentParameters(double _shift, double _scale, double _drift,
+                                                                       double _var, double _scale_sd, double _var_sd,
+                                                                       double _shift_sd);
+
+
 stList *nanopore_remapAnchorPairs(stList *anchorPairs, int64_t *eventMap);
 
 stList *nanopore_remapAnchorPairsWithOffset(stList *unmappedPairs, int64_t *eventMap, int64_t mapOffset);

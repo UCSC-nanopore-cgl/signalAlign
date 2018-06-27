@@ -203,7 +203,7 @@ static inline void emissions_signal_initKmerSkipTableToZero(double *skipModel, i
     memset(skipModel, 0, parameterSetSize * sizeof(double));
 }
 
-static inline double emissions_signal_getModelLevelMean(const double *eventModel, int64_t kmerIndex) {
+double emissions_signal_getModelLevelMean(const double *eventModel, int64_t kmerIndex) {
     return kmerIndex > NUM_OF_KMERS ? 0.0 : eventModel[(kmerIndex * MODEL_PARAMS)];
 }
 
@@ -495,6 +495,54 @@ double emissions_signal_getHdpKmerDensity(StateMachine *sM, void *x_i, void *e_j
 }
 
 
+double emissions_signal_strawManGetKmerEventMatchProbWithDescaling_MeanOnly(StateMachine *sM, void *x_i, void *e_j, bool match) {
+    StateMachine3 *self = (StateMachine3 *)sM;  // downcast
+
+    if (x_i == NULL) {
+        return LOG_ZERO;
+    }
+    // this is meant to work with getKmer (NOT getKmer2)
+    // wrangle e_j data
+    double eventMean = *(double *) e_j;
+//    double eventNoise = *(double *) ((char *) e_j + sizeof(double)); // aaah pointers
+
+    // make temp x_i
+    char *kmer_i = malloc((self->model.kmerLength) * sizeof(char));
+    for (int64_t x = 0; x < self->model.kmerLength; x++) {
+        kmer_i[x] = *((char *) x_i + x);
+    }
+    kmer_i[self->model.kmerLength] = '\0';
+
+    // get index
+    int64_t kmerIndex = kmer_id(kmer_i, self->model.alphabet, self->model.alphabetSize, self->model.kmerLength);
+
+    double *eventModel = match ? self->model.EMISSION_MATCH_MATRIX : self->model.EMISSION_GAP_Y_MATRIX;
+    // get the µ and σ for the level and noise for the model
+    double levelMean = emissions_signal_getModelLevelMean(eventModel, kmerIndex);
+    double levelStdDev = emissions_signal_getModelLevelSd(eventModel, kmerIndex);
+    eventMean = emissions_signal_descaleEventMean_JordanStyle(eventMean, levelMean, self->model.scale,
+                                                              self->model.shift, self->model.var);
+
+//    double noiseMean = emissions_signal_getModelFluctuationMean(eventModel, kmerIndex);
+//    //double noiseStdDev = emissions_signal_getModelFluctuationSd(eventModel, kmerIndex);
+//
+//    double modelNoiseLambda = emissions_signal_getModelFluctuationLambda(eventModel, kmerIndex);
+
+    double l_probEventMean = emissions_signal_logGaussPdf(eventMean, levelMean, levelStdDev);
+
+    //double l_probEventNoise = emissions_signal_logGaussPdf(eventNoise, noiseMean, noiseStdDev);
+//    double l_probEventNoise = emissions_signal_logInvGaussPdf(eventNoise, noiseMean, modelNoiseLambda);
+
+    // clean
+    free(kmer_i);
+
+    // debugging
+    //double prob = l_probEventMean + l_probEventNoise;
+    //st_uglyf("MATCHING--x_i:%s (index: %lld), e_j mean: %f, \n modelMean: %f, modelLsd: %f probEvent: %f probNoise: %f, combined: %f\n",
+    //         kmer_i, kmerIndex, eventMean, levelMean, levelStdDev, l_probEventMean, l_probEventNoise, prob);
+    return l_probEventMean;
+}
+
 double emissions_signal_strawManGetKmerEventMatchProbWithDescaling(StateMachine *sM, void *x_i, void *e_j, bool match) {
     StateMachine3 *self = (StateMachine3 *)sM;  // downcast
 
@@ -540,7 +588,6 @@ double emissions_signal_strawManGetKmerEventMatchProbWithDescaling(StateMachine 
     //double prob = l_probEventMean + l_probEventNoise;
     //st_uglyf("MATCHING--x_i:%s (index: %lld), e_j mean: %f, \n modelMean: %f, modelLsd: %f probEvent: %f probNoise: %f, combined: %f\n",
     //         kmer_i, kmerIndex, eventMean, levelMean, levelStdDev, l_probEventMean, l_probEventNoise, prob);
-
     return l_probEventMean + l_probEventNoise;
 }
 
@@ -1087,7 +1134,7 @@ void stateMachine3_setTransitionsToNanoporeDefaults(StateMachine *sM) {
     sM3->TRANSITION_GAP_SWITCH_TO_Y = LOG_ZERO;
 }
 
-static void stateMachine3_loadTransitionsFromFile(StateMachine *sM, stList *transitions) {
+ void stateMachine3_loadTransitionsFromFile(StateMachine *sM, stList *transitions) {
     StateMachine3 *self = (StateMachine3 *)sM;
     int64_t j;
     double transition;
