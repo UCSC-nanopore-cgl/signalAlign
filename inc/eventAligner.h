@@ -13,39 +13,23 @@
 #include "scrappie_common.h"
 #include "nanopore.h"
 
-//typedef struct {
-//    double scale;
-//    double shift;
-//    double drift;
-//    double var;
-//    double scale_sd;
-//    double var_sd;
-//
-//    // derived parameters that are cached for efficiency
-//    double log_var;
-//    double scaled_var;
-//    double log_scaled_var;
-//} SquiggleScalings;
-//
-//
-//static SquiggleScalings const SquiggleScalings_default = {
-//        .scale = 1.0,
-//        .shift = 0.0,
-//        .drift = 0.0,
-//        .var = 1.0,
-//        .scale_sd = 1.0,
-//        .var_sd = 1.0,
-//        .log_var = 0.0,
-//        .scaled_var = 1.0,
-//        .log_scaled_var = 0.0
-//};
-//
-//
-//
-//SquiggleScalings set6_SquiggleScalings(double _shift, double _scale, double _drift, double _var, double _scale_sd,
-//                                       double _var_sd);
-//
-//SquiggleScalings set4_SquiggleScalings(double _shift, double _scale, double _drift, double _var);
+typedef struct {
+    uint64_t start;
+    float length;
+    float mean;
+    float stdv;
+    int pos;
+    int state;
+} event_t;
+
+typedef struct {
+    size_t n;
+    size_t start;
+    size_t end;
+    event_t *event;
+} event_table;
+
+
 
 // open the file and return the hdf ID
 hid_t fast5_open(char* filename);
@@ -62,7 +46,7 @@ typedef struct {
 
 
 // close the file
-void fast5_close(hid_t hdf5_file);
+void* fast5_close(hid_t hdf5_file);
 
 // get the raw samples from this file
 raw_table fast5_get_raw_samples(hid_t hdf5_file, fast5_raw_scaling scaling);
@@ -81,8 +65,10 @@ char* fast5_get_experiment_type(hid_t hdf5_file);
 
 // Get sample rate, and ADC-to-pA scalings
 fast5_raw_scaling fast5_get_channel_params(hid_t hdf5_file);
-//
-//
+
+// set an events table
+void* fast5_set_event_table(hid_t hdf5_file, char* table_name, event_table *et);
+
 // Internal utility functions
 //
 //char* fast5_get_fixed_string_attribute(hid_t hdf5_file, const std::string& group_name, const std::string& attribute_name);

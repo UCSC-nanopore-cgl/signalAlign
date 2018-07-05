@@ -13,7 +13,9 @@ c_compile_args.extend(optimisation)
 event_detect = 'eventdetection'
 pkg_path = os.path.join(os.path.dirname(__file__), event_detect)
 
-include_dirs = [event_detect]
+son_Lib = "sonLib/lib"
+
+include_dirs = [event_detect, son_Lib]
 
 extensions = []
 
@@ -26,6 +28,12 @@ extensions.append(Extension(
 
 extensions.append(Extension("signalalign.cparsers", sources=[os.path.join(pkg_path, 'cparsers.c')], include_dirs=[np.get_include()]))
 
+# extensions.append(Extension(
+#     'eventalign',
+#     sources=[os.path.join(pkg_path, 'event_align_wrapper.c')],
+#     include_dirs=include_dirs,
+#     extra_compile_args=c_compile_args
+# ))
 
 setup(name="signalAlign",
       version="0.1.6",

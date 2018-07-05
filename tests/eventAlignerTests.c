@@ -3,7 +3,9 @@
 //
 
 #include <stdlib.h>
-#include <string.h>
+#include "hdf5.h"
+#include "hdf5_hl.h"
+
 #include <math.h>
 #include <inttypes.h>
 #include <unistd.h>
@@ -121,6 +123,54 @@ static void test_fast5_get_raw_samples(CuTest *testCase){
     CuAssertIntEquals(testCase, (unsigned int) n_answer, (unsigned int) rna_table.n);
     fast5_close(fast5_handle);
 
+
+}
+
+static void test_fast5_set_event_table(CuTest *testCase){
+    char* path = stString_concat(HOME, "tests/minion_test_reads/RNA_edge_cases/DEAMERNANOPORE_20170922_FAH26525_MN16450_sequencing_run_MA_821_R94_NA12878_mRNA_09_22_17_67136_read_61_ch_151_strand.fast5");
+    hid_t fast5_handle = fast5_open(path);
+    fast5_raw_scaling channel_params = fast5_get_channel_params(fast5_handle);
+    raw_table rt = fast5_get_raw_samples(fast5_handle, channel_params);
+    const detector_param* ed_params = &event_detection_rna;
+
+    event_table et = detect_events(rt, *ed_params);
+    fast5_set_event_table(fast5_handle, "Analyses/SignalAlign_Basecall_1D_000/Events", &et);
+    size_t n_events = et.n;
+    event_t dst_buf[n_events];
+    size_t dst_offset[6]=  {HOFFSET(event_t, start),
+                            HOFFSET(event_t, length),
+                            HOFFSET(event_t, mean),
+                            HOFFSET(event_t, stdv),
+                            HOFFSET(event_t, pos),
+                            HOFFSET(event_t, state)};
+
+    size_t dst_sizes[6] = {sizeof(dst_buf[0].start),
+                           sizeof(dst_buf[0].length),
+                           sizeof(dst_buf[0].mean),
+                           sizeof(dst_buf[0].stdv),
+                           sizeof(dst_buf[0].pos),
+                           sizeof(dst_buf[0].state)};
+    size_t dst_size = sizeof(event_t);
+
+    H5TBread_table( fast5_handle, "Analyses/SignalAlign_Basecall_1D_000/Events", dst_size, dst_offset, dst_sizes, dst_buf );
+
+    CuAssertIntEquals(testCase, 0, (int) dst_buf[0].start);
+    CuAssertDblEquals(testCase, 7.000000, dst_buf[0].length, 0.001);
+    CuAssertDblEquals(testCase, 92.086693, dst_buf[0].mean, 0.001);
+    CuAssertDblEquals(testCase, 3.655048, dst_buf[0].stdv, 0.001);
+    CuAssertIntEquals(testCase, -1, dst_buf[0].pos);
+    CuAssertIntEquals(testCase, -1, dst_buf[0].state);
+
+    CuAssertIntEquals(testCase, 7, (int) dst_buf[1].start);
+    CuAssertDblEquals(testCase, 15.000000, dst_buf[1].length, 0.001);
+    CuAssertDblEquals(testCase, 87.082771, dst_buf[1].mean, 0.001);
+    CuAssertDblEquals(testCase, 1.637721, dst_buf[1].stdv, 0.001);
+    CuAssertIntEquals(testCase, -1, dst_buf[1].pos);
+    CuAssertIntEquals(testCase, -1, dst_buf[1].state);
+    H5TBdelete_record (fast5_handle, "Analyses/SignalAlign_Basecall_1D_000/Events", 0, n_events);
+    H5Ldelete( fast5_handle, "Analyses/SignalAlign_Basecall_1D_000/Events", H5P_DEFAULT );
+
+    fast5_close(fast5_handle);
 
 }
 
@@ -282,22 +332,23 @@ CuSuite *eventAlignerTestSuite(void) {
 
     SUITE_ADD_TEST(suite, test_adaptive_banded_simple_event_align);
     SUITE_ADD_TEST(suite, test_sonlib_lists);
+    SUITE_ADD_TEST(suite, test_fast5_set_event_table);
 //    SUITE_ADD_TEST(suite, test_load_from_raw);
 
     return suite;
 }
 
-//int main(int argc, char *argv[]) {
-//    // collect output and create a new test suite
-//    CuString *output = CuStringNew();
-//    CuSuite *suite = CuSuiteNew();
-//    //    add and run this test suite
-//    CuSuiteAddSuite(suite, eventAlignerTestSuite());
-//    CuSuiteRun(suite);
-//    CuSuiteSummary(suite, output);
-//    CuSuiteDetails(suite, output);
-//    printf("%s\n", output->buffer);
-//    CuStringDelete(output);
-//    int good = suite->failCount > 0;
-//    return good;
-//}
+int main(int argc, char *argv[]) {
+    // collect output and create a new test suite
+    CuString *output = CuStringNew();
+    CuSuite *suite = CuSuiteNew();
+    //    add and run this test suite
+    CuSuiteAddSuite(suite, eventAlignerTestSuite());
+    CuSuiteRun(suite);
+    CuSuiteSummary(suite, output);
+    CuSuiteDetails(suite, output);
+    printf("%s\n", output->buffer);
+    CuStringDelete(output);
+    int good = suite->failCount > 0;
+    return good;
+}

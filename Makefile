@@ -17,7 +17,7 @@ LIBS= -lsz -lz -lm
 HDF5?=install
 # Default to automatically installing hdf5
 ifeq ($(HDF5), install)
-    H5_LIB=./lib/libhdf5.a
+    H5_LIB=./lib/libhdf5.a ./lib/libhdf5_hl.a
     H5_INCLUDE=-I./include
     LIBS += -ldl
 else

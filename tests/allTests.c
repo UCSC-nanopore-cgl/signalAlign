@@ -47,13 +47,13 @@ CuSuite *stBaseAlignerRunAllTests(void) {
 
     return suite;
 }
-
-int main(int argc, char *argv[]) {
-    if(argc == 2) {
-        st_setLogLevelFromString(argv[1]);
-    }
-    CuSuite *allTests = stBaseAlignerRunAllTests();
-    int good = allTests->failCount > 0;
-    CuSuiteDelete(allTests);
-    return good;
-}
+//
+//int main(int argc, char *argv[]) {
+//    if(argc == 2) {
+//        st_setLogLevelFromString(argv[1]);
+//    }
+//    CuSuite *allTests = stBaseAlignerRunAllTests();
+//    int good = allTests->failCount > 0;
+//    CuSuiteDelete(allTests);
+//    return good;
+//}

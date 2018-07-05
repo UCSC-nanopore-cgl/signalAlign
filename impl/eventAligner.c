@@ -8,19 +8,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include <hdf5.h>
+#include "hdf5_hl.h"
 #include <scrappie_structures.h>
 #include <eventAligner.h>
 
-//#include "event_detection.h"
-//#include "scrappie_common.h"
-
-#include "htslib/faidx.h"
-#include "sonLib.h"
 #include "signalMachineUtils.h"
-#include "htslib/hfile.h"
-#include "eventAligner.h"
-#include "stateMachine.h"
-#include "nanopore.h"
 
 #define RAW_ROOT "/Raw/Reads/"
 //#define DEBUG_FAST5_IO 1
@@ -28,15 +20,16 @@
 
 hid_t fast5_open(char* filename)
     {
-    hid_t hdf5file = H5Fopen(filename, H5F_ACC_RDONLY, H5P_DEFAULT);
+    hid_t hdf5file = H5Fopen(filename, H5F_ACC_RDWR, H5P_DEFAULT);
     return hdf5file;
     }
 
 
-void fast5_close(hid_t hdf5_file)
+void* fast5_close(hid_t hdf5_file)
 {
     H5Fclose(hdf5_file);
 }
+
 
 
 char* fast5_get_raw_read_name(hid_t hdf5_file)
@@ -278,39 +271,59 @@ char* fast5_get_fixed_string_attribute(hid_t hdf5_file, char* group_name, char* 
     }
 
 
-// C implementation of Nanopolish code
-//
-//SquiggleScalings set6_SquiggleScalings(double _shift,
-//                                        double _scale,
-//                                        double _drift,
-//                                        double _var,
-//                                        double _scale_sd,
-//                                        double _var_sd){
-//    SquiggleScalings default_scaling = SquiggleScalings_default;
-//    // direct
-//
-//    default_scaling.shift = _shift;
-//    default_scaling.scale = _scale;
-//    default_scaling.drift = _drift;
-//    default_scaling.var = _var;
-//    default_scaling.scale_sd = _scale_sd;
-//    default_scaling.var_sd = _var_sd;
-//
-//    // derived
-//    default_scaling.log_var = log(_var);
-//    default_scaling.scaled_var = _var / _scale;
-//    default_scaling.log_scaled_var = log(_var / _scale);
-//
-//    return default_scaling;
-//}
-//
-//
-//SquiggleScalings set4_SquiggleScalings(double _shift, double _scale, double _drift, double _var) {
-//
-//    SquiggleScalings set4_scalings = set6_SquiggleScalings(_shift, _scale, _drift, _var, 1.0, 1.0);
-//    return set4_scalings;
-//}
-//
+void* fast5_set_event_table(hid_t hdf5_file, char* table_name, event_table *et) {
+//    create empty event table with correct number of elements
+//    int NFIELDS = 6;
+
+    size_t dst_size = sizeof(event_t);
+    size_t n_events = et->n;
+//    event_t dst_buf[n_events];
+    event_t dst_buf[n_events];
+    for (int i = 0; i<n_events; i++){
+        dst_buf[i].stdv = et->event[i].stdv;
+        dst_buf[i].state = et->event[i].state;
+        dst_buf[i].mean = et->event[i].mean;
+        dst_buf[i].start = et->event[i].start;
+        dst_buf[i].pos = et->event[i].pos;
+        dst_buf[i].length = et->event[i].length;
+    }
+
+
+    size_t dst_offset[6]=  {HOFFSET(event_t, start),
+                                  HOFFSET(event_t, length),
+                                  HOFFSET(event_t, mean),
+                                  HOFFSET(event_t, stdv),
+                                  HOFFSET(event_t, pos),
+                                  HOFFSET(event_t, state)};
+
+//    size_t dst_sizes[NFIELDS] = {sizeof(dst_buf[0].start),
+//                                 sizeof(dst_buf[0].length),
+//                                 sizeof(dst_buf[0].mean),
+//                                 sizeof(dst_buf[0].stdv),
+//                                 sizeof(dst_buf[0].pos),
+//                                 sizeof(dst_buf[0].state)};
+
+    const char *field_names[6] = {"start", "length", "mean", "stdv", "pos", "state"};
+
+    hid_t field_type[n_events];
+    hsize_t chunk_size = 10;
+    int *fill_data = NULL;
+    int compress = 0;
+
+    field_type[0] = H5T_NATIVE_UINT64;
+    field_type[1] = H5T_NATIVE_FLOAT;
+    field_type[2] = H5T_NATIVE_FLOAT;
+    field_type[3] = H5T_NATIVE_FLOAT;
+    field_type[4] = H5T_NATIVE_INT;
+    field_type[5] = H5T_NATIVE_INT;
+
+
+    H5TBmake_table("Table Title", hdf5_file, table_name, 6, n_events,
+                   dst_size, field_names, dst_offset, field_type,
+                   chunk_size, fill_data, compress, dst_buf);
+
+}
+
 
 
 NanoporeReadAdjustmentParameters estimate_scalings_using_mom(const char* sequence, StateMachine pore_model, event_table et) {
@@ -404,8 +417,6 @@ struct EventKmerPair move_right(struct EventKmerPair curr_band) {
 }
 
 
-
-
 void alignedPair_destruct(struct AlignedPair *aligned_pair) {
     free(aligned_pair);
 }
@@ -417,7 +428,6 @@ struct AlignedPair *alignedPair_construct(int ref_pos, int read_pos) {
 
     return alignedPair;
 }
-
 
 
 stList* adaptive_banded_simple_event_align(event_table et, StateMachine *pore_model, char* sequence) {
@@ -802,6 +812,9 @@ stList* load_from_raw(hid_t hdf5_file, StateMachine *sM, char* sequence) {
     stList *event_alignment = adaptive_banded_simple_event_align(et, sM, sequence);
     return event_alignment;
 }
+
+
+
     // transform alignment into the base-to-event map
 //    if(event_alignment.size() > 0) {
 //    if(stList_length(event_alignment) > 0) {
