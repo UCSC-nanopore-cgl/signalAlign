@@ -11,6 +11,25 @@
 
 static PyObject *eventAlignError;
 
+static PyObject *wrap_load_from_raw(PyObject *self, PyObject *args, PyObject *keywds) {
+    /* Parse the input tuple */
+    char* fast5_path;
+    char* template_model_file;
+    char* nuc_sequence;
+    char* path_in_fast5;
+    static char *kwlist[] = {"fast5_path", "template_model_file", "nuc_sequence", "path_in_fast5", NULL};
+
+    if (!PyArg_ParseTupleAndKeywords(args, keywds, "ssss", kwlist,
+                                     &fast5_path, &template_model_file, &nuc_sequence, &path_in_fast5))
+        return NULL;
+
+    load_from_raw(fast5_path, template_model_file, nuc_sequence, path_in_fast5);
+
+    return Py_BuildValue("i", 0);
+}
+
+
+
 fast5_raw_scaling get_channel_params(const char* hdf5_path){
 
     hid_t hdf_file = fast5_open(hdf5_path);
@@ -18,6 +37,7 @@ fast5_raw_scaling get_channel_params(const char* hdf5_path){
     fast5_close(hdf_file);
     return scaling_params;
 }
+
 
 static PyObject *wrap_get_channel_params(PyObject *self, PyObject *args) {
     /* Parse the input tuple */
@@ -97,6 +117,9 @@ static PyMethodDef eventalign_methods[] = {
         {"get_id", wrap_get_raw_read_name, METH_VARARGS, "Get the Read ID from a fast5 file."},
         {"version", (PyCFunction)version, METH_NOARGS, "Returns the version kmerAligner"},
         {"get_channel_params", wrap_get_channel_params, METH_VARARGS, "Returns the channel parameters of a read"},
+        {"load_from_raw", wrap_load_from_raw, METH_VARARGS|METH_KEYWORDS, "Performs banded alignment between kmers of a sequence "
+                                                                         "and the raw current readings given a "
+                                                                         "model file"},
         {NULL, NULL, 0, NULL} /* Sentinel */
 };
 

@@ -97,7 +97,7 @@ raw_table fast5_get_raw_samples(hid_t hdf5_file, fast5_raw_scaling scaling)
 
     // Create data set name
     char* signal_path = stString_concat(raw_read_group, "/Signal");
-
+    free(raw_read_group);
     hid_t dset = H5Dopen(hdf5_file, signal_path, H5P_DEFAULT);
     if (dset < 0) {
 #ifdef DEBUG_FAST5_IO
@@ -194,10 +194,6 @@ fast5_raw_scaling fast5_get_channel_params(hid_t hdf5_file)
 
     return scaling;
 }
-
-//
-// Internal functions
-//
 
 
 char* fast5_get_fixed_string_attribute(hid_t hdf5_file, char* group_name, char* attribute_name)
@@ -305,7 +301,7 @@ void* fast5_set_event_table(hid_t hdf5_file, char* table_name, event_table *et) 
 
     const char *field_names[6] = {"start", "length", "mean", "stdv", "pos", "state"};
 
-    hid_t field_type[n_events];
+    hid_t field_type[6];
     hsize_t chunk_size = 10;
     int *fill_data = NULL;
     int compress = 0;
@@ -324,6 +320,113 @@ void* fast5_set_event_table(hid_t hdf5_file, char* table_name, event_table *et) 
 
 }
 
+void* fast5_set_basecall_event_table(hid_t hdf5_file, char* table_name, basecalled_event_table *et) {
+
+    size_t n_events = et->n;
+    size_t k = strlen(et->event[1].model_state);
+//    printf("hey this is it %i \n", k+1);
+    typedef struct {
+        float start;
+        float length;
+        float mean;
+        float stdv;
+        char model_state[k+1];
+        int move;
+        uint64_t raw_start;
+        uint64_t raw_length;
+        double p_model_state;
+    } _basecalled_event;
+
+    size_t dst_size = sizeof(_basecalled_event);
+
+    _basecalled_event dst_buf[n_events];
+
+    for (int i = 0; i<n_events; i++){
+        dst_buf[i].stdv = et->event[i].stdv;
+        strcpy(dst_buf[i].model_state, et->event[i].model_state);
+//        dst_buf[i].model_state =  et->event[i].model_state;
+        dst_buf[i].mean = et->event[i].mean;
+        dst_buf[i].start = et->event[i].start;
+        dst_buf[i].move = et->event[i].move;
+        dst_buf[i].length = et->event[i].length;
+        dst_buf[i].raw_start = et->event[i].raw_start;
+        dst_buf[i].raw_length = et->event[i].raw_length;
+        dst_buf[i].p_model_state = et->event[i].p_model_state;
+
+    }
+
+    size_t dst_offset[9]=  {HOFFSET(_basecalled_event, start),
+                            HOFFSET(_basecalled_event, length),
+                            HOFFSET(_basecalled_event, mean),
+                            HOFFSET(_basecalled_event, stdv),
+                            HOFFSET(_basecalled_event, raw_start),
+                            HOFFSET(_basecalled_event, raw_length),
+                            HOFFSET(_basecalled_event, model_state),
+                            HOFFSET(_basecalled_event, move),
+                            HOFFSET(_basecalled_event, p_model_state)};
+
+//    size_t dst_sizes[NFIELDS] = {sizeof(dst_buf[0].start),
+//                                 sizeof(dst_buf[0].length),
+//                                 sizeof(dst_buf[0].mean),
+//                                 sizeof(dst_buf[0].stdv),
+//                                 sizeof(dst_buf[0].pos),
+//                                 sizeof(dst_buf[0].state)};
+
+    const char *field_names[9] = {"start", "length", "mean", "stdv", "raw_start", "raw_length", "model_state",
+                                  "move", "p_model_state"};
+
+    hid_t field_type[9];
+    hsize_t chunk_size = 10;
+    int *fill_data = NULL;
+    int compress = 0;
+    hid_t string_type = H5Tcopy( H5T_C_S1 );
+    H5Tset_size( string_type, k+1 );
+    field_type[0] = H5T_NATIVE_FLOAT;
+    field_type[1] = H5T_NATIVE_FLOAT;
+    field_type[2] = H5T_NATIVE_FLOAT;
+    field_type[3] = H5T_NATIVE_FLOAT;
+    field_type[4] = H5T_NATIVE_UINT64;
+    field_type[5] = H5T_NATIVE_UINT64;
+    field_type[6] = string_type;
+    field_type[7] = H5T_NATIVE_INT;
+    field_type[8] = H5T_NATIVE_DOUBLE;
+
+    H5TBmake_table("Table Title", hdf5_file, table_name, 9, n_events,
+                   dst_size, field_names, dst_offset, field_type,
+                   chunk_size, fill_data, compress, dst_buf);
+
+    H5Tclose(string_type);
+
+}
+
+
+float fast5_get_start_time(hid_t hdf5_file){
+    char* read_name = fast5_get_raw_read_group(hdf5_file);
+
+    hid_t scaling_group = H5Gopen(hdf5_file, read_name, H5P_DEFAULT);
+    return fast5_read_float_attribute(scaling_group, "start_time");
+}
+
+basecalled_event_table event_table_to_basecalled_table(event_table *et, fast5_raw_scaling scaling, float start_time){
+
+    basecalled_event_table basecalled_et = { 0 };
+    basecalled_et.event = calloc(et->n, sizeof(basecalled_event));
+    basecalled_et.start = et->start;
+    basecalled_et.end = et->end;
+    basecalled_et.n = et->n;
+
+    for (int i=0; i < et->n; i++){
+        basecalled_et.event[i].raw_start = et->event[i].start;
+        basecalled_et.event[i].raw_length = (uint64_t) et->event[i].length;
+        basecalled_et.event[i].mean = et->event[i].mean;
+        basecalled_et.event[i].stdv = et->event[i].stdv;
+        basecalled_et.event[i].start = (((float) et->event[i].start) / scaling.sample_rate) + (start_time / scaling.sample_rate);
+        basecalled_et.event[i].length = et->event[i].length / scaling.sample_rate;
+        basecalled_et.event[i].p_model_state = 0.0;
+    }
+    return basecalled_et;
+
+}
 
 
 NanoporeReadAdjustmentParameters estimate_scalings_using_mom(const char* sequence, StateMachine pore_model, event_table et) {
@@ -423,7 +526,9 @@ void alignedPair_destruct(struct AlignedPair *aligned_pair) {
 
 struct AlignedPair *alignedPair_construct(int ref_pos, int read_pos) {
     struct AlignedPair *alignedPair = st_malloc(sizeof(struct AlignedPair));
+//    kmer indx
     alignedPair->ref_pos = ref_pos;
+//    event index
     alignedPair->read_pos = read_pos;
 
     return alignedPair;
@@ -606,11 +711,8 @@ stList* adaptive_banded_simple_event_align(event_table et, StateMachine *pore_mo
             int event_idx = event_at_offset(band_idx, offset);
             int kmer_idx = kmer_at_offset(band_idx, offset);
 
-            char *kmer_rank = kmer_list[kmer_idx];
-            double y[2];
-            y[0] = (double) et.event[event_idx].mean;
-            y[1] = (double) et.event[event_idx].stdv;
-
+            char *kmer = kmer_list[kmer_idx];
+            double y[2] = {(double) et.event[event_idx].mean, (double) et.event[event_idx].stdv};
 
             int offset_up = band_event_to_offset(band_idx - 1, event_idx - 1);
             int offset_left = band_kmer_to_offset(band_idx - 1, kmer_idx - 1);
@@ -629,7 +731,7 @@ stList* adaptive_banded_simple_event_align(event_table et, StateMachine *pore_mo
             float left = is_offset_valid(offset_left) ? bands[band_idx - 1][offset_left] : -INFINITY;
             float diag = is_offset_valid(offset_diag) ? bands[band_idx - 2][offset_diag] : -INFINITY;
 
-            double lp_emission = sM3->getMatchProbFcn(pore_model, kmer_rank, y, TRUE);
+            double lp_emission = sM3->getMatchProbFcn(pore_model, kmer, y, TRUE);
 
 //            float lp_emission = log_probability_match_r9(read, pore_model, kmer_rank, event_idx, strand_idx);
             float score_d = (float) (diag + lp_step + lp_emission);
@@ -669,7 +771,6 @@ for(int col = 0; col <= 10; ++col) {
     }
 }
 */
-
 
 //     Backtrack to compute alignment
 
@@ -717,14 +818,11 @@ for(int col = 0; col <= 10; ++col) {
 //        int event_idx = event_at_offset(band_idx, offset);
 //        int kmer_idx = kmer_at_offset(band_idx, offset);
 
-        char *kmer_rank = kmer_list[curr_kmer_idx];
-        double y[2];
-        y[0] = (double) et.event[curr_event_idx].mean;
-        y[1] = (double) et.event[curr_event_idx].stdv;
-
+        char *kmer = kmer_list[curr_kmer_idx];
+        double y[2] = {(double) et.event[curr_event_idx].mean, (double) et.event[curr_event_idx].stdv};
 //        size_t kmer_rank = alphabet->kmer_rank(sequence.substr(curr_kmer_idx, k).c_str(), k);
 //        sum_emission += log_probability_match_r9(read, pore_model, kmer_rank, curr_event_idx, strand_idx);
-        sum_emission += sM3->getMatchProbFcn(pore_model, kmer_rank, y, TRUE);
+        sum_emission += sM3->getMatchProbFcn(pore_model, kmer, y, TRUE);
 
         n_aligned_events += 1;
 
@@ -769,32 +867,30 @@ for(int col = 0; col <= 10; ++col) {
     return out;
 }
 
+// embed event table from fast5 path, template model path and nucleotide sequence
+void* load_from_raw(char* fast5_file_path, char* templateModelFile, char* sequence, char* path_to_embed) {
+//    load model
+    StateMachine *sM = stateMachine3_loadFromFile(templateModelFile, threeState, emissions_kmer_getGapProb,
+                                                  emissions_signal_strawManGetKmerEventMatchProbWithDescaling_MeanOnly,
+                                                  stateMachine3_loadTransitionsFromFile, NULL);
 
-stList* load_from_raw(hid_t hdf5_file, StateMachine *sM, char* sequence) {
 
-    // Hardcoded parameters, for now we can only do template with the main R9.4 model
-    size_t strand_idx = 0;
-    char *alphabet = "nucleotide";
-    char *kit = "r9.4_450bps";
-    char *strand_str = "template";
-    size_t k = 6;
-
+//    load fast5
+    hid_t hdf5_file = fast5_open(fast5_file_path);
+    // Get start time and event detection defaults
+    float start_time = fast5_get_start_time(hdf5_file);
     const detector_param *ed_params = &event_detection_defaults;
     char *experiment_type = fast5_get_experiment_type(hdf5_file);
     char *RNA = "rna";
-
+// if experiment is RNA, change defaults and nucleotide sequence
     if (strcmp(experiment_type, RNA) == 0) {
-        kit = "r9.4_70bps";
-        alphabet = "u_to_t_rna";
-        k = 5;
         ed_params = &event_detection_rna;
         char *new_sequence = stString_ReverseString(stString_replace(sequence, "U", "T"));
         sequence = new_sequence;
     }
-
+//    get channel parameters and scale raw ADC counts to get pA raw current
     fast5_raw_scaling channel_params = fast5_get_channel_params(hdf5_file);
     raw_table rt = fast5_get_raw_samples(hdf5_file, channel_params);
-
     // trim using scrappie's internal method
     // parameters taken directly from scrappie defaults
     int trim_start = 200;
@@ -802,94 +898,77 @@ stList* load_from_raw(hid_t hdf5_file, StateMachine *sM, char* sequence) {
     int varseg_chunk = 100;
     float varseg_thresh = 0.0;
     trim_and_segment_raw(rt, trim_start, trim_end, varseg_chunk, varseg_thresh);
+//  get events
     event_table et = detect_events(rt, *ed_params);
     assert(rt.n > 0);
     assert(et.n > 0);
-//    printf ("%lu\n", (unsigned long int) et.end);
+// estimate scalings via method of moments using scrappie methods
     NanoporeReadAdjustmentParameters scalings_template = estimate_scalings_using_mom(sequence, *sM, et);
+//    update signal machine with new parameters
     update_SignalMachineWithNanoporeParameters(scalings_template, sM);
-
+// banded kmer to event alignment
     stList *event_alignment = adaptive_banded_simple_event_align(et, sM, sequence);
-    return event_alignment;
+// create new event table with our own data structure
+    basecalled_event_table b_et = event_table_to_basecalled_table(&et, channel_params, start_time);
+    basecalled_event_table *event_table = alignment_to_base_event_map(event_alignment, &b_et, sequence, sM);
+    fast5_set_basecall_event_table(hdf5_file, path_to_embed, event_table);
+    fast5_close(hdf5_file);
+    stateMachine_destruct(sM);
+    return 0;
 }
 
+basecalled_event_table* alignment_to_base_event_map(stList *event_alignment, basecalled_event_table* b_et,
+                                                   char *sequence, StateMachine *pore_model) {
 
-
+    StateMachine3 *sM3 = (StateMachine3 *) pore_model;
+    int k = (int) sM3->model.kmerLength;
     // transform alignment into the base-to-event map
-//    if(event_alignment.size() > 0) {
-//    if(stList_length(event_alignment) > 0) {
-//        // create base-to-event map
-//        size_t n_kmers = (strlen(sequence) - k + 1);
-//
-////        size_t n_kmers = read_sequence.size() - this->get_model_k(strand_idx) + 1;
-////        this->base_to_event_map.clear();
-////        this->base_to_event_map.resize(n_kmers);
-//        stList *base_to_event_map = stList_construct3(n_kmers, (void (*)(void *)) alignedPair_destruct);
-//
-//        size_t max_event = 0;
-//        size_t min_event = INFINITY;
-//
-//        size_t prev_event_idx = -1;
-//        int64_t event_alignment_size = stList_length(event_alignment);
-//        for(size_t i = 0; i < event_alignment.size(); ++i) {
-//        for(int64_t i = 0; i < event_alignment_size; ++i) {
-//            struct AlignedPair *aligned_pair = stList_get(event_alignment, i);
-//            int k_idx = aligned_pair->ref_pos;
-//            int event_idx = aligned_pair->read_pos;
+    int64_t alignment_length = stList_length(event_alignment);
+    assert(alignment_length > 0) ;
+    int k_idx;
+    int event_idx;
+    char *kmer;
+    double lp_emission;
+    int prev_event_idx = -1;
+    int prev_kmer_indx = 0;
 
-//            size_t k_idx = event_alignment[i].ref_pos;
-//            size_t event_idx = event_alignment[i].read_pos;
+//      loop through the alignment and create assignments
 
-//            IndexPair& elem = this->base_to_event_map[k_idx].indices[strand_idx];
-//            if(event_idx != prev_event_idx) {
-//                if(elem.start == -1) {
-//                    elem.start = event_idx;
-//                }
-//                elem.stop = event_idx;
-//            }
-//            max_event = std::max(max_event, event_idx);
-//            min_event = std::min(min_event, event_idx);
-//            prev_event_idx = event_idx;
-//        }
-//
-//        events_per_base[strand_idx] = (double)(max_event - min_event) / n_kmers;
-//
-//        // prepare data structures for the final calibration
-//        std::vector<EventAlignment> alignment =
-//                get_eventalignment_for_1d_basecalls(read_sequence, alphabet, this->base_to_event_map, this->base_model[strand_idx]->k, strand_idx, 0);
-//
-//        // run recalibration to get the best set of scaling parameters and the residual
-//        // between the (scaled) event levels and the model.
-//        // internally this function will set shift/scale/etc of the pore model
-//        bool calibrated = recalibrate_model(*this, *this->base_model[strand_idx], strand_idx, alignment, true, false);
-//
-//#ifdef DEBUG_MODEL_SELECTION
-//        fprintf(stderr, "[calibration] read: %s events: %zu"
-//                         " scale: %.2lf shift: %.2lf drift: %.5lf var: %.2lf\n",
-//                                read_name.substr(0, 6).c_str(), this->events[strand_idx].size(), this->scalings[strand_idx].scale,
-//                                this->scalings[strand_idx].shift, this->scalings[strand_idx].drift, this->scalings[strand_idx].var);
-//#endif
-//
-//        // QC calibration
-//        if(!calibrated || this->scalings[strand_idx].var > MIN_CALIBRATION_VAR) {
-//            events[strand_idx].clear();
-//            g_failed_calibration_reads += 1;
-//        }
-//    } else {
-//        // Could not align, fail this read
-//        this->events[strand_idx].clear();
-//        this->events_per_base[strand_idx] = 0.0f;
-//        g_failed_alignment_reads += 1;
-//    }
-//
-//    // Filter poor quality reads that have too many "stays"
-//    if(!this->events[strand_idx].empty() && this->events_per_base[strand_idx] > 5.0) {
-//        g_qc_fail_reads += 1;
-//        events[0].clear();
-//        events[1].clear();
-//    }
-//}
+    for (int64_t i = 0; i < alignment_length; ++i) {
 
+        struct AlignedPair *aligned_pair = stList_get(event_alignment, i);
+        k_idx = aligned_pair->ref_pos;
+        event_idx = aligned_pair->read_pos;
+
+        kmer = stString_getSubString(sequence, k_idx, k);
+        double y[2] = {b_et->event[event_idx].mean, b_et->event[event_idx].stdv};
+        lp_emission = sM3->getMatchProbFcn(pore_model, kmer, y, TRUE);
+        if (event_idx == prev_event_idx) {
+            if (k_idx == prev_kmer_indx){
+                fprintf(stderr, "[Event Aligner] There was an error in the event map.");
+            } else {
+                b_et->event[event_idx].p_model_state = exp(lp_emission);
+                b_et->event[event_idx].model_state = kmer;
+                b_et->event[event_idx].move += k_idx-prev_kmer_indx;
+//                    printf("We assigned to %i\n", event_idx);
+                prev_kmer_indx = k_idx;
+                prev_event_idx = event_idx;
+            }
+        } else {
+            b_et->event[event_idx].p_model_state = exp(lp_emission);
+            b_et->event[event_idx].model_state = kmer;
+
+            if (k_idx == prev_kmer_indx){
+                b_et->event[event_idx].move = 0;
+            } else {
+                b_et->event[event_idx].move = k_idx-prev_kmer_indx;
+            }
+            prev_kmer_indx = k_idx;
+            prev_event_idx = event_idx;
+        }
+    }
+    return b_et;
+}
 
 
 

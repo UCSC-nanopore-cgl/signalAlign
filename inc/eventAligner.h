@@ -14,21 +14,23 @@
 #include "nanopore.h"
 
 typedef struct {
-    uint64_t start;
+    float start;
     float length;
     float mean;
     float stdv;
-    int pos;
-    int state;
-} event_t;
+    char* model_state;
+    int move;
+    uint64_t raw_start;
+    uint64_t raw_length;
+    double p_model_state;
+} basecalled_event;
 
 typedef struct {
     size_t n;
     size_t start;
     size_t end;
-    event_t *event;
-} event_table;
-
+    basecalled_event *event;
+} basecalled_event_table;
 
 
 // open the file and return the hdf ID
@@ -69,8 +71,12 @@ fast5_raw_scaling fast5_get_channel_params(hid_t hdf5_file);
 // set an events table
 void* fast5_set_event_table(hid_t hdf5_file, char* table_name, event_table *et);
 
-// Internal utility functions
-//
+// set basecalled events table
+void* fast5_set_basecall_event_table(hid_t hdf5_file, char* table_name, basecalled_event_table *et);
+
+//get start time of a read
+float fast5_get_start_time(hid_t hdf5_file);
+
 //char* fast5_get_fixed_string_attribute(hid_t hdf5_file, const std::string& group_name, const std::string& attribute_name);
 char* fast5_get_fixed_string_attribute(hid_t hdf5_file, char* group_name, char* attribute_name);
 
@@ -86,7 +92,15 @@ void* update_SignalMachineWithNanoporeParameters(NanoporeReadAdjustmentParameter
 // create adaptive banded alignment in C using our model
 stList* adaptive_banded_simple_event_align(event_table et, StateMachine *pore_model, char* sequence);
 
-//void load_from_raw(hid_t hdf5_file, StateMachine sM, char* sequence);
+// convert event table into basecalled event table. Assume's start and length are "raw_start" and "raw_length"
+basecalled_event_table event_table_to_basecalled_table(event_table *et, fast5_raw_scaling scaling, float start_time);
+
+// create basecalled_event_table from alignment
+basecalled_event_table* alignment_to_base_event_map(stList *event_alignment, basecalled_event_table* b_et,
+                                                    char *sequence, StateMachine *pore_model);
+
+void* load_from_raw(char* fast5_file_path, char* templateModelFile, char* sequence, char* path_to_embed);
+
 
 // struct from nanopolish
 struct AlignedPair

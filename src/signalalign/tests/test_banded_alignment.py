@@ -18,7 +18,7 @@ import time
 from signalalign.banded_alignment import *
 from signalalign.fast5 import Fast5
 from py3helpers.utils import all_string_permutations, get_random_string
-
+import kmeralign
 
 class BandedAlignmentTests(unittest.TestCase):
 
@@ -34,6 +34,9 @@ class BandedAlignmentTests(unittest.TestCase):
         cls.dna_fast5_path = os.path.join(cls.HOME,
                                           "tests/minion_test_reads/1D/LomanLabz_PC_20161025_FNFAB42699_MN17633_sequencing_run_20161025_E_coli_native_450bps_82361_ch112_read108_strand.fast5")
         cls.dna_handle = Fast5(cls.dna_fast5_path)
+
+        cls.rna_fast5_path = os.path.join(cls.HOME,
+                             "tests/minion_test_reads/RNA_edge_cases/DEAMERNANOPORE_20170922_FAH26525_MN16450_sequencing_run_MA_821_R94_NA12878_mRNA_09_22_17_67136_read_61_ch_151_strand.fast5")
 
     def test_simple_banded_alignment1(self):
         # event_table = self.dna_handle.get_basecall_data()
@@ -91,6 +94,25 @@ class BandedAlignmentTests(unittest.TestCase):
         self.assertSequenceEqual(events['mean'].tolist(), [86.9, 75.3, 80.2])
         self.assertSequenceEqual([bytes.decode(x) for x in events['model_state']], ["AAAAA", "AAAAT", "AAATA"])
         self.assertSequenceEqual(events['move'].tolist(), [0, 1, 1])
+
+    def test_kmeralign(self):
+        fast5_handle = Fast5(self.rna_fast5_path, read='r')
+        nuc_sequence = fast5_handle.get_fastq(analysis="Basecall_1D", section="template").split()[2]
+        # fast5_handle = fast5_handle.repack()
+        fast5_handle.close()
+        kmeralign.load_from_raw(fast5_path=self.rna_fast5_path, template_model_file=self.rna_model_file, nuc_sequence=nuc_sequence, path_in_fast5="Analyses/Events")
+        #dna
+        fast5_handle = Fast5(self.dna_fast5_path, read='r')
+        nuc_sequence = fast5_handle.get_fastq(analysis="Basecall_1D", section="template").split()[2]
+        # fast5_handle = fast5_handle.repack()
+        # fast5_handle.close()
+        # segfalut here!! whoops sorry bud!
+        # kmeralign.load_from_raw(fast5_path=self.dna_fast5_path, template_model_file=self.dna_template_model_file, nuc_sequence=nuc_sequence, path_in_fast5="Analyses/Events")
+
+        # have to re-open file to get at new data
+        # handle = Fast5(self.rna_fast5_path, read='r+')
+        # handle = handle.repack()
+        # handle.close()
 
 
 if __name__ == '__main__':
