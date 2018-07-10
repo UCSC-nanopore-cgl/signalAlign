@@ -17,6 +17,7 @@ import threading
 import time
 from signalalign.fast5 import Fast5
 from signalalign.event_detection import *
+from py3helpers.utils import time_it
 import unittest
 
 
@@ -25,13 +26,15 @@ class EventDetectTests(unittest.TestCase):
     def setUpClass(cls):
         super(EventDetectTests, cls).setUpClass()
         cls.HOME = '/'.join(os.path.abspath(__file__).split("/")[:-4])
-        cls.dna_file = os.path.join(cls.HOME, "tests/minion_test_reads/canonical_ecoli_R9/miten_PC_20160820_FNFAD20259_MN17223_mux_scan_AMS_158_R9_WGA_Ecoli_08_20_16_83098_ch138_read23_strand.fast5")
+        cls.dna_file = os.path.join(cls.HOME,
+                                    "tests/minion_test_reads/canonical_ecoli_R9/miten_PC_20160820_FNFAD20259_MN17223_mux_scan_AMS_158_R9_WGA_Ecoli_08_20_16_83098_ch138_read23_strand.fast5")
         cls.rna_file = os.path.join(cls.HOME,
                                     "tests/minion_test_reads/RNA_edge_cases/DEAMERNANOPORE_20170922_FAH26525_MN16450_sequencing_run_MA_821_R94_NA12878_mRNA_09_22_17_67136_read_61_ch_151_strand.fast5")
         dna_handle = Fast5(cls.dna_file, 'r+')
         rna_handle = Fast5(cls.rna_file, 'r+')
         cls.dna_handle = dna_handle.create_copy("test_dna.fast5")
         cls.rna_handle = rna_handle.create_copy("test_rna.fast5")
+        cls.path_to_scrappie = os.path.join(cls.HOME, "scrappie/build/scrappie")
 
     def test_create_speedy_event_table(self):
         # """Test create_speedy_event_table"""
@@ -71,7 +74,6 @@ class EventDetectTests(unittest.TestCase):
                                           window_width=800)
 
     def test_create_minknow_event_table(self):
-        # """Test create_minknow_event_table"""
         for fast5handle in [self.rna_handle, self.dna_handle]:
             sampling_freq = fast5handle.sample_rate
             signal = fast5handle.get_read(raw=True, scale=True)
@@ -408,8 +410,6 @@ class EventDetectTests(unittest.TestCase):
                             analysis_path="ReSegmentBasecall_000")
             fasthandle = resegment_reads(fast5_file, params=speedy_params, speedy=True, overwrite=True,
                                          analysis_path="ReSegmentBasecall_000")
-            # TODO make sure this is working with test files
-            # fasthandle.delete("Analyses/ReSegmentBasecall_000")
 
     def test_sequence_from_events(self):
         # """Test sequence from events method"""
@@ -507,15 +507,82 @@ class EventDetectTests(unittest.TestCase):
     def test_create_minknow_events_from_fast5(self):
         for path in ["test_rna.fast5", "test_dna.fast5"]:
             events, f5handle = create_minknow_events_from_fast5(path)
-            passing = check_numpy_table(events, req_fields=('start', 'length', 'mean', 'stdv', 'model_state', 'move', 'p_model_state'))
+            passing = check_numpy_table(events, req_fields=(
+            'start', 'length', 'mean', 'stdv', 'model_state', 'move', 'p_model_state'))
             self.assertTrue(passing)
             self.assertIsInstance(f5handle, Fast5)
 
     def test_create_scrappie_event_table(self):
-        pass
+        for fast5handle, path in [(self.rna_handle, "test_rna.fast5"), (self.dna_handle, "test_dna.fast5")]:
+            sampling_freq = fast5handle.sample_rate
+            signal = fast5handle.get_read(raw=True, scale=True)
+            start_time = fast5handle.raw_attributes['start_time']
+            events = create_scrappie_event_table(fast5_location=path, sampling_freq=sampling_freq,
+                                                 start_time=start_time, path_to_scrappie=self.path_to_scrappie)
+            events_to_check = np.random.randint(0, len(events), 10)
+            for x in events_to_check:
+                event = events[x]
+                signal_mean = np.mean(signal[event["raw_start"]:(event["raw_start"] + event["raw_length"])])
+                signal_std = np.std(signal[event["raw_start"]:(event["raw_start"] + event["raw_length"])])
+                self.assertAlmostEqual(event["mean"], signal_mean, places=4)
+                self.assertAlmostEqual(event["stdv"], signal_std, places=2)
+                self.assertAlmostEqual(event['raw_start'],
+                                       (event['start'] - (start_time / sampling_freq)) * sampling_freq)
+                self.assertAlmostEqual(event['raw_length'], event['length'] * sampling_freq)
+
+        self.assertRaises(AssertionError, create_scrappie_event_table, "random_path",
+                          sampling_freq, self.path_to_scrappie)
+        self.assertRaises(AssertionError, create_scrappie_event_table, path,
+                          sampling_freq)
+
+    def test_minknow_vs_scrappie(self):
+        for fast5handle, path in [(self.rna_handle, "test_rna.fast5"), (self.dna_handle, "test_dna.fast5")]:
+            sampling_freq = fast5handle.sample_rate
+            signal = fast5handle.get_read(raw=True, scale=True)
+            start_time = fast5handle.raw_attributes['start_time']
+            s_events, s_time = time_it(create_scrappie_event_table, path, sampling_freq, start_time,
+                                       self.path_to_scrappie)
+            params = get_default_event_detection_params('minknow', rna=False)
+            m_events, m_time = time_it(create_minknow_event_table, signal, sampling_freq, start_time,
+                                       params['window_lengths'],
+                                       params['thresholds'], params['peak_height'])
+            # minknow is at least 25% faster
+            self.assertLess(m_time, s_time * 0.75)
+            mismatches = set(s_events['raw_start']) ^ set(m_events['raw_start'])
+            # there are less than 0.2% difference in event breakpoints
+            self.assertLess(len(mismatches), len(s_events['raw_start'])*0.002)
 
     def test_scrappie_event_detect(self):
-        pass
+        events = scrappie_event_detect("test_dna.fast5", path_to_scrappie=self.path_to_scrappie)
+        # print(events)
+        self.assertAlmostEqual(events[0]["pos"], 0)
+        self.assertAlmostEqual(events[0]["start"], 0)
+        self.assertAlmostEqual(events[0]["stdv"], 45.00887680053711, places=5)
+        self.assertAlmostEqual(events[0]["mean"], 118.47407, places=5)
+        self.assertEqual(3148, len(events))
+        events = scrappie_event_detect("test_rna.fast5", path_to_scrappie=self.path_to_scrappie)
+        self.assertAlmostEqual(events[0]["pos"], 0)
+        self.assertAlmostEqual(events[0]["start"], 0)
+        self.assertAlmostEqual(events[0]["stdv"], 1.3342689275741577, places=5)
+        self.assertAlmostEqual(events[0]["mean"], 95.096466, places=5)
+        self.assertEqual(4936, len(events))
+        self.assertRaises(AssertionError, scrappie_event_detect, "test_rna.fast5")
+
+    def test_get_empty_event_table(self):
+        events = get_empty_event_table(10)
+        self.assertTrue(check_numpy_table(events,
+                                          req_fields=(
+                                          'start', 'length', 'mean', 'stdv', 'model_state', 'move', 'p_model_state')))
+
+    def test_get_default_event_detection_params(self):
+        self.assertEqual(get_default_event_detection_params("speedy"),
+                         dict(min_width=5, max_width=80, min_gain_per_sample=0.008, window_width=800))
+        self.assertEqual(get_default_event_detection_params("minknow"),
+                         dict(window_lengths=(3, 6), thresholds=(1.4, 9.0), peak_height=0.2))
+        self.assertEqual(get_default_event_detection_params("scrappie"), {})
+        self.assertEqual(get_default_event_detection_params("minknow", rna=True),
+                         dict(window_lengths=(7, 14), thresholds=(2.5, 9.0), peak_height=1.0))
+        self.assertIsNone(get_default_event_detection_params("something else"))
 
     @classmethod
     def tearDownClass(cls):

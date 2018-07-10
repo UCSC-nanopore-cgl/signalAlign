@@ -308,6 +308,8 @@ double emissions_signal_getEventMatchProbWithTwoDists(const double *eventModel, 
 
 double emissions_signal_strawManGetKmerEventMatchProbWithDescaling(StateMachine *sM, void *x_i, void *e_j, bool match);
 
+double emissions_signal_strawManGetKmerEventMatchProbWithDescaling_MeanOnly(StateMachine *sM, void *x_i, void *e_j, bool match);
+
 double emissions_signal_strawManGetKmerEventMatchProb(StateMachine *sM, void *x_i, void *e_j, bool match);
 
 void emissions_signal_scaleModel(StateMachine *sM, double scale, double shift, double var,
@@ -347,5 +349,9 @@ StateMachine *getStateMachineEchelon(const char *modelFile);
 StateMachine *getStateMachine5(Hmm *hmmD, StateMachineFunctions *sMfs);
 
 void stateMachine_destruct(StateMachine *sM);
+
+void stateMachine3_loadTransitionsFromFile(StateMachine *sM, stList *transitions);
+
+double emissions_signal_getModelLevelMean(const double *eventModel, int64_t kmerIndex);
 
 #endif /* STATEMACHINE_H_ */

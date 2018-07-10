@@ -4,32 +4,55 @@ include ./include.mk
 libSources = impl/*.c
 libHeaders = inc/*.h
 libTests = tests/*.c
-#scrappie_c = scrappie/*.c
-#scrappie_h = scrappie/*.h
 
 signalAlignDependencies =  ${basicLibsDependencies}
 signalAlignLib = ${basicLibs}
 
 test_directory = ${rootPath}/src/signalalign/tests/
+scrappie_build = ${rootPath}/scrappie/build
 
 htsLib = -L././htslib -lhts
+LIBS= -lsz -lz -lm
+
+HDF5?=install
+# Default to automatically installing hdf5
+ifeq ($(HDF5), install)
+    H5_LIB=./lib/libhdf5.a ./lib/libhdf5_hl.a
+    H5_INCLUDE=-I./include
+    LIBS += -ldl
+else
+    # Use system-wide hdf5
+    H5_LIB=
+    H5_INCLUDE=
+    LIBS += -lhdf5
+endif
+
 
 all : sL bD hs python-utils ${libPath}/signalAlignLib.a ${signalAlignBin}/signalAlignLibTests \
 	  ${signalAlignBin}/compareDistributions \
 	  ${signalAlignBin}/signalMachine ${signalAlignBin}/runSignalAlign \
 	  ${signalAlignBin}/variantCallingLib.py ${signalAlignBin}/alignmentAnalysisLib.py \
 	  ${signalAlignBin}/buildHdpUtil ${signalAlignBin}/trainModels all_tests \
-	  externals nanoporeParams python_setup \
+	  externals nanoporeParams python_setup ${scrappie_build}/scrappie \
 
 python-utils :
 	cd python_utils && python3 setup.py install
 
 
-scrappie :
-	cd scrappie && mkdir build && cd build && cmake .. && make
+${rootPath}/lib/libhdf5.a:
+	if [ ! -e hdf5-1.8.14.tar.gz ]; then wget https://support.hdfgroup.org/ftp/HDF5/releases/hdf5-1.8/hdf5-1.8.14/src/hdf5-1.8.14.tar.gz; fi
+	tar -xzf hdf5-1.8.14.tar.gz || exit 255
+	cd hdf5-1.8.14 && ./configure --enable-threadsafe --prefix=`pwd`/.. && make && make install
 
-debugging : hs ${libPath}/signalAlignLib.a ${signalAlignDependencies}
-	${cxx} ${cflags} -I inc -I${libPath} -I${htsLibRootPath} -o ${signalAlignBin}/debugging debugging.c ${libPath}/signalAlignLib.a ${signalAlignLib} ${htsLib}
+
+${scrappie_build}/scrappie :
+	cd scrappie && \
+    if ! [ -d ${scrappie_build} ]; then \
+        mkdir build; \
+    fi; \
+	cd build && \
+	cmake .. && \
+	make
 
 core : sL bD ${libPath}/signalAlignLib.a ${signalAlignBin}/signalAlignLibTests ${signalAlignBin}/signalMachine
 
@@ -73,13 +96,15 @@ test :
 	done
 #	cd ${binPath} && ./sonLibTests
 	cd python_utils && pytest
+	cd scrappie && make test
+
 # //		exit "$$?"; \
 
 ${signalAlignBin}/compareDistributions : compareDistributions.c ${libPath}/signalAlignLib.a ${signalAlignDependencies}
 	${cxx} ${cflags}  -I inc -I${libPath} -o ${signalAlignBin}/compareDistributions compareDistributions.c ${libPath}/signalAlignLib.a ${signalAlignLib}
 
-${signalAlignBin}/signalAlignLibTests : ${libTests} tests/*.h ${libPath}/signalAlignLib.a ${signalAlignDependencies} .FORCE
-	${cxx} ${cflags}  -I inc -I${libPath} -I${htsLibRootPath} -I${htsLibPath} -Wno-error -o ${signalAlignBin}/signalAlignLibTests ${libTests} ${libPath}/signalAlignLib.a ${signalAlignLib}  ${htsLib}
+${signalAlignBin}/signalAlignLibTests : ${libTests} tests/*.h ${libPath}/signalAlignLib.a ${signalAlignDependencies} ${rootPath}/lib/libhdf5.a .FORCE
+	${cxx} ${cflags}  -I inc -I${libPath} ${H5_INCLUDE} -I${htsLibRootPath} -I${htsLibPath} -Wno-error -o ${signalAlignBin}/signalAlignLibTests ${libTests} ${libPath}/signalAlignLib.a ${signalAlignLib} ${H5_LIB} ${LIBS} ${htsLib}
 
 ${signalAlignBin}/signalMachine : signalMachine.c ${libPath}/signalAlignLib.a ${signalAlignDependencies}
 	${cxx} ${cflags}  -I inc -I${libPath} -I${htsLibRootPath} -I${htsLibPath} -o ${signalAlignBin}/signalMachine signalMachine.c ${libPath}/signalAlignLib.a ${signalAlignLib}  ${htsLib}
@@ -118,8 +143,8 @@ ${signalAlignBin}/variantCallingLib.py : ${rootPath}src/signalalign/scripts/vari
 ${signalAlignBin}/alignmentAnalysisLib.py : ${rootPath}src/signalalign/scripts/alignmentAnalysisLib.py
 	cp ${rootPath}src/signalalign/scripts/alignmentAnalysisLib.py ${signalAlignBin}/alignmentAnalysisLib.py
 
-${libPath}/signalAlignLib.a : ${libSources} ${libHeaders} ${stBarDependencies}
-	${cxx} ${cflags} -I inc -I ${libPath}/ -I ${htsLibRootPath} -I ${htsLibPath}  ${htsLib} -c ${libSources}
+${libPath}/signalAlignLib.a : ${libSources} ${libHeaders} ${stBarDependencies} ${rootPath}/lib/libhdf5.a
+	${cxx} ${cflags} -I inc -I ${libPath}/ ${H5_INCLUDE} -I ${htsLibRootPath} -I ${htsLibPath}  ${htsLib} -c ${libSources} ${H5_LIB} ${LIBS}
 	ar rc signalAlignLib.a *.o
 	ranlib signalAlignLib.a
 	rm *.o
@@ -128,14 +153,6 @@ ${libPath}/signalAlignLib.a : ${libSources} ${libHeaders} ${stBarDependencies}
 
 hs :
 	cd htslib && make
-
-#	echo DIR
-#	cd ${test_directory} && \
-#	for i in 1 2 3; do \
-#		python $$i; \
-#		[[ $$? != 0 ]] && exit -1; \
-#	    echo 'done'; \
-#	done
 
 
 .FORCE:

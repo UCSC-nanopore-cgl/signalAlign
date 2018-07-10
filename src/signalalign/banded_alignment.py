@@ -11,8 +11,13 @@
 import os
 import pandas as pd
 import numpy as np
-from collections import namedtuple
+import importlib
+import subprocess
 
+from collections import namedtuple
+from numpy.ctypeslib import ndpointer
+from ctypes import c_double, c_bool, c_size_t, c_int, Structure, POINTER
+from signalalign.utils.nanonetUtils import get_shared_lib
 from py3helpers.utils import check_numpy_table, TimeStamp, merge_dicts
 from signalalign.fast5 import Fast5
 from signalalign.event_detection import create_minknow_events_from_fast5
@@ -517,6 +522,7 @@ def adaptive_banded_simple_event_align(events, model, nucleotide_seq, debug=Fals
 
 
 def main():
+    pass
     # fast5_path = "/Users/andrewbailey/CLionProjects/nanopolish/ucsc_run5_20170922_directRNA/ucsc_run5_20170922_directRNA_fast5/DEAMERNANOPORE_20170922_FAH26525_MN16450_sequencing_run_MA_821_R94_NA12878_mRNA_09_22_17_67136_read_744_ch_111_strand.fast5"
     # nucleotide_seq = "CCUGAAAGCAAUACCUGAUGGAGGCAGCAACAAAGUGUUCCUGGCCAAGUAACCUCGAGAGCUACUUUGACCGUCUGUCUAUCAGGAUGAGAUCGCUGGUGCAUUGAAGGCCUACGAGAAAAUUUUACUGAGGCCACCCAGAACUUCAACACCAAAAGAUGACAGACUACGCCAAGAGGUGAGUGUCCUGGGCCCAACAACUACGGAUAGUUUUUGCCAGCCAGCAGAAGCCGGACACCAUUCCCACAGAACUGGCCAAACGGGUUCGAGUUAUGCCGGCAGCUGGAGAUGAAACCGAUCGUCUGAGCCCCGGGCACUGGUGGGCGGGCAGGGUCUACAAACAGUUCCGCAAGGUCCAAAGGUGGACGUCCAUCCUAAAGCCAAGC"
     # TODO RNA model files are 3' to 5' but in nanopolish they are 5' to 3'
@@ -553,23 +559,23 @@ def main():
     # f5fh.set_new_event_table(name, events, attributes, overwrite=False)
 
     #DNA
-    model_file = "/Users/andrewbailey/CLionProjects/nanopore-RNN/submodules/signalAlign/models/testModelR9_5mer_acgt_template.model"
-    model_types = ["threeState", "threeStateHdp"]
-    model = HmmModel(model_file)
-
-    fast5_path = "/Users/andrewbailey/CLionProjects/nanopore-RNN/submodules/signalAlign/tests/minion_test_reads/1D/LomanLabz_PC_20161025_FNFAB42699_MN17633_sequencing_run_20161025_E_coli_native_450bps_82361_ch92_read1108_strand.fast5"
-    event_table, f5fh = create_minknow_events_from_fast5(fast5_path)
-
-    fastq = f5fh.get_fastq(analysis="Basecall_1D", section="template")
-    nucleotide_seq = fastq.split('\n')[1]
-
-    name = "AdaptiveBandedAlignment_00{}"
-    events, sum_emission = adaptive_banded_simple_event_align(event_table[:30], model, nucleotide_seq[:25], debug=False)
-    # embed
-    keys = ["log(total_probability)", "time_stamp"]
-    values = [sum_emission, TimeStamp().posix_date()]
-    attributes = dict(zip(keys, values))
-    f5fh.set_new_event_table(name, events, attributes, overwrite=True)
+    # model_file = "/Users/andrewbailey/CLionProjects/nanopore-RNN/submodules/signalAlign/models/testModelR9_5mer_acgt_template.model"
+    # model_types = ["threeState", "threeStateHdp"]
+    # model = HmmModel(model_file)
+    #
+    # fast5_path = "/Users/andrewbailey/CLionProjects/nanopore-RNN/submodules/signalAlign/tests/minion_test_reads/1D/LomanLabz_PC_20161025_FNFAB42699_MN17633_sequencing_run_20161025_E_coli_native_450bps_82361_ch92_read1108_strand.fast5"
+    # event_table, f5fh = create_minknow_events_from_fast5(fast5_path)
+    #
+    # fastq = f5fh.get_fastq(analysis="Basecall_1D", section="template")
+    # nucleotide_seq = fastq.split('\n')[1]
+    #
+    # name = "AdaptiveBandedAlignment_00{}"
+    # events, sum_emission = adaptive_banded_simple_event_align(event_table[:30], model, nucleotide_seq[:25], debug=False)
+    # # embed
+    # keys = ["log(total_probability)", "time_stamp"]
+    # values = [sum_emission, TimeStamp().posix_date()]
+    # attributes = dict(zip(keys, values))
+    # f5fh.set_new_event_table(name, events, attributes, overwrite=True)
 
 
 if __name__ == '__main__':

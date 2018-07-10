@@ -311,7 +311,6 @@ class TrainSignalAlign(object):
     def train_hdp(self):
         """Train hdp.... duh?
         :param outpath: output file path
-        :param number_of_assignments: total number of assignments to collect FOR EACH GROUP
         :param build_alignment: path to alignment file
         :param num_alignments: number of alignments in alignment file
         :param threshold:
@@ -695,7 +694,8 @@ def main():
             print("{config} not found".format(config=args.config))
             exit(1)
         # run training
-        TrainSignalAlign(args.config).expectation_maximization_training()
+        config_args = create_dot_dict(load_json(args.config))
+        TrainSignalAlign(config_args).expectation_maximization_training()
     else:
         print("Error, try: `trainModels run --config path/to/config.json`")
 

@@ -106,6 +106,41 @@ NanoporeReadAdjustmentParameters *nanopore_readAdjustmentParametersConstruct() {
     return params;
 }
 
+
+static NanoporeReadAdjustmentParameters const NanoporeReadAdjustmentParameters_default = {
+        .scale = 1.0,
+        .shift = 0.0,
+        .drift = 0.0,
+        .var = 1.0,
+        .scale_sd = 1.0,
+        .var_sd = 1.0,
+        .shift_sd = 0.0
+};
+
+NanoporeReadAdjustmentParameters set7_NanoporeReadAdjustmentParameters(double _shift, double _scale, double _drift,
+                                                                       double _var, double _scale_sd, double _var_sd,
+                                                                       double _shift_sd){
+    NanoporeReadAdjustmentParameters default_scaling = NanoporeReadAdjustmentParameters_default;
+    // direct
+    default_scaling.shift = _shift;
+    default_scaling.scale = _scale;
+    default_scaling.drift = _drift;
+    default_scaling.var = _var;
+    default_scaling.scale_sd = _scale_sd;
+    default_scaling.var_sd = _var_sd;
+    default_scaling.shift_sd = _shift_sd;
+
+    return default_scaling;
+}
+
+NanoporeReadAdjustmentParameters set4_NanoporeReadAdjustmentParameters(double _shift, double _scale, double _drift, double _var) {
+
+    NanoporeReadAdjustmentParameters set4_scalings = set7_NanoporeReadAdjustmentParameters(_shift, _scale, _drift, _var, 1.0, 1.0, 0.0);
+    return set4_scalings;
+}
+
+
+
 NanoporeRead *nanopore_loadNanoporeReadFromFile(const char *nanoporeReadFile) {
     FILE *fH = fopen(nanoporeReadFile, "r");
     // line 1: all tab-seperated
