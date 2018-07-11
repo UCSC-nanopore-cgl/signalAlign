@@ -12,7 +12,7 @@ test_directory = ${rootPath}/src/signalalign/tests/
 scrappie_build = ${rootPath}/scrappie/build
 
 htsLib = -L././htslib -lhts
-LIBS= -lsz -lz -lm
+LIBS= -lz -lm
 
 HDF5?=install
 # Default to automatically installing hdf5
