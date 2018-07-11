@@ -17,7 +17,7 @@ LIBS= -lsz -lz -lm
 HDF5?=install
 # Default to automatically installing hdf5
 ifeq ($(HDF5), install)
-    H5_LIB=./lib/libhdf5.a ./lib/libhdf5_hl.a
+    H5_LIB=./lib/libhdf5_hl.a ./lib/libhdf5.a
     H5_INCLUDE=-I./include
     LIBS += -ldl
 else
@@ -77,7 +77,7 @@ pip_install : .FORCE
 signalAlignLib : ${libPath}/signalAlignLib.a
 
 sL :
-	cd sonLib && make
+	cd sonLib && CFLAGS="${CFLAGS} -fPIC" make
 
 bD :
 	mkdir -v -p ${rootPath}bin
@@ -144,7 +144,7 @@ ${signalAlignBin}/alignmentAnalysisLib.py : ${rootPath}src/signalalign/scripts/a
 	cp ${rootPath}src/signalalign/scripts/alignmentAnalysisLib.py ${signalAlignBin}/alignmentAnalysisLib.py
 
 ${libPath}/signalAlignLib.a : ${libSources} ${libHeaders} ${stBarDependencies} ${rootPath}/lib/libhdf5.a
-	${cxx} ${cflags} -I inc -I ${libPath}/ ${H5_INCLUDE} -I ${htsLibRootPath} -I ${htsLibPath}  ${htsLib} -c ${libSources} ${H5_LIB} ${LIBS}
+	${cxx} ${cflags} -fPIC -I inc -I ${libPath}/ ${H5_INCLUDE} -I ${htsLibRootPath} -I ${htsLibPath}  ${htsLib} -c ${libSources} ${H5_LIB} ${LIBS}
 	ar rc signalAlignLib.a *.o
 	ranlib signalAlignLib.a
 	rm *.o

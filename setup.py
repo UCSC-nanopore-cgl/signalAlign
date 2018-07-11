@@ -42,11 +42,14 @@ cu_test_a = os.path.join(HOME, "sonLib/lib/cuTest.a")
 
 libraries = ['dl', 'z', 'sz', 'm', 'hts', 'pthread', 'gomp']
 
-extra_objects = [h5_lib_a, signalAlign_a, son_Lib_a, h5_hl_lib_a]
+extra_objects = [h5_hl_lib_a, h5_lib_a, signalAlign_a, son_Lib_a]
 include_dirs = [h5_include, sa_include, sonlib_include, htsLib_include]
 
-c_compile_args = ['-pedantic', '-Wall', '-std=c99', '-mmacosx-version-min=10.11', '-DNDEBUG', '-fstrict-aliasing',
-                  '-undefined', 'dynamic_lookup', '-fopenmp']
+# c_compile_args = ['-pedantic', '-Wall', '-std=c99', '-mmacosx-version-min=10.11', '-DNDEBUG', '-fstrict-aliasing',
+#                   '-undefined', 'dynamic_lookup', '-fopenmp']
+
+c_compile_args = ['-pedantic', '-Wall', '-std=c99', '-DNDEBUG', '-fstrict-aliasing',
+                  '-Udynamic_lookup', '-fopenmp']
 
 extensions.append(Extension('kmeralign',
                             sources=[os.path.join(pkg_path, 'event_align_wrapper.c')],
