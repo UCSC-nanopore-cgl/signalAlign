@@ -40,7 +40,7 @@ h5_hl_lib_a = os.path.join(HOME, "lib/libhdf5_hl.a")
 son_Lib_a = os.path.join(HOME, "sonLib/lib/sonLib.a")
 cu_test_a = os.path.join(HOME, "sonLib/lib/cuTest.a")
 
-libraries = ['dl', 'z', 'sz', 'm', 'hts', 'pthread', 'gomp']
+libraries = ['dl', 'z', 'm', 'pthread', 'gomp']
 
 extra_objects = [h5_hl_lib_a, h5_lib_a, signalAlign_a, son_Lib_a]
 include_dirs = [h5_include, sa_include, sonlib_include, htsLib_include]
