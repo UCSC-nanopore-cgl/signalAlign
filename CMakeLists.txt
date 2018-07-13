@@ -78,9 +78,10 @@ set(SOURCE_FILES
         impl/rnglib.c
         impl/signalMachineUtils.c
         impl/fasta_handler.c
-        impl/banded_alignment.c
+#        impl/banded_alignment.c
         impl/
-        /Users/andrewbailey/CLionProjects/nanopore-RNN/submodules/signalAlign/tests/allTests.c)
+#        /Users/andrewbailey/CLionProjects/nanopore-RNN/submodules/signalAlign/tests/allTests.c
+        )
 
 set(SIGNAL_MACHINE signalMachine.c)
 set(DEBUGGING debugging.c)
@@ -127,13 +128,13 @@ add_dependencies(signalMachine signalAlign)
 
 
 
-add_executable(debugging ${SOURCE_FILES} ${DEBUGGING})
-target_link_libraries(debugging)
-target_link_libraries(debugging -L${CMAKE_CURRENT_SOURCE_DIR}/htslib hts ${CMAKE_CURRENT_SOURCE_DIR}/htslib/libhts.a
-        ${CMAKE_CURRENT_SOURCE_DIR}/sonLib/lib/sonLib.a
-
-        ${CMAKE_CURRENT_SOURCE_DIR}/sonLib/lib/cuTest.a)
-add_dependencies(debugging signalAlign)
+#add_executable(debugging ${SOURCE_FILES} ${DEBUGGING})
+#target_link_libraries(debugging)
+#target_link_libraries(debugging -L${CMAKE_CURRENT_SOURCE_DIR}/htslib hts ${CMAKE_CURRENT_SOURCE_DIR}/htslib/libhts.a
+#        ${CMAKE_CURRENT_SOURCE_DIR}/sonLib/lib/sonLib.a
+#
+#        ${CMAKE_CURRENT_SOURCE_DIR}/sonLib/lib/cuTest.a)
+#add_dependencies(debugging signalAlign)
 
 
 
