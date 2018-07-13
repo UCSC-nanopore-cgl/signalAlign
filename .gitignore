@@ -19,6 +19,8 @@ venv
 /tests/minion_test_reads/RNA_edge_cases/DEAMERNANOPORE_20170922_FAH26525_MN16450_sequencing_run_MA_821_R94_NA12878_mRNA_09_22_17_67136_read_36_ch_218_strand.fast5
 hdf5-1.8.14.tar.gz
 hdf5-1.8.14/
+hdf5-1.10.2.tar.gz
+hdf5-1.10.2/
 include
 lib
 share
