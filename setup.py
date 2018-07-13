@@ -17,6 +17,8 @@ include_dirs = [event_detect, son_Lib]
 
 extensions = []
 
+### nanonet filters ###
+
 extensions.append(Extension(
     'nanonetfilters',
     sources=[os.path.join(pkg_path, 'filters.c')],
@@ -24,10 +26,16 @@ extensions.append(Extension(
     extra_compile_args=c_compile_args
 ))
 
+
+### cparsers ###
+
 extensions.append(
     Extension("signalalign.cparsers", sources=[os.path.join(pkg_path, 'cparsers.c')], include_dirs=[np.get_include()]))
 
-HOME = os.path.dirname(__file__)
+
+### kmer align ###
+
+HOME = os.path.abspath(os.path.dirname(__file__))
 
 sonlib_include = os.path.join(HOME, "sonLib/C/inc")
 sa_include = os.path.join(HOME, "inc")
@@ -40,16 +48,10 @@ h5_hl_lib_a = os.path.join(HOME, "lib/libhdf5_hl.a")
 son_Lib_a = os.path.join(HOME, "sonLib/lib/sonLib.a")
 cu_test_a = os.path.join(HOME, "sonLib/lib/cuTest.a")
 
-libraries = ['dl', 'z', 'm', 'pthread', 'gomp']
-
-extra_objects = [h5_hl_lib_a, h5_lib_a, signalAlign_a, son_Lib_a]
+libraries = ['dl', 'z', 'm', 'pthread', 'gomp', 'hdf5_hl', 'hdf5']
+extra_objects = [h5_lib_a, h5_hl_lib_a, signalAlign_a, son_Lib_a]
 include_dirs = [h5_include, sa_include, sonlib_include, htsLib_include]
-
-# c_compile_args = ['-pedantic', '-Wall', '-std=c99', '-mmacosx-version-min=10.11', '-DNDEBUG', '-fstrict-aliasing',
-#                   '-undefined', 'dynamic_lookup', '-fopenmp']
-
-c_compile_args = ['-pedantic', '-Wall', '-std=c99', '-DNDEBUG', '-fstrict-aliasing',
-                  '-Udynamic_lookup', '-fopenmp']
+c_compile_args = ['-pedantic', '-Wall', '-std=c99', '-DNDEBUG', '-fstrict-aliasing', '-fopenmp']
 
 extensions.append(Extension('kmeralign',
                             sources=[os.path.join(pkg_path, 'event_align_wrapper.c')],
@@ -65,6 +67,7 @@ setup(name="signalAlign",
       author_email="andbaile@ucsc.edu",
       url="https://github.com/UCSC-nanopore-cgl/signalAlign",
       package_dir={"": "src"},
+      # library_dirs=[os.path.join(HOME, "lib")],
       ext_modules=extensions,
       packages=find_packages("src"),
       install_requires=["numpy>=1.9.2",

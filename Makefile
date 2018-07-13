@@ -11,7 +11,7 @@ signalAlignLib = ${basicLibs}
 test_directory = ${rootPath}/src/signalalign/tests/
 scrappie_build = ${rootPath}/scrappie/build
 
-htsLib = -L././htslib -lhts
+htsLib = -L./htslib -lhts
 LIBS= -lz -lm
 
 HDF5?=install
@@ -64,6 +64,8 @@ clean_light:
 
 clean :
 	if [ -d ${signalAlignBin} ]; then rm -r ${signalAlignBin}; fi
+	if [ -d build/ ]; then rm -r build/; fi
+	-rm -r sonLib/lib/*.a
 	rm -f ${libPath}/signalAlignLib.a
 	cd externalTools && make clean
 	cd scrappie && make clean
@@ -138,13 +140,13 @@ ${signalAlignBin}/empire : ${rootPath}src/signalalign/scripts/empire.py
 	chmod +x ${signalAlignBin}/empire
 
 ${signalAlignBin}/variantCallingLib.py : ${rootPath}src/signalalign/scripts/variantCallingLib.py
-	cp ${rootPath}src/signalalign/scripts/variantCallingLib.py ${signalAlignBin}/variantCallingLib.py
+	cp ${rootPath}src/signalalign/scripts/variantCallingLib.py ${signalAlignBin}/variantCallingLib.pyq
 
 ${signalAlignBin}/alignmentAnalysisLib.py : ${rootPath}src/signalalign/scripts/alignmentAnalysisLib.py
 	cp ${rootPath}src/signalalign/scripts/alignmentAnalysisLib.py ${signalAlignBin}/alignmentAnalysisLib.py
 
 ${libPath}/signalAlignLib.a : ${libSources} ${libHeaders} ${stBarDependencies} ${rootPath}/lib/libhdf5.a
-	${cxx} ${cflags} -fPIC -I inc -I ${libPath}/ ${H5_INCLUDE} -I ${htsLibRootPath} -I ${htsLibPath}  ${htsLib} -c ${libSources} ${H5_LIB} ${LIBS}
+	${cxx} ${cflags} -fPIC -Iinc/ -I${libPath}/ ${H5_INCLUDE} -I${htsLibRootPath} -I${htsLibPath}  ${htsLib} -c ${libSources} ${H5_LIB} ${LIBS}
 	ar rc signalAlignLib.a *.o
 	ranlib signalAlignLib.a
 	rm *.o
