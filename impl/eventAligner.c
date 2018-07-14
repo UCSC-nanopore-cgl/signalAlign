@@ -202,7 +202,7 @@ char* fast5_get_fixed_string_attribute(hid_t hdf5_file, char* group_name, char* 
     char* buffer;
     hid_t group, attribute, attribute_type;
     int ret;
-    char* out;
+    char* out = "";
 
     // according to http://hdf-forum.184993.n3.nabble.com/check-if-dataset-exists-td194725.html
     // we should use H5Lexists to check for the existence of a group/dataset using an arbitrary path
@@ -211,7 +211,7 @@ char* fast5_get_fixed_string_attribute(hid_t hdf5_file, char* group_name, char* 
         return "";
     }
 
-    // Open the group /Raw/Reads/Read_nnn
+    // Open thoute group /Raw/Reads/Read_nnn
     group = H5Gopen(hdf5_file, group_name, H5P_DEFAULT);
     if(group < 0) {
     #ifdef DEBUG_FAST5_IO
@@ -251,7 +251,7 @@ char* fast5_get_fixed_string_attribute(hid_t hdf5_file, char* group_name, char* 
     // finally read the attribute
     ret = H5Aread(attribute, attribute_type, buffer);
     if(ret >= 0) {
-        out = buffer;
+        out = stString_copy(buffer);
     }
 
     // clean up
@@ -496,6 +496,8 @@ void* update_SignalMachineWithNanoporeParameters(NanoporeReadAdjustmentParameter
 #define is_offset_valid(offset) (offset) >= 0 && (offset) < bandwidth
 #define event_at_offset(bi, offset) band_lower_left[(bi)].event_idx - (offset)
 #define kmer_at_offset(bi, offset) band_lower_left[(bi)].kmer_idx + (offset)
+#define band_array_access_2d(bi, offset) (bi) * bandwidth + (offset)
+
 
 //#define move_down(curr_band) { (curr_band).event_idx + 1, (curr_band).kmer_idx }
 //#define move_right(curr_band) { (curr_band).event_idx, (curr_band).kmer_idx + 1 }
@@ -540,15 +542,11 @@ stList* adaptive_banded_simple_event_align(event_table et, StateMachine *pore_mo
     StateMachine3 *sM3 = (StateMachine3 *) pore_model;
 
 //    size_t strand_idx = 0;
-    int64_t k = sM3->model.kmerLength;
+    int64_t kmer_length = sM3->model.kmerLength;
 //    char *alphabet = sM3->model.alphabet;
-    size_t n_kmers = (strlen(sequence) - k + 1);
+    size_t n_kmers = (strlen(sequence) - kmer_length + 1);
     size_t n_events = et.n;
 //    int64_t alphabet_size = sM3->model.alphabetSize;
-
-//    const Alphabet* alphabet = pore_model.pmalphabet;
-//    size_t n_events = read.events[strand_idx].size();
-//    size_t n_kmers = sequence.size() - k + 1;
 
     // backtrack markers
     const uint8_t FROM_D = 0;
@@ -587,35 +585,27 @@ stList* adaptive_banded_simple_event_align(event_table et, StateMachine *pore_mo
     char *kmer_list[n_kmers];
 
     for (size_t i = 0; i < n_kmers; ++i) {
-        char *kmer = stString_getSubString(sequence, i, k);
+        char *kmer = stString_getSubString(sequence, i, kmer_length);
         kmer_list[i] = kmer;
 //        kmer_ranks[i] = alphabet->kmer_rank(sequence.substr(i, k).c_str(), k);
     }
 
 //    typedef std::vector<float> bandscore;
 //    typedef std::vector<uint8_t> bandtrace;
-    double bands[n_bands][bandwidth];
-    uint8_t trace[n_bands][bandwidth];
+    //double bands[n_bands][bandwidth];
+    //uint8_t trace[n_bands][bandwidth];
+    double* bands = (double*) malloc(sizeof(double) * n_bands * bandwidth);
+    uint8_t* trace = (uint8_t*) malloc(sizeof(uint8_t) * n_bands * bandwidth);
     for (size_t j = 0; j < n_bands; j++) {
         for (size_t k = 0; k < bandwidth; k++) {
-            trace[j][k] = 0;
-            bands[j][k] = -INFINITY;
+            trace[band_array_access_2d(j,k)] = 0;
+            bands[band_array_access_2d(j,k)] = -INFINITY;
         }
     }
 
-//    std::vector<bandscore> bands(n_bands);
-//    std::vector<bandtrace> trace(n_bands);
-
-//    for(size_t i = 0; i < n_bands; ++i) {
-//        bands[i].resize(bandwidth, -INFINITY);
-//        trace[i].resize(bandwidth, 0);
-//    }
-//
     // Keep track of the event/kmer index for the lower left corner of the band
     // these indices are updated at every iteration to perform the adaptive banding
     // Only the first two bands have their coordinates initialized, the rest are computed adaptively
-//    std::vector<EventKmerPair> band_lower_left(n_bands);
-//
     struct EventKmerPair band_lower_left[n_bands];
 
     // initialize range of first two bands
@@ -627,14 +617,14 @@ stList* adaptive_banded_simple_event_align(event_table et, StateMachine *pore_mo
     int start_cell_offset = band_kmer_to_offset(0, -1);
     assert(is_offset_valid(start_cell_offset));
     assert(band_event_to_offset(0, -1) == start_cell_offset);
-    bands[0][start_cell_offset] = 0.0f;
+    bands[band_array_access_2d(0, start_cell_offset)] = 0.0f;
 
     // band 1: first event is trimmed
     int first_trim_offset = band_event_to_offset(1, 0);
     assert(kmer_at_offset(1, first_trim_offset) == -1);
     assert(is_offset_valid(first_trim_offset));
-    bands[1][first_trim_offset] = lp_trim;
-    trace[1][first_trim_offset] = FROM_U;
+    bands[band_array_access_2d(1, first_trim_offset)] = lp_trim;
+    trace[band_array_access_2d(1, first_trim_offset)] = FROM_U;
 
     int fills = 0;
 #ifdef DEBUG_ADAPTIVE
@@ -646,8 +636,9 @@ stList* adaptive_banded_simple_event_align(event_table et, StateMachine *pore_mo
         // Determine placement of this band according to Suzuki's adaptive algorithm
         // When both ll and ur are out-of-band (ob) we alternate movements
         // otherwise we decide based on scores
-        double ll = bands[band_idx - 1][0];
-        double ur = bands[band_idx - 1][bandwidth - 1];
+
+        double ll = bands[band_array_access_2d(band_idx - 1, 0)];
+        double ur = bands[band_array_access_2d(band_idx - 1, bandwidth - 1)];
         bool ll_ob = ll == -INFINITY;
         bool ur_ob = ur == -INFINITY;
 
@@ -687,10 +678,10 @@ stList* adaptive_banded_simple_event_align(event_table et, StateMachine *pore_mo
         if (is_offset_valid(trim_offset)) {
             int event_idx = event_at_offset(band_idx, trim_offset);
             if (event_idx >= 0 && event_idx < n_events) {
-                bands[band_idx][trim_offset] = (lp_trim * (event_idx + 1));
-                trace[band_idx][trim_offset] = FROM_U;
+                bands[band_array_access_2d(band_idx, trim_offset)] = (lp_trim * (event_idx + 1));
+                trace[band_array_access_2d(band_idx, trim_offset)] = FROM_U;
             } else {
-                bands[band_idx][trim_offset] = -INFINITY;
+                bands[band_array_access_2d(band_idx, trim_offset)] = -INFINITY;
             }
         }
 
@@ -727,13 +718,12 @@ stList* adaptive_banded_simple_event_align(event_table et, StateMachine *pore_mo
                         assert(offset >= 0 && offset < bandwidth);
 #endif
 
-            float up = is_offset_valid(offset_up) ? bands[band_idx - 1][offset_up] : -INFINITY;
-            float left = is_offset_valid(offset_left) ? bands[band_idx - 1][offset_left] : -INFINITY;
-            float diag = is_offset_valid(offset_diag) ? bands[band_idx - 2][offset_diag] : -INFINITY;
+            float up = is_offset_valid(offset_up) ? bands[band_array_access_2d(band_idx - 1, offset_up)] : -INFINITY;
+            float left = is_offset_valid(offset_left) ? bands[band_array_access_2d(band_idx - 1, offset_left)] : -INFINITY;
+            float diag = is_offset_valid(offset_diag) ? bands[band_array_access_2d(band_idx - 2, offset_diag)] : -INFINITY;
 
             double lp_emission = sM3->getMatchProbFcn(pore_model, kmer, y, TRUE);
 
-//            float lp_emission = log_probability_match_r9(read, pore_model, kmer_rank, event_idx, strand_idx);
             float score_d = (float) (diag + lp_step + lp_emission);
             float score_u = (float) (up + lp_stay + lp_emission);
             float score_l = (float) (left + lp_skip);
@@ -751,8 +741,8 @@ stList* adaptive_banded_simple_event_align(event_table et, StateMachine *pore_mo
                         fprintf(stderr, "[adafill] up: %.2lf diag: %.2lf left: %.2lf\n", up, diag, left);
                         fprintf(stderr, "[adafill] bi: %d o: %d e: %d k: %d s: %.2lf f: %d emit: %.2lf\n", band_idx, offset, event_idx, kmer_idx, max_score, from, lp_emission);
 #endif
-            bands[band_idx][offset] = max_score;
-            trace[band_idx][offset] = from;
+            bands[band_array_access_2d(band_idx, offset)] = max_score;
+            trace[band_array_access_2d(band_idx, offset)] = from;
             fills += 1;
         }
     }
@@ -784,12 +774,11 @@ for(int col = 0; col <= 10; ++col) {
     // Find best score between an event and the last k-mer. after trimming the remaining evnets
     for (int event_idx = 0; event_idx < n_events; ++event_idx) {
         int band_idx = event_kmer_to_band(event_idx, curr_kmer_idx);
-//        assert(band_idx < bands.size());
         assert(band_idx < n_bands);
 
         int offset = band_event_to_offset(band_idx, event_idx);
         if (is_offset_valid(offset)) {
-            float s = (float) (bands[band_idx][offset] + (n_events - event_idx) * lp_trim);
+            float s = (float) (bands[band_array_access_2d(band_idx, offset)] + (n_events - event_idx) * lp_trim);
             if (s > max_score) {
                 max_score = s;
                 curr_event_idx = event_idx;
@@ -799,7 +788,6 @@ for(int col = 0; col <= 10; ++col) {
 #ifdef DEBUG_ADAPTIVE
     fprintf(stderr, "[adaback] ei: %d ki: %d s: %.2f\n", curr_event_idx, curr_kmer_idx, max_score);
 #endif
-//    std::vector<AlignedPair> out;
     stList *out = stList_construct3(0, (void (*)(void *)) alignedPair_destruct);
 //    stList_append(AlignedPair_list, alignedPair_construct(1, 2));
 //    stList_append(AlignedPair_list, alignedPair_construct(3, 4));
@@ -830,7 +818,7 @@ for(int col = 0; col <= 10; ++col) {
         int offset = band_event_to_offset(band_idx, curr_event_idx);
         assert(band_kmer_to_offset(band_idx, curr_kmer_idx) == offset);
 
-        uint8_t from = trace[band_idx][offset];
+        uint8_t from = trace[band_array_access_2d(band_idx, offset)];
         if (from == FROM_D) {
             curr_kmer_idx -= 1;
             curr_event_idx -= 1;
@@ -842,15 +830,12 @@ for(int col = 0; col <= 10; ++col) {
             curr_kmer_idx -= 1;
             curr_gap += 1;
             max_gap = new_max(curr_gap, max_gap);
-//            max_gap = std::max(curr_gap, max_gap);
         }
     }
 
-//    std::reverse(out.begin(), out.end());
     stList_reverse(out);
     // QC results
     double avg_log_emission = sum_emission / n_aligned_events;
-//    bool spanned = out.front().ref_pos == 0 && out.back().ref_pos == n_kmers - 1;
     struct AlignedPair *front = (struct AlignedPair *) stList_get(out, 0);
     struct AlignedPair *back = (struct AlignedPair *) stList_get(out, stList_length(out)-1);
 
@@ -869,28 +854,26 @@ for(int col = 0; col <= 10; ++col) {
 
 // embed event table from fast5 path, template model path and nucleotide sequence
 void* load_from_raw(char* fast5_file_path, char* templateModelFile, char* sequence, char* path_to_embed) {
-//    load model
+    // prep
     StateMachine *sM = stateMachine3_loadFromFile(templateModelFile, threeState, emissions_kmer_getGapProb,
                                                   emissions_signal_strawManGetKmerEventMatchProbWithDescaling_MeanOnly,
                                                   stateMachine3_loadTransitionsFromFile, NULL);
-
-
-//    load fast5
     hid_t hdf5_file = fast5_open(fast5_file_path);
-    // Get start time and event detection defaults
     float start_time = fast5_get_start_time(hdf5_file);
     const detector_param *ed_params = &event_detection_defaults;
+
+    // if experiment is RNA, change defaults and nucleotide sequence
     char *experiment_type = fast5_get_experiment_type(hdf5_file);
-    char *RNA = "rna";
-// if experiment is RNA, change defaults and nucleotide sequence
-    if (strcmp(experiment_type, RNA) == 0) {
+    if (strcmp(experiment_type, "rna") == 0) {
         ed_params = &event_detection_rna;
         char *new_sequence = stString_ReverseString(stString_replace(sequence, "U", "T"));
         sequence = new_sequence;
     }
-//    get channel parameters and scale raw ADC counts to get pA raw current
+
+    // get channel parameters and scale raw ADC counts to get pA raw current
     fast5_raw_scaling channel_params = fast5_get_channel_params(hdf5_file);
     raw_table rt = fast5_get_raw_samples(hdf5_file, channel_params);
+
     // trim using scrappie's internal method
     // parameters taken directly from scrappie defaults
     int trim_start = 200;
@@ -898,20 +881,26 @@ void* load_from_raw(char* fast5_file_path, char* templateModelFile, char* sequen
     int varseg_chunk = 100;
     float varseg_thresh = 0.0;
     trim_and_segment_raw(rt, trim_start, trim_end, varseg_chunk, varseg_thresh);
-//  get events
+
+    // get events
     event_table et = detect_events(rt, *ed_params);
     assert(rt.n > 0);
     assert(et.n > 0);
-// estimate scalings via method of moments using scrappie methods
+
+    // estimate scalings via method of moments using scrappie methods
     NanoporeReadAdjustmentParameters scalings_template = estimate_scalings_using_mom(sequence, *sM, et);
-//    update signal machine with new parameters
+    // update signal machine with new parameters
     update_SignalMachineWithNanoporeParameters(scalings_template, sM);
-// banded kmer to event alignment
+
+    // banded kmer to event alignment
     stList *event_alignment = adaptive_banded_simple_event_align(et, sM, sequence);
-// create new event table with our own data structure
+
+    // create new event table with our own data structure
     basecalled_event_table b_et = event_table_to_basecalled_table(&et, channel_params, start_time);
     basecalled_event_table *event_table = alignment_to_base_event_map(event_alignment, &b_et, sequence, sM);
     fast5_set_basecall_event_table(hdf5_file, path_to_embed, event_table);
+
+    // cleanup
     fast5_close(hdf5_file);
     stateMachine_destruct(sM);
     return 0;
@@ -972,9 +961,16 @@ basecalled_event_table* alignment_to_base_event_map(stList *event_alignment, bas
 
 
 int main(int argc, char *argv[]) {
-    char *nucleotide_sequence = "CAUCCUGCCCUGUGUUAUCCAGUUAUGAGAUAAAAAAUGAAUAUAAGAGUGCUUGUCAUUAUAAAAGUUUUCCUUUUUAUUACCAUCCAAGCCACCAGCUGCCAGCCACCAGCAGCCAGCUGCCAGCACUAGCUUUUUUUUUUUAGCACUUAGUAUUUAGCAGCAUUUAUUAACAGGUACUUUAAGAAUGAUGAAGCAUUGUUUUAAUCUCACUGACUAUGAAGGUUUUAGUUUCUGCUUUUGCAAUUGUGUUUGUGAAAUUUGAAUACUUGCAGGCUUUGUAUGUGAAUAAUUUUAGCGGCUGGUUGGAGAUAAUCCUACGGGAAUUACUUAAAACUGUGCUUUAACUAAAAUGAAUGAGCUUUAAAAUCCCUCCUCCUACUCCAUCAUCAUCCCACUAUUCAUCUUAUCUCAUUAUCAUCAACCUAUCCCACAUCCCUAUCACCACAGCAAUCCAA";
-    char *fast5_path = "tests/minion_test_reads/RNA_edge_cases/DEAMERNANOPORE_20170922_FAH26525_MN16450_sequencing_run_MA_821_R94_NA12878_mRNA_09_22_17_67136_read_61_ch_151_strand.fast5";
-    char *model_file = "models/testModelR9p4_5mer_acgt_RNA.model";
+    //RNA
+//    char *nucleotide_sequence = "CAUCCUGCCCUGUGUUAUCCAGUUAUGAGAUAAAAAAUGAAUAUAAGAGUGCUUGUCAUUAUAAAAGUUUUCCUUUUUAUUACCAUCCAAGCCACCAGCUGCCAGCCACCAGCAGCCAGCUGCCAGCACUAGCUUUUUUUUUUUAGCACUUAGUAUUUAGCAGCAUUUAUUAACAGGUACUUUAAGAAUGAUGAAGCAUUGUUUUAAUCUCACUGACUAUGAAGGUUUUAGUUUCUGCUUUUGCAAUUGUGUUUGUGAAAUUUGAAUACUUGCAGGCUUUGUAUGUGAAUAAUUUUAGCGGCUGGUUGGAGAUAAUCCUACGGGAAUUACUUAAAACUGUGCUUUAACUAAAAUGAAUGAGCUUUAAAAUCCCUCCUCCUACUCCAUCAUCAUCCCACUAUUCAUCUUAUCUCAUUAUCAUCAACCUAUCCCACAUCCCUAUCACCACAGCAAUCCAA";
+//    char *fast5_path = "tests/minion_test_reads/RNA_edge_cases/DEAMERNANOPORE_20170922_FAH26525_MN16450_sequencing_run_MA_821_R94_NA12878_mRNA_09_22_17_67136_read_61_ch_151_strand.fast5";
+//    char *model_file = "models/testModelR9p4_5mer_acgt_RNA.model";
+//    char *path_in_fast5 = "Analyses/Events";
+
+    //DNA
+    char *nucleotide_sequence = "TGCATGCCGTTTCCGTTACGTATTGCTAATCACGGGTGACGCCGTTTTCGCGCATTGAGCGAATCAGCAAAACCATCGCTAAACCACGGCTAACCCGGCGATGTGTGCTCCGTTCTCATCGACATCCCAAACCGTCAAACCATCCGGCGACAATCAGATCAGCGCAAAGATAATTAACCCACGTTGCAGGTAAATGCCACTTTGCGGATCGCGTTCGCCGTAGCCAGACGTAGCCCATCAGCACGCCACCACGCCAAGCCCGCCAAACCGGCCGCTGAATTTTGCTGCACATAGCCGCTTAACAGGGCGCTGATGGCGTAATGACGAGGTGGCTTACCGCTACCGAGGCGTTTTCCACCGCACCGCCGAGATACCACCACCAAGAGCAGGTTAAAGGGATCAGCGAAATTGCATTAACGCGTGGGTGGTAACGCCAGAACTCAAATTTCGTGTTGGATCCGAATGGCGGGGCCAGCCATAACGTCACTTCCTGATCGCCGGGGTACATGGCAATAAACACCACCACGCAGGCGATCATCATCACCCGGTTACCGGACCTGCGCGTTCACACCAAGGCGGCAAAGGATAACGGCGATAATGCAGGCCCTGCCGACCATGGCCTGCCTGCCAGCTCGCCGCCAGATAACACGCGCGGATCTGCCGGTTTCGAAAACGCGCCAGCTCCGCCCGTACGCTATCGGCACAGGACTCATCCGCCAGCCAGACATCGCTTTGGTTATGTTGTTGGTCGTGGGGATAATACCCTGCGTCGCCATGTAATCAACAAACGCCTGCGCCACGCGGGGATTGTAAAAGTGTCATCAGCATCGTTGCTGTCATATTCCACAAGGGACAGTATAAAGCGTTACGCGCCGTACGCCACCTCTGCGGAAACTGACGTTGCCGGGCTTCAAGCCGCCGTCAATGCTATGAACCACATCGTAGCCCTGTTGCAGCAGATGCTGCGCCGCGCCTTTGCTGCTGTGCCGTGATAACACATCACCATCACCGGGTGTCAAAGTCGTTATCACGCATAAAAGCGCCCAGCGTGTCGTTGGTTAAATGGAAAGCCTGCACCACTGTCCATTGCGAAACTCTGTGGATCCGCCTTGAATATCAGAGCCAGCACCGCCTCTTTCCTGCAACTTCTGGTGCGCGTCGGCAGCGTTAATGCATTGAACTGATCCATGCGTCTCTCTTTCTTTGACAAGTGGGCAGAATTACCGCACAGTTTACGTCGAAGCGGCAGATAAACGCCATAATGTTGCCATATCATAAAATGTTTTCAATGTTACCCCGCGATTCTTTGCTAATATGTTCGATAACGAACATTTATGAGCTTTAACGAAAGTGAATGAGGGCGGCATGACCAAAGATCTGATTGTGATGGGGGCGGCATCAATGGTGCTGGTATCGCGGCAGACGCCGCTGGACGCGGACCTCCGTGCTGATGCTGGGCGCAGGATCTCGCTTGCGGCCTCTTCCGCCAGTTCAAACTCATTCGGTGGCCTGCATACCTTGAGCACTATAATTCCGCTTTGGTCAGCGAGGCGCTGAACGTGAAGTGCTGCTGAAAATGGCCCCGCATATCGCGCCTTCCCGATGCGTTTCGCCTGCCATCGTCCGCATCTGCGCCCGGCGTGGATGATTCGCATTGGTCTGTTTATGTACGATCATCTGGGTAAACGCACCAGCTTGCCGGGATCAACTGGTTTGCGTTTTGGCGCAAATTCAGTGTTGAAATTAGCGCGGATTCCAGATATTCTGACTGTTGGTGGGCGACGCCCGTCTGGTACTCGCCAACGCCCAGATGGTGTGGTGCGTAAAGGCGGCGAAGTGCTACTCGGACTCGCGCCACCTCTGCTCGCCGCGAAACGGCCTGTGGATTGTGGAAGCGGAAGATCGATACCGGCAAAAATATAGCTGGCAAGCGCGCGGCAGTTAACGCGCCACCGGCCCGTGGGGTGAAACAGTTCTTCGACGACGGGATGCATCTGCCTTCGCCTTATGGCATTCGCCTGATCAAGGCAGCCATATTGTGGTGCCGCGCGTGCATGCAAGCAAGCCTACATTCTGCAAAACGAGATAAACGTATTGTGTTCGTGATCCCGTGGATGGACGAGTTTTCCATCATCGGCACTACCGATGTCGAGTACAAAGGCGAATCGAAAGCGGTGAAGATTGAAGAGTGAAATCAATTACCTGCTGAATAACACGCACTTTAAAAAGCCAGTTAAGCCATTGACGATATCGTCTGGACCTACTCCGGTGTGCGTCCGCTGTGTGATGATAGGTCGACTCGCCGCAGGCTATTACCCGTGATTACACCCTTGATATTCGCGGTGAAATGGCAAGCACCGCTGCTGTCGGTATTCGGCGGTAAGCTGACCACCTACCGAAAACTGGCGGAACATGCGCTGGAAAACTAACGCCGTATTATCAGGGTATTGGCCCGGCATGGACGAAAGAGAGTGTGCTACCGGGTGGCGCCATTGAAGCGACCGCGACGTTAATACCGCTCGCCTGCGCCGCCGCTATCCGTTCCTGACTGAATCGCTGGCGCGTCGTACGCTCGCACTTACGGCAGCAACAGCGAGCTGCTGCTCGGCAATGCAGGAACGGTAAGCGATCTCAGGGAAGATTTCGGTCATGGGTTCTACAAGCGGAGCTGAAATACGGTGGATGGGTCCACCGCCGACGACGCCCTGTAGTCGCACAAGTAAGGCATGTGGCTAAATGCGGATCAACAATCTCGTGTGAGTCGGTGGCTGGTGGAGTATACGCAGCAGGTTATCATGGCGTCGTAAATTAACGTAAGGTGATCGGTCAGATTTCGACTGGCCTGAGACTGATGACAAACCTACAAAACTGCCTGATGCGCTTCGCTTATCAGGCCTACGTAGTTTATGCAATATATTGAATTTGCATGGTCTTGTAGGCCAGATAAGACGTTCACGTCGCATCCGGCATGAACTCAGCACTTTGTCAAAAATCTAACCTACTTTTAATTCAGGGAATTACCGCAAAGCCCACATACCATCATGCAACGTAACAAAACTCAGGCACGTTCCCCTCGCCCCGAGAAAATAGCATTAATGCGCCCAGCGCCAGCATAAAAATTTTGAGCGGTGGTGTTGGCGTGATAATACAAACTAATAATACCGGCAAGTCCGACACCCAGCATGTAACCACCGCCAAAATTGCGCCAGTATGGGGATGCCGAAAAGTCATTACAACGAGGTCAAAATCCATTTCTGTTTTGCATTATTCTTCCATTCTTTTGAATGGTGAAGTGCTCCCGTGTTATACTTATGGACACTTTTCGAAATGATGGCGGAAAAACGGGACCGCTGGCCCCGTTCTGGCTGACCGGTGAACTTACAATCTCACCGGATCGATATGCCAGATATGATCGGCGTACTCTTTGATGGTACGGTCAGAAGAAGTAGCCCATATTGGCAATGTTCAACATCGCTTTGCGGTCCCACTCTTCCTGAAGCTCGTAGGGACATCGACTTTATCTGACAATCGACATAGCTGCGATAATCCATGAGTACGTATTGATCGCCGCCAGTTGATCAGCAGTCAACAGGTCGCGATAGCGACCGGATCTTCCGGACCCACCGCTGCCGATTTGCGTCGGCACCTGGTGCAGCTCCTCATCTTTCTCGTAGTATTCACGCGGTTGTAGCCCTGACGACGCGCAGTTCTTCCACTTCCGCTGTGTTACCAAAATAAGATATTGTCAGCGCCGACATGATCAGCATCTCGTATTCACCTCAACGCGATAGTCAGCGCACCGTTAAGCGCAAACTTCACGTATTACTGGTGCCGGAAGCTGCGTCCCTGCCAGCGAAATCTGTTCGAACAGATCTGCCGCCGGAATGATCAGCTGCGCCGGTTCTTGTAGTTCAGGATGAACACGACTTTCAACATCGCCAATCTGCGGATCGTTGTTGATCACTTTCGCTACGTCATTGATCAAATGAATAATGTGCTTCGCCATGTAATAGGCCGAAACCGCCTTACCGCCAAAATATTCACGCGCGGCCCACTTCGCATCGGTCGGCCTTGATGCGGTTGCGTAATCACATGCAACACATTCATCAATTGACGTTTGTATTCGTGAATACGTTTGGTTGTACATCGAACAACGCCTTTGGATTCACCACCACATTCAGCTGCTGGGCGATATACTCTGCCAGACGCTTTTGTTCTCCAGCCATGATGCACAGCGTGATTAACCATTGGGAAATCACAGTGTTGTTTTTGCAACTCATTAAGCAGGCTAAGGTCGGTGCCAGTTGCGGCCAGGTGTTCGTCCAGCACGGCTGAAGCGATGGGTTCGCTACCGCCAGCCAGCGACGCGGCGTACACCGTTGGTGACGTTGGTGAAACTGACCGGGAAGATTTCGCAAAGTCGGCAAACAACGTTGCACCATCAGTTAGAGTGCAGTTCCGATACACCGTTAACTGTGGCTCACAACAACCGCCAGCCGGGCCATACGCACGACGACCGTTGGATTCATCAATGATCGACGCCCGTCCCAGCGCAGATCGGTATCGTTCAGTTCTACTGTTCCTGCAAGTTTCAGAAATAGTCGTTGATTTCAAGATGATCTGCAGGTGACGCGGCAAATTTTACCAGCATATCAACCGGCGGGTTTCCAGCGCCTCGCTCATCAGCGTGGTTAGTGTAGGAAGACCTGACAACACACCTCAAACGCGTCGTCCAGCTAAATTGGTGCTCATCGATCAGCAGACGCATCCTCTCAGGAATCGACAATTGCGGATGGGTATCATTGAGATGATCGCGATTTTATCCGCCAGGTTATCGTAGGTTTTATGCAACTGATAATGGCGGCAAATGTCCCTGAATGGTCGAAACCGGGAAGTATTCTGACGCAGGCACAGCTCACGCCAGGTAAATTGAGTCATCCGGATACAACCGCGAGATACGTTCTCGAGTGGTTTTATCTTCTTCCACTGCCGCGAAGTAGTCACCTGGTTGAATTACCGAGTTAATTTCGCTAAACGCGCACTCCACAAACGCAGCGTGTTGGTCGCACGTCGGTGTCGTAACCGAGGATTATCGTAAGCGACTCCCAGAATCTCTTCGGTTTTCAATCCAGCGCGTTTTACCTTCCTGCTGAATGCACGTACGCCAAAACGGACTTTATATGGCGCGTGTTGTGGCGTTTGAATTCCACAGGTTACCGTATTCCAGCCAGTAGTCTGGCGACTCTTTCTGGCTACCGTTAACGATGTTCTGCTTGAACATACCCATGGTCATAGCGGATGCCGTAACCACGCCCAGCAGCCCTAACGTCGCCAGAATCAAAGGAAGCAAGCCGCCAGACGTCCCAGGCACCGTGCGAGGCACGGATCGACACCTTCATCAATCAGCTCTTCAGTTAACCCATCGCTTCCAGTGCGCCCTGTACATCTTCGTAAATTCTAGCGACAACATGGCGTTGGAGGCTTGTTAATCAAAACTCCATCGACTGGTATTAAACCTGATGAGTTTCTTACGACAACTGGGCACGGTTTGAACGTAACCAGCGCTCCGGACGATCGCGCACAGCAAATAACGTTGCGTTGTGATCATGTTGTGGCGACGACCGGGTTCCTTTCAATCGTAAACATCAGCTTGTAAGCGATAGAGTGTAGGCTTCTACGCGCTAAGCGTGGGCGATAGATATGTAAACGGAGCGATATATAAACCACAAACTAACACAAGCGATAGTAGCTCACGGTACGACTTCGCCGCGACCTGCCAGCTAAAATCCATTGCCATAGCCTGACGTTTGCACAAACCGCCACAGTGAAGGACGGGACCACAGTACAAAAGCACGTCCGAATAGCCCGTAACAGCGACCGGGCATTACTATCTTCAAGACAAAGCCACAGCGACGCCATCTGCAAGGTTCTCGAGAACGATCCAGAAACCGTGTCATAAACCCACCGGTGCACATAACGGCAACGTACCATGCTTCAATCCATAAAGTTGCGTTAAGCCGCACGGTTCAAGCGGCTGGGCACCAGGGCCAGCGTCCGCGCCGCCCTTAATGCGATGCGAAAATGCTTCGTGACCATCAGGCGCCCACCCTGACCGGGGTATTCCGCTGCCGCCGCAAAACCTTCCTGCAACGCACCGGATCGCCCGCGCCGAGGTAGCATAACGCCCTGCTCCAGAAGACCCGGTAGGCTTCCAGCACCGGGTCAGACGCTCTGGCTGGTCGGGCGGCTCACCACCGCAAAAGCGGCACTTTATCGTCAACGCCGCCCCATTGCGATTTGTAACTGGCGCTTATTTTCCGCTTTATCTTCAACGTATCGCGGGTGTATGAGGCCAACAGTAAGTCGATCTCTGGGCTCCGTTTTCTCCCACGCCGTTCAGTACGCCGGAAGACGCCCTTCACGGTGACAGCACGTAGACCTTCGCGCCACCGTGAGCAAACTGCGGTCGGTGATCTCGCGAGCGTGGTTGGACGACCGCCGTAATGCTTGATCGGCATGGTACAGACCGGCCTTCAGAAACT";
+    char *fast5_path = "tests/minion_test_reads/1D/LomanLabz_PC_20161025_FNFAB42699_MN17633_sequencing_run_20161025_E_coli_native_450bps_82361_ch112_read108_strand.fast5";
+    char *model_file = "models/testModelR9p4_5mer_acegt_template.model";
     char *path_in_fast5 = "Analyses/Events";
 
     load_from_raw(fast5_path, model_file, nucleotide_sequence, path_in_fast5);
