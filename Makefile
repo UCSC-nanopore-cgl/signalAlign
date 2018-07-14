@@ -94,17 +94,18 @@ externals :
 test_files := $(shell find $(test_directory) -name '*.py')
 
 test :
+	export FAIL=0 ; \
 	for i in ${test_files}; do \
 		python $$i; \
 		if [ $$? -ne 0 ]; then\
-		exit -1;\
+			echo "\nTEST FAIL $$i\n";\
+			export FAIL=1;\
 		fi;\
-	done
-#	cd ${binPath} && ./sonLibTests
+	done; \
+	if [ $$FAIL -ne 0 ]; then exit -1; fi;
 	cd python_utils && pytest
 	cd scrappie && make test
 
-# //		exit "$$?"; \
 
 ${signalAlignBin}/compareDistributions : compareDistributions.c ${libPath}/signalAlignLib.a ${signalAlignDependencies}
 	${cxx} ${cflags}  -I inc -I${libPath} -o ${signalAlignBin}/compareDistributions compareDistributions.c ${libPath}/signalAlignLib.a ${signalAlignLib}
