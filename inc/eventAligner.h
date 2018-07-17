@@ -73,6 +73,9 @@ void* fast5_set_event_table(hid_t hdf5_file, char* table_name, event_table *et);
 // set basecalled events table
 herr_t fast5_set_basecall_event_table(hid_t hdf5_file, char* table_location, basecalled_event_table *et);
 
+// get basecalled events table
+herr_t fast5_get_basecall_events(hid_t hdf5_file, char* table_location, basecalled_event *dst_buf);
+
 //get start time of a read
 float fast5_get_start_time(hid_t hdf5_file);
 

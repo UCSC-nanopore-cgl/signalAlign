@@ -279,20 +279,6 @@ herr_t fast5_set_basecall_event_table(hid_t hdf5_file, char* table_location, bas
     }
     assert(k != 0);
     assert(n_events != 0);
-
-    /* First structure and dataset*/
-//    typedef struct {
-//        float start;
-//        float length;
-//        float mean;
-//        float stdv;
-//        char model_state[k+1];
-//        int move;
-//        uint64_t raw_start;
-//        uint64_t raw_length;
-//        double p_model_state;
-//    } _basecalled_event;
-
     basecalled_event dst_buf[n_events];
     hid_t      bce_tid;
     hid_t      dataset, space; /* Handles */
@@ -336,12 +322,40 @@ herr_t fast5_set_basecall_event_table(hid_t hdf5_file, char* table_location, bas
     /* Create and write the dataset. */
     space = H5Screate_simple(1, dim, NULL);
     dataset = H5Dcreate2(hdf5_file, table_location, bce_tid, space, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-    status = H5Dwrite(dataset, bce_tid, H5S_ALL, H5S_ALL, H5P_DEFAULT, dst_buf);\
+    status = H5Dwrite(dataset, bce_tid, H5S_ALL, H5S_ALL, H5P_DEFAULT, dst_buf);
 
     /* Release resources */
     H5Tclose(string_type);
     H5Tclose(bce_tid);
     H5Sclose(space);
+    H5Dclose(dataset);
+
+    return status;
+}
+
+herr_t fast5_get_basecall_events(hid_t hdf5_file, char* table_location, basecalled_event *dst_buf) {
+    hid_t      bce_tid;
+    hid_t      dataset;
+    herr_t     status;
+
+    dataset = H5Dopen2(hdf5_file, table_location, H5P_DEFAULT);
+
+    hid_t string_type = H5Tcopy( H5T_C_S1 );
+    H5Tset_size( string_type, 6 ); //supports size of five or six.. I think?
+    bce_tid = H5Tcreate (H5T_COMPOUND, sizeof(basecalled_event));
+    H5Tinsert(bce_tid, "start", HOFFSET(basecalled_event, start), H5T_NATIVE_FLOAT);
+    H5Tinsert(bce_tid, "length", HOFFSET(basecalled_event, length), H5T_NATIVE_FLOAT);
+    H5Tinsert(bce_tid, "mean", HOFFSET(basecalled_event, mean), H5T_NATIVE_FLOAT);
+    H5Tinsert(bce_tid, "stdv", HOFFSET(basecalled_event, stdv), H5T_NATIVE_FLOAT);
+    H5Tinsert(bce_tid, "raw_start", HOFFSET(basecalled_event, raw_start), H5T_NATIVE_UINT64);
+    H5Tinsert(bce_tid, "raw_length", HOFFSET(basecalled_event, raw_length), H5T_NATIVE_UINT64);
+    H5Tinsert(bce_tid, "model_state", HOFFSET(basecalled_event, model_state), string_type);
+    H5Tinsert(bce_tid, "move", HOFFSET(basecalled_event, move), H5T_NATIVE_INT);
+    H5Tinsert(bce_tid, "p_model_state", HOFFSET(basecalled_event, p_model_state), H5T_NATIVE_DOUBLE);
+
+    status = H5Dread(dataset, bce_tid, H5S_ALL, H5S_ALL, H5P_DEFAULT, dst_buf);
+
+    H5Tclose(bce_tid);
     H5Dclose(dataset);
 
     return status;

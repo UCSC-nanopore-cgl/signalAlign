@@ -18,7 +18,7 @@
 #include "stateMachine.h"
 
 //#define HOME "/Users/andrewbailey/CLionProjects/nanopore-RNN/submodules/signalAlign/"
-#define HOME "./"
+#define HOME "../" //this is based on where travis runs tests from
 
 static void test_fast5_get_raw_read_name(CuTest *testCase) {
     char* path = stString_concat(HOME, "tests/minion_test_reads/RNA_edge_cases/DEAMERNANOPORE_20170922_FAH26525_MN16450_sequencing_run_MA_821_R94_NA12878_mRNA_09_22_17_67136_read_61_ch_151_strand.fast5");
@@ -202,12 +202,6 @@ static void test_event_table_to_basecalled_table(CuTest *testCase){
     CuAssertDblEquals(testCase, 77.195221, b_et.event[1].start, 0.0001);
     CuAssertDblEquals(testCase, 0.004980, b_et.event[1].length, 0.0001);
     CuAssertDblEquals(testCase, 0.0, b_et.event[1].p_model_state, 0.0001);
-//    fprintf(stdout, "%" PRId64 "\n", b_et.event[1].raw_start);
-//    fprintf(stdout, "%" PRId64 "\n", b_et.event[1].raw_length);
-//    fprintf(stdout, "%f\n" , b_et.event[1].mean);
-//    fprintf(stdout, "%f\n" , b_et.event[1].stdv);
-//    fprintf(stdout, "%f\n" , b_et.event[1].start);
-//    fprintf(stdout, "%f\n" , b_et.event[1].length);
 
 }
 
@@ -251,21 +245,27 @@ static void test_fast5_set_basecall_event_table(CuTest *testCase){
     //open and read
     fast5_handle = fast5_open(path);
     basecalled_event dst_buf[2];
-    //TODO
-    //H5TBread_table( fast5_handle, "Analyses/SignalAlign_Basecall_1D_000/Events", dst_size, dst_offset, dst_sizes, dst_buf );
+    status = fast5_get_basecall_events(fast5_handle, "Analyses/UnitTest_Events", dst_buf);
+    CuAssertIntEquals(testCase, 0, (int) status);
 
     CuAssertIntEquals(testCase, 0, (int) dst_buf[0].raw_start);
-    CuAssertDblEquals(testCase, 7.000000, dst_buf[0].raw_length, 0.001);
-    CuAssertDblEquals(testCase, 92.086693, dst_buf[0].mean, 0.001);
-    CuAssertDblEquals(testCase, 3.655048, dst_buf[0].stdv, 0.001);
-    CuAssertStrEquals(testCase, "AACCT", dst_buf[0].model_state);
+    CuAssertIntEquals(testCase, 1, (int) dst_buf[0].raw_length);
+    CuAssertDblEquals(testCase, 100.0, dst_buf[0].mean, 0.00001);
+    CuAssertDblEquals(testCase, 10.0, dst_buf[0].stdv, 0.00001);
+    CuAssertDblEquals(testCase, 0.1, dst_buf[0].start, 0.00001);
+    CuAssertDblEquals(testCase, 0.1, dst_buf[0].length, 0.00001);
+    CuAssertDblEquals(testCase, 0.99, dst_buf[0].p_model_state, 0.00001);
+    CuAssertStrEquals(testCase, "GATTA", dst_buf[0].model_state);
     CuAssertIntEquals(testCase, 0, dst_buf[0].move);
 
-    CuAssertIntEquals(testCase, 7, (int) dst_buf[1].raw_start);
-    CuAssertDblEquals(testCase, 15.000000, dst_buf[1].raw_length, 0.001);
-    CuAssertDblEquals(testCase, 87.082771, dst_buf[1].mean, 0.001);
-    CuAssertDblEquals(testCase, 1.637721, dst_buf[1].stdv, 0.001);
-    CuAssertStrEquals(testCase, "ACCTA", dst_buf[1].model_state);
+    CuAssertIntEquals(testCase, 1, (int) dst_buf[1].raw_start);
+    CuAssertIntEquals(testCase, 2, (int) dst_buf[1].raw_length);
+    CuAssertDblEquals(testCase, 200.0, dst_buf[1].mean, 0.00001);
+    CuAssertDblEquals(testCase, 20.0, dst_buf[1].stdv, 0.00001);
+    CuAssertDblEquals(testCase, 0.2, dst_buf[1].start, 0.00001);
+    CuAssertDblEquals(testCase, 0.2, dst_buf[1].length, 0.00001);
+    CuAssertDblEquals(testCase, 0.5, dst_buf[1].p_model_state, 0.00001);
+    CuAssertStrEquals(testCase, "TTACA", dst_buf[1].model_state);
     CuAssertIntEquals(testCase, 1, dst_buf[1].move);
 
     H5Ldelete( fast5_handle, "Analyses/UnitTest_Events", H5P_DEFAULT );
@@ -554,6 +554,9 @@ static void test_load_from_raw_dna(CuTest *testCase){
 
 
 CuSuite *eventAlignerTestSuite(void) {
+    st_system("pwd");
+    printf("\ntest suite location\n");
+
     CuSuite *suite = CuSuiteNew();
 
     SUITE_ADD_TEST(suite, test_fast5_get_raw_read_name);
