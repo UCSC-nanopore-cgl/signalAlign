@@ -44,12 +44,11 @@ htsLib_include = os.path.join(HOME, "htslib/htslib")
 
 signalAlign_a = os.path.join(HOME, "sonLib/lib/signalAlignLib.a")
 h5_lib_a = os.path.join(HOME, "lib/libhdf5.a")
-h5_hl_lib_a = os.path.join(HOME, "lib/libhdf5_hl.a")
 son_Lib_a = os.path.join(HOME, "sonLib/lib/sonLib.a")
 cu_test_a = os.path.join(HOME, "sonLib/lib/cuTest.a")
 
-libraries = ['dl', 'z', 'm', 'pthread', 'gomp', 'hdf5_hl', 'hdf5']
-extra_objects = [h5_lib_a, h5_hl_lib_a, signalAlign_a, son_Lib_a]
+libraries = ['dl', 'z', 'm', 'pthread', 'gomp', 'hdf5']
+extra_objects = [h5_lib_a, signalAlign_a, son_Lib_a]
 include_dirs = [h5_include, sa_include, sonlib_include, htsLib_include]
 c_compile_args = ['-pedantic', '-Wall', '-std=c99', '-DNDEBUG', '-fstrict-aliasing', '-fopenmp']
 

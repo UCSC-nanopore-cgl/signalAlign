@@ -6,7 +6,6 @@
 #define NANOPORE_RNN_EVENTAILIGNER_H
 
 #include <stdlib.h>
-#include "eventAligner.h"
 #include <hdf5.h>
 #include "event_detection.h"
 #include "stateMachine.h"
@@ -72,7 +71,7 @@ fast5_raw_scaling fast5_get_channel_params(hid_t hdf5_file);
 void* fast5_set_event_table(hid_t hdf5_file, char* table_name, event_table *et);
 
 // set basecalled events table
-void* fast5_set_basecall_event_table(hid_t hdf5_file, char* table_name, basecalled_event_table *et);
+herr_t fast5_set_basecall_event_table(hid_t hdf5_file, char* table_location, basecalled_event_table *et);
 
 //get start time of a read
 float fast5_get_start_time(hid_t hdf5_file);
@@ -99,7 +98,7 @@ basecalled_event_table event_table_to_basecalled_table(event_table *et, fast5_ra
 basecalled_event_table* alignment_to_base_event_map(stList *event_alignment, basecalled_event_table* b_et,
                                                     char *sequence, StateMachine *pore_model);
 
-void* load_from_raw(char* fast5_file_path, char* templateModelFile, char* sequence, char* path_to_embed);
+herr_t load_from_raw(char* fast5_file_path, char* templateModelFile, char* sequence, char* path_to_embed);
 
 
 // struct from nanopolish

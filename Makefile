@@ -17,7 +17,7 @@ LIBS= -lz -lm
 HDF5?=install
 # Default to automatically installing hdf5
 ifeq ($(HDF5), install)
-    H5_LIB=./lib/libhdf5_hl.a ./lib/libhdf5.a
+    H5_LIB=./lib/libhdf5.a
     H5_INCLUDE=-I./include
     LIBS += -ldl
 else
@@ -42,11 +42,7 @@ python-utils :
 ${rootPath}/lib/libhdf5.a:
 	if [ ! -e hdf5-1.10.2.tar.gz ]; then wget https://support.hdfgroup.org/ftp/HDF5/releases/hdf5-1.10/hdf5-1.10.2/src/hdf5-1.10.2.tar.gz; fi
 	tar -xzf hdf5-1.10.2.tar.gz || exit 255
-	# in 1.10.2, --enable-threadsafe is incompatible with building the high-level library.  I think we probably don't
-	# need the HL library, so I think it's better to get rid of anything HL, but that is still a
-	# TODO
-	#cd hdf5-1.10.2 && ./configure --enable-threadsafe --prefix=`pwd`/.. && make && make install
-	cd hdf5-1.10.2 && ./configure --prefix=`pwd`/.. && make && make install
+	cd hdf5-1.10.2 && ./configure --enable-threadsafe --disable-hl --prefix=`pwd`/.. && make && make install
 
 
 ${scrappie_build}/scrappie :
