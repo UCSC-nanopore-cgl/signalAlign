@@ -24,9 +24,9 @@ hid_t fast5_open(char* filename)
     }
 
 
-void* fast5_close(hid_t hdf5_file)
+herr_t fast5_close(hid_t hdf5_file)
 {
-    H5Fclose(hdf5_file);
+    return H5Fclose(hdf5_file);
 }
 
 
@@ -875,9 +875,9 @@ herr_t load_from_raw(char* fast5_file_path, char* templateModelFile, char* seque
     // cleanup
     free(b_et->event);
     free(b_et);
-    fast5_close(hdf5_file);
+    herr_t close_success = fast5_close(hdf5_file);
     stateMachine_destruct(sM);
-    return write_success;
+    return write_success | close_success;
 }
 
 void alignment_to_base_event_map(stList *event_alignment, basecalled_event_table* b_et,

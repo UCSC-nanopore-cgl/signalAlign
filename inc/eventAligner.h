@@ -49,7 +49,7 @@ typedef struct {
 
 
 // close the file
-void* fast5_close(hid_t hdf5_file);
+herr_t fast5_close(hid_t hdf5_file);
 
 // get the raw samples from this file
 raw_table fast5_get_raw_samples(hid_t hdf5_file, fast5_raw_scaling scaling);

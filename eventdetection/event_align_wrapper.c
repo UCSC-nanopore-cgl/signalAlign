@@ -23,9 +23,9 @@ static PyObject *wrap_load_from_raw(PyObject *self, PyObject *args, PyObject *ke
                                      &fast5_path, &template_model_file, &nuc_sequence, &path_in_fast5))
         return NULL;
 
-    load_from_raw(fast5_path, template_model_file, nuc_sequence, path_in_fast5);
+    int status = load_from_raw(fast5_path, template_model_file, nuc_sequence, path_in_fast5);
 
-    return Py_BuildValue("i", 0);
+    return Py_BuildValue("i", status);
 }
 
 

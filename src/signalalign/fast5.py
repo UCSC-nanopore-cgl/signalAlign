@@ -351,6 +351,19 @@ class Fast5(h5py.File):
         return np.asarray(events), corr_start_rel_to_raw
 
     #todo fix path creation
+    def get_custom_analysis_events(self, name):
+        """Get events stored in a custom path"""
+        path = None
+        try:
+            path = self.get_analysis_events_path_latest(name)
+            events = np.asarray(self[path])
+        except KeyError:
+            raise KeyError('File does not contain events at: {}'.format(path))
+        except IndexError:
+            raise IndexError('File does not contain analysis with name: {}'.format(name))
+        return events
+
+    #todo fix path creation
     def get_signalalign_events(self, mea=False, sam=False):
         """Get signal align events, sam or mea alignment"""
         assert (not mea or not sam), "Both mea and sam cannot be set to True"
@@ -709,6 +722,25 @@ class Fast5(h5py.File):
             )
             counter = 0
         return '{}_{:03d}'.format(root, counter)
+
+    def get_analysis_events_path_new(self, name, section=__default_section__):
+        return self._join_path(self.get_analysis_new(name), self.__default_basecall_1d_events__.format(section))
+
+    def get_analysis_events_path_latest(self, name, section=__default_section__):
+        return self._join_path(self.get_analysis_latest(name), self.__default_basecall_1d_events__.format(section))
+
+    def ensure_path(self, path, include_last_element=False):
+        # get directory parts we want to find or create
+        parts = path.lstrip("/").split("/")
+        if not include_last_element:
+            parts = parts[:-1]
+
+        # iterate over all parts, ensuring directory structure exists
+        curr_path = "/"
+        for part in parts:
+            curr_path = os.path.join(curr_path, part)
+            if curr_path not in self:
+                self.create_group(curr_path)
 
     # The remaining are methods to read and write data as chimaera produces
     #    It is necessarily all a bit nasty, but should provide a more
