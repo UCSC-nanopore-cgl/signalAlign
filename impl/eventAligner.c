@@ -266,13 +266,37 @@ char* fast5_get_fixed_string_attribute(hid_t hdf5_file, char* group_name, char* 
     }
 
 
+void fast5_basecall_event_type(hid_t* types) {
+
+//    hid_t string_type = H5Tcopy( H5T_C_S1 );
+//    H5Tset_size( string_type, MAX_KMER_SIZE + 1 );
+
+
+    hid_t string_type = H5Tcopy( H5T_C_S1 );
+    H5Tset_size( string_type, MAX_KMER_SIZE + 1 );
+    hid_t bce_tid = H5Tcreate (H5T_COMPOUND, sizeof(basecalled_event));
+    H5Tinsert(bce_tid, "start", HOFFSET(basecalled_event, start), H5T_NATIVE_FLOAT);
+    H5Tinsert(bce_tid, "length", HOFFSET(basecalled_event, length), H5T_NATIVE_FLOAT);
+    H5Tinsert(bce_tid, "mean", HOFFSET(basecalled_event, mean), H5T_NATIVE_FLOAT);
+    H5Tinsert(bce_tid, "stdv", HOFFSET(basecalled_event, stdv), H5T_NATIVE_FLOAT);
+    H5Tinsert(bce_tid, "raw_start", HOFFSET(basecalled_event, raw_start), H5T_NATIVE_UINT64);
+    H5Tinsert(bce_tid, "raw_length", HOFFSET(basecalled_event, raw_length), H5T_NATIVE_UINT64);
+    H5Tinsert(bce_tid, "model_state", HOFFSET(basecalled_event, model_state), string_type);
+    H5Tinsert(bce_tid, "move", HOFFSET(basecalled_event, move), H5T_NATIVE_INT);
+    H5Tinsert(bce_tid, "p_model_state", HOFFSET(basecalled_event, p_model_state), H5T_NATIVE_DOUBLE);
+
+    types[0] = bce_tid;
+    types[1] = string_type;
+}
+
+
 herr_t fast5_set_basecall_event_table(hid_t hdf5_file, char* table_location, basecalled_event_table *et) {
 
     /* prep */
     size_t n_events = 0;
     size_t k = 0;
     for (int i = 0; i < et->n; i++) {
-        if (et->event[i].model_state != NULL) {
+        if (strlen(et->event[i].model_state) != 0) {
             if (k == 0) k = strlen(et->event[i].model_state);
             n_events++;
         }
@@ -280,20 +304,23 @@ herr_t fast5_set_basecall_event_table(hid_t hdf5_file, char* table_location, bas
     assert(k != 0);
     assert(n_events != 0);
     basecalled_event dst_buf[n_events];
-    hid_t      bce_tid;
     hid_t      dataset, space; /* Handles */
     herr_t     status;
-    hsize_t    dim[] = {n_events};   /* Dataspace dimensions */
-
+    hsize_t    dim = n_events;   /* Dataspace dimensions */
+    hid_t      dtypes[2];
+    fast5_basecall_event_type(dtypes);
+    hid_t      bce_tid = dtypes[0];
+    hid_t      str_tid = dtypes[1];
 
     /* Initialize the data */
     int j = 0;
     for (int i = 0; i<et->n; i++){
         // skip unaligned events (these were trimmed)
-        if (et->event[i].model_state == NULL) continue;
+        if (strlen(et->event[i].model_state) == 0) continue;
 
         dst_buf[j].stdv = et->event[i].stdv;
-        dst_buf[j].model_state = stString_copy(et->event[i].model_state);
+//        dst_buf[j].model_state = stString_copy(et->event[i].model_state);
+        strcpy(dst_buf[j].model_state, et->event[i].model_state);
         dst_buf[j].mean = et->event[i].mean;
         dst_buf[j].start = et->event[i].start;
         dst_buf[j].move = et->event[i].move;
@@ -305,27 +332,13 @@ herr_t fast5_set_basecall_event_table(hid_t hdf5_file, char* table_location, bas
     }
     assert(j == n_events);
 
-    /* Create the data types. */
-    hid_t string_type = H5Tcopy( H5T_C_S1 );
-    H5Tset_size( string_type, k+1 );
-    bce_tid = H5Tcreate (H5T_COMPOUND, sizeof(basecalled_event));
-    H5Tinsert(bce_tid, "start", HOFFSET(basecalled_event, start), H5T_NATIVE_FLOAT);
-    H5Tinsert(bce_tid, "length", HOFFSET(basecalled_event, length), H5T_NATIVE_FLOAT);
-    H5Tinsert(bce_tid, "mean", HOFFSET(basecalled_event, mean), H5T_NATIVE_FLOAT);
-    H5Tinsert(bce_tid, "stdv", HOFFSET(basecalled_event, stdv), H5T_NATIVE_FLOAT);
-    H5Tinsert(bce_tid, "raw_start", HOFFSET(basecalled_event, raw_start), H5T_NATIVE_UINT64);
-    H5Tinsert(bce_tid, "raw_length", HOFFSET(basecalled_event, raw_length), H5T_NATIVE_UINT64);
-    H5Tinsert(bce_tid, "model_state", HOFFSET(basecalled_event, model_state), string_type);
-    H5Tinsert(bce_tid, "move", HOFFSET(basecalled_event, move), H5T_NATIVE_INT);
-    H5Tinsert(bce_tid, "p_model_state", HOFFSET(basecalled_event, p_model_state), H5T_NATIVE_DOUBLE);
-
     /* Create and write the dataset. */
-    space = H5Screate_simple(1, dim, NULL);
+    space = H5Screate_simple(1, &dim, NULL);
     dataset = H5Dcreate2(hdf5_file, table_location, bce_tid, space, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
     status = H5Dwrite(dataset, bce_tid, H5S_ALL, H5S_ALL, H5P_DEFAULT, dst_buf);
 
     /* Release resources */
-    H5Tclose(string_type);
+    H5Tclose(str_tid);
     H5Tclose(bce_tid);
     H5Sclose(space);
     H5Dclose(dataset);
@@ -333,28 +346,21 @@ herr_t fast5_set_basecall_event_table(hid_t hdf5_file, char* table_location, bas
     return status;
 }
 
+// There is no size checking in H5Dread, so dst_buf MUST BE of the right size.
+// I recommend that this only be used in unit tests
 herr_t fast5_get_basecall_events(hid_t hdf5_file, char* table_location, basecalled_event *dst_buf) {
-    hid_t      bce_tid;
     hid_t      dataset;
     herr_t     status;
+    hid_t      dtypes[2];
+    fast5_basecall_event_type(dtypes);
+    hid_t      bce_tid = dtypes[0];
+    hid_t      str_tid = dtypes[1];
 
     dataset = H5Dopen2(hdf5_file, table_location, H5P_DEFAULT);
 
-    hid_t string_type = H5Tcopy( H5T_C_S1 );
-    H5Tset_size( string_type, 6 ); //supports size of five or six.. I think?
-    bce_tid = H5Tcreate (H5T_COMPOUND, sizeof(basecalled_event));
-    H5Tinsert(bce_tid, "start", HOFFSET(basecalled_event, start), H5T_NATIVE_FLOAT);
-    H5Tinsert(bce_tid, "length", HOFFSET(basecalled_event, length), H5T_NATIVE_FLOAT);
-    H5Tinsert(bce_tid, "mean", HOFFSET(basecalled_event, mean), H5T_NATIVE_FLOAT);
-    H5Tinsert(bce_tid, "stdv", HOFFSET(basecalled_event, stdv), H5T_NATIVE_FLOAT);
-    H5Tinsert(bce_tid, "raw_start", HOFFSET(basecalled_event, raw_start), H5T_NATIVE_UINT64);
-    H5Tinsert(bce_tid, "raw_length", HOFFSET(basecalled_event, raw_length), H5T_NATIVE_UINT64);
-    H5Tinsert(bce_tid, "model_state", HOFFSET(basecalled_event, model_state), string_type);
-    H5Tinsert(bce_tid, "move", HOFFSET(basecalled_event, move), H5T_NATIVE_INT);
-    H5Tinsert(bce_tid, "p_model_state", HOFFSET(basecalled_event, p_model_state), H5T_NATIVE_DOUBLE);
-
     status = H5Dread(dataset, bce_tid, H5S_ALL, H5S_ALL, H5P_DEFAULT, dst_buf);
 
+    H5Tclose(str_tid);
     H5Tclose(bce_tid);
     H5Dclose(dataset);
 
@@ -369,22 +375,26 @@ float fast5_get_start_time(hid_t hdf5_file){
     return fast5_read_float_attribute(scaling_group, "start_time");
 }
 
-basecalled_event_table event_table_to_basecalled_table(event_table *et, fast5_raw_scaling scaling, float start_time){
+basecalled_event_table* event_table_to_basecalled_table(event_table *et, fast5_raw_scaling scaling, float start_time){
 
-    basecalled_event_table basecalled_et = { 0 };
-    basecalled_et.event = calloc(et->n, sizeof(basecalled_event));
-    basecalled_et.start = et->start;
-    basecalled_et.end = et->end;
-    basecalled_et.n = et->n;
+    basecalled_event_table* basecalled_et = malloc(sizeof(basecalled_event_table));
+    basecalled_et->event = calloc(et->n, sizeof(basecalled_event));
+    basecalled_et->start = et->start;
+    basecalled_et->end = et->end;
+    basecalled_et->n = et->n;
+    basecalled_et->aln_n = 0;
 
     for (int i=0; i < et->n; i++){
-        basecalled_et.event[i].raw_start = et->event[i].start;
-        basecalled_et.event[i].raw_length = (uint64_t) et->event[i].length;
-        basecalled_et.event[i].mean = et->event[i].mean;
-        basecalled_et.event[i].stdv = et->event[i].stdv;
-        basecalled_et.event[i].start = (((float) et->event[i].start) / scaling.sample_rate) + (start_time / scaling.sample_rate);
-        basecalled_et.event[i].length = et->event[i].length / scaling.sample_rate;
-        basecalled_et.event[i].p_model_state = 0.0;
+        basecalled_et->event[i].raw_start = et->event[i].start;
+        basecalled_et->event[i].raw_length = (uint64_t) et->event[i].length;
+        basecalled_et->event[i].mean = et->event[i].mean;
+        basecalled_et->event[i].stdv = et->event[i].stdv;
+        basecalled_et->event[i].start = (((float) et->event[i].start) / scaling.sample_rate) + (start_time / scaling.sample_rate);
+        basecalled_et->event[i].length = et->event[i].length / scaling.sample_rate;
+        basecalled_et->event[i].p_model_state = 0.0;
+        basecalled_et->event[i].move = 0;
+        basecalled_et->event[i].model_state[0] = '\0';
+
     }
     return basecalled_et;
 
@@ -858,17 +868,19 @@ herr_t load_from_raw(char* fast5_file_path, char* templateModelFile, char* seque
     stList *event_alignment = adaptive_banded_simple_event_align(et, sM, sequence);
 
     // create new event table with our own data structure
-    basecalled_event_table b_et = event_table_to_basecalled_table(&et, channel_params, start_time);
-    basecalled_event_table *event_table = alignment_to_base_event_map(event_alignment, &b_et, sequence, sM);
-    herr_t write_success = fast5_set_basecall_event_table(hdf5_file, path_to_embed, event_table);
+    basecalled_event_table* b_et = event_table_to_basecalled_table(&et, channel_params, start_time);
+    alignment_to_base_event_map(event_alignment, b_et, sequence, sM);
+    herr_t write_success = fast5_set_basecall_event_table(hdf5_file, path_to_embed, b_et);
 
     // cleanup
+    free(b_et->event);
+    free(b_et);
     fast5_close(hdf5_file);
     stateMachine_destruct(sM);
     return write_success;
 }
 
-basecalled_event_table* alignment_to_base_event_map(stList *event_alignment, basecalled_event_table* b_et,
+void alignment_to_base_event_map(stList *event_alignment, basecalled_event_table* b_et,
                                                    char *sequence, StateMachine *pore_model) {
 
     StateMachine3 *sM3 = (StateMachine3 *) pore_model;
@@ -882,9 +894,9 @@ basecalled_event_table* alignment_to_base_event_map(stList *event_alignment, bas
     double lp_emission;
     int prev_event_idx = -1;
     int prev_kmer_indx = 0;
+    b_et->aln_n = 0;
 
-//      loop through the alignment and create assignments
-
+    // loop through the alignment and create assignments
     for (int64_t i = 0; i < alignment_length; ++i) {
 
         struct AlignedPair *aligned_pair = stList_get(event_alignment, i);
@@ -899,15 +911,16 @@ basecalled_event_table* alignment_to_base_event_map(stList *event_alignment, bas
                 fprintf(stderr, "[Event Aligner] There was an error in the event map.");
             } else {
                 b_et->event[event_idx].p_model_state = exp(lp_emission);
-                b_et->event[event_idx].model_state = stString_copy(kmer);;
+//                b_et->event[event_idx].model_state = stString_copy(kmer);;
+                strcpy(b_et->event[event_idx].model_state, kmer);
                 b_et->event[event_idx].move += k_idx-prev_kmer_indx;
-//                    printf("We assigned to %i\n", event_idx);
                 prev_kmer_indx = k_idx;
                 prev_event_idx = event_idx;
             }
         } else {
             b_et->event[event_idx].p_model_state = exp(lp_emission);
-            b_et->event[event_idx].model_state = stString_copy(kmer);
+//            b_et->event[event_idx].model_state = stString_copy(kmer);
+            strcpy(b_et->event[event_idx].model_state, kmer);
 
             if (k_idx == prev_kmer_indx){
                 b_et->event[event_idx].move = 0;
@@ -917,8 +930,9 @@ basecalled_event_table* alignment_to_base_event_map(stList *event_alignment, bas
             prev_kmer_indx = k_idx;
             prev_event_idx = event_idx;
         }
+        b_et->aln_n += 1;
+        free(kmer);
     }
-    return b_et;
 }
 
 

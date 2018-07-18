@@ -4,6 +4,7 @@
 
 #ifndef NANOPORE_RNN_EVENTAILIGNER_H
 #define NANOPORE_RNN_EVENTAILIGNER_H
+#define MAX_KMER_SIZE 6
 
 #include <stdlib.h>
 #include <hdf5.h>
@@ -17,7 +18,7 @@ typedef struct {
     float length;
     float mean;
     float stdv;
-    char* model_state;
+    char model_state[MAX_KMER_SIZE + 1];
     int move;
     uint64_t raw_start;
     uint64_t raw_length;
@@ -26,6 +27,7 @@ typedef struct {
 
 typedef struct {
     size_t n;
+    size_t aln_n;
     size_t start;
     size_t end;
     basecalled_event *event;
@@ -95,10 +97,10 @@ void* update_SignalMachineWithNanoporeParameters(NanoporeReadAdjustmentParameter
 stList* adaptive_banded_simple_event_align(event_table et, StateMachine *pore_model, char* sequence);
 
 // convert event table into basecalled event table. Assume's start and length are "raw_start" and "raw_length"
-basecalled_event_table event_table_to_basecalled_table(event_table *et, fast5_raw_scaling scaling, float start_time);
+basecalled_event_table* event_table_to_basecalled_table(event_table *et, fast5_raw_scaling scaling, float start_time);
 
-// create basecalled_event_table from alignment
-basecalled_event_table* alignment_to_base_event_map(stList *event_alignment, basecalled_event_table* b_et,
+// fill basecalled_event_table from alignment
+void alignment_to_base_event_map(stList *event_alignment, basecalled_event_table* b_et,
                                                     char *sequence, StateMachine *pore_model);
 
 herr_t load_from_raw(char* fast5_file_path, char* templateModelFile, char* sequence, char* path_to_embed);
