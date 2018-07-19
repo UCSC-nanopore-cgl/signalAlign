@@ -275,10 +275,10 @@ void fast5_basecall_event_type(hid_t* types) {
     hid_t string_type = H5Tcopy( H5T_C_S1 );
     H5Tset_size( string_type, MAX_KMER_SIZE + 1 );
     hid_t bce_tid = H5Tcreate (H5T_COMPOUND, sizeof(basecalled_event));
-    H5Tinsert(bce_tid, "start", HOFFSET(basecalled_event, start), H5T_NATIVE_FLOAT);
-    H5Tinsert(bce_tid, "length", HOFFSET(basecalled_event, length), H5T_NATIVE_FLOAT);
-    H5Tinsert(bce_tid, "mean", HOFFSET(basecalled_event, mean), H5T_NATIVE_FLOAT);
-    H5Tinsert(bce_tid, "stdv", HOFFSET(basecalled_event, stdv), H5T_NATIVE_FLOAT);
+    H5Tinsert(bce_tid, "start", HOFFSET(basecalled_event, start), H5T_NATIVE_DOUBLE);
+    H5Tinsert(bce_tid, "length", HOFFSET(basecalled_event, length), H5T_NATIVE_DOUBLE);
+    H5Tinsert(bce_tid, "mean", HOFFSET(basecalled_event, mean), H5T_NATIVE_DOUBLE);
+    H5Tinsert(bce_tid, "stdv", HOFFSET(basecalled_event, stdv), H5T_NATIVE_DOUBLE);
     H5Tinsert(bce_tid, "raw_start", HOFFSET(basecalled_event, raw_start), H5T_NATIVE_UINT64);
     H5Tinsert(bce_tid, "raw_length", HOFFSET(basecalled_event, raw_length), H5T_NATIVE_UINT64);
     H5Tinsert(bce_tid, "model_state", HOFFSET(basecalled_event, model_state), string_type);
@@ -389,7 +389,7 @@ basecalled_event_table* event_table_to_basecalled_table(event_table *et, fast5_r
         basecalled_et->event[i].raw_length = (uint64_t) et->event[i].length;
         basecalled_et->event[i].mean = et->event[i].mean;
         basecalled_et->event[i].stdv = et->event[i].stdv;
-        basecalled_et->event[i].start = (((float) et->event[i].start) / scaling.sample_rate) + (start_time / scaling.sample_rate);
+        basecalled_et->event[i].start = (((double) et->event[i].start) / scaling.sample_rate) + (start_time / scaling.sample_rate);
         basecalled_et->event[i].length = et->event[i].length / scaling.sample_rate;
         basecalled_et->event[i].p_model_state = 0.0;
         basecalled_et->event[i].move = 0;

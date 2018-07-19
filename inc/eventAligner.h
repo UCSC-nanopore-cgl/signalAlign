@@ -14,10 +14,10 @@
 #include "nanopore.h"
 
 typedef struct {
-    float start;
-    float length;
-    float mean;
-    float stdv;
+    double start;
+    double length;
+    double mean;
+    double stdv;
     char model_state[MAX_KMER_SIZE + 1];
     int move;
     uint64_t raw_start;
