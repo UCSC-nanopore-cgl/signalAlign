@@ -86,7 +86,7 @@ class SignalAlignment(object):
                  check_for_temp_file_existance=True,
                  track_memory_usage=False,
                  get_expectations=False,
-                 path_to_bin=''):
+                 path_to_bin='./'):
         self.in_fast5 = in_fast5  # fast5 file to align
         self.destination = destination  # place where the alignments go, should already exist
         self.stateMachineType = stateMachineType  # flag for signalMachine

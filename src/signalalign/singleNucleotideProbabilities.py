@@ -13,6 +13,7 @@ import pysam
 from argparse import ArgumentParser
 from random import shuffle
 from contextlib import closing
+from py3helpers.utils import TimeStamp, merge_dicts
 from signalalign.nanoporeRead import NanoporeRead
 from signalalign.signalAlignment import multithread_signal_alignment
 from signalalign.scripts.alignmentAnalysisLib import CallMethylation
@@ -20,7 +21,8 @@ from signalalign.utils.fileHandlers import FolderHandler
 from signalalign.utils.sequenceTools import get_full_nucleotide_read_from_alignment, replace_periodic_reference_positions
 from signalalign.utils.multithread import *
 from signalalign.motif import getDegenerateEnum
-from signalalign.event_detection import generate_events_and_alignment
+from signalalign.event_detection import save_event_table_and_fastq, generate_events_and_alignment, create_fastq_line
+from signalalign.fast5 import Fast5
 
 
 READ_NAME_KEY = "read_name"
@@ -494,8 +496,8 @@ def variant_caller(work_queue, done_queue, service_name="variant_caller"):
         done_queue.put("{}:{}".format(FAILURE_KEY, failure_count))
 
 
-def event_detection(work_queue, done_queue, alignment_file, event_detection_strategy=None, event_detection_params=None,
-                    service_name="event_detection"):
+def event_detection(work_queue, done_queue, alignment_file, model_file_location,
+                    event_detection_strategy=None, event_detection_params=None, service_name="event_detection"):
     # prep
     total_handled = 0
     failure_count = 0
@@ -503,15 +505,44 @@ def event_detection(work_queue, done_queue, alignment_file, event_detection_stra
     #catch overall exceptions
     try:
         for tmp in iter(work_queue.get, 'STOP'):
+            # get data from iterator
             fast5, read_id = tmp['fast5']
+
             # catch exceptions on each element
             try:
-                nucleotide, qualities, hardcode_front, hardcode_back = get_full_nucleotide_read_from_alignment(
-                    alignment_file, read_id)
-                success, _, _ = generate_events_and_alignment(fast5, nucleotide, nucleotide_qualities=qualities,
-                                                              save_to_fast5=False, overwrite=False)
-                if not success:
-                    failure_count += 1
+                # get/build nucleotide sequence (accounting for hardclipping)
+                nucleotide_sequence, nucleotide_qualities, hardclip_front, hardclip_back = \
+                    get_full_nucleotide_read_from_alignment(alignment_file, read_id)
+                nucleotide_sequence = ("N" * hardclip_front) + nucleotide_sequence + ("N" * hardclip_back)
+                if nucleotide_qualities is not None:
+                    nucleotide_qualities = ("!" * hardclip_front) + nucleotide_qualities + ("!" * hardclip_back)
+                else:
+                    nucleotide_qualities = "!" * len(nucleotide_sequence)
+                fastq = create_fastq_line(read_id, nucleotide_sequence, nucleotide_qualities)
+
+                # get new location
+                with closing(Fast5(fast5, read='r+')) as f5fh:
+                    dest = f5fh.get_analysis_events_path_new("SignalAlign")
+                    f5fh.ensure_path(dest)
+
+                #todo this is a hack
+                # run our alignment script
+                subprocess.check_call(['python', '-c',
+                                       'import kmeralign ; kmeralign.load_from_raw(fast5_path="{}", nuc_sequence="{}", template_model_file="{}", path_in_fast5="{}")'.format(
+                                           fast5, nucleotide_sequence, model_file_location, dest)])
+
+                # get events and save to "normal" location
+                with closing(Fast5(fast5, read='r+')) as f5fh:
+                    # get attrs
+                    keys = ["nanotensor version", "time_stamp"]
+                    values = ["0.2.0", TimeStamp().posix_date()]
+                    attributes = merge_dicts([dict(zip(keys, values)), f5fh.raw_attributes])
+                    # get events
+                    events = f5fh.get_custom_analysis_events("SignalAlign")
+                    saved_location = save_event_table_and_fastq(f5fh, events, fastq, attributes=attributes)
+                    print("[{}] Saved {} events and {} nucleotides to {} in {}".format(
+                        service_name, len(events), len(nucleotide_sequence), saved_location, fast5))
+
 
             except Exception as e:
                 # get error and log it
@@ -559,8 +590,7 @@ def discover_single_nucleotide_probabilities(args, working_folder, kmer_length, 
         # prep for event detection
         event_detection_service_args = {
             'alignment_file': args.alignment_file,
-            'event_detection_strategy': None,
-            'event_detection_params': None
+            'model_file_location': alignment_args['in_templateHmm'],
         }
 
         # do event detection

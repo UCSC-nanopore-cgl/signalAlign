@@ -22,7 +22,7 @@ from signalalign.core import *
 
 import pyximport
 pyximport.install(setup_args={'include_dirs': [np.get_include(), './']})
-from signalalign.cparsers import FastStatSplit
+# from signalalign.cparsers import FastStatSplit
 
 import json
 

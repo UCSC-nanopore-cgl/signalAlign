@@ -202,12 +202,12 @@ class NanoporeRead(object):
             self.close()
             return False
 
-        self.template_read        = self.bytes_to_string(self.fastFive[fastq_sequence_address][()].split()[2])
+        self.template_read        = self.bytes_to_string(self.fastFive[fastq_sequence_address][()]).split('\n')[1]
         if self.rna:
             # reverse and replace "U"
             self.template_read = self.template_read.replace("U", "T")[::-1]
 
-        self.kmer_length          = len(self.fastFive[self.template_event_table_address][0][4])
+        self.kmer_length          = len(self.bytes_to_string(self.fastFive[self.template_event_table_address][0]['model_state']))
         self.template_read_length = len(self.template_read)
         if self.template_read_length <= 0 or self.kmer_length <= 0:
             self.logError("[NanoporeRead:_initialize] ERROR illegal read parameters "
