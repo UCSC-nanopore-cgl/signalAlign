@@ -107,7 +107,7 @@ def resolvePath(p):
         return os.path.abspath(p)
 
 
-def organize_fast5s(fast5_locations):
+def organize_fast5s(fast5_locations, realign_all=True):
     # gathered data
     fast5_to_read_id = dict()
     requires_event_calling = list()
@@ -119,7 +119,7 @@ def organize_fast5s(fast5_locations):
         read_id = npr.read_label
         fast5_id = os.path.basename(fast5)[:-6]
         fast5_to_read_id[fast5_id] = read_id
-        if not success:
+        if not success or realign_all:
             requires_event_calling.append((fast5, read_id))
         npr.close()
 
@@ -513,10 +513,7 @@ def event_detection(work_queue, done_queue, alignment_file, model_file_location,
                 # get/build nucleotide sequence (accounting for hardclipping)
                 nucleotide_sequence, nucleotide_qualities, hardclip_front, hardclip_back = \
                     get_full_nucleotide_read_from_alignment(alignment_file, read_id)
-                nucleotide_sequence = ("N" * hardclip_front) + nucleotide_sequence + ("N" * hardclip_back)
-                if nucleotide_qualities is not None:
-                    nucleotide_qualities = ("!" * hardclip_front) + nucleotide_qualities + ("!" * hardclip_back)
-                else:
+                if nucleotide_qualities is None:
                     nucleotide_qualities = "!" * len(nucleotide_sequence)
                 fastq = create_fastq_line(read_id, nucleotide_sequence, nucleotide_qualities)
 
@@ -539,6 +536,8 @@ def event_detection(work_queue, done_queue, alignment_file, model_file_location,
                     attributes = merge_dicts([dict(zip(keys, values)), f5fh.raw_attributes])
                     # get events
                     events = f5fh.get_custom_analysis_events("SignalAlign")
+                    if len(events) == 0:
+                        raise Exception("Failed to align events for {}".format(os.path.basename(fast5)))
                     saved_location = save_event_table_and_fastq(f5fh, events, fastq, attributes=attributes)
                     print("[{}] Saved {} events and {} nucleotides to {} in {}".format(
                         service_name, len(events), len(nucleotide_sequence), saved_location, fast5))
