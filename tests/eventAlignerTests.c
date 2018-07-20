@@ -453,14 +453,6 @@ static void test_load_from_raw_rna(CuTest *testCase) {
     CuAssertStrEquals(testCase, "AACCT", old_events[0].model_state);
     CuAssertStrEquals(testCase, "CCTAC", old_events[old_event_n - 1].model_state);
 
-    //TODO calculate that both alignments are similar
-//    CuAssertIntEquals(testCase, 0, (int) dst_buf[0].raw_start);
-//    CuAssertDblEquals(testCase, 7.000000, dst_buf[0].raw_length, 0.001);
-//    CuAssertDblEquals(testCase, 92.086693, dst_buf[0].mean, 0.001);
-//    CuAssertDblEquals(testCase, 3.655048, dst_buf[0].stdv, 0.001);
-//    CuAssertStrEquals(testCase, "AACCT", dst_buf[0].model_state);
-//    CuAssertIntEquals(testCase, 0, dst_buf[0].move);
-
     status = H5Ldelete( fast5_handle, EVENT_LOCATION, H5P_DEFAULT );
     CuAssertIntEquals(testCase, 0, (int) status);
     fast5_close(fast5_handle);
@@ -489,20 +481,10 @@ static void test_load_from_raw_dna(CuTest *testCase){
     CuAssertStrEquals(testCase, "TGCAT", old_events[0].model_state);
     CuAssertStrEquals(testCase, "AAACT", old_events[old_event_n - 1].model_state);
 
-    //TODO calculate that both alignments are similar
-//    CuAssertIntEquals(testCase, 0, (int) dst_buf[0].raw_start);
-//    CuAssertDblEquals(testCase, 7.000000, dst_buf[0].raw_length, 0.001);
-//    CuAssertDblEquals(testCase, 92.086693, dst_buf[0].mean, 0.001);
-//    CuAssertDblEquals(testCase, 3.655048, dst_buf[0].stdv, 0.001);
-//    CuAssertStrEquals(testCase, "AACCT", dst_buf[0].model_state);
-//    CuAssertIntEquals(testCase, 0, dst_buf[0].move);
-
     status = H5Ldelete( fast5_handle, EVENT_LOCATION, H5P_DEFAULT );
     CuAssertIntEquals(testCase, 0, (int) status);
     fast5_close(fast5_handle);
 }
-
-
 
 CuSuite *eventAlignerTestSuite(void) {
 
