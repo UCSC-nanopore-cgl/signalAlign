@@ -13,6 +13,7 @@ from py3helpers.utils import captured_output
 
 SIGNALALIGN_ROOT = '/'.join(os.path.abspath(__file__).split("/")[:-4])
 SIGNALMACHINE_EXE = os.path.join(SIGNALALIGN_ROOT, "bin/signalMachine")
+KMEREVENTALIGN_EXE = os.path.join(SIGNALALIGN_ROOT, "bin/kmerEventAlign")
 TEMPLATE_MODEL = os.path.join(SIGNALALIGN_ROOT, "models/testModelR9_5mer_acgt_template.model")
 TEST_FILES = os.path.join(SIGNALALIGN_ROOT, "tests/test_singleNucProbs_errorCorrection")
 
@@ -41,21 +42,24 @@ class SingleNuclProbsTest(unittest.TestCase):
             shutil.rmtree(SingleNuclProbsTest.WORK_DIR)
         os.makedirs(SingleNuclProbsTest.WORK_DIR)
         shutil.copy(SIGNALMACHINE_EXE, os.path.join(SingleNuclProbsTest.WORK_DIR, "signalMachine"))
+        shutil.copy(KMEREVENTALIGN_EXE, os.path.join(SingleNuclProbsTest.WORK_DIR, "kmerEventAlign"))
+
         os.chdir(SingleNuclProbsTest.WORK_DIR)
 
     def tearDown(self):
         shutil.rmtree(SingleNuclProbsTest.WORK_DIR)
 
-    def run_single_nucl_prob(self, fast5_glob, reference_location):
+    def run_single_nucl_prob(self, fast5_glob, reference_location, alignment_file):
         output_tmp_dir = os.path.join(os.path.abspath(SingleNuclProbsTest.WORK_DIR), "output")
         args = ['-g', fast5_glob,
                 '-r', reference_location,
                 '-T', TEMPLATE_MODEL,
                 '-o', output_tmp_dir,
+                '--alignment_file', alignment_file,
                 '--step_size', '5']
 
-        with captured_output() as (err, out):
-            singleNuclProb.main(args)
+        # with captured_output() as (err, out):
+        singleNuclProb.main(args)
 
         in_file_count = len(glob.glob(fast5_glob))
         output_files = glob.glob(os.path.join(output_tmp_dir, "*.tsv"))
@@ -76,7 +80,8 @@ class SingleNuclProbsTest(unittest.TestCase):
         oneD_reads = os.path.join(SIGNALALIGN_ROOT,
                                   "tests/minion_test_reads/1D/LomanLabz_PC_20161025_FNFAB42699_MN17633_sequencing_run_20161025_E_coli_native_450bps_82361_ch112_read108_strand.fast5")
         ecoli_ref = os.path.join(SIGNALALIGN_ROOT, "tests/test_sequences/E.coli_K12.fasta")
-        self.run_single_nucl_prob(oneD_reads, ecoli_ref)
+        oneD_alignment_file = os.path.join(SIGNALALIGN_ROOT, "tests/minion_test_reads/oneD_alignments.sam")
+        self.run_single_nucl_prob(oneD_reads, ecoli_ref, alignment_file=oneD_alignment_file)
 
 
 def main():

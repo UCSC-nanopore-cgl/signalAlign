@@ -10,7 +10,6 @@
 # Author: Andrew Bailey
 # History: 12/21/2017 Created
 ########################################################################
-import unittest
 import os
 import numpy as np
 import threading
@@ -19,6 +18,7 @@ from signalalign.fast5 import Fast5
 from signalalign.event_detection import *
 from py3helpers.utils import time_it
 import unittest
+from signalalign.nanoporeRead import NanoporeRead
 
 
 class EventDetectTests(unittest.TestCase):
@@ -30,14 +30,18 @@ class EventDetectTests(unittest.TestCase):
                                     "tests/minion_test_reads/canonical_ecoli_R9/miten_PC_20160820_FNFAD20259_MN17223_mux_scan_AMS_158_R9_WGA_Ecoli_08_20_16_83098_ch138_read23_strand.fast5")
         cls.rna_file = os.path.join(cls.HOME,
                                     "tests/minion_test_reads/RNA_edge_cases/DEAMERNANOPORE_20170922_FAH26525_MN16450_sequencing_run_MA_821_R94_NA12878_mRNA_09_22_17_67136_read_61_ch_151_strand.fast5")
+        cls.rna_model_file = os.path.join(cls.HOME, "models/testModelR9p4_5mer_acgt_RNA.model")
+        cls.dna_template_model_file = os.path.join(cls.HOME, "models/testModelR9p4_5mer_acegt_template.model")
         dna_handle = Fast5(cls.dna_file, 'r+')
         rna_handle = Fast5(cls.rna_file, 'r+')
         cls.dna_handle = dna_handle.create_copy("test_dna.fast5")
         cls.rna_handle = rna_handle.create_copy("test_rna.fast5")
-        cls.path_to_scrappie = os.path.join(cls.HOME, "scrappie/build/scrappie")
+        rna_handle = Fast5(cls.rna_file, 'r+')
+        cls.rna_handle2 = rna_handle.create_copy("test_rna2.fast5")
+        rna_handle = Fast5(cls.rna_file, 'r+')
+        cls.rna_handle3 = rna_handle.create_copy("test_rna3.fast5")
 
     def test_create_speedy_event_table(self):
-        # """Test create_speedy_event_table"""
         for fast5handle in [self.dna_handle, self.rna_handle]:
             sampling_freq = fast5handle.sample_rate
             signal = fast5handle.get_read(raw=True, scale=True)
@@ -435,7 +439,6 @@ class EventDetectTests(unittest.TestCase):
         sampling_freq = self.rna_handle.sample_rate
         start_time = self.rna_handle.raw_attributes['start_time']
         event_table = self.rna_handle.get_basecall_data(analysis="Basecall_1D")
-        print(event_table.dtype)
         # run method
         new_table = index_to_time(event_table, sampling_freq=sampling_freq, start_time=start_time)
         start = event_table["start"] / sampling_freq + (start_time / sampling_freq)
@@ -512,62 +515,6 @@ class EventDetectTests(unittest.TestCase):
             self.assertTrue(passing)
             self.assertIsInstance(f5handle, Fast5)
 
-    def test_create_scrappie_event_table(self):
-        for fast5handle, path in [(self.rna_handle, "test_rna.fast5"), (self.dna_handle, "test_dna.fast5")]:
-            sampling_freq = fast5handle.sample_rate
-            signal = fast5handle.get_read(raw=True, scale=True)
-            start_time = fast5handle.raw_attributes['start_time']
-            events = create_scrappie_event_table(fast5_location=path, sampling_freq=sampling_freq,
-                                                 start_time=start_time, path_to_scrappie=self.path_to_scrappie)
-            events_to_check = np.random.randint(0, len(events), 10)
-            for x in events_to_check:
-                event = events[x]
-                signal_mean = np.mean(signal[event["raw_start"]:(event["raw_start"] + event["raw_length"])])
-                signal_std = np.std(signal[event["raw_start"]:(event["raw_start"] + event["raw_length"])])
-                self.assertAlmostEqual(event["mean"], signal_mean, places=4)
-                self.assertAlmostEqual(event["stdv"], signal_std, places=2)
-                self.assertAlmostEqual(event['raw_start'],
-                                       (event['start'] - (start_time / sampling_freq)) * sampling_freq)
-                self.assertAlmostEqual(event['raw_length'], event['length'] * sampling_freq)
-
-        self.assertRaises(AssertionError, create_scrappie_event_table, "random_path",
-                          sampling_freq, self.path_to_scrappie)
-        self.assertRaises(AssertionError, create_scrappie_event_table, path,
-                          sampling_freq)
-
-    def test_minknow_vs_scrappie(self):
-        for fast5handle, path in [(self.rna_handle, "test_rna.fast5"), (self.dna_handle, "test_dna.fast5")]:
-            sampling_freq = fast5handle.sample_rate
-            signal = fast5handle.get_read(raw=True, scale=True)
-            start_time = fast5handle.raw_attributes['start_time']
-            s_events, s_time = time_it(create_scrappie_event_table, path, sampling_freq, start_time,
-                                       self.path_to_scrappie)
-            params = get_default_event_detection_params('minknow', rna=False)
-            m_events, m_time = time_it(create_minknow_event_table, signal, sampling_freq, start_time,
-                                       params['window_lengths'],
-                                       params['thresholds'], params['peak_height'])
-            # minknow is at least 25% faster
-            self.assertLess(m_time, s_time * 0.75)
-            mismatches = set(s_events['raw_start']) ^ set(m_events['raw_start'])
-            # there are less than 0.2% difference in event breakpoints
-            self.assertLess(len(mismatches), len(s_events['raw_start'])*0.002)
-
-    def test_scrappie_event_detect(self):
-        events = scrappie_event_detect("test_dna.fast5", path_to_scrappie=self.path_to_scrappie)
-        # print(events)
-        self.assertAlmostEqual(events[0]["pos"], 0)
-        self.assertAlmostEqual(events[0]["start"], 0)
-        self.assertAlmostEqual(events[0]["stdv"], 45.00887680053711, places=5)
-        self.assertAlmostEqual(events[0]["mean"], 118.47407, places=5)
-        self.assertEqual(3148, len(events))
-        events = scrappie_event_detect("test_rna.fast5", path_to_scrappie=self.path_to_scrappie)
-        self.assertAlmostEqual(events[0]["pos"], 0)
-        self.assertAlmostEqual(events[0]["start"], 0)
-        self.assertAlmostEqual(events[0]["stdv"], 1.3342689275741577, places=5)
-        self.assertAlmostEqual(events[0]["mean"], 95.096466, places=5)
-        self.assertEqual(4936, len(events))
-        self.assertRaises(AssertionError, scrappie_event_detect, "test_rna.fast5")
-
     def test_get_empty_event_table(self):
         events = get_empty_event_table(10)
         self.assertTrue(check_numpy_table(events,
@@ -579,15 +526,49 @@ class EventDetectTests(unittest.TestCase):
                          dict(min_width=5, max_width=80, min_gain_per_sample=0.008, window_width=800))
         self.assertEqual(get_default_event_detection_params("minknow"),
                          dict(window_lengths=(3, 6), thresholds=(1.4, 9.0), peak_height=0.2))
-        self.assertEqual(get_default_event_detection_params("scrappie"), {})
         self.assertEqual(get_default_event_detection_params("minknow", rna=True),
                          dict(window_lengths=(7, 14), thresholds=(2.5, 9.0), peak_height=1.0))
         self.assertIsNone(get_default_event_detection_params("something else"))
+
+
+    def test_load_from_raw(self):
+        path_to_bin = os.path.join(self.HOME, "bin")
+        self.rna_handle3.close()
+        np_handle = NanoporeRead(os.path.abspath("test_rna3.fast5"))
+        np_handle._initialize_metadata()
+        alignment_file = os.path.join(self.HOME, "tests/minion_test_reads/RNA_edge_case.sam")
+        saved_location = load_from_raw(np_handle, alignment_file, self.rna_model_file, path_to_bin)
+
+        events = np.array(np_handle.fastFive["/Analyses/Basecall_1D_001/BaseCalled_template/Events"])
+        self.assertEqual(events[0]["raw_length"], 7)
+        self.assertTrue("/Analyses/Basecall_1D_001/BaseCalled_template/Fastq" in np_handle.fastFive)
+        self.assertEqual(saved_location, "/Analyses/Basecall_1D_001")
+
+    def test_run_kmeralign_exe(self):
+        path_to_bin = os.path.join(self.HOME, "bin")
+        rna_fast5_path = os.path.abspath("test_rna2.fast5")
+        nuc_sequence = "CAUCCUGCCCUGUGUUAUCCAGUUAUGAGAUAAAAAAUGAAUAUAAGAGUGCUUGUCAUUAUAAAAGUUUUCCUUUUUAUUACCAUCCAAGCCACCAGCUGCCAGCCACCAGCAGCCAGCUGCCAGCACUAGCUUUUUUUUUUUAGCACUUAGUAUUUAGCAGCAUUUAUUAACAGGUACUUUAAGAAUGAUGAAGCAUUGUUUUAAUCUCACUGACUAUGAAGGUUUUAGUUUCUGCUUUUGCAAUUGUGUUUGUGAAAUUUGAAUACUUGCAGGCUUUGUAUGUGAAUAAUUUUAGCGGCUGGUUGGAGAUAAUCCUACGGGAAUUACUUAAAACUGUGCUUUAACUAAAAUGAAUGAGCUUUAAAAUCCCUCCUCCUACUCCAUCAUCAUCCCACUAUUCAUCUUAUCUCAUUAUCAUCAACCUAUCCCACAUCCCUAUCACCACAGCAAUCCAA"
+        rna_model_file = self.rna_model_file
+        np_handle = NanoporeRead(os.path.abspath("test_rna3.fast5"))
+        np_handle._initialize_metadata()
+
+        dest = "/Analyses/SignalAlign_Basecall_1D_001/BaseCalled_template"
+        self.rna_handle2.close()
+
+        status = run_kmeralign_exe(path_to_bin, rna_fast5_path, nuc_sequence, rna_model_file, dest)
+        rna_handle = Fast5("test_rna2.fast5", 'r+')
+
+        events = np.array(rna_handle[dest+"/Events"])
+
+        self.assertEqual(events[0]["raw_length"], 7)
+        self.assertTrue(status)
 
     @classmethod
     def tearDownClass(cls):
         """Remove test fast5 file"""
         os.remove("test_rna.fast5")
+        os.remove("test_rna2.fast5")
+        os.remove("test_rna3.fast5")
         os.remove("test_dna.fast5")
 
 

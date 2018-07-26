@@ -46,6 +46,11 @@ def parse_args():
     parser.add_argument('--backward_ref', action='store',
                         dest='backward_ref', required=False, type=str,
                         help="backward reference sequence for SignalAlignment align to, in FASTA")
+
+    parser.add_argument('--alignment_file', action='store',
+                        dest='alignment_file', required=False, type=str,
+                        help="SAM or BAM file of alignments if FAST5s do not have fasta info or events")
+
     parser.add_argument('--bwa_reference', '-r', action='store',
                         dest='bwa_reference', required=True, type=str,
                         help="Reference sequence required for generating guide alignment")
@@ -105,15 +110,6 @@ def parse_args():
 
     args = parser.parse_args()
     return args
-
-
-def aligner(work_queue, done_queue):
-    try:
-        for f in iter(work_queue.get, 'STOP'):
-            alignment = SignalAlignment(**f)
-            alignment.run()
-    except Exception as e:
-        done_queue.put("%s failed with %s" % (current_process().name, e))
 
 
 def concat_variant_call_files(path):
@@ -211,7 +207,7 @@ def main(args):
         "event_table": args.event_table,
         "backward_reference": args.backward_reference,
         "forward_reference": args.forward_reference,
-        "alignment_file": None,
+        "alignment_file": args.alignment_file,
         "check_for_temp_file_existance": True,
         "track_memory_usage": False,
         "get_expectations": False,

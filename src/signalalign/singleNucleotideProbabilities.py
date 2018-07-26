@@ -21,7 +21,7 @@ from signalalign.utils.fileHandlers import FolderHandler
 from signalalign.utils.sequenceTools import get_full_nucleotide_read_from_alignment, replace_periodic_reference_positions
 from signalalign.utils.multithread import *
 from signalalign.motif import getDegenerateEnum
-from signalalign.event_detection import save_event_table_and_fastq, generate_events_and_alignment, create_fastq_line
+from signalalign.event_detection import save_event_table_and_fastq, run_kmeralign_exe, create_fastq_line
 from signalalign.fast5 import Fast5
 
 
@@ -522,11 +522,11 @@ def event_detection(work_queue, done_queue, alignment_file, model_file_location,
                     dest = f5fh.get_analysis_events_path_new("SignalAlign")
                     f5fh.ensure_path(dest)
 
-                #todo this is a hack
                 # run our alignment script
-                subprocess.check_call(['python', '-c',
-                                       'import kmeralign ; kmeralign.load_from_raw(fast5_path="{}", nuc_sequence="{}", template_model_file="{}", path_in_fast5="{}")'.format(
-                                           fast5, nucleotide_sequence, model_file_location, dest)])
+                status = run_kmeralign_exe("./", fast5, nucleotide_sequence, model_file_location, dest)
+                # subprocess.check_call(['python', '-c',
+                #                        'import kmeralign ; kmeralign.load_from_raw(fast5_path="{}", nuc_sequence="{}", template_model_file="{}", path_in_fast5="{}")'.format(
+                #                            fast5, nucleotide_sequence, model_file_location, dest)])
 
                 # get events and save to "normal" location
                 with closing(Fast5(fast5, read='r+')) as f5fh:
@@ -541,7 +541,6 @@ def event_detection(work_queue, done_queue, alignment_file, model_file_location,
                     saved_location = save_event_table_and_fastq(f5fh, events, fastq, attributes=attributes)
                     print("[{}] Saved {} events and {} nucleotides to {} in {}".format(
                         service_name, len(events), len(nucleotide_sequence), saved_location, fast5))
-
 
             except Exception as e:
                 # get error and log it
@@ -577,30 +576,30 @@ def discover_single_nucleotide_probabilities(args, working_folder, kmer_length, 
     fast5_to_read, requires_event_calling = organize_fast5s(list_of_fast5s)
     print("[info] built map of fast5 identifiers to read ids with {} elements".format(len(fast5_to_read)))
 
-    # promethION fast5s do not come with events, need to do event calling
-    if len(requires_event_calling) > 0:
-        # log and error checking
-        print("[info] {}/{} fast5s need event detection and read alignment".format(
-            len(requires_event_calling), len(fast5_to_read)))
-        if args.alignment_file is None:
-            print("[error] Cannot perform event detection without alignmentfile", file=sys.stderr)
-            sys.exit(1)
-
-        # prep for event detection
-        event_detection_service_args = {
-            'alignment_file': args.alignment_file,
-            'model_file_location': alignment_args['in_templateHmm'],
-        }
-
-        # do event detection
-        total, failure, messages = run_service(event_detection, requires_event_calling, {}, 'fast5', workers,
-                                               service_arguments=event_detection_service_args)
-
-        # loggit and continue
-        print("[info] {}/{} fast5s successfully had events detected".format(total - failure, total))
-        if failure == total:
-            print("[error] all event detection failed!", file=sys.stderr)
-            sys.exit(1)
+    # # promethION fast5s do not come with events, need to do event calling
+    # if len(requires_event_calling) > 0:
+    #     # log and error checking
+    #     print("[info] {}/{} fast5s need event detection and read alignment".format(
+    #         len(requires_event_calling), len(fast5_to_read)))
+    #     if args.alignment_file is None:
+    #         print("[error] Cannot perform event detection without alignmentfile", file=sys.stderr)
+    #         sys.exit(1)
+    #
+    #     # prep for event detection
+    #     event_detection_service_args = {
+    #         'alignment_file': args.alignment_file,
+    #         'model_file_location': alignment_args['in_templateHmm'],
+    #     }
+    #
+    #     # do event detection
+    #     total, failure, messages = run_service(event_detection, requires_event_calling, {}, 'fast5', workers,
+    #                                            service_arguments=event_detection_service_args)
+    #
+    #     # loggit and continue
+    #     print("[info] {}/{} fast5s successfully had events detected".format(total - failure, total))
+    #     if failure == total:
+    #         print("[error] all event detection failed!", file=sys.stderr)
+    #         sys.exit(1)
 
 
     # do alignment and calling for each step

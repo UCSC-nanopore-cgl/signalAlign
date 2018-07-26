@@ -47,7 +47,7 @@ CuSuite *stBaseAlignerRunAllTests(void) {
 
     return suite;
 }
-//
+
 int main(int argc, char *argv[]) {
     if(argc == 2) {
         st_setLogLevelFromString(argv[1]);

@@ -61,6 +61,7 @@ class Fast5(h5py.File):
     __default_basecall_1d_events__ = 'BaseCalled_{}/Events'
     __default_basecall_1d_model__ = 'BaseCalled_{}/Model'
     __default_basecall_1d_summary__ = 'Summary/basecall_1d_{}'
+    __default_basecall_1d__ = 'BaseCalled_{}'
 
     __default_alignment_analysis__ = 'Alignment'
 
@@ -725,6 +726,9 @@ class Fast5(h5py.File):
 
     def get_analysis_events_path_new(self, name, section=__default_section__):
         return self._join_path(self.get_analysis_new(name), self.__default_basecall_1d_events__.format(section))
+
+    def get_analysis_path_new(self, name, section=__default_section__):
+        return self._join_path(self.get_analysis_new(name), self.__default_basecall_1d__.format(section))
 
     def get_analysis_events_path_latest(self, name, section=__default_section__):
         return self._join_path(self.get_analysis_latest(name), self.__default_basecall_1d_events__.format(section))

@@ -618,7 +618,8 @@ def get_full_nucleotide_read_from_alignment(alignment_location, read_name, hardc
     sequence, qualities, hardclipped_start, hardclipped_end = None, None, 0, 0
     with closing(pysam.AlignmentFile(alignment_location, 'rb' if alignment_location.endswith("bam") else 'r')) as aln:
         for aligned_segment in aln.fetch():
-            if aligned_segment.qname != read_name: continue
+            if read_name not in aligned_segment.qname:
+                continue
             BAM_CHARD_CLIP = 5
 
             # get data and sanity check

@@ -5,21 +5,13 @@
 #include <stdlib.h>
 #include "hdf5.h"
 
-#include <math.h>
-#include <inttypes.h>
-#include <unistd.h>
 #include <eventAligner.h>
-#include <scrappie_structures.h>
 #include "CuTest.h"
-#include "eventAligner.h"
-#include "sonLibString.h"
-#include "sonLibList.h"
 #include "signalMachine.h"
-#include "stateMachine.h"
 
 #define HOME "../" //this is based on where travis runs tests from
 
-#define EVENT_LOCATION "/Analyses/UnitTestEvents"
+#define EVENT_LOCATION "/Analyses"
 
 static void test_fast5_get_raw_read_name(CuTest *testCase) {
     char* path = stString_concat(HOME, "tests/minion_test_reads/RNA_edge_cases/DEAMERNANOPORE_20170922_FAH26525_MN16450_sequencing_run_MA_821_R94_NA12878_mRNA_09_22_17_67136_read_61_ch_151_strand.fast5");
@@ -123,60 +115,7 @@ static void test_fast5_get_raw_samples(CuTest *testCase){
     CuAssertIntEquals(testCase, (unsigned int) end_answer, (unsigned int) rna_table.end);
     CuAssertIntEquals(testCase, (unsigned int) n_answer, (unsigned int) rna_table.n);
     fast5_close(fast5_handle);
-
-
 }
-
-//TODO do we need "set_event_table" without "setbasecalled_event_table"?
-//static void test_fast5_set_event_table(CuTest *testCase){
-//    char* path = stString_concat(HOME, "tests/minion_test_reads/RNA_edge_cases/DEAMERNANOPORE_20170922_FAH26525_MN16450_sequencing_run_MA_821_R94_NA12878_mRNA_09_22_17_67136_read_61_ch_151_strand.fast5");
-//    hid_t fast5_handle = fast5_open(path);
-//    fast5_raw_scaling channel_params = fast5_get_channel_params(fast5_handle);
-//    raw_table rt = fast5_get_raw_samples(fast5_handle, channel_params);
-//    const detector_param* ed_params = &event_detection_rna;
-//
-//    event_table et = detect_events(rt, *ed_params);
-//    fast5_set_event_table(fast5_handle, "Analyses/UnitTest_Events", &et);
-//    size_t n_events = et.n;
-//    event_t dst_buf[n_events];
-//    size_t dst_offset[6]=  {HOFFSET(event_t, start),
-//                            HOFFSET(event_t, length),
-//                            HOFFSET(event_t, mean),
-//                            HOFFSET(event_t, stdv),
-//                            HOFFSET(event_t, pos),
-//                            HOFFSET(event_t, state)};
-//
-//    size_t dst_sizes[6] = {sizeof(dst_buf[0].start),
-//                           sizeof(dst_buf[0].length),
-//                           sizeof(dst_buf[0].mean),
-//                           sizeof(dst_buf[0].stdv),
-//                           sizeof(dst_buf[0].pos),
-//                           sizeof(dst_buf[0].state)};
-//    size_t dst_size = sizeof(event_t);
-//
-//    //TODO
-//    //H5TBread_table( fast5_handle, "Analyses/UnitTest_Events", dst_size, dst_offset, dst_sizes, dst_buf );
-//
-//    CuAssertIntEquals(testCase, 0, (int) dst_buf[0].start);
-//    CuAssertDblEquals(testCase, 7.000000, dst_buf[0].length, 0.001);
-//    CuAssertDblEquals(testCase, 92.086693, dst_buf[0].mean, 0.001);
-//    CuAssertDblEquals(testCase, 3.655048, dst_buf[0].stdv, 0.001);
-//    CuAssertIntEquals(testCase, -1, dst_buf[0].pos);
-//    CuAssertIntEquals(testCase, -1, dst_buf[0].state);
-//
-//    CuAssertIntEquals(testCase, 7, (int) dst_buf[1].start);
-//    CuAssertDblEquals(testCase, 15.000000, dst_buf[1].length, 0.001);
-//    CuAssertDblEquals(testCase, 87.082771, dst_buf[1].mean, 0.001);
-//    CuAssertDblEquals(testCase, 1.637721, dst_buf[1].stdv, 0.001);
-//    CuAssertIntEquals(testCase, -1, dst_buf[1].pos);
-//    CuAssertIntEquals(testCase, -1, dst_buf[1].state);
-//    //TODO
-//    //H5TBdelete_record (fast5_handle, "Analyses/SignalAlign_Basecall_1D_000/Events", 0, n_events);
-//    H5Ldelete( fast5_handle, "Analyses/UnitTest_Events", H5P_DEFAULT );
-//
-//    fast5_close(fast5_handle);
-//
-//}
 
 static void test_fast5_get_start_time(CuTest *testCase){
     char* path = stString_concat(HOME, "tests/minion_test_reads/RNA_edge_cases/DEAMERNANOPORE_20170922_FAH26525_MN16450_sequencing_run_MA_821_R94_NA12878_mRNA_09_22_17_67136_read_61_ch_151_strand.fast5");
@@ -248,7 +187,7 @@ static void test_fast5_set_basecall_event_table(CuTest *testCase){
     //open and read
     fast5_handle = fast5_open(path);
     basecalled_event dst_buf[2];
-    status = fast5_get_basecall_events(fast5_handle, EVENT_LOCATION, dst_buf);
+    status = fast5_get_basecall_events(fast5_handle, stString_concat(EVENT_LOCATION, "/Events"), dst_buf);
     CuAssertIntEquals(testCase, 0, (int) status);
 
     CuAssertIntEquals(testCase, 0, (int) dst_buf[0].raw_start);
@@ -271,13 +210,55 @@ static void test_fast5_set_basecall_event_table(CuTest *testCase){
     CuAssertStrEquals(testCase, "TTACA", dst_buf[1].model_state);
     CuAssertIntEquals(testCase, 1, dst_buf[1].move);
 
-    H5Ldelete( fast5_handle, EVENT_LOCATION, H5P_DEFAULT );
+    H5Ldelete( fast5_handle, stString_concat(EVENT_LOCATION, "/Events"), H5P_DEFAULT );
 
     fast5_close(fast5_handle);
 
 }
 
 static void test_alignment_to_base_event_map(CuTest *testCase){
+    char* templateModelFile = stString_concat(HOME, "/models/testModelR9p4_5mer_acegt_template.model");
+    StateMachine *sM = stateMachine3_loadFromFile(templateModelFile, threeState, emissions_kmer_getGapProb,
+                                                  emissions_signal_strawManGetKmerEventMatchProbWithDescaling_MeanOnly,
+                                                  stateMachine3_loadTransitionsFromFile, NULL);
+
+    char* path = stString_concat(HOME, "tests/minion_test_reads/1D/LomanLabz_PC_20161025_FNFAB42699_MN17633_sequencing_run_20161025_E_coli_native_450bps_82361_ch112_read108_strand.fast5");
+    hid_t fast5_handle = fast5_open(path);
+    fast5_raw_scaling channel_params = fast5_get_channel_params(fast5_handle);
+    raw_table rt = fast5_get_raw_samples(fast5_handle, channel_params);
+    int trim_start = 200;
+    int trim_end = 10;
+    int varseg_chunk = 100;
+    float varseg_thresh = 0.0;
+    trim_and_segment_raw(rt, trim_start, trim_end, varseg_chunk, varseg_thresh);
+    const detector_param *ed_params = &event_detection_defaults;
+
+    char* sequence = "TGCATGCCGTTTCCGTTACGTATTGCTAATCACGGGTGACGCCGTTTTCGCGCATTGAGCGAATCAGCAAAACCATCGCTAAACCACGGCTAACCCGGCGATGTGTGCTCCGTTCTCATCGACATCCCAAACCGTCAAACCATCCGGCGACAATCAGATCAGCGCAAAGATAATTAACCCACGTTGCAGGTAAATGCCACTTTGCGGATCGCGTTCGCCGTAGCCAGACGTAGCCCATCAGCACGCCACCACGCCAAGCCCGCCAAACCGGCCGCTGAATTTTGCTGCACATAGCCGCTTAACAGGGCGCTGATGGCGTAATGACGAGGTGGCTTACCGCTACCGAGGCGTTTTCCACCGCACCGCCGAGATACCACCACCAAGAGCAGGTTAAAGGGATCAGCGAAATTGCATTAACGCGTGGGTGGTAACGCCAGAACTCAAATTTCGTGTTGGATCCGAATGGCGGGGCCAGCCATAACGTCACTTCCTGATCGCCGGGGTACATGGCAATAAACACCACCACGCAGGCGATCATCATCACCCGGTTACCGGACCTGCGCGTTCACACCAAGGCGGCAAAGGATAACGGCGATAATGCAGGCCCTGCCGACCATGGCCTGCCTGCCAGCTCGCCGCCAGATAACACGCGCGGATCTGCCGGTTTCGAAAACGCGCCAGCTCCGCCCGTACGCTATCGGCACAGGACTCATCCGCCAGCCAGACATCGCTTTGGTTATGTTGTTGGTCGTGGGGATAATACCCTGCGTCGCCATGTAATCAACAAACGCCTGCGCCACGCGGGGATTGTAAAAGTGTCATCAGCATCGTTGCTGTCATATTCCACAAGGGACAGTATAAAGCGTTACGCGCCGTACGCCACCTCTGCGGAAACTGACGTTGCCGGGCTTCAAGCCGCCGTCAATGCTATGAACCACATCGTAGCCCTGTTGCAGCAGATGCTGCGCCGCGCCTTTGCTGCTGTGCCGTGATAACACATCACCATCACCGGGTGTCAAAGTCGTTATCACGCATAAAAGCGCCCAGCGTGTCGTTGGTTAAATGGAAAGCCTGCACCACTGTCCATTGCGAAACTCTGTGGATCCGCCTTGAATATCAGAGCCAGCACCGCCTCTTTCCTGCAACTTCTGGTGCGCGTCGGCAGCGTTAATGCATTGAACTGATCCATGCGTCTCTCTTTCTTTGACAAGTGGGCAGAATTACCGCACAGTTTACGTCGAAGCGGCAGATAAACGCCATAATGTTGCCATATCATAAAATGTTTTCAATGTTACCCCGCGATTCTTTGCTAATATGTTCGATAACGAACATTTATGAGCTTTAACGAAAGTGAATGAGGGCGGCATGACCAAAGATCTGATTGTGATGGGGGCGGCATCAATGGTGCTGGTATCGCGGCAGACGCCGCTGGACGCGGACCTCCGTGCTGATGCTGGGCGCAGGATCTCGCTTGCGGCCTCTTCCGCCAGTTCAAACTCATTCGGTGGCCTGCATACCTTGAGCACTATAATTCCGCTTTGGTCAGCGAGGCGCTGAACGTGAAGTGCTGCTGAAAATGGCCCCGCATATCGCGCCTTCCCGATGCGTTTCGCCTGCCATCGTCCGCATCTGCGCCCGGCGTGGATGATTCGCATTGGTCTGTTTATGTACGATCATCTGGGTAAACGCACCAGCTTGCCGGGATCAACTGGTTTGCGTTTTGGCGCAAATTCAGTGTTGAAATTAGCGCGGATTCCAGATATTCTGACTGTTGGTGGGCGACGCCCGTCTGGTACTCGCCAACGCCCAGATGGTGTGGTGCGTAAAGGCGGCGAAGTGCTACTCGGACTCGCGCCACCTCTGCTCGCCGCGAAACGGCCTGTGGATTGTGGAAGCGGAAGATCGATACCGGCAAAAATATAGCTGGCAAGCGCGCGGCAGTTAACGCGCCACCGGCCCGTGGGGTGAAACAGTTCTTCGACGACGGGATGCATCTGCCTTCGCCTTATGGCATTCGCCTGATCAAGGCAGCCATATTGTGGTGCCGCGCGTGCATGCAAGCAAGCCTACATTCTGCAAAACGAGATAAACGTATTGTGTTCGTGATCCCGTGGATGGACGAGTTTTCCATCATCGGCACTACCGATGTCGAGTACAAAGGCGAATCGAAAGCGGTGAAGATTGAAGAGTGAAATCAATTACCTGCTGAATAACACGCACTTTAAAAAGCCAGTTAAGCCATTGACGATATCGTCTGGACCTACTCCGGTGTGCGTCCGCTGTGTGATGATAGGTCGACTCGCCGCAGGCTATTACCCGTGATTACACCCTTGATATTCGCGGTGAAATGGCAAGCACCGCTGCTGTCGGTATTCGGCGGTAAGCTGACCACCTACCGAAAACTGGCGGAACATGCGCTGGAAAACTAACGCCGTATTATCAGGGTATTGGCCCGGCATGGACGAAAGAGAGTGTGCTACCGGGTGGCGCCATTGAAGCGACCGCGACGTTAATACCGCTCGCCTGCGCCGCCGCTATCCGTTCCTGACTGAATCGCTGGCGCGTCGTACGCTCGCACTTACGGCAGCAACAGCGAGCTGCTGCTCGGCAATGCAGGAACGGTAAGCGATCTCAGGGAAGATTTCGGTCATGGGTTCTACAAGCGGAGCTGAAATACGGTGGATGGGTCCACCGCCGACGACGCCCTGTAGTCGCACAAGTAAGGCATGTGGCTAAATGCGGATCAACAATCTCGTGTGAGTCGGTGGCTGGTGGAGTATACGCAGCAGGTTATCATGGCGTCGTAAATTAACGTAAGGTGATCGGTCAGATTTCGACTGGCCTGAGACTGATGACAAACCTACAAAACTGCCTGATGCGCTTCGCTTATCAGGCCTACGTAGTTTATGCAATATATTGAATTTGCATGGTCTTGTAGGCCAGATAAGACGTTCACGTCGCATCCGGCATGAACTCAGCACTTTGTCAAAAATCTAACCTACTTTTAATTCAGGGAATTACCGCAAAGCCCACATACCATCATGCAACGTAACAAAACTCAGGCACGTTCCCCTCGCCCCGAGAAAATAGCATTAATGCGCCCAGCGCCAGCATAAAAATTTTGAGCGGTGGTGTTGGCGTGATAATACAAACTAATAATACCGGCAAGTCCGACACCCAGCATGTAACCACCGCCAAAATTGCGCCAGTATGGGGATGCCGAAAAGTCATTACAACGAGGTCAAAATCCATTTCTGTTTTGCATTATTCTTCCATTCTTTTGAATGGTGAAGTGCTCCCGTGTTATACTTATGGACACTTTTCGAAATGATGGCGGAAAAACGGGACCGCTGGCCCCGTTCTGGCTGACCGGTGAACTTACAATCTCACCGGATCGATATGCCAGATATGATCGGCGTACTCTTTGATGGTACGGTCAGAAGAAGTAGCCCATATTGGCAATGTTCAACATCGCTTTGCGGTCCCACTCTTCCTGAAGCTCGTAGGGACATCGACTTTATCTGACAATCGACATAGCTGCGATAATCCATGAGTACGTATTGATCGCCGCCAGTTGATCAGCAGTCAACAGGTCGCGATAGCGACCGGATCTTCCGGACCCACCGCTGCCGATTTGCGTCGGCACCTGGTGCAGCTCCTCATCTTTCTCGTAGTATTCACGCGGTTGTAGCCCTGACGACGCGCAGTTCTTCCACTTCCGCTGTGTTACCAAAATAAGATATTGTCAGCGCCGACATGATCAGCATCTCGTATTCACCTCAACGCGATAGTCAGCGCACCGTTAAGCGCAAACTTCACGTATTACTGGTGCCGGAAGCTGCGTCCCTGCCAGCGAAATCTGTTCGAACAGATCTGCCGCCGGAATGATCAGCTGCGCCGGTTCTTGTAGTTCAGGATGAACACGACTTTCAACATCGCCAATCTGCGGATCGTTGTTGATCACTTTCGCTACGTCATTGATCAAATGAATAATGTGCTTCGCCATGTAATAGGCCGAAACCGCCTTACCGCCAAAATATTCACGCGCGGCCCACTTCGCATCGGTCGGCCTTGATGCGGTTGCGTAATCACATGCAACACATTCATCAATTGACGTTTGTATTCGTGAATACGTTTGGTTGTACATCGAACAACGCCTTTGGATTCACCACCACATTCAGCTGCTGGGCGATATACTCTGCCAGACGCTTTTGTTCTCCAGCCATGATGCACAGCGTGATTAACCATTGGGAAATCACAGTGTTGTTTTTGCAACTCATTAAGCAGGCTAAGGTCGGTGCCAGTTGCGGCCAGGTGTTCGTCCAGCACGGCTGAAGCGATGGGTTCGCTACCGCCAGCCAGCGACGCGGCGTACACCGTTGGTGACGTTGGTGAAACTGACCGGGAAGATTTCGCAAAGTCGGCAAACAACGTTGCACCATCAGTTAGAGTGCAGTTCCGATACACCGTTAACTGTGGCTCACAACAACCGCCAGCCGGGCCATACGCACGACGACCGTTGGATTCATCAATGATCGACGCCCGTCCCAGCGCAGATCGGTATCGTTCAGTTCTACTGTTCCTGCAAGTTTCAGAAATAGTCGTTGATTTCAAGATGATCTGCAGGTGACGCGGCAAATTTTACCAGCATATCAACCGGCGGGTTTCCAGCGCCTCGCTCATCAGCGTGGTTAGTGTAGGAAGACCTGACAACACACCTCAAACGCGTCGTCCAGCTAAATTGGTGCTCATCGATCAGCAGACGCATCCTCTCAGGAATCGACAATTGCGGATGGGTATCATTGAGATGATCGCGATTTTATCCGCCAGGTTATCGTAGGTTTTATGCAACTGATAATGGCGGCAAATGTCCCTGAATGGTCGAAACCGGGAAGTATTCTGACGCAGGCACAGCTCACGCCAGGTAAATTGAGTCATCCGGATACAACCGCGAGATACGTTCTCGAGTGGTTTTATCTTCTTCCACTGCCGCGAAGTAGTCACCTGGTTGAATTACCGAGTTAATTTCGCTAAACGCGCACTCCACAAACGCAGCGTGTTGGTCGCACGTCGGTGTCGTAACCGAGGATTATCGTAAGCGACTCCCAGAATCTCTTCGGTTTTCAATCCAGCGCGTTTTACCTTCCTGCTGAATGCACGTACGCCAAAACGGACTTTATATGGCGCGTGTTGTGGCGTTTGAATTCCACAGGTTACCGTATTCCAGCCAGTAGTCTGGCGACTCTTTCTGGCTACCGTTAACGATGTTCTGCTTGAACATACCCATGGTCATAGCGGATGCCGTAACCACGCCCAGCAGCCCTAACGTCGCCAGAATCAAAGGAAGCAAGCCGCCAGACGTCCCAGGCACCGTGCGAGGCACGGATCGACACCTTCATCAATCAGCTCTTCAGTTAACCCATCGCTTCCAGTGCGCCCTGTACATCTTCGTAAATTCTAGCGACAACATGGCGTTGGAGGCTTGTTAATCAAAACTCCATCGACTGGTATTAAACCTGATGAGTTTCTTACGACAACTGGGCACGGTTTGAACGTAACCAGCGCTCCGGACGATCGCGCACAGCAAATAACGTTGCGTTGTGATCATGTTGTGGCGACGACCGGGTTCCTTTCAATCGTAAACATCAGCTTGTAAGCGATAGAGTGTAGGCTTCTACGCGCTAAGCGTGGGCGATAGATATGTAAACGGAGCGATATATAAACCACAAACTAACACAAGCGATAGTAGCTCACGGTACGACTTCGCCGCGACCTGCCAGCTAAAATCCATTGCCATAGCCTGACGTTTGCACAAACCGCCACAGTGAAGGACGGGACCACAGTACAAAAGCACGTCCGAATAGCCCGTAACAGCGACCGGGCATTACTATCTTCAAGACAAAGCCACAGCGACGCCATCTGCAAGGTTCTCGAGAACGATCCAGAAACCGTGTCATAAACCCACCGGTGCACATAACGGCAACGTACCATGCTTCAATCCATAAAGTTGCGTTAAGCCGCACGGTTCAAGCGGCTGGGCACCAGGGCCAGCGTCCGCGCCGCCCTTAATGCGATGCGAAAATGCTTCGTGACCATCAGGCGCCCACCCTGACCGGGGTATTCCGCTGCCGCCGCAAAACCTTCCTGCAACGCACCGGATCGCCCGCGCCGAGGTAGCATAACGCCCTGCTCCAGAAGACCCGGTAGGCTTCCAGCACCGGGTCAGACGCTCTGGCTGGTCGGGCGGCTCACCACCGCAAAAGCGGCACTTTATCGTCAACGCCGCCCCATTGCGATTTGTAACTGGCGCTTATTTTCCGCTTTATCTTCAACGTATCGCGGGTGTATGAGGCCAACAGTAAGTCGATCTCTGGGCTCCGTTTTCTCCCACGCCGTTCAGTACGCCGGAAGACGCCCTTCACGGTGACAGCACGTAGACCTTCGCGCCACCGTGAGCAAACTGCGGTCGGTGATCTCGCGAGCGTGGTTGGACGACCGCCGTAATGCTTGATCGGCATGGTACAGACCGGCCTTCAGAAACT";
+    event_table et = detect_events(rt, *ed_params);
+    stList* kmer_list = build_kmer_list(sequence, sM->kmerLength, FALSE);
+
+    NanoporeReadAdjustmentParameters test_squiggle_scalings = estimate_scalings_using_mom(kmer_list, *sM, et);
+    update_SignalMachineWithNanoporeParameters(test_squiggle_scalings, sM);
+    stList* event_alignment = adaptive_banded_simple_event_align(et, sM, kmer_list);
+    float start_time = fast5_get_start_time(fast5_handle);
+    basecalled_event_table* b_et = event_table_to_basecalled_table(&et, channel_params, start_time);
+    alignment_to_base_event_map(event_alignment, b_et, kmer_list, sM);
+    char* prev_kmer = b_et->event[0].model_state;
+    int move;
+    int k = (int) sM->kmerLength;
+    for (int i = 1; i < b_et->n; i++){
+        move = b_et->event[i].move;
+        if (strlen(prev_kmer) > 0) {
+            CuAssertStrEquals(testCase, stString_getSubString(prev_kmer, move, k-move),
+                              stString_getSubString(b_et->event[i].model_state, 0, k-move));
+        }
+        prev_kmer = b_et->event[i].model_state;
+    }
+    fast5_close(fast5_handle);
+
+}
+
+static void test_rna_alignment_to_base_event_map(CuTest *testCase){
     char* templateModelFile = stString_concat(HOME, "/models/testModelR9p4_5mer_acgt_RNA.model");
     StateMachine *sM = stateMachine3_loadFromFile(templateModelFile, threeState, emissions_kmer_getGapProb,
                                                   emissions_signal_strawManGetKmerEventMatchProbWithDescaling_MeanOnly,
@@ -295,24 +276,39 @@ static void test_alignment_to_base_event_map(CuTest *testCase){
     const detector_param* ed_params = &event_detection_rna;
 
     const char* sequence = "CAUCCUGCCCUGUGUUAUCCAGUUAUGAGAUAAAAAAUGAAUAUAAGAGUGCUUGUCAUUAUAAAAGUUUUCCUUUUUAUUACCAUCCAAGCCACCAGCUGCCAGCCACCAGCAGCCAGCUGCCAGCACUAGCUUUUUUUUUUUAGCACUUAGUAUUUAGCAGCAUUUAUUAACAGGUACUUUAAGAAUGAUGAAGCAUUGUUUUAAUCUCACUGACUAUGAAGGUUUUAGUUUCUGCUUUUGCAAUUGUGUUUGUGAAAUUUGAAUACUUGCAGGCUUUGUAUGUGAAUAAUUUUAGCGGCUGGUUGGAGAUAAUCCUACGGGAAUUACUUAAAACUGUGCUUUAACUAAAAUGAAUGAGCUUUAAAAUCCCUCCUCCUACUCCAUCAUCAUCCCACUAUUCAUCUUAUCUCAUUAUCAUCAACCUAUCCCACAUCCCUAUCACCACAGCAAUCCAA";
-    char* new_sequence = stString_ReverseString(stString_replace(sequence, "U", "T"));
-    event_table et = detect_events(rt, *ed_params);
 
-    NanoporeReadAdjustmentParameters test_squiggle_scalings = estimate_scalings_using_mom(new_sequence, *sM, et);
+    event_table et = detect_events(rt, *ed_params);
+    event_table et2 = reverse_events(et);
+    et = et2;
+    stList* kmer_list = build_kmer_list(sequence, sM->kmerLength, TRUE);
+
+    NanoporeReadAdjustmentParameters test_squiggle_scalings = estimate_scalings_using_mom(kmer_list, *sM, et);
     update_SignalMachineWithNanoporeParameters(test_squiggle_scalings, sM);
-    stList* event_alignment = adaptive_banded_simple_event_align(et, sM, new_sequence);
+    stList* event_alignment = adaptive_banded_simple_event_align(et, sM, kmer_list);
     float start_time = fast5_get_start_time(fast5_handle);
     basecalled_event_table* b_et = event_table_to_basecalled_table(&et, channel_params, start_time);
-    alignment_to_base_event_map(event_alignment, b_et, new_sequence, sM);
+    rna_alignment_to_base_event_map(event_alignment, b_et, kmer_list, sM);
+    basecalled_event_table *bet2 = reverse_basecalled_events(b_et);
+    free(b_et);
+    b_et = bet2;
+
     char* prev_kmer = b_et->event[0].model_state;
     int move;
     int k = (int) sM->kmerLength;
     for (int i = 1; i < b_et->n; i++){
+
+//        printf("%i\n", b_et->event[i].move);
+//        printf("%s\n", b_et->event[i].model_state);
+//        printf("%" PRId64 "\n\n", b_et->event[i].raw_start);
+
         move = b_et->event[i].move;
-        CuAssertStrEquals(testCase, stString_getSubString(prev_kmer, move, k-move),
-                          stString_getSubString(b_et->event[i].model_state, 0, k-move));
+        if (strlen(prev_kmer) > 0) {
+            CuAssertStrEquals(testCase, stString_getSubString(prev_kmer, move, k-move),
+                              stString_getSubString(b_et->event[i].model_state, 0, k-move));
+        }
         prev_kmer = b_et->event[i].model_state;
     }
+
     fast5_close(fast5_handle);
 
 }
@@ -336,7 +332,9 @@ static void test_estimate_scalings_using_mom(CuTest *testCase){
     const char* sequence = "CAUCCUGCCCUGUGUUAUCCAGUUAUGAGAUAAAAAAUGAAUAUAAGAGUGCUUGUCAUUAUAAAAGUUUUCCUUUUUAUUACCAUCCAAGCCACCAGCUGCCAGCCACCAGCAGCCAGCUGCCAGCACUAGCUUUUUUUUUUUAGCACUUAGUAUUUAGCAGCAUUUAUUAACAGGUACUUUAAGAAUGAUGAAGCAUUGUUUUAAUCUCACUGACUAUGAAGGUUUUAGUUUCUGCUUUUGCAAUUGUGUUUGUGAAAUUUGAAUACUUGCAGGCUUUGUAUGUGAAUAAUUUUAGCGGCUGGUUGGAGAUAAUCCUACGGGAAUUACUUAAAACUGUGCUUUAACUAAAAUGAAUGAGCUUUAAAAUCCCUCCUCCUACUCCAUCAUCAUCCCACUAUUCAUCUUAUCUCAUUAUCAUCAACCUAUCCCACAUCCCUAUCACCACAGCAAUCCAA";
     char* new_sequence = stString_ReverseString(stString_replace(sequence, "U", "T"));
     event_table et = detect_events(rt, *ed_params);
-    NanoporeReadAdjustmentParameters test_squiggle_scalings = estimate_scalings_using_mom(new_sequence, *sM, et);
+    stList* kmer_list = build_kmer_list(sequence, sM->kmerLength, TRUE);
+
+    NanoporeReadAdjustmentParameters test_squiggle_scalings = estimate_scalings_using_mom(kmer_list, *sM, et);
     CuAssertDblEquals(testCase, 1.016111, test_squiggle_scalings.scale, 0.0001);
     CuAssertDblEquals(testCase, 20.720264, test_squiggle_scalings.shift, 0.0001);
     free(new_sequence);
@@ -417,18 +415,19 @@ static void test_adaptive_banded_simple_event_align(CuTest *testCase){
     const detector_param* ed_params = &event_detection_rna;
 
     const char* sequence = "CAUCCUGCCCUGUGUUAUCCAGUUAUGAGAUAAAAAAUGAAUAUAAGAGUGCUUGUCAUUAUAAAAGUUUUCCUUUUUAUUACCAUCCAAGCCACCAGCUGCCAGCCACCAGCAGCCAGCUGCCAGCACUAGCUUUUUUUUUUUAGCACUUAGUAUUUAGCAGCAUUUAUUAACAGGUACUUUAAGAAUGAUGAAGCAUUGUUUUAAUCUCACUGACUAUGAAGGUUUUAGUUUCUGCUUUUGCAAUUGUGUUUGUGAAAUUUGAAUACUUGCAGGCUUUGUAUGUGAAUAAUUUUAGCGGCUGGUUGGAGAUAAUCCUACGGGAAUUACUUAAAACUGUGCUUUAACUAAAAUGAAUGAGCUUUAAAAUCCCUCCUCCUACUCCAUCAUCAUCCCACUAUUCAUCUUAUCUCAUUAUCAUCAACCUAUCCCACAUCCCUAUCACCACAGCAAUCCAA";
-    char* new_sequence = stString_ReverseString(stString_replace(sequence, "U", "T"));
     event_table et = detect_events(rt, *ed_params);
+    event_table et2 = reverse_events(et);
+    et = et2;
+    stList* kmer_list = build_kmer_list(sequence, sM->kmerLength, TRUE);
 
-    NanoporeReadAdjustmentParameters test_squiggle_scalings = estimate_scalings_using_mom(new_sequence, *sM, et);
+    NanoporeReadAdjustmentParameters test_squiggle_scalings = estimate_scalings_using_mom(kmer_list, *sM, et);
     update_SignalMachineWithNanoporeParameters(test_squiggle_scalings, sM);
-    stList* something = adaptive_banded_simple_event_align(et, sM, new_sequence);
+    stList* something = adaptive_banded_simple_event_align(et, sM, kmer_list);
     struct AlignedPair *test_end = (struct AlignedPair*) stList_pop(something);
     CuAssertIntEquals(testCase, 453, test_end->ref_pos);
     CuAssertIntEquals(testCase, 1219, test_end->read_pos);
     fast5_close(fast5_handle);
 }
-
 
 static void test_load_from_raw_rna(CuTest *testCase) {
     char* path = stString_concat(HOME, "tests/minion_test_reads/RNA_edge_cases/DEAMERNANOPORE_20170922_FAH26525_MN16450_sequencing_run_MA_821_R94_NA12878_mRNA_09_22_17_67136_read_61_ch_151_strand.fast5");
@@ -441,7 +440,7 @@ static void test_load_from_raw_rna(CuTest *testCase) {
 
     int new_event_n = 1220; //how many events are generated (empirically determined)
     basecalled_event new_events[new_event_n + 1];
-    fast5_get_basecall_events(fast5_handle, EVENT_LOCATION, new_events);
+    fast5_get_basecall_events(fast5_handle, stString_concat(EVENT_LOCATION, "/Events"), new_events);
 
     int old_event_n = 1719; //how many events were called
     basecalled_event old_events[old_event_n + 1];
@@ -453,24 +452,23 @@ static void test_load_from_raw_rna(CuTest *testCase) {
     CuAssertStrEquals(testCase, "AACCT", old_events[0].model_state);
     CuAssertStrEquals(testCase, "CCTAC", old_events[old_event_n - 1].model_state);
 
-    status = H5Ldelete( fast5_handle, EVENT_LOCATION, H5P_DEFAULT );
+    status = H5Ldelete( fast5_handle, stString_concat(EVENT_LOCATION, "/Events"), H5P_DEFAULT );
     CuAssertIntEquals(testCase, 0, (int) status);
     fast5_close(fast5_handle);
 }
-
 
 static void test_load_from_raw_dna(CuTest *testCase){
     char* path = stString_concat(HOME, "tests/minion_test_reads/1D/LomanLabz_PC_20161025_FNFAB42699_MN17633_sequencing_run_20161025_E_coli_native_450bps_82361_ch112_read108_strand.fast5");
     char* templateModelFile = stString_concat(HOME, "models/testModelR9p4_5mer_acegt_template.model");
     char* sequence = "TGCATGCCGTTTCCGTTACGTATTGCTAATCACGGGTGACGCCGTTTTCGCGCATTGAGCGAATCAGCAAAACCATCGCTAAACCACGGCTAACCCGGCGATGTGTGCTCCGTTCTCATCGACATCCCAAACCGTCAAACCATCCGGCGACAATCAGATCAGCGCAAAGATAATTAACCCACGTTGCAGGTAAATGCCACTTTGCGGATCGCGTTCGCCGTAGCCAGACGTAGCCCATCAGCACGCCACCACGCCAAGCCCGCCAAACCGGCCGCTGAATTTTGCTGCACATAGCCGCTTAACAGGGCGCTGATGGCGTAATGACGAGGTGGCTTACCGCTACCGAGGCGTTTTCCACCGCACCGCCGAGATACCACCACCAAGAGCAGGTTAAAGGGATCAGCGAAATTGCATTAACGCGTGGGTGGTAACGCCAGAACTCAAATTTCGTGTTGGATCCGAATGGCGGGGCCAGCCATAACGTCACTTCCTGATCGCCGGGGTACATGGCAATAAACACCACCACGCAGGCGATCATCATCACCCGGTTACCGGACCTGCGCGTTCACACCAAGGCGGCAAAGGATAACGGCGATAATGCAGGCCCTGCCGACCATGGCCTGCCTGCCAGCTCGCCGCCAGATAACACGCGCGGATCTGCCGGTTTCGAAAACGCGCCAGCTCCGCCCGTACGCTATCGGCACAGGACTCATCCGCCAGCCAGACATCGCTTTGGTTATGTTGTTGGTCGTGGGGATAATACCCTGCGTCGCCATGTAATCAACAAACGCCTGCGCCACGCGGGGATTGTAAAAGTGTCATCAGCATCGTTGCTGTCATATTCCACAAGGGACAGTATAAAGCGTTACGCGCCGTACGCCACCTCTGCGGAAACTGACGTTGCCGGGCTTCAAGCCGCCGTCAATGCTATGAACCACATCGTAGCCCTGTTGCAGCAGATGCTGCGCCGCGCCTTTGCTGCTGTGCCGTGATAACACATCACCATCACCGGGTGTCAAAGTCGTTATCACGCATAAAAGCGCCCAGCGTGTCGTTGGTTAAATGGAAAGCCTGCACCACTGTCCATTGCGAAACTCTGTGGATCCGCCTTGAATATCAGAGCCAGCACCGCCTCTTTCCTGCAACTTCTGGTGCGCGTCGGCAGCGTTAATGCATTGAACTGATCCATGCGTCTCTCTTTCTTTGACAAGTGGGCAGAATTACCGCACAGTTTACGTCGAAGCGGCAGATAAACGCCATAATGTTGCCATATCATAAAATGTTTTCAATGTTACCCCGCGATTCTTTGCTAATATGTTCGATAACGAACATTTATGAGCTTTAACGAAAGTGAATGAGGGCGGCATGACCAAAGATCTGATTGTGATGGGGGCGGCATCAATGGTGCTGGTATCGCGGCAGACGCCGCTGGACGCGGACCTCCGTGCTGATGCTGGGCGCAGGATCTCGCTTGCGGCCTCTTCCGCCAGTTCAAACTCATTCGGTGGCCTGCATACCTTGAGCACTATAATTCCGCTTTGGTCAGCGAGGCGCTGAACGTGAAGTGCTGCTGAAAATGGCCCCGCATATCGCGCCTTCCCGATGCGTTTCGCCTGCCATCGTCCGCATCTGCGCCCGGCGTGGATGATTCGCATTGGTCTGTTTATGTACGATCATCTGGGTAAACGCACCAGCTTGCCGGGATCAACTGGTTTGCGTTTTGGCGCAAATTCAGTGTTGAAATTAGCGCGGATTCCAGATATTCTGACTGTTGGTGGGCGACGCCCGTCTGGTACTCGCCAACGCCCAGATGGTGTGGTGCGTAAAGGCGGCGAAGTGCTACTCGGACTCGCGCCACCTCTGCTCGCCGCGAAACGGCCTGTGGATTGTGGAAGCGGAAGATCGATACCGGCAAAAATATAGCTGGCAAGCGCGCGGCAGTTAACGCGCCACCGGCCCGTGGGGTGAAACAGTTCTTCGACGACGGGATGCATCTGCCTTCGCCTTATGGCATTCGCCTGATCAAGGCAGCCATATTGTGGTGCCGCGCGTGCATGCAAGCAAGCCTACATTCTGCAAAACGAGATAAACGTATTGTGTTCGTGATCCCGTGGATGGACGAGTTTTCCATCATCGGCACTACCGATGTCGAGTACAAAGGCGAATCGAAAGCGGTGAAGATTGAAGAGTGAAATCAATTACCTGCTGAATAACACGCACTTTAAAAAGCCAGTTAAGCCATTGACGATATCGTCTGGACCTACTCCGGTGTGCGTCCGCTGTGTGATGATAGGTCGACTCGCCGCAGGCTATTACCCGTGATTACACCCTTGATATTCGCGGTGAAATGGCAAGCACCGCTGCTGTCGGTATTCGGCGGTAAGCTGACCACCTACCGAAAACTGGCGGAACATGCGCTGGAAAACTAACGCCGTATTATCAGGGTATTGGCCCGGCATGGACGAAAGAGAGTGTGCTACCGGGTGGCGCCATTGAAGCGACCGCGACGTTAATACCGCTCGCCTGCGCCGCCGCTATCCGTTCCTGACTGAATCGCTGGCGCGTCGTACGCTCGCACTTACGGCAGCAACAGCGAGCTGCTGCTCGGCAATGCAGGAACGGTAAGCGATCTCAGGGAAGATTTCGGTCATGGGTTCTACAAGCGGAGCTGAAATACGGTGGATGGGTCCACCGCCGACGACGCCCTGTAGTCGCACAAGTAAGGCATGTGGCTAAATGCGGATCAACAATCTCGTGTGAGTCGGTGGCTGGTGGAGTATACGCAGCAGGTTATCATGGCGTCGTAAATTAACGTAAGGTGATCGGTCAGATTTCGACTGGCCTGAGACTGATGACAAACCTACAAAACTGCCTGATGCGCTTCGCTTATCAGGCCTACGTAGTTTATGCAATATATTGAATTTGCATGGTCTTGTAGGCCAGATAAGACGTTCACGTCGCATCCGGCATGAACTCAGCACTTTGTCAAAAATCTAACCTACTTTTAATTCAGGGAATTACCGCAAAGCCCACATACCATCATGCAACGTAACAAAACTCAGGCACGTTCCCCTCGCCCCGAGAAAATAGCATTAATGCGCCCAGCGCCAGCATAAAAATTTTGAGCGGTGGTGTTGGCGTGATAATACAAACTAATAATACCGGCAAGTCCGACACCCAGCATGTAACCACCGCCAAAATTGCGCCAGTATGGGGATGCCGAAAAGTCATTACAACGAGGTCAAAATCCATTTCTGTTTTGCATTATTCTTCCATTCTTTTGAATGGTGAAGTGCTCCCGTGTTATACTTATGGACACTTTTCGAAATGATGGCGGAAAAACGGGACCGCTGGCCCCGTTCTGGCTGACCGGTGAACTTACAATCTCACCGGATCGATATGCCAGATATGATCGGCGTACTCTTTGATGGTACGGTCAGAAGAAGTAGCCCATATTGGCAATGTTCAACATCGCTTTGCGGTCCCACTCTTCCTGAAGCTCGTAGGGACATCGACTTTATCTGACAATCGACATAGCTGCGATAATCCATGAGTACGTATTGATCGCCGCCAGTTGATCAGCAGTCAACAGGTCGCGATAGCGACCGGATCTTCCGGACCCACCGCTGCCGATTTGCGTCGGCACCTGGTGCAGCTCCTCATCTTTCTCGTAGTATTCACGCGGTTGTAGCCCTGACGACGCGCAGTTCTTCCACTTCCGCTGTGTTACCAAAATAAGATATTGTCAGCGCCGACATGATCAGCATCTCGTATTCACCTCAACGCGATAGTCAGCGCACCGTTAAGCGCAAACTTCACGTATTACTGGTGCCGGAAGCTGCGTCCCTGCCAGCGAAATCTGTTCGAACAGATCTGCCGCCGGAATGATCAGCTGCGCCGGTTCTTGTAGTTCAGGATGAACACGACTTTCAACATCGCCAATCTGCGGATCGTTGTTGATCACTTTCGCTACGTCATTGATCAAATGAATAATGTGCTTCGCCATGTAATAGGCCGAAACCGCCTTACCGCCAAAATATTCACGCGCGGCCCACTTCGCATCGGTCGGCCTTGATGCGGTTGCGTAATCACATGCAACACATTCATCAATTGACGTTTGTATTCGTGAATACGTTTGGTTGTACATCGAACAACGCCTTTGGATTCACCACCACATTCAGCTGCTGGGCGATATACTCTGCCAGACGCTTTTGTTCTCCAGCCATGATGCACAGCGTGATTAACCATTGGGAAATCACAGTGTTGTTTTTGCAACTCATTAAGCAGGCTAAGGTCGGTGCCAGTTGCGGCCAGGTGTTCGTCCAGCACGGCTGAAGCGATGGGTTCGCTACCGCCAGCCAGCGACGCGGCGTACACCGTTGGTGACGTTGGTGAAACTGACCGGGAAGATTTCGCAAAGTCGGCAAACAACGTTGCACCATCAGTTAGAGTGCAGTTCCGATACACCGTTAACTGTGGCTCACAACAACCGCCAGCCGGGCCATACGCACGACGACCGTTGGATTCATCAATGATCGACGCCCGTCCCAGCGCAGATCGGTATCGTTCAGTTCTACTGTTCCTGCAAGTTTCAGAAATAGTCGTTGATTTCAAGATGATCTGCAGGTGACGCGGCAAATTTTACCAGCATATCAACCGGCGGGTTTCCAGCGCCTCGCTCATCAGCGTGGTTAGTGTAGGAAGACCTGACAACACACCTCAAACGCGTCGTCCAGCTAAATTGGTGCTCATCGATCAGCAGACGCATCCTCTCAGGAATCGACAATTGCGGATGGGTATCATTGAGATGATCGCGATTTTATCCGCCAGGTTATCGTAGGTTTTATGCAACTGATAATGGCGGCAAATGTCCCTGAATGGTCGAAACCGGGAAGTATTCTGACGCAGGCACAGCTCACGCCAGGTAAATTGAGTCATCCGGATACAACCGCGAGATACGTTCTCGAGTGGTTTTATCTTCTTCCACTGCCGCGAAGTAGTCACCTGGTTGAATTACCGAGTTAATTTCGCTAAACGCGCACTCCACAAACGCAGCGTGTTGGTCGCACGTCGGTGTCGTAACCGAGGATTATCGTAAGCGACTCCCAGAATCTCTTCGGTTTTCAATCCAGCGCGTTTTACCTTCCTGCTGAATGCACGTACGCCAAAACGGACTTTATATGGCGCGTGTTGTGGCGTTTGAATTCCACAGGTTACCGTATTCCAGCCAGTAGTCTGGCGACTCTTTCTGGCTACCGTTAACGATGTTCTGCTTGAACATACCCATGGTCATAGCGGATGCCGTAACCACGCCCAGCAGCCCTAACGTCGCCAGAATCAAAGGAAGCAAGCCGCCAGACGTCCCAGGCACCGTGCGAGGCACGGATCGACACCTTCATCAATCAGCTCTTCAGTTAACCCATCGCTTCCAGTGCGCCCTGTACATCTTCGTAAATTCTAGCGACAACATGGCGTTGGAGGCTTGTTAATCAAAACTCCATCGACTGGTATTAAACCTGATGAGTTTCTTACGACAACTGGGCACGGTTTGAACGTAACCAGCGCTCCGGACGATCGCGCACAGCAAATAACGTTGCGTTGTGATCATGTTGTGGCGACGACCGGGTTCCTTTCAATCGTAAACATCAGCTTGTAAGCGATAGAGTGTAGGCTTCTACGCGCTAAGCGTGGGCGATAGATATGTAAACGGAGCGATATATAAACCACAAACTAACACAAGCGATAGTAGCTCACGGTACGACTTCGCCGCGACCTGCCAGCTAAAATCCATTGCCATAGCCTGACGTTTGCACAAACCGCCACAGTGAAGGACGGGACCACAGTACAAAAGCACGTCCGAATAGCCCGTAACAGCGACCGGGCATTACTATCTTCAAGACAAAGCCACAGCGACGCCATCTGCAAGGTTCTCGAGAACGATCCAGAAACCGTGTCATAAACCCACCGGTGCACATAACGGCAACGTACCATGCTTCAATCCATAAAGTTGCGTTAAGCCGCACGGTTCAAGCGGCTGGGCACCAGGGCCAGCGTCCGCGCCGCCCTTAATGCGATGCGAAAATGCTTCGTGACCATCAGGCGCCCACCCTGACCGGGGTATTCCGCTGCCGCCGCAAAACCTTCCTGCAACGCACCGGATCGCCCGCGCCGAGGTAGCATAACGCCCTGCTCCAGAAGACCCGGTAGGCTTCCAGCACCGGGTCAGACGCTCTGGCTGGTCGGGCGGCTCACCACCGCAAAAGCGGCACTTTATCGTCAACGCCGCCCCATTGCGATTTGTAACTGGCGCTTATTTTCCGCTTTATCTTCAACGTATCGCGGGTGTATGAGGCCAACAGTAAGTCGATCTCTGGGCTCCGTTTTCTCCCACGCCGTTCAGTACGCCGGAAGACGCCCTTCACGGTGACAGCACGTAGACCTTCGCGCCACCGTGAGCAAACTGCGGTCGGTGATCTCGCGAGCGTGGTTGGACGACCGCCGTAATGCTTGATCGGCATGGTACAGACCGGCCTTCAGAAACT";
+    hid_t fast5_handle = fast5_open(path);
+
     herr_t status = load_from_raw(path, templateModelFile, sequence, EVENT_LOCATION);
     CuAssertIntEquals(testCase, 0, (int) status);
 
-    hid_t fast5_handle = fast5_open(path);
-
     int new_event_n = 11020; //how many events are generated (empirically determined)
     basecalled_event new_events[new_event_n + 1];
-    fast5_get_basecall_events(fast5_handle, EVENT_LOCATION, new_events);
+    fast5_get_basecall_events(fast5_handle, stString_concat(EVENT_LOCATION, "/Events"), new_events);
 
     int old_event_n = 10922; //how many events were called
     basecalled_event old_events[old_event_n + 1];
@@ -481,10 +479,165 @@ static void test_load_from_raw_dna(CuTest *testCase){
     CuAssertStrEquals(testCase, "TGCAT", old_events[0].model_state);
     CuAssertStrEquals(testCase, "AAACT", old_events[old_event_n - 1].model_state);
 
-    status = H5Ldelete( fast5_handle, EVENT_LOCATION, H5P_DEFAULT );
+    status = H5Ldelete( fast5_handle, stString_concat(EVENT_LOCATION, "/Events"), H5P_DEFAULT );
     CuAssertIntEquals(testCase, 0, (int) status);
     fast5_close(fast5_handle);
 }
+
+static void test_reverse_events(CuTest *testCase) {
+    char* path = stString_concat(HOME, "tests/minion_test_reads/RNA_edge_cases/DEAMERNANOPORE_20170922_FAH26525_MN16450_sequencing_run_MA_821_R94_NA12878_mRNA_09_22_17_67136_read_61_ch_151_strand.fast5");
+    hid_t fast5_handle = fast5_open(path);
+    fast5_raw_scaling channel_params = fast5_get_channel_params(fast5_handle);
+    raw_table rt = fast5_get_raw_samples(fast5_handle, channel_params);
+    int trim_start = 200;
+    int trim_end = 10;
+    int varseg_chunk = 100;
+    float varseg_thresh = 0.0;
+    trim_and_segment_raw(rt, trim_start, trim_end, varseg_chunk, varseg_thresh);
+    const detector_param* ed_params = &event_detection_rna;
+
+    event_table et = detect_events(rt, *ed_params);
+    event_table et2 = reverse_events(et);
+    CuAssertIntEquals(testCase, (int) et.n, (int) et2.n);
+    CuAssertIntEquals(testCase, (int) et.start, (int) et2.start);
+    CuAssertIntEquals(testCase, (int) et.end, (int) et2.end);
+    size_t n = et.n;
+    for (int i = 0; i < n; i++){
+        event_t event = et.event[n - 1 - i];
+        event_t event2 = et2.event[i];
+        CuAssertIntEquals(testCase, (int) event2.start, (int) event.start);
+        CuAssertIntEquals(testCase, event2.pos, event.pos);
+        CuAssertIntEquals(testCase, event2.state, event.state);
+        CuAssertDblEquals(testCase, (double) event2.length, (double) event.length, 0.00001);
+        CuAssertDblEquals(testCase, (double) event2.mean, (double) event.mean, 0.00001);
+        CuAssertDblEquals(testCase, (double) event2.stdv, (double) event.stdv, 0.00001);
+    }
+    fast5_close(fast5_handle);
+
+}
+
+static void test_reverse_basecalled_events(CuTest *testCase){
+    char* path = stString_concat(HOME, "tests/minion_test_reads/RNA_edge_cases/DEAMERNANOPORE_20170922_FAH26525_MN16450_sequencing_run_MA_821_R94_NA12878_mRNA_09_22_17_67136_read_61_ch_151_strand.fast5");
+    hid_t fast5_handle = fast5_open(path);
+    fast5_raw_scaling channel_params = fast5_get_channel_params(fast5_handle);
+    raw_table rt = fast5_get_raw_samples(fast5_handle, channel_params);
+    int trim_start = 200;
+    int trim_end = 10;
+    int varseg_chunk = 100;
+    float varseg_thresh = 0.0;
+    trim_and_segment_raw(rt, trim_start, trim_end, varseg_chunk, varseg_thresh);
+    const detector_param* ed_params = &event_detection_rna;
+
+
+    event_table et = detect_events(rt, *ed_params);
+    event_table et2 = reverse_events(et);
+    et = et2;
+
+    char* templateModelFile = stString_concat(HOME, "/models/testModelR9p4_5mer_acgt_RNA.model");
+    StateMachine *sM = stateMachine3_loadFromFile(templateModelFile, threeState, emissions_kmer_getGapProb,
+                                                  emissions_signal_strawManGetKmerEventMatchProbWithDescaling_MeanOnly,
+                                                  stateMachine3_loadTransitionsFromFile, NULL);
+    const char* sequence = "CAUCCUGCCCUGUGUUAUCCAGUUAUGAGAUAAAAAAUGAAUAUAAGAGUGCUUGUCAUUAUAAAAGUUUUCCUUUUUAUUACCAUCCAAGCCACCAGCUGCCAGCCACCAGCAGCCAGCUGCCAGCACUAGCUUUUUUUUUUUAGCACUUAGUAUUUAGCAGCAUUUAUUAACAGGUACUUUAAGAAUGAUGAAGCAUUGUUUUAAUCUCACUGACUAUGAAGGUUUUAGUUUCUGCUUUUGCAAUUGUGUUUGUGAAAUUUGAAUACUUGCAGGCUUUGUAUGUGAAUAAUUUUAGCGGCUGGUUGGAGAUAAUCCUACGGGAAUUACUUAAAACUGUGCUUUAACUAAAAUGAAUGAGCUUUAAAAUCCCUCCUCCUACUCCAUCAUCAUCCCACUAUUCAUCUUAUCUCAUUAUCAUCAACCUAUCCCACAUCCCUAUCACCACAGCAAUCCAA";
+
+    stList* kmer_list = build_kmer_list(sequence, sM->kmerLength, TRUE);
+
+    NanoporeReadAdjustmentParameters test_squiggle_scalings = estimate_scalings_using_mom(kmer_list, *sM, et);
+    update_SignalMachineWithNanoporeParameters(test_squiggle_scalings, sM);
+    stList* something = adaptive_banded_simple_event_align(et, sM, kmer_list);
+    float start_time = fast5_get_start_time(fast5_handle);
+    basecalled_event_table* b_et = event_table_to_basecalled_table(&et, channel_params, start_time);
+    rna_alignment_to_base_event_map(something, b_et, kmer_list, sM);
+    basecalled_event_table *bet2 = reverse_basecalled_events(b_et);
+
+
+
+    CuAssertIntEquals(testCase, (int) bet2->n, (int) b_et->n);
+    CuAssertIntEquals(testCase, (int) bet2->start, (int) b_et->start);
+    CuAssertIntEquals(testCase, (int) bet2->end, (int) b_et->end);
+    CuAssertIntEquals(testCase, (int) bet2->aln_n, (int) b_et->aln_n);
+
+    size_t n = b_et->n;
+    for (int i = 0; i < n; i++){
+        basecalled_event event = b_et->event[n - 1 - i];
+        basecalled_event event2 = bet2->event[i];
+        CuAssertIntEquals(testCase, (int) event2.raw_start, (int) event.raw_start);
+        CuAssertIntEquals(testCase, (int) event2.raw_length, (int) event.raw_length);
+        CuAssertIntEquals(testCase, event2.move, event.move);
+        CuAssertDblEquals(testCase, event2.start, event.start, 0.00001);
+        CuAssertDblEquals(testCase, event2.length, event.length, 0.00001);
+        CuAssertDblEquals(testCase, event2.mean, event.mean, 0.00001);
+        CuAssertDblEquals(testCase, event2.stdv, event.stdv, 0.00001);
+        CuAssertDblEquals(testCase, event2.p_model_state, event.p_model_state, 0.00001);
+        CuAssertStrEquals(testCase, event2.model_state, event.model_state);
+
+    }
+    fast5_close(fast5_handle);
+
+}
+
+static void test_build_kmer_list(CuTest *testCase){
+    // DNA - ATGCATGC -> ATGCA, TGCAT, GCATG, CATGC
+    // RNA - AUGCAUGC -> ACGTA, TACGT, GTACG, CGTAC
+    const char* dna_sequence = "ATGCATGC";
+    char* expected_dna_kmers[4] = {"ATGCA", "TGCAT", "GCATG", "CATGC"};
+    stList* dna_kmers = build_kmer_list(dna_sequence, 5, FALSE);
+    for (int x = 0; x < 4; x++){
+        CuAssertStrEquals(testCase, expected_dna_kmers[x], stList_get(dna_kmers, x));
+    }
+
+    const char* rna_sequence = "AUGCAUGC";
+    char* expected_rna_kmers[4] = {"ACGTA", "TACGT", "GTACG", "CGTAC"};
+    stList* rna_kmers = build_kmer_list(rna_sequence, 5, TRUE);
+    for (int x = 0; x < 4; x++){
+        CuAssertStrEquals(testCase, expected_rna_kmers[x], stList_get(rna_kmers, x));
+    }
+}
+
+static void test_fast5_create_group(CuTest *testCase){
+    char* path = stString_concat(HOME, "tests/minion_test_reads/RNA_edge_cases/DEAMERNANOPORE_20170922_FAH26525_MN16450_sequencing_run_MA_821_R94_NA12878_mRNA_09_22_17_67136_read_61_ch_151_strand.fast5");
+    hid_t fast5_handle = fast5_open(path);
+
+    herr_t status = fast5_create_group(fast5_handle, "/Analyses/FakePath");
+    CuAssertIntEquals(testCase, 0, status);
+    status = fast5_create_group(fast5_handle, "/Analyses/FakePath");
+    CuAssertIntEquals(testCase, 0, status);
+    H5Gunlink(fast5_handle, "/Analyses/FakePath");
+    status = fast5_create_group(fast5_handle, "/Analyses/FakePath");
+    CuAssertIntEquals(testCase, 0, status);
+    H5Gunlink(fast5_handle, "/Analyses/FakePath");
+    status = fast5_create_group(fast5_handle, "/FakePath");
+    CuAssertIntEquals(testCase, 0, status);
+    H5Gunlink(fast5_handle, "/FakePath");
+//    clean up
+    fast5_close(fast5_handle);
+
+}
+
+static void test_fast5_create_all_groups(CuTest *testCase){
+    char* path = stString_concat(HOME, "tests/minion_test_reads/RNA_edge_cases/DEAMERNANOPORE_20170922_FAH26525_MN16450_sequencing_run_MA_821_R94_NA12878_mRNA_09_22_17_67136_read_61_ch_151_strand.fast5");
+    hid_t fast5_handle = fast5_open(path);
+
+    herr_t status = fast5_create_all_groups(fast5_handle, "/Analyses/FakePath");
+    CuAssertIntEquals(testCase, 0, status);
+    status = fast5_create_all_groups(fast5_handle, "/Analyses/FakePath");
+    CuAssertIntEquals(testCase, 0, status);
+    H5Gunlink(fast5_handle, "/Analyses/FakePath");
+    status = fast5_create_all_groups(fast5_handle, "/Analyses/FakePath");
+    CuAssertIntEquals(testCase, 0, status);
+    H5Gunlink(fast5_handle, "/Analyses/FakePath");
+    status = fast5_create_all_groups(fast5_handle, "/FakePath");
+    CuAssertIntEquals(testCase, 0, status);
+    H5Gunlink(fast5_handle, "/FakePath");
+    status = fast5_create_all_groups(fast5_handle, "/FakePath/depth");
+    CuAssertIntEquals(testCase, 0, status);
+    H5Gunlink(fast5_handle, "/FakePath/depth");
+    H5Gunlink(fast5_handle, "/FakePath");
+
+//    clean up
+    fast5_close(fast5_handle);
+
+}
+
 
 CuSuite *eventAlignerTestSuite(void) {
 
@@ -498,9 +651,10 @@ CuSuite *eventAlignerTestSuite(void) {
     SUITE_ADD_TEST(suite, test_fast5_read_float_attribute);
     SUITE_ADD_TEST(suite, test_fast5_get_channel_params);
     SUITE_ADD_TEST(suite, test_fast5_get_raw_samples);
-    //SUITE_ADD_TEST(suite, test_fast5_set_event_table);
     SUITE_ADD_TEST(suite, test_fast5_get_start_time);
     SUITE_ADD_TEST(suite, test_fast5_set_basecall_event_table);
+    SUITE_ADD_TEST(suite, test_fast5_create_group);
+    SUITE_ADD_TEST(suite, test_fast5_create_all_groups);
 
     SUITE_ADD_TEST(suite, test_set_NanoporeReadAdjustmentParameters);
     SUITE_ADD_TEST(suite, test_estimate_scalings_using_mom);
@@ -509,13 +663,19 @@ CuSuite *eventAlignerTestSuite(void) {
     SUITE_ADD_TEST(suite, test_adaptive_banded_simple_event_align);
     SUITE_ADD_TEST(suite, test_event_table_to_basecalled_table);
 
+    SUITE_ADD_TEST(suite, test_rna_alignment_to_base_event_map);
     SUITE_ADD_TEST(suite, test_alignment_to_base_event_map);
+
     SUITE_ADD_TEST(suite, test_load_from_raw_rna);
     SUITE_ADD_TEST(suite, test_load_from_raw_dna);
 
+    SUITE_ADD_TEST(suite, test_reverse_events);
+    SUITE_ADD_TEST(suite, test_reverse_basecalled_events);
+    SUITE_ADD_TEST(suite, test_build_kmer_list);
+
     return suite;
 }
-
+//
 //int main(int argc, char *argv[]) {
 //    // collect output and create a new test suite
 //    CuString *output = CuStringNew();

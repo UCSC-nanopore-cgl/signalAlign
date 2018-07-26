@@ -24,55 +24,13 @@ from collections import defaultdict
 from timeit import default_timer as timer
 from signalalign.utils.pyporeParsers import SpeedyStatSplit
 from signalalign.fast5 import Fast5
+from signalalign.utils.sequenceTools import get_full_nucleotide_read_from_alignment
 from signalalign.utils.filters import minknow_event_detect
 from py3helpers.utils import check_numpy_table, list_dir, TimeStamp, change_np_field_type, merge_dicts
 from py3helpers.seq_tools import create_fastq_line, check_fastq_line, ReverseComplement, pairwise_alignment_accuracy
 
 EVENT_DETECT_SPEEDY = "speedy"
 EVENT_DETECT_MINKNOW = "minknow"
-EVENT_DETECT_SCRAPPIE = "scrappie"
-
-
-def scrappie_event_detect(fast5_location, temp_fast5_location=None, path_to_scrappie=None):
-    """Generate events from scrappie.
-    :param fast5_location: path to a fast5 file
-    :param temp_fast5_location: place to store temporary fast5 file
-    :param path_to_scrappie: option to go to scrappie via a path if scrappie is not in PATH
-    :return: list of dictionaries with fields = 'mean', 'stdv', 'pos', 'start'
-    """
-    # get temp location
-    if temp_fast5_location is None:
-        temp_fast5_location = "{}.tmp.fast5".format(fast5_location)
-    if os.path.isfile(temp_fast5_location): os.remove(temp_fast5_location)
-    # check if scrappie exists in PATH
-    if not path_to_scrappie:
-        path_to_scrappie = "./scrappie"
-        assert which("scrappie") is not None, \
-            "Scrappie is not in the PATH. Select a path_to_scrappie or put scrappie in your PATH"
-    # get events
-    events = None
-    try:
-        # invoke scrappie
-        cmd = [path_to_scrappie, 'events', '--dump', temp_fast5_location, fast5_location]
-        with open(os.devnull, 'w') as devnull:
-            subprocess.check_call(cmd, stdout=devnull, stderr=devnull)
-
-        # parse event information
-        with closing(h5py.File(temp_fast5_location, 'r+')) as fast5:
-            keys = list(fast5.keys())
-            if len(keys) != 1:
-                print("[scrappie_event_detect] found multiple keys in {}: {}".format(temp_fast5_location, keys))
-            else:
-                # events = list()
-                #
-                # for mean, stdev, pos, start in fast5[keys[0]]['mean', 'stdv', 'pos', 'start']:
-                #     events.append({'mean': mean, 'stdv': stdev, 'pos': pos, 'start': start})
-                events = np.asanyarray(fast5[keys[0]][()])
-    finally:
-        # cleanup
-        if os.path.isfile(temp_fast5_location): os.remove(temp_fast5_location)
-
-    return events
 
 
 def create_speedy_event_table(signal, sampling_freq, start_time, min_width=5, max_width=80, min_gain_per_sample=0.008,
@@ -138,38 +96,6 @@ def create_minknow_event_table(signal, sampling_freq, start_time,
         event_table['stdv'][i] = event["stdv"]
         event_table['raw_start'][i] = np.round(event["start"] * sampling_freq)
         event_table['raw_length'][i] = np.round(event["length"] * sampling_freq)
-
-    return event_table
-
-
-def create_scrappie_event_table(fast5_location, sampling_freq, start_time=0, path_to_scrappie=None):
-    """Create new event table using scrappie event detection via subprocess call to scrappie
-
-    :param fast5_location: path to
-    :param sampling_freq: sampling frequency of ADC in Hz
-    :param start_time: start time from fast5 file (time in seconds * sampling frequency)
-    :param path_to_scrappie: option to go to scrappie via a path if scrappie is not in PATH
-    :return: Table of events without model state or move information
-    """
-    events = scrappie_event_detect(fast5_location, path_to_scrappie=path_to_scrappie)
-    assert events is not None and len(events) > 0, "Could not use scrappie to detect events in {}".format(
-        fast5_location)
-    num_events = len(events)
-    event_table = get_empty_event_table(num_events - 1)
-
-    for i, event in enumerate(events):
-        # drop last event (cannot compute length without "next" event)
-        if i == num_events - 1: break
-        event_table['start'][i] = event["start"] / sampling_freq + (start_time / sampling_freq)
-        event_table['length'][i] = 0.0
-        event_table['mean'][i] = event["mean"]
-        event_table['stdv'][i] = event["stdv"]
-        event_table['raw_start'][i] = np.round(event["start"])
-        event_table['raw_length'][i] = 0
-
-        if i != 0:
-            event_table['length'][i - 1] = event_table['start'][i] - event_table['start'][i - 1]
-            event_table['raw_length'][i - 1] = event_table['raw_start'][i] - event_table['raw_start'][i - 1]
 
     return event_table
 
@@ -428,7 +354,7 @@ def resegment_reads(fast5_path, params=None, speedy=False, overwrite=True, analy
 def get_default_event_detection_params(event_detection_strategy, rna=False):
     """Get the default event detection parameters for each event detection strategy.
 
-    :param event_detection_strategy: must be in {"speedy", "minknow", "scrappie"}
+    :param event_detection_strategy: must be in {"speedy", "minknow"}
     :param rna: boolean option to return parameters for rna data
     :return: dictionary of correct parameters for given event detection
     """
@@ -439,8 +365,6 @@ def get_default_event_detection_params(event_detection_strategy, rna=False):
             return dict(window_lengths=(7, 14), thresholds=(2.5, 9.0), peak_height=1.0)
         else:
             return dict(window_lengths=(3, 6), thresholds=(1.4, 9.0), peak_height=0.2)
-    elif event_detection_strategy == EVENT_DETECT_SCRAPPIE:
-        return {}
     else:
         return None
 
@@ -473,13 +397,10 @@ def generate_events_and_alignment(fast5_path, nucleotide_sequence, nucleotide_qu
         signal = f5fh.get_read(raw=True, scale=True)
         event_table = create_minknow_event_table(signal, sampling_freq, start_time, **event_detection_params)
         event_detection_params = merge_dicts([event_detection_params, {"event_detection": "minknow_event_detect"}])
-    elif event_detection_strategy == EVENT_DETECT_SCRAPPIE:
-        event_table = create_scrappie_event_table(fast5_path, sampling_freq, start_time)
-        event_detection_params = merge_dicts([event_detection_params, {"event_detection": "scrappie_event_detect"}])
     else:
         raise Exception("PROGRAMMER ERROR: unknown resegment strat {}: expected {}"
                         .format(event_detection_strategy,
-                                [EVENT_DETECT_SPEEDY, EVENT_DETECT_MINKNOW, EVENT_DETECT_SCRAPPIE]))
+                                [EVENT_DETECT_SPEEDY, EVENT_DETECT_MINKNOW]))
 
     # gather attributes
     keys = ["nanotensor version", "time_stamp"]
@@ -631,6 +552,80 @@ def create_minknow_events_from_fast5(fast5_path, window_lengths=(3, 6), threshol
                                              thresholds=thresholds, peak_height=peak_height)
 
     return event_table, f5fh
+
+
+def load_from_raw(np_handle, alignment_file, model_file_location, path_to_bin):
+    """Load a nanopore read from raw signal and an alignment file. Need a model to create banded alignment.
+    :param np_handle: NanoporeRead class object
+    :param alignment_file: sam/bam file
+    :param model_file_location: path to model file
+    :param path_to_bin: bath to signalAlign bin where executables are stored
+    :return: path to events in fast5 file or -1 if the task fails
+    """
+    assert os.path.isfile(model_file_location), \
+        "Model_file_location must be a real path to a SignalAlign HMM model file"
+    assert os.path.isfile(alignment_file), \
+        "alignment_file must be a real path a SAM/BAM alignment file"
+    assert os.path.exists(path_to_bin), \
+        "path_to_bin must exist"
+
+    # check if file is open
+    if not np_handle.open():
+        return False
+    # grab read id
+    read_id = np_handle.read_label
+
+    # get/build nucleotide sequence (accounting for hardclipping)
+    nucleotide_sequence, nucleotide_qualities, _, _ = \
+        get_full_nucleotide_read_from_alignment(alignment_file, read_id)
+    if nucleotide_qualities is None:
+        nucleotide_qualities = "!" * len(nucleotide_sequence)
+
+    # we need to swap the orientation because alignments for RNA reads are 3'-5' for reasons that were good I swear
+    if np_handle.rna:
+        nucleotide_sequence = nucleotide_sequence[::-1].replace("T", "U")
+        nucleotide_qualities = nucleotide_qualities[::-1]
+
+    fastq = create_fastq_line(read_id, nucleotide_sequence, nucleotide_qualities)
+    # get new location
+    dest = np_handle.fastFive.get_analysis_path_new("Basecall_1D")
+    file_name = np_handle.filename
+    np_handle.close()
+    # run the c code which does the required stuff
+    status = run_kmeralign_exe(path_to_bin, file_name, nucleotide_sequence, model_file_location, dest)
+    if status:
+        np_handle.open()
+        # get attrs
+        keys = ["signalAlign version", "time_stamp"]
+        values = ["0.1.7", TimeStamp().posix_date()]
+        attributes = merge_dicts([dict(zip(keys, values)), np_handle.fastFive.raw_attributes])
+        # get events
+        np_handle.fastFive._add_attrs(attributes, np_handle.fastFive.get_analysis_latest("Basecall_1D"))
+        np_handle.fastFive.set_fastq(np_handle.fastFive.get_analysis_latest("Basecall_1D"), fastq)
+        return np_handle.fastFive.get_analysis_latest("Basecall_1D")
+    else:
+        return False
+
+
+def run_kmeralign_exe(path_to_bin, fast5_path, nuc_sequence, model_file, dest):
+    """Run kmerEventAlign. Generates alignment file
+    :param path_to_bin: path to SignalAlign bin with executables
+    :param fast5_path: path to fast5
+    :param nuc_sequence: nucleotide sequence to align
+    :param model_file: signal align model file
+    :param dest: location to place events.
+                    ex.  passing "Analyses/Basecalled_1D_template" will create "Analyses/Basecalled_1D_template/Events"
+    :return:
+    """
+    executable = os.path.join(path_to_bin, "kmerEventAlign")
+    try:
+        subprocess.check_call([executable, '-f', fast5_path, '-m', model_file, '-N', nuc_sequence, '-p', dest])
+        status = True
+    except Exception as e:
+        print("Exception in run_kmeralign: {}".format(e))
+        status = False
+
+    return status
 
 
 def main():

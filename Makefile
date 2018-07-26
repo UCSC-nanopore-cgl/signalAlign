@@ -33,7 +33,7 @@ all : sL bD hs python-utils ${libPath}/signalAlignLib.a ${signalAlignBin}/signal
 	  ${signalAlignBin}/signalMachine ${signalAlignBin}/runSignalAlign \
 	  ${signalAlignBin}/variantCallingLib.py ${signalAlignBin}/alignmentAnalysisLib.py \
 	  ${signalAlignBin}/buildHdpUtil ${signalAlignBin}/trainModels all_tests \
-	  externals nanoporeParams python_setup ${scrappie_build}/scrappie \
+	  externals nanoporeParams python_setup # ${scrappie_build}/scrappie \
 
 python-utils :
 	cd python_utils && python3 setup.py install

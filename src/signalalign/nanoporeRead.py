@@ -6,7 +6,8 @@ import re
 from signalalign.fast5 import Fast5
 
 from itertools import islice
-from signalalign.event_detection import resegment_reads, EVENT_DETECT_MINKNOW, EVENT_DETECT_SCRAPPIE, EVENT_DETECT_SPEEDY
+from signalalign.event_detection import load_from_raw, resegment_reads, EVENT_DETECT_MINKNOW, \
+    EVENT_DETECT_SPEEDY
 
 
 TEMPLATE_BASECALL_KEY   = Fast5.__default_basecall_1d_analysis__ #"/Analyses/Basecall_1D_00{}"
@@ -15,15 +16,16 @@ TWOD_BASECALL_KEY       = Fast5.__default_basecall_2d_analysis__ #"/Analyses/Bas
 TWOD_BASECALL_KEY_0     = os.path.join(Fast5.__base_analysis__, TWOD_BASECALL_KEY + "_000") #"/Analyses/Basecall_2D_000"
 METADATA_PATH_KEY       = Fast5.__tracking_id_path__ #"/UniqueGlobalKey/tracking_id"
 READS_KEY               = Fast5.__raw_path__ #"/Raw/Reads/"
-VERSION_KEY             = ("version", "dragonet version", "nanotensor version")
-SUPPORTED_1D_VERSIONS   = ("1.0.1", "1.2.1", "1.2.4", "1.23.0", "1.22.4", "2.1.0", "0.2.0")
+VERSION_KEY             = ("version", "dragonet version", "nanotensor version", "signalAlign version")
+SUPPORTED_1D_VERSIONS   = ("1.0.1", "1.2.1", "1.2.4", "1.23.0", "1.22.4", "2.1.0", "0.2.0", "0.1.7")
 
-RESEGMENT_STRAGEGIES     = [EVENT_DETECT_MINKNOW, EVENT_DETECT_SCRAPPIE, EVENT_DETECT_SPEEDY]
+RESEGMENT_STRAGEGIES     = [EVENT_DETECT_MINKNOW, EVENT_DETECT_SPEEDY]
 
 # promethion read_name: self.fast5['PreviousReadInfo'].attrs['previous_read_id'].decode()
 
 class NanoporeRead(object):
-    def __init__(self, fast_five_file, twoD=False, event_table='', initialize=False):
+    def __init__(self, fast_five_file, twoD=False, event_table='', initialize=False, path_to_bin=None,
+                 alignment_file=None, model_file_location=None):
         # load the fast5
         self.filename = fast_five_file         # fast5 file path
         self.fastFive = None                   # fast5 object
@@ -56,7 +58,9 @@ class NanoporeRead(object):
         self.complement_scale_sd = 1           #
         self.complement_var_sd = 1             #
         self.event_table = event_table         # if we look for alternative events table
-
+        self.path_to_bin = path_to_bin         # path to bin
+        self.alignment_file=alignment_file
+        self.model_file_location=model_file_location
         # determination of 2D reads
         self.twoD = twoD                       # 2D read flag, necessary right now, and the client should know
         if type(self) == NanoporeRead:
@@ -90,8 +94,9 @@ class NanoporeRead(object):
 
     def close(self):
         self.is_open = False
-        if self.fastFive is None: return
-        self.fastFive.close()
+        if self.fastFive:
+            self.fastFive.close()
+
 
     def get_latest_basecall_edition(self, address, new=False):
         if address.startswith(Fast5.__base_analysis__):
@@ -145,7 +150,8 @@ class NanoporeRead(object):
         """Routine setup 1D NanoporeReads, returns false if basecalled with upsupported
         version or is not base-called
         """
-        if not self.open(): return False
+        if not self.open():
+            return False
 
         # get oneD directory and check if the table location exists in the fast5file
         if self.event_table:
@@ -154,7 +160,6 @@ class NanoporeRead(object):
                 print("[SignalAlignment.run] Resegmenting read", file=sys.stderr)
                 resegment_reads(self.filename, speedy=False, overwrite=True, analysis_path=self.event_table)
                 oned_root_address = self.get_latest_basecall_edition(self.event_table)
-
         elif self.rna:
             oned_root_address = self.get_latest_basecall_edition(RESEGMENT_KEY)
             # TODO fix bug for speedy stat split
@@ -171,10 +176,12 @@ class NanoporeRead(object):
 
         # sanity check
         if not oned_root_address:
-            self.logError("[NanoporeRead:_initialize] ERROR could not find 1D root address in {}"
-                          .format(self.filename))
-            self.close()
-            return False
+            oned_root_address = load_from_raw(self, self.alignment_file, self.model_file_location, self.path_to_bin)
+            if not oned_root_address:
+                self.logError("[NanoporeRead:_initialize] ERROR could not find 1D root address in {}"
+                              .format(self.filename))
+                self.close()
+                return False
 
         # get basecall version
         if not any(x in self.fastFive[oned_root_address].attrs.keys() for x in VERSION_KEY):
@@ -185,8 +192,11 @@ class NanoporeRead(object):
             self.version = bytes.decode(self.fastFive[oned_root_address].attrs["version"])
         elif "dragonet version" in self.fastFive[oned_root_address].attrs.keys():
             self.version = bytes.decode(self.fastFive[oned_root_address].attrs["dragonet version"])
-        else:
+        elif "nanotensor version" in self.fastFive[oned_root_address].attrs.keys():
             self.version = self.fastFive[oned_root_address].attrs["nanotensor version"]
+        else:
+            self.version = self.fastFive[oned_root_address].attrs["signalAlign version"]
+
         if self.version not in SUPPORTED_1D_VERSIONS:
             self.logError("[NanoporeRead:_initialize] ERROR %s unsupported version %s " % (self.filename, self.version))
             self.close()
@@ -218,7 +228,6 @@ class NanoporeRead(object):
             return False
 
         return True
-
 
     @staticmethod
     def make_event_map(events, kmer_length):
@@ -257,7 +266,8 @@ class NanoporeRead(object):
 
         return True
 
-    def sequence_from_events(self, events):
+    @staticmethod
+    def sequence_from_events(events):
         """Get new read from event table"""
         bases = []
         for i, event in enumerate(events):

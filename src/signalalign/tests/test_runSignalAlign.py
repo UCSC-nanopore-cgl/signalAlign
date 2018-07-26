@@ -5,6 +5,7 @@ import unittest
 import glob
 import os
 import shutil
+import tempfile
 import pandas as pd
 import numpy as np
 from subprocess import call
@@ -70,7 +71,7 @@ class SignalAlignAlignmentTest(unittest.TestCase):
             else:
                 return bytes.decode(kmer)
 
-        assert len(glob.glob(reads + "*.fast5")) > 0, "Didn't find test MinION reads"
+        assert len(glob.glob(os.path.join(reads, "*.fast5"))) > 0, "Didn't find test MinION reads"
         assert os.path.isfile(reference), "Didn't find reference sequence"
         run_signal_align = os.path.join(BIN_PATH, "runSignalAlign")
         alignment_command = "{runsignalalign} -d={reads} --bwa_reference={ref} -smt=threeState -o={testDir} " \
@@ -170,10 +171,29 @@ class SignalAlignAlignmentTest(unittest.TestCase):
                               contig_name="rna_fake_reversed",
                               extra_args="-T=../models/testModelR9p4_5mer_acgt_RNA.model ")
 
+    def test_signal_files_without_events(self):
+        """Test if signalAlign can handle signal files without event information"""
+        signal_file_true_alignments = os.path.join(SIGNALALIGN_ROOT,
+                                                   "tests/test_alignments/ecoli1D_test_alignments_RAW/")
+        signal_file_reads = os.path.join(SIGNALALIGN_ROOT, "tests/minion_test_reads/no_event_data_1D_ecoli")
+
+        with tempfile.TemporaryDirectory() as tempdir:
+            new_dir = os.path.join(tempdir, "new_dir")
+            shutil.copytree(signal_file_reads, new_dir)
+            ecoli_reference = os.path.join(SIGNALALIGN_ROOT, "tests/test_sequences/E.coli_K12.fasta")
+            signal_file_guide_alignment = os.path.join(SIGNALALIGN_ROOT, "tests/minion_test_reads/oneD_alignments.sam")
+            self.check_alignments(true_alignments=signal_file_true_alignments,
+                                  reads=new_dir,
+                                  reference=ecoli_reference,
+                                  kmer_length=5,
+                                  contig_name="gi_ecoli",
+                                  extra_args="-T=../models/testModelR9p4_5mer_acegt_template.model "
+                                             "--alignment_file {}".format(signal_file_guide_alignment))
+
 
 
 def add_all_tests_to_Suite(test_suite, test_class):
-    """Add all tests from a testCase class to testSuite
+    """Add all tests from a testCase class to testSuite`
     :param test_suite: instance of unittest.TestSuite
     :param test_class: instance of instance of unittest.TestCase
     """
@@ -194,6 +214,8 @@ def main():
     testSuite.addTest(SignalAlignAlignmentTest('test_pUC_r9_reads_6mer'))
     testSuite.addTest(SignalAlignAlignmentTest('test_Ecoli1D_reads_5mer'))
     testSuite.addTest(SignalAlignAlignmentTest('test_RNA_edge_alignments_reads_5mer'))
+    testSuite.addTest(SignalAlignAlignmentTest('test_signal_files_without_events'))
+
     # deprecated
     # testSuite.addTest(SignalAlignAlignmentTest('test_zymo_reads'))
 

@@ -69,8 +69,13 @@ char* fast5_get_experiment_type(hid_t hdf5_file);
 // Get sample rate, and ADC-to-pA scalings
 fast5_raw_scaling fast5_get_channel_params(hid_t hdf5_file);
 
-// set an events table
-void* fast5_set_event_table(hid_t hdf5_file, char* table_name, event_table *et);
+// Look for a group and if it does not exist, create it
+// (group_location = /Old/New) -> creates New group
+herr_t fast5_create_group(hid_t hdf5_file, char* group_location);
+
+// Look for a group and if it does not exist, create it
+// (group_location = /Old/New/New2/New3) -> creates New/New2/New3 groups
+herr_t fast5_create_all_groups(hid_t hdf5_file, char* group_location);
 
 // set basecalled events table
 herr_t fast5_set_basecall_event_table(hid_t hdf5_file, char* table_location, basecalled_event_table *et);
@@ -88,23 +93,29 @@ char* fast5_get_fixed_string_attribute(hid_t hdf5_file, char* group_name, char* 
 float fast5_read_float_attribute(hid_t group, const char *attribute);
 
 // use nanopolish's algorithm to estimate the shift and scale
-NanoporeReadAdjustmentParameters estimate_scalings_using_mom(const char* sequence, StateMachine pore_model, event_table et);
+NanoporeReadAdjustmentParameters estimate_scalings_using_mom(stList* kmer_list, StateMachine pore_model, event_table et);
 
 // update the SignalMachine with new NanoporeReadAdjustementParameters
 void* update_SignalMachineWithNanoporeParameters(NanoporeReadAdjustmentParameters npp, StateMachine *sM);
 
 // create adaptive banded alignment in C using our model
-stList* adaptive_banded_simple_event_align(event_table et, StateMachine *pore_model, char* sequence);
+stList* adaptive_banded_simple_event_align(event_table et, StateMachine *pore_model, stList* kmer_list);
 
 // convert event table into basecalled event table. Assume's start and length are "raw_start" and "raw_length"
 basecalled_event_table* event_table_to_basecalled_table(event_table *et, fast5_raw_scaling scaling, float start_time);
 
 // fill basecalled_event_table from alignment
 void alignment_to_base_event_map(stList *event_alignment, basecalled_event_table* b_et,
-                                                    char *sequence, StateMachine *pore_model);
+                                 stList *kmer_list, StateMachine *pore_model);
+
+void rna_alignment_to_base_event_map(stList *event_alignment, basecalled_event_table* b_et,
+                                     stList *kmer_list, StateMachine *pore_model);
 
 herr_t load_from_raw(char* fast5_file_path, char* templateModelFile, char* sequence, char* path_to_embed);
 
+event_table reverse_events(event_table et);
+
+basecalled_event_table* reverse_basecalled_events(basecalled_event_table *bet);
 
 // struct from nanopolish
 struct AlignedPair
@@ -117,5 +128,15 @@ struct AlignedPair
 void alignedPair_destruct(struct AlignedPair *aligned_pair);
 
 struct AlignedPair *alignedPair_construct(int ref_pos, int read_pos);
+
+// generate list of kmers to align to events.
+// If rna, we replace the U's with T's and create 3'-5' kmers in reverse order because we align events in reverse order to
+// limit effect of the beginning long stalls during polyA sequencing
+//
+// DNA - ATGCATGC -> ATGCA, TGCAT, GCATG, CATGC
+// RNA - AUGCAUGC -> ACGTA, TACGT, GTACG, CGTAC
+stList* build_kmer_list(const char* sequence, int64_t kmer_len, bool rna);
+
+
 
 #endif //NANOPORE_RNN_EVENTAILIGNER_H

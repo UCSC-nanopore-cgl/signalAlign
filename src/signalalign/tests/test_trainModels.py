@@ -314,111 +314,117 @@ class TrainSignalAlignTest(unittest.TestCase):
         self.assertRaises(AssertionError, TrainSignalAlign, fake_args)
 
     def test_canonical_expectation_maximization_training(self):
-        with tempfile.TemporaryDirectory() as tempdir:
-            fake_args = create_dot_dict(self.default_args.copy())
-            fake_args.output_dir = tempdir
-            fake_args.job_count = 1
-            fake_args.training.transitions = True
-            fake_args.training.normal_emissions = True
-            fake_args.training.hdp_emissions = True
-            fake_args.training.expectation_maximization = True
-            fake_args.training.em_iterations = 3
-            fake_args.hdp_args.gibbs_samples = 100
-            fake_args.hdp_args.burnin_multiplier = 0
-            fake_args.hdp_args.number_of_assignments = 1
-            # Test EM training 3 rounds
-            TrainSignalAlign(fake_args).expectation_maximization_training()
+        with captured_output() as (out, err):
+            with tempfile.TemporaryDirectory() as tempdir:
+                fake_args = create_dot_dict(self.default_args.copy())
+                fake_args.output_dir = tempdir
+                fake_args.job_count = 1
+                fake_args.training.transitions = True
+                fake_args.training.normal_emissions = True
+                fake_args.training.hdp_emissions = True
+                fake_args.training.expectation_maximization = True
+                fake_args.training.em_iterations = 3
+                fake_args.hdp_args.gibbs_samples = 100
+                fake_args.hdp_args.burnin_multiplier = 0
+                fake_args.hdp_args.number_of_assignments = 1
+                # Test EM training 3 rounds
+                TrainSignalAlign(fake_args).expectation_maximization_training()
 
     def test_hdp_and_transition_training(self):
-        with tempfile.TemporaryDirectory() as tempdir:
-            fake_args = create_dot_dict(self.default_args.copy())
-            fake_args.output_dir = tempdir
-            fake_args.training.transitions = True
-            fake_args.training.normal_emissions = True
-            fake_args.training.hdp_emissions = True
-            fake_args.training.expectation_maximization = False
-            fake_args.training.em_iterations = 3
-            fake_args.hdp_args.gibbs_samples = 100
-            fake_args.hdp_args.burnin_multiplier = 0
-            fake_args.hdp_args.number_of_assignments = 1
-            # Test hdp AND transition training worked
-            TrainSignalAlign(fake_args).expectation_maximization_training()
+        with captured_output() as (out, err):
+            with tempfile.TemporaryDirectory() as tempdir:
+                fake_args = create_dot_dict(self.default_args.copy())
+                fake_args.output_dir = tempdir
+                fake_args.training.transitions = True
+                fake_args.training.normal_emissions = True
+                fake_args.training.hdp_emissions = True
+                fake_args.training.expectation_maximization = False
+                fake_args.training.em_iterations = 3
+                fake_args.hdp_args.gibbs_samples = 100
+                fake_args.hdp_args.burnin_multiplier = 0
+                fake_args.hdp_args.number_of_assignments = 1
+                # Test hdp AND transition training worked
+                TrainSignalAlign(fake_args).expectation_maximization_training()
 
     def test_transition_training(self):
-        with tempfile.TemporaryDirectory() as tempdir:
-            fake_args = create_dot_dict(self.default_args.copy())
-            fake_args.output_dir = tempdir
-            fake_args.training.transitions = True
-            fake_args.training.normal_emissions = True
-            fake_args.training.hdp_emissions = False
-            fake_args.training.expectation_maximization = False
-            # with captured_output() as (out, err):
-            # Test transitions training worked
-            TrainSignalAlign(fake_args).expectation_maximization_training()
+        with captured_output() as (out, err):
+            with tempfile.TemporaryDirectory() as tempdir:
+                fake_args = create_dot_dict(self.default_args.copy())
+                fake_args.output_dir = tempdir
+                fake_args.training.transitions = True
+                fake_args.training.normal_emissions = True
+                fake_args.training.hdp_emissions = False
+                fake_args.training.expectation_maximization = False
+                # with captured_output() as (out, err):
+                # Test transitions training worked
+                TrainSignalAlign(fake_args).expectation_maximization_training()
 
     def test_hdp_training(self):
-        with tempfile.TemporaryDirectory() as tempdir:
-            fake_args = create_dot_dict(self.default_args.copy())
-            fake_args.output_dir = tempdir
-            fake_args.training.transitions = False
-            fake_args.training.normal_emissions = True
-            fake_args.training.hdp_emissions = True
-            fake_args.training.expectation_maximization = False
-            fake_args.training.em_iterations = 3
-            fake_args.hdp_args.gibbs_samples = 100
-            fake_args.hdp_args.burnin_multiplier = 0
-            fake_args.hdp_args.number_of_assignments = 1
-            # Test hdp training worked
-            TrainSignalAlign(fake_args).expectation_maximization_training()
+        with captured_output() as (out, err):
+            with tempfile.TemporaryDirectory() as tempdir:
+                fake_args = create_dot_dict(self.default_args.copy())
+                fake_args.output_dir = tempdir
+                fake_args.training.transitions = False
+                fake_args.training.normal_emissions = True
+                fake_args.training.hdp_emissions = True
+                fake_args.training.expectation_maximization = False
+                fake_args.training.em_iterations = 3
+                fake_args.hdp_args.gibbs_samples = 100
+                fake_args.hdp_args.burnin_multiplier = 0
+                fake_args.hdp_args.number_of_assignments = 1
+                # Test hdp training worked
+                TrainSignalAlign(fake_args).expectation_maximization_training()
 
-            fake_args.training.hdp_emissions = False
-            # raise error when no training is selected
-            self.assertRaises(AssertionError, TrainSignalAlign(fake_args).expectation_maximization_training)
+                fake_args.training.hdp_emissions = False
+                # raise error when no training is selected
+                self.assertRaises(AssertionError, TrainSignalAlign(fake_args).expectation_maximization_training)
 
     def test_methylated_transitions_training(self):
-        with tempfile.TemporaryDirectory() as tempdir:
-            fake_args = create_dot_dict(self.default_args.copy())
-            fake_args.output_dir = tempdir
-            fake_args.samples.append(create_dot_dict(fake_args.samples[0]))
-            fake_args.samples[1].motifs = [["CCAGG", "CEAGG"], ["CCTGG", "CETGG"]]
-            fake_args.samples[1].name = "methylated"
-            fake_args.complement_hmm_model = self.r9_complement_model_file
-            fake_args.template_hmm_model = self.r9_template_model_file
+        with captured_output() as (out, err):
+            with tempfile.TemporaryDirectory() as tempdir:
+                fake_args = create_dot_dict(self.default_args.copy())
+                fake_args.output_dir = tempdir
+                fake_args.samples.append(create_dot_dict(fake_args.samples[0]))
+                fake_args.samples[1].motifs = [["CCAGG", "CEAGG"], ["CCTGG", "CETGG"]]
+                fake_args.samples[1].name = "methylated"
+                fake_args.complement_hmm_model = self.r9_complement_model_file
+                fake_args.template_hmm_model = self.r9_template_model_file
 
-            fake_args.job_count = 1
-            fake_args.training.transitions = True
-            fake_args.training.normal_emissions = False
-            fake_args.training.hdp_emissions = False
-            fake_args.training.expectation_maximization = False
-            # Test EM training 3 rounds
-            template_hmm_model_path, complement_hmm_model_path, template_hdp_model_path, complement_hdp_model_path = \
-                TrainSignalAlign(fake_args).expectation_maximization_training()
+                fake_args.job_count = 1
+                fake_args.training.transitions = True
+                fake_args.training.normal_emissions = False
+                fake_args.training.hdp_emissions = False
+                fake_args.training.expectation_maximization = False
+                # Test EM training 3 rounds
+                template_hmm_model_path, complement_hmm_model_path, template_hdp_model_path, complement_hdp_model_path = \
+                    TrainSignalAlign(fake_args).expectation_maximization_training()
 
     def test_methylated_hdp_training(self):
-        with tempfile.TemporaryDirectory() as tempdir:
-            fake_args = create_dot_dict(self.default_args.copy())
-            fake_args.output_dir = tempdir
-            fake_args.samples.append(create_dot_dict(fake_args.samples[0]))
-            fake_args.samples[1].motifs = [["CCAGG", "CEAGG"], ["CCTGG", "CETGG"]]
-            fake_args.samples[1].name = "methylated"
-            fake_args.complement_hmm_model = self.r9_complement_model_file
-            fake_args.template_hmm_model = self.r9_template_model_file
+        with captured_output() as (out, err):
+            with tempfile.TemporaryDirectory() as tempdir:
+                fake_args = create_dot_dict(self.default_args.copy())
+                fake_args.output_dir = tempdir
+                fake_args.samples.append(create_dot_dict(fake_args.samples[0]))
+                fake_args.samples[1].motifs = [["CCAGG", "CEAGG"], ["CCTGG", "CETGG"]]
+                fake_args.samples[1].name = "methylated"
+                fake_args.complement_hmm_model = self.r9_complement_model_file
+                fake_args.template_hmm_model = self.r9_template_model_file
 
-            fake_args.job_count = 1
-            fake_args.training.transitions = False
-            fake_args.training.normal_emissions = False
-            fake_args.training.hdp_emissions = True
-            fake_args.training.expectation_maximization = False
-            fake_args.training.em_iterations = 3
-            fake_args.hdp_args.hdp_type = "singleLevelPrior2"
-            fake_args.hdp_args.gibbs_samples = 100
-            fake_args.hdp_args.burnin_multiplier = 0
-            fake_args.hdp_args.number_of_assignments = 1
-            fake_args.two_d = True
+                fake_args.job_count = 1
+                fake_args.training.transitions = False
+                fake_args.training.normal_emissions = False
+                fake_args.training.hdp_emissions = True
+                fake_args.training.expectation_maximization = False
+                fake_args.training.em_iterations = 3
+                fake_args.hdp_args.hdp_type = "singleLevelPrior2"
+                fake_args.hdp_args.gibbs_samples = 100
+                fake_args.hdp_args.burnin_multiplier = 0
+                fake_args.hdp_args.number_of_assignments = 1
+                fake_args.two_d = True
 
-            # Test EM training 3 rounds
-            template_hmm_model_path, complement_hmm_model_path, template_hdp_model_path, complement_hdp_model_path = \
-                TrainSignalAlign(fake_args).expectation_maximization_training()
+                # Test EM training 3 rounds
+                template_hmm_model_path, complement_hmm_model_path, template_hdp_model_path, complement_hdp_model_path = \
+                    TrainSignalAlign(fake_args).expectation_maximization_training()
 
 
 

@@ -111,6 +111,7 @@ class SignalAlignment(object):
         self.max_memory_usage_kb = None
         self.read_label = None
         self.get_expectations = get_expectations  # option to gather expectations of transitions and emissions
+        self.path_to_bin = path_to_bin
         self.path_to_signalMachine = os.path.join(path_to_bin, "signalMachine")  # path to signalMachine
 
         assert os.path.exists(self.path_to_signalMachine), "Path to signalMachine does not exist"
@@ -151,11 +152,12 @@ class SignalAlignment(object):
         # prep
         self.openTempFolder("tempFiles_%s" % self.read_name)
         if self.twoD_chemistry:
-            npRead = NanoporeRead2D(fast_five_file=self.in_fast5, event_table=self.event_table, initialize=True)
+            npRead = NanoporeRead2D(fast_five_file=self.in_fast5, event_table=self.event_table, initialize=True,
+                                    path_to_bin=self.path_to_bin)
         else:
-            npRead = NanoporeRead(fast_five_file=self.in_fast5, event_table=self.event_table, initialize=True)
+            npRead = NanoporeRead(fast_five_file=self.in_fast5, event_table=self.event_table, initialize=True,
+                                  path_to_bin=self.path_to_bin, alignment_file=self.alignment_file, model_file_location=self.in_templateHmm)
         #todo need to validate / generate events and nucleotide read
-
         # read label
         read_label = npRead.read_label  # use this to identify the read throughout
         self.read_label = read_label
