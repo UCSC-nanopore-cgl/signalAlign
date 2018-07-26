@@ -92,11 +92,13 @@ add_custom_target(
         ${CMAKE_CURRENT_SOURCE_DIR}/htslib/libhts.a)
 
 add_executable(signalMachine ${SOURCE_FILES} ${SIGNAL_MACHINE})
-target_link_libraries(signalMachine -lpthread -lrt -lm -L${CMAKE_CURRENT_SOURCE_DIR}/htslib hts
+target_link_libraries(signalMachine -lz -lm -L${CMAKE_CURRENT_SOURCE_DIR}/htslib hts
         ${CMAKE_CURRENT_SOURCE_DIR}/sonLib/lib/sonLib.a
         ${CMAKE_CURRENT_SOURCE_DIR}/sonLib/lib/signalAlignLib.a
         ${CMAKE_CURRENT_SOURCE_DIR}/sonLib/lib/cuTest.a
         ${CMAKE_CURRENT_SOURCE_DIR}/htslib/libhts.a
+        ${CMAKE_CURRENT_SOURCE_DIR}/lib/libhdf5.a
+        -lz -ldl -lpthread
         )
 add_dependencies(signalMachine signalAlign)
 

@@ -115,7 +115,7 @@ def organize_fast5s(fast5_locations, realign_all=True):
     # examine each fast5
     for fast5 in fast5_locations:
         npr = NanoporeRead(fast5)
-        success = npr.Initialize()
+        success = npr._initialize_metadata()
         read_id = npr.read_label
         fast5_id = os.path.basename(fast5)[:-6]
         fast5_to_read_id[fast5_id] = read_id
@@ -576,6 +576,8 @@ def discover_single_nucleotide_probabilities(args, working_folder, kmer_length, 
     fast5_to_read, requires_event_calling = organize_fast5s(list_of_fast5s)
     print("[info] built map of fast5 identifiers to read ids with {} elements".format(len(fast5_to_read)))
 
+    # Decided to process the Fast5's on the fly.
+
     # # promethION fast5s do not come with events, need to do event calling
     # if len(requires_event_calling) > 0:
     #     # log and error checking
@@ -625,7 +627,7 @@ def discover_single_nucleotide_probabilities(args, working_folder, kmer_length, 
             substitution_ref = replace_periodic_reference_positions(reference_location, sub_fasta_path, step_size, s)
             alignment_args['forward_reference'] = substitution_ref
             # run alignment
-            multithread_signal_alignment(alignment_args, list_of_fast5s, workers)
+            alignments = multithread_signal_alignment(alignment_args, list_of_fast5s, workers)
 
             # get alignments
             alignments = [x for x in glob.glob(os.path.join(working_folder.path, "*.tsv")) if os.stat(x).st_size != 0]

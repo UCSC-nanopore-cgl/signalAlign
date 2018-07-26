@@ -553,9 +553,13 @@ double emissions_signal_strawManGetKmerEventMatchProbWithDescaling(StateMachine 
     // wrangle e_j data
     double eventMean = *(double *) e_j;
     double eventNoise = *(double *) ((char *) e_j + sizeof(double)); // aaah pointers
-
+    // if eventNoise turns up zero we get a NAN error so add small value
+    if (eventNoise == 0){
+        eventNoise = 0.000000001;
+    }
     // make temp x_i
     char *kmer_i = malloc((self->model.kmerLength) * sizeof(char));
+
     for (int64_t x = 0; x < self->model.kmerLength; x++) {
         kmer_i[x] = *((char *) x_i + x);
     }

@@ -83,10 +83,18 @@ class SingleNuclProbsTest(unittest.TestCase):
         oneD_alignment_file = os.path.join(SIGNALALIGN_ROOT, "tests/minion_test_reads/oneD_alignments.sam")
         self.run_single_nucl_prob(oneD_reads, ecoli_ref, alignment_file=oneD_alignment_file)
 
+    def test_1D_raw_reads(self):
+        oneD_reads = os.path.join(SIGNALALIGN_ROOT,
+                                  "tests/minion_test_reads/no_event_data_1D_ecoli/LomanLabz_PC_20161025_FNFAB42699_MN17633_sequencing_run_20161025_E_coli_native_450bps_82361_ch112_read108_strand.fast5")
+        ecoli_ref = os.path.join(SIGNALALIGN_ROOT, "tests/test_sequences/E.coli_K12.fasta")
+        oneD_alignment_file = os.path.join(SIGNALALIGN_ROOT, "tests/minion_test_reads/oneD_alignments.sam")
+        self.run_single_nucl_prob(oneD_reads, ecoli_ref, alignment_file=oneD_alignment_file)
 
 def main():
     testSuite = unittest.TestSuite()
-    testSuite.addTest(SingleNuclProbsTest('test_1D_reads'))
+    # testSuite.addTest(SingleNuclProbsTest('test_1D_reads'))
+    testSuite.addTest(SingleNuclProbsTest('test_1D_raw_reads'))
+
     testRunner = unittest.TextTestRunner(verbosity=2)
     return testRunner.run(testSuite).wasSuccessful()
 
