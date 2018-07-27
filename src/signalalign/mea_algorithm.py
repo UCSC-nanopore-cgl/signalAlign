@@ -366,6 +366,7 @@ def get_events_from_path(event_matrix, path):
     return events
 
 
+# TODO we should be grabbing path kmer not reference kmer!!!
 def match_events_with_signalalign(sa_events=None, event_detections=None, minus=False, rna=False):
     """Match event index with event detection data to label segments of signal for each kmer
 

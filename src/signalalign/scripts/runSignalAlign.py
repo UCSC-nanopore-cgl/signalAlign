@@ -54,9 +54,6 @@ def parse_args():
     parser.add_argument('--bwa_reference', '-r', action='store',
                         dest='bwa_reference', required=True, type=str,
                         help="Reference sequence required for generating guide alignment")
-
-    parser.add_argument("--bwt", action='store', dest="bwt", default=None,
-                        help="path to BWT files. example: ../ref.fasta")
     parser.add_argument('--output_location', '-o', action='store', dest='out',
                         required=True, type=str, default=None,
                         help="directory to put the alignments")
