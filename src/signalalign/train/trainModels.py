@@ -11,7 +11,7 @@ import numpy as np
 from timeit import default_timer as timer
 from argparse import ArgumentParser
 from shutil import copyfile
-from subprocess import Popen
+from subprocess import check_call
 
 from py3helpers.utils import create_dot_dict, merge_lists, all_string_permutations, save_json, load_json, \
     count_lines_in_file
@@ -405,8 +405,8 @@ class TrainSignalAlign(object):
                                               leaf=self.args.hdp_args.leaf_gamma)
 
         print("[[trainModels_buildHdpUtil] Command: {}\n".format(build_initial_hdp_command))
-        procs = Popen(build_initial_hdp_command.split(), stdout=sys.stdout, stderr=sys.stderr)
-        procs.wait()
+        check_call(build_initial_hdp_command.split())
+
         print("[trainModels_buildHdpUtil] - finished training HDP emissions routine")
 
         # check if the HDP created models

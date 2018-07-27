@@ -347,17 +347,17 @@ class TrainSignalAlignTest(unittest.TestCase):
                 TrainSignalAlign(fake_args).expectation_maximization_training()
 
     def test_transition_training(self):
-        with captured_output() as (out, err):
-            with tempfile.TemporaryDirectory() as tempdir:
-                fake_args = create_dot_dict(self.default_args.copy())
-                fake_args.output_dir = tempdir
-                fake_args.training.transitions = True
-                fake_args.training.normal_emissions = True
-                fake_args.training.hdp_emissions = False
-                fake_args.training.expectation_maximization = False
-                # with captured_output() as (out, err):
-                # Test transitions training worked
-                TrainSignalAlign(fake_args).expectation_maximization_training()
+        # with captured_output() as (out, err):
+        with tempfile.TemporaryDirectory() as tempdir:
+            fake_args = create_dot_dict(self.default_args.copy())
+            fake_args.output_dir = tempdir
+            fake_args.training.transitions = True
+            fake_args.training.normal_emissions = True
+            fake_args.training.hdp_emissions = False
+            fake_args.training.expectation_maximization = False
+            # with captured_output() as (out, err):
+            # Test transitions training worked
+            TrainSignalAlign(fake_args).expectation_maximization_training()
 
     def test_hdp_training(self):
         with captured_output() as (out, err):
