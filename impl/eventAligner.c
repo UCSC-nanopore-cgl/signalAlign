@@ -335,11 +335,14 @@ herr_t fast5_set_basecall_event_table(hid_t hdf5_file, char* table_location, bas
     /* Create and write the dataset. */
     space = H5Screate_simple(1, &dim, NULL);
     status = fast5_create_all_groups(hdf5_file, table_location);
-    dataset = H5Dcreate2(hdf5_file, stString_concat(table_location, "/Events"), bce_tid, space, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    if (status != 0) {
+        st_logInfo("Error creating groups for %s\n", table_location);
+    }
+
+    dataset = H5Dcreate2(hdf5_file, table_location, bce_tid, space, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
     status = H5Dwrite(dataset, bce_tid, H5S_ALL, H5S_ALL, H5P_DEFAULT, dst_buf);
 
     /* Release resources */
-
     H5Tclose(str_tid);
     H5Tclose(bce_tid);
     H5Sclose(space);
@@ -352,11 +355,7 @@ herr_t fast5_set_basecall_event_table(hid_t hdf5_file, char* table_location, bas
 herr_t fast5_create_group(hid_t hdf5_file, char* group_location){
     H5Eset_auto(NULL, NULL, NULL);
     herr_t status = H5Gget_objinfo(hdf5_file, group_location, 0, NULL);
-//    printf("%s", group_location);
-    if (status == 0) {
-//        printf ("The group exists.\n");
-    } else {
-//        printf ("The group either does NOT exist\n or some other error occurred.\n");
+    if (status != 0) {
         hid_t group_id = H5Gcreate2(hdf5_file, group_location, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
         status = H5Gclose(group_id);
     }
@@ -369,11 +368,12 @@ herr_t fast5_create_all_groups(hid_t hdf5_file, char* group_location){
     char* temp_group;
     herr_t status = 0;
     stList* all_groups = stString_splitByString(group_location, "/");
-    int64_t n_groups = stList_length(all_groups);
-    for (int64_t i = 0; i < n_groups; i++){
+    // we don't want to create the last "group" as this is the table name
+    int64_t n_groups = stList_length(all_groups) - 1;
+    for (int64_t i = 0; i < n_groups; i++) {
         temp_group = stString_concat("/", stList_get(all_groups, i));
         group = stString_concat(group, temp_group);
-        status = fast5_create_group(hdf5_file, group);
+        status = status | fast5_create_group(hdf5_file, group);
     }
     return status;
 }

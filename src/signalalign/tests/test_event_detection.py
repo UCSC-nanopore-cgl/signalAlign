@@ -555,7 +555,7 @@ class EventDetectTests(unittest.TestCase):
         dest = "/Analyses/SignalAlign_Basecall_1D_001/BaseCalled_template"
         self.rna_handle2.close()
 
-        status = run_kmeralign_exe(path_to_bin, rna_fast5_path, nuc_sequence, rna_model_file, dest)
+        status = run_kmeralign_exe(rna_fast5_path, nuc_sequence, rna_model_file, dest, path_to_bin)
         rna_handle = Fast5("test_rna2.fast5", 'r+')
 
         events = np.array(rna_handle[dest+"/Events"])
