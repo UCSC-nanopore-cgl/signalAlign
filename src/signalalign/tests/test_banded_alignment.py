@@ -123,8 +123,9 @@ class BandedAlignmentTests(unittest.TestCase):
         # pre-alignment work
         with closing(Fast5(file_path, read='r+')) as fast5_handle:
             nuc_sequence = fast5_handle.get_fastq(analysis="Basecall_1D", section="template").split()[2]
-            dest = fast5_handle.get_analysis_path_new(self.UNIT_TEST_NAME)
-            fast5_handle.ensure_path(dest)
+            dest = fast5_handle.get_analysis_events_path_new(self.UNIT_TEST_NAME)
+            #todo verify we don't need this
+            # fast5_handle.ensure_path(dest)
 
         # run kmeralign
         model_file = self.dna_template_model_file if dna else self.rna_model_file

@@ -558,7 +558,7 @@ class EventDetectTests(unittest.TestCase):
         status = run_kmeralign_exe(rna_fast5_path, nuc_sequence, rna_model_file, dest, path_to_bin)
         rna_handle = Fast5("test_rna2.fast5", 'r+')
 
-        events = np.array(rna_handle[dest+"/Events"])
+        events = np.array(rna_handle[dest])
 
         self.assertEqual(events[0]["raw_length"], 7)
         self.assertTrue(status)
