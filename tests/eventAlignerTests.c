@@ -676,17 +676,17 @@ CuSuite *eventAlignerTestSuite(void) {
     return suite;
 }
 
-int main(int argc, char *argv[]) {
-    // collect output and create a new test suite
-    CuString *output = CuStringNew();
-    CuSuite *suite = CuSuiteNew();
-    // add and run this test suite
-    CuSuiteAddSuite(suite, eventAlignerTestSuite());
-    CuSuiteRun(suite);
-    CuSuiteSummary(suite, output);
-    CuSuiteDetails(suite, output);
-    printf("%s\n", output->buffer);
-    CuStringDelete(output);
-    int good = suite->failCount > 0;
-    return good;
-}
+//int main(int argc, char *argv[]) {
+//    // collect output and create a new test suite
+//    CuString *output = CuStringNew();
+//    CuSuite *suite = CuSuiteNew();
+//    // add and run this test suite
+//    CuSuiteAddSuite(suite, eventAlignerTestSuite());
+//    CuSuiteRun(suite);
+//    CuSuiteSummary(suite, output);
+//    CuSuiteDetails(suite, output);
+//    printf("%s\n", output->buffer);
+//    CuStringDelete(output);
+//    int good = suite->failCount > 0;
+//    return good;
+//}
