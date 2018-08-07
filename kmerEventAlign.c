@@ -21,6 +21,7 @@ int main(int argc, char *argv[]) {
     char *savePath = NULL;
     char *nucleotides = NULL;
     char *nucleotideFile = NULL;
+    bool writeFailedAlignment = false;
 
     int key;
     while (1) {
@@ -31,11 +32,12 @@ int main(int argc, char *argv[]) {
                 {"save_path",               required_argument,  0,  'p'},
                 {"nucleotides",             required_argument,  0,  'N'},
                 {"nucleotide_file",         required_argument,  0,  'n'},
+                {"force_write",             no_argument,        0,  'w'},
                 {0, 0, 0, 0} };
 
         int option_index = 0;
 
-        key = getopt_long(argc, argv, "h:f:m:p:N:n:",
+        key = getopt_long(argc, argv, "h:f:m:p:N:n:w",
                           long_options, &option_index);
 
         if (key == -1) {
@@ -60,6 +62,9 @@ int main(int argc, char *argv[]) {
                 break;
             case 'n':
                 nucleotideFile = stString_copy(optarg);
+                break;
+            case 'w':
+                writeFailedAlignment = true;
                 break;
             default:
                 usage();
@@ -88,5 +93,5 @@ int main(int argc, char *argv[]) {
     }
 
     // do the alignment and return the status code
-    return load_from_raw(fast5File, modelFile, nucleotides, savePath);
+    return load_from_raw2(fast5File, modelFile, nucleotides, savePath, writeFailedAlignment);
 }

@@ -564,6 +564,10 @@ struct AlignedPair *alignedPair_construct(int ref_pos, int read_pos) {
 
 
 stList* adaptive_banded_simple_event_align(event_table et, StateMachine *pore_model, stList* kmer_list) {
+    return adaptive_banded_simple_event_align2(et, pore_model, kmer_list, false);
+}
+stList* adaptive_banded_simple_event_align2(event_table et, StateMachine *pore_model, stList* kmer_list,
+                                           bool writeFailedAlignment) {
 
     StateMachine3 *sM3 = (StateMachine3 *) pore_model;
 
@@ -800,7 +804,7 @@ for(int col = 0; col <= 10; ++col) {
     int curr_event_idx = 0;
     int curr_kmer_idx = (int) (n_kmers - 1);
 
-    // Find best score between an event and the last k-mer. after trimming the remaining evnets
+    // Find best score between an event and the last k-mer. after trimming the remaining events
     for (int event_idx = 0; event_idx < n_events; ++event_idx) {
         int band_idx = event_kmer_to_band(event_idx, curr_kmer_idx);
         assert(band_idx < n_bands);
@@ -872,18 +876,37 @@ for(int col = 0; col <= 10; ++col) {
     bool spanned = front->ref_pos == 0 && back->ref_pos == n_kmers - 1;
 
     bool failed = false;
+    char *errMsg = NULL;
     if (avg_log_emission < min_average_log_emission || !spanned || max_gap > max_gap_threshold) {
         failed = true;
-        stList_destruct(out);
-        stList *out = stList_construct3(0, (void (*)(void *)) alignedPair_destruct);
+        errMsg = stString_print("FAILED\tavg_emission:%s;spanned:%s;max_gap:%s;writing:%s",
+                                (avg_log_emission < min_average_log_emission ?
+                                 stString_print("%.2lf<%.2lf", avg_log_emission, min_average_log_emission) : "ok"),
+                                (!spanned ? "not_ok" : "ok"),
+                                (max_gap > max_gap_threshold ?
+                                 stString_print("%d>%d", max_gap, max_gap_threshold) : "ok"),
+                                (writeFailedAlignment ? "true" : "false")
+        );
+
+        if (!writeFailedAlignment) {
+            stList_destruct(out);
+            stList *out = stList_construct3(0, (void (*)(void *)) alignedPair_destruct);
+        }
     }
 
-    fprintf(stderr, "%s\tevents_per_kmer:%.2lf\tsequence_len:%zu\tavg_log_emission:%.2lf\tcurr_event_idx:%d\tmax_gap:%d\tfills:%d\n", failed ? "FAILED" : "OK", events_per_kmer, (n_kmers+kmer_length-1) , avg_log_emission, curr_event_idx, max_gap, fills);
+    fprintf(stderr,
+            "%s\tevents_per_kmer:%.2lf\tsequence_len:%zu\tavg_log_emission:%.2lf\tcurr_event_idx:%d\tmax_gap:%d\tfills:%d\n",
+            failed ? errMsg : "OK\t.",
+            events_per_kmer, (n_kmers+kmer_length-1) , avg_log_emission, curr_event_idx, max_gap, fills);
     return out;
 }
 
 // embed event table from fast5 path, template model path and nucleotide sequence
 herr_t load_from_raw(char* fast5_file_path, char* templateModelFile, char* sequence, char* path_to_embed) {
+    return load_from_raw2(fast5_file_path, templateModelFile, sequence, path_to_embed, false);
+}
+herr_t load_from_raw2(char* fast5_file_path, char* templateModelFile, char* sequence, char* path_to_embed,
+                      bool writeFailedAlignment) {
     // prep
     StateMachine *sM = stateMachine3_loadFromFile(templateModelFile, threeState, emissions_kmer_getGapProb,
                                                   emissions_signal_strawManGetKmerEventMatchProbWithDescaling_MeanOnly,
@@ -926,7 +949,7 @@ herr_t load_from_raw(char* fast5_file_path, char* templateModelFile, char* seque
     update_SignalMachineWithNanoporeParameters(scalings_template, sM);
 
     // banded kmer to event alignment
-    stList *event_alignment = adaptive_banded_simple_event_align(et, sM, kmer_list);
+    stList *event_alignment = adaptive_banded_simple_event_align2(et, sM, kmer_list, writeFailedAlignment);
 
     // create new event table with our own data structure
     basecalled_event_table* b_et = event_table_to_basecalled_table(&et, channel_params, start_time);
