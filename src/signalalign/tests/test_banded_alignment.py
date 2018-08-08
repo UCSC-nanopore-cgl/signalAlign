@@ -57,23 +57,6 @@ class BandedAlignmentTests(unittest.TestCase):
 
         return status
 
-    @staticmethod
-    def run_kmeralign(rna_fast5_path, nuc_sequence, rna_model_file, dest):
-
-        # because the file handles stay open when I use the cython integration :/
-        try:
-            subprocess.check_call(['python', '-c', 'import kmeralign ; kmeralign.load_from_raw(fast5_path="{}", nuc_sequence="{}", template_model_file="{}", path_in_fast5="{}")'.format(rna_fast5_path, nuc_sequence, rna_model_file, dest)])
-            status = 0
-        except Exception as e:
-            print("Exception in run_kmeralign: {}".format(e))
-            status = -1
-
-        # todo this is how we want to invoke this
-        # status = kmeralign.load_from_raw(fast5_path=self.rna_fast5_path, template_model_file=self.rna_model_file,
-        #                                  nuc_sequence=nuc_sequence, path_in_fast5=dest)
-
-        return status
-
     def compare_event_alignment(self, old_events, new_events):
 
         old_event_map = nanoporeRead.NanoporeRead.make_event_map(old_events, len(old_events[0]['model_state']))
