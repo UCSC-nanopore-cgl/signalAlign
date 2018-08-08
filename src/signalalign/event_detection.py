@@ -610,7 +610,7 @@ def load_from_raw(np_handle, alignment_file, model_file_location, path_to_bin=".
 
 
 def run_kmeralign_exe(fast5_path, nuc_sequence, model_file, dest, path_to_bin="./", tmp_directory=None,
-                      delete_tmp_fasta=True):
+                      delete_tmp_fasta=True, writeFailedAlignments=False):
     """Run kmerEventAlign. Generates alignment file
     :param fast5_path: path to fast5
     :param nuc_sequence: nucleotide sequence to align
@@ -626,6 +626,8 @@ def run_kmeralign_exe(fast5_path, nuc_sequence, model_file, dest, path_to_bin=".
     fasta_location = None
     try:
         cmd = [executable, '-f', fast5_path, '-m', model_file, '-p', dest]
+        if writeFailedAlignments:
+            cmd.append('-w')
         if tmp_directory is None:
             cmd.extend(['-N', nuc_sequence])
         else:

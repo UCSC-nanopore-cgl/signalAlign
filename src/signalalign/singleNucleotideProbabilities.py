@@ -498,7 +498,7 @@ def variant_caller(work_queue, done_queue, service_name="variant_caller"):
 
 def event_detection(work_queue, done_queue, alignment_file, model_file_location,
                     event_detection_strategy=None, event_detection_params=None,
-                    tmp_directory=None, service_name="event_detection"):
+                    tmp_directory=None, writeFailedAlignments=True, service_name="event_detection"):
     # prep
     total_handled = 0
     failure_count = 0
@@ -525,7 +525,7 @@ def event_detection(work_queue, done_queue, alignment_file, model_file_location,
 
                 # run our alignment script
                 status = run_kmeralign_exe(fast5, nucleotide_sequence, model_file_location, dest,
-                                           tmp_directory=tmp_directory)
+                                           tmp_directory=tmp_directory, writeFailedAlignments=writeFailedAlignments)
                 if not status:
                     raise Exception("run_kmer_align failed on read {} in {}".format(read_id, fast5))
 
