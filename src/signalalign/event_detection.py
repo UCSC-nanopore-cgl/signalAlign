@@ -31,6 +31,7 @@ from py3helpers.seq_tools import create_fastq_line, check_fastq_line, ReverseCom
 
 EVENT_DETECT_SPEEDY = "speedy"
 EVENT_DETECT_MINKNOW = "minknow"
+EVENT_KMERALIGN_TMP = "SignalAlign_tmp"
 
 
 def create_speedy_event_table(signal, sampling_freq, start_time, min_width=5, max_width=80, min_gain_per_sample=0.008,
@@ -554,18 +555,21 @@ def create_minknow_events_from_fast5(fast5_path, window_lengths=(3, 6), threshol
     return event_table, f5fh
 
 
-def load_from_raw(np_handle, alignment_file, model_file_location, path_to_bin="./"):
+def load_from_raw(np_handle, alignment_file, model_file_location, path_to_bin="./",
+                  nucleotide_sequence=None, analysis_identifier=None):
     """Load a nanopore read from raw signal and an alignment file. Need a model to create banded alignment.
     :param np_handle: NanoporeRead class object
     :param alignment_file: sam/bam file
     :param model_file_location: path to model file
     :param path_to_bin: bath to signalAlign bin where executables are stored
+    :param nucleotide_sequence: nucleotide sequence (needed if no alignment file is available)
+    :param analysis_identifier: identifier for storage of event table and fastq
     :return: path to events in fast5 file or -1 if the task fails
     """
     assert os.path.isfile(model_file_location), \
         "Model_file_location must be a real path to a SignalAlign HMM model file"
-    assert os.path.isfile(alignment_file), \
-        "alignment_file must be a real path a SAM/BAM alignment file"
+    assert os.path.isfile(alignment_file) or nucleotide_sequence is not None, \
+        "alignment_file must be a real path a SAM/BAM alignment file, or nucleotide_sequence must be specified"
     assert os.path.exists(path_to_bin), \
         "path_to_bin must exist"
 
@@ -575,9 +579,16 @@ def load_from_raw(np_handle, alignment_file, model_file_location, path_to_bin=".
     # grab read id
     read_id = np_handle.read_label
 
-    # get/build nucleotide sequence (accounting for hardclipping)
-    nucleotide_sequence, nucleotide_qualities, _, _ = \
-        get_full_nucleotide_read_from_alignment(alignment_file, read_id)
+    # get nucleotides and qualities
+    if nucleotide_sequence is None:
+        # get/build nucleotide sequence from alignment file (accounting for hardclipping)
+        nucleotide_sequence, nucleotide_qualities, _, _ = \
+            get_full_nucleotide_read_from_alignment(alignment_file, read_id)
+        if nucleotide_sequence is None:
+            print("[load_from_raw] nucleotides for {} not found in {}".format(read_id, alignment_file), file=sys.stderr)
+            return False
+    else:
+        nucleotide_qualities = None
     if nucleotide_qualities is None:
         nucleotide_qualities = "!" * len(nucleotide_sequence)
 
@@ -588,24 +599,27 @@ def load_from_raw(np_handle, alignment_file, model_file_location, path_to_bin=".
 
     fastq = create_fastq_line(read_id, nucleotide_sequence, nucleotide_qualities)
 
-    # get new location
-    dest = np_handle.fastFive.get_analysis_path_new("Basecall_1D")
-    np_handle.fastFive.ensure_path(dest)
+    # get temp location
+    tmp_dest = np_handle.fastFive.get_analysis_events_path_new(EVENT_KMERALIGN_TMP)
     file_name = np_handle.filename
     np_handle.close()
     # run the c code which does the required stuff
-    status = run_kmeralign_exe(file_name, nucleotide_sequence, model_file_location, dest, path_to_bin)
+    status = run_kmeralign_exe(file_name, nucleotide_sequence, model_file_location, tmp_dest, path_to_bin)
     if status:
         np_handle.open()
+        if analysis_identifier is None: analysis_identifier = Fast5.__default_basecall_1d_analysis__
         # get attrs
         keys = ["signalAlign version", "time_stamp"]
         values = ["0.1.7", TimeStamp().posix_date()]
         attributes = merge_dicts([dict(zip(keys, values)), np_handle.fastFive.raw_attributes])
         # get events
-        np_handle.fastFive._add_attrs(attributes, np_handle.fastFive.get_analysis_latest("Basecall_1D"))
-        np_handle.fastFive.set_fastq(np_handle.fastFive.get_analysis_latest("Basecall_1D"), fastq)
-        return np_handle.fastFive.get_analysis_latest("Basecall_1D")
+        events = np_handle.fastFive.get_custom_analysis_events(EVENT_KMERALIGN_TMP)
+        # save events and fastq
+        saved_loc = save_event_table_and_fastq(np_handle.fastFive, events, fastq, attributes,
+                                               analysis_identifier=analysis_identifier)
+        return np_handle.fastFive.get_analysis_latest(analysis_identifier)
     else:
+        print("[load_from_raw] error performing kmeralign", file=sys.stderr)
         return False
 
 
