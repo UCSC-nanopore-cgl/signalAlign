@@ -18,7 +18,7 @@ from signalalign.utils.bwaWrapper import *
 from signalalign.utils.fileHandlers import FolderHandler
 from signalalign.utils.sequenceTools import fastaWrite, samtools_faidx_fasta, processReferenceFasta
 from signalalign.mea_algorithm import mea_alignment_from_signal_align, match_events_with_signalalign
-from py3helpers.utils import merge_dicts
+
 
 def create_signalAlignment_args(backward_reference=None, forward_reference=None, destination=None,
                                 stateMachineType="threeState", in_templateHmm=None,
@@ -29,11 +29,8 @@ def create_signalAlignment_args(backward_reference=None, forward_reference=None,
                                 track_memory_usage=False, get_expectations=False, output_format='full', embed=False,
                                 event_table=False,
                                 check_for_temp_file_existance=True,
-                                path_to_bin='', force_load_from_raw=False):
-    """
-    Create alignment arguments for SignalAlign. Every parameter except in_fast5.
-    Parameters are explained in SignalAlignment
-    """
+                                path_to_bin=''):
+    """Create alignment arguments for SignalAlign. Parameters are explained in SignalAlignment"""
     alignment_args = {
         "backward_reference": backward_reference,
         "forward_reference": forward_reference,
@@ -57,8 +54,7 @@ def create_signalAlignment_args(backward_reference=None, forward_reference=None,
         'embed': embed,
         'event_table': event_table,
         'check_for_temp_file_existance': check_for_temp_file_existance,
-        'path_to_bin': path_to_bin,
-        'force_load_from_raw': force_load_from_raw}
+        'path_to_bin': path_to_bin}
 
     return alignment_args
 
@@ -86,12 +82,13 @@ class SignalAlignment(object):
                  target_regions=None,
                  output_format="full",
                  embed=False,
-                 force_load_from_raw=False,
                  event_table=False,
                  check_for_temp_file_existance=True,
                  track_memory_usage=False,
                  get_expectations=False,
-                 path_to_bin='./'):
+                 path_to_bin='./',
+                 # True: always perform, False: never perform, None: perform if required
+                 perform_kmer_event_alignment=None):
         self.in_fast5 = in_fast5  # fast5 file to align
         self.destination = destination  # place where the alignments go, should already exist
         self.stateMachineType = stateMachineType  # flag for signalMachine
@@ -118,9 +115,7 @@ class SignalAlignment(object):
         self.get_expectations = get_expectations  # option to gather expectations of transitions and emissions
         self.path_to_bin = path_to_bin
         self.path_to_signalMachine = os.path.join(path_to_bin, "signalMachine")  # path to signalMachine
-        self.force_load_from_raw = force_load_from_raw  # boolean option to force predictive alignment
-                                                                      # between kmers and nucleotide sequence
-        self.nucleotide_sequence = None
+        self.perform_kmer_event_alignment = perform_kmer_event_alignment
 
         assert os.path.exists(self.path_to_signalMachine), "Path to signalMachine does not exist"
         assert self.bwa_reference is not None or self.alignment_file is not None, \
@@ -154,19 +149,25 @@ class SignalAlignment(object):
             if self.twoD_chemistry:
                 assert self.in_complementHmm is not None, "Need complement HMM files for model training"
         if not os.path.isfile(self.in_fast5):
-            print("[SignalAlignment.run] ERROR: Did not find .fast5 at{file}".format(file=self.in_fast5))
+            print("[SignalAlignment.run] ERROR: Did not find .fast5 at{file}".format(file=self.in_fast5), file=sys.stderr)
             return False
 
         # prep
         self.openTempFolder("tempFiles_%s" % self.read_name)
         if self.twoD_chemistry:
             npRead = NanoporeRead2D(fast_five_file=self.in_fast5, event_table=self.event_table, initialize=True,
-                                    path_to_bin=self.path_to_bin)
+                                    path_to_bin=self.path_to_bin,
+                                    perform_kmer_event_alignment=self.perform_kmer_event_alignment)
         else:
             npRead = NanoporeRead(fast_five_file=self.in_fast5, event_table=self.event_table, initialize=True,
                                   path_to_bin=self.path_to_bin, alignment_file=self.alignment_file,
-                                  model_file_location=self.in_templateHmm, force_load_from_raw=self.force_load_from_raw)
-        #todo need to validate / generate events and nucleotide read
+                                  model_file_location=self.in_templateHmm,
+                                  perform_kmer_event_alignment=self.perform_kmer_event_alignment)
+        # sanity check
+        if not npRead.initialize_success:
+            self.failStop("[SignalAlignment.run] ERROR: NanoporeRead failed initialization: {}".format(self.in_fast5), npRead)
+            return False
+
         # read label
         read_label = npRead.read_label  # use this to identify the read throughout
         self.read_label = read_label
@@ -477,7 +478,7 @@ class SignalAlignment(object):
         self.temp_folder.remove_folder()
         if nanopore_read is not None:
             nanopore_read.close()
-        print(message)
+        print(message, file=sys.stderr)
 
     def read_in_signal_align_tsv(self, tsv_path, file_type):
         """Read in tsv file"""
@@ -585,8 +586,6 @@ def multithread_signal_alignment(signal_align_arguments, fast5_locations, worker
 
     # if we didn't get an alignment file then check for index file
     if 'alignment_file' not in signal_align_arguments or not signal_align_arguments['alignment_file']:
-        assert not signal_align_arguments['force_load_from_raw'], "Currently need to have alignment file to get " \
-                                                                  "sequence information if you want to load from raw"
         # ensure alignments can be generated (either from bwa on the reference or by an alignment file)
         bwa_reference = buildBwaIndex(signal_align_arguments["bwa_reference"],
                                       os.path.dirname(signal_align_arguments["bwa_reference"]),
@@ -600,7 +599,7 @@ def multithread_signal_alignment(signal_align_arguments, fast5_locations, worker
                           'degenerate', 'forward_reference'}
     optional_arguments = {'backward_reference', 'alignment_file', 'bwa_reference', 'twoD_chemistry',
                           'target_regions', 'output_format', 'embed', 'event_table', 'check_for_temp_file_existance',
-                          'track_memory_usage', 'get_expectations', 'path_to_bin', 'force_load_from_raw'}
+                          'track_memory_usage', 'get_expectations', 'path_to_bin'}
     missing_arguments = list(filter(lambda x: x not in signal_align_arguments.keys(), required_arguments))
     unexpected_arguments = list(filter(lambda x: x not in required_arguments and x not in optional_arguments,
                                        signal_align_arguments.keys()))

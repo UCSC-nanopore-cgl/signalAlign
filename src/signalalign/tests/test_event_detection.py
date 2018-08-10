@@ -10,36 +10,50 @@
 # Author: Andrew Bailey
 # History: 12/21/2017 Created
 ########################################################################
-import os
-import numpy as np
-import threading
-import time
-from signalalign.fast5 import Fast5
 from signalalign.event_detection import *
-from py3helpers.utils import time_it
 import unittest
 from signalalign.nanoporeRead import NanoporeRead
+import tempfile
+import shutil
 
 
 class EventDetectTests(unittest.TestCase):
+
     @classmethod
     def setUpClass(cls):
         super(EventDetectTests, cls).setUpClass()
         cls.HOME = '/'.join(os.path.abspath(__file__).split("/")[:-4])
-        cls.dna_file = os.path.join(cls.HOME,
-                                    "tests/minion_test_reads/canonical_ecoli_R9/miten_PC_20160820_FNFAD20259_MN17223_mux_scan_AMS_158_R9_WGA_Ecoli_08_20_16_83098_ch138_read23_strand.fast5")
-        cls.rna_file = os.path.join(cls.HOME,
-                                    "tests/minion_test_reads/RNA_edge_cases/DEAMERNANOPORE_20170922_FAH26525_MN16450_sequencing_run_MA_821_R94_NA12878_mRNA_09_22_17_67136_read_61_ch_151_strand.fast5")
         cls.rna_model_file = os.path.join(cls.HOME, "models/testModelR9p4_5mer_acgt_RNA.model")
         cls.dna_template_model_file = os.path.join(cls.HOME, "models/testModelR9p4_5mer_acegt_template.model")
-        dna_handle = Fast5(cls.dna_file, 'r+')
-        rna_handle = Fast5(cls.rna_file, 'r+')
-        cls.dna_handle = dna_handle.create_copy("test_dna.fast5")
-        cls.rna_handle = rna_handle.create_copy("test_rna.fast5")
-        rna_handle = Fast5(cls.rna_file, 'r+')
-        cls.rna_handle2 = rna_handle.create_copy("test_rna2.fast5")
-        rna_handle = Fast5(cls.rna_file, 'r+')
-        cls.rna_handle3 = rna_handle.create_copy("test_rna3.fast5")
+
+        cls.tmp_directory = tempfile.mkdtemp()
+
+        dna_file = os.path.join(cls.HOME,
+                                "tests/minion_test_reads/canonical_ecoli_R9/miten_PC_20160820_FNFAD20259_MN17223_mux_scan_AMS_158_R9_WGA_Ecoli_08_20_16_83098_ch138_read23_strand.fast5")
+        rna_file = os.path.join(cls.HOME,
+                                "tests/minion_test_reads/RNA_edge_cases/DEAMERNANOPORE_20170922_FAH26525_MN16450_sequencing_run_MA_821_R94_NA12878_mRNA_09_22_17_67136_read_61_ch_151_strand.fast5")
+
+        # get file locations
+        cls.tmp_dna_file = os.path.join(str(cls.tmp_directory), 'test_dna.fast5')
+        cls.tmp_rna_file1 = os.path.join(str(cls.tmp_directory), 'test_rna1.fast5')
+        cls.tmp_rna_file2 = os.path.join(str(cls.tmp_directory), 'test_rna2.fast5')
+        cls.tmp_rna_file3 = os.path.join(str(cls.tmp_directory), 'test_rna3.fast5')
+
+        # copy file to tmp directory
+        shutil.copy(dna_file, cls.tmp_dna_file)
+        shutil.copy(rna_file, cls.tmp_rna_file1)
+        shutil.copy(rna_file, cls.tmp_rna_file2)
+        shutil.copy(rna_file, cls.tmp_rna_file3)
+
+        # create handles
+        cls.dna_handle = Fast5(cls.tmp_dna_file, 'r+')
+        cls.rna_handle = Fast5(cls.tmp_rna_file1, 'r+')
+        cls.rna_handle2 = Fast5(cls.tmp_rna_file2, 'r+')
+        cls.rna_handle3 = Fast5(cls.tmp_rna_file3, 'r+')
+
+        # clear line for output
+        print("")
+        print("", file=sys.stderr)
 
     def test_create_speedy_event_table(self):
         for fast5handle in [self.dna_handle, self.rna_handle]:
@@ -407,9 +421,9 @@ class EventDetectTests(unittest.TestCase):
         with self.assertRaises(AssertionError):
             resegment_reads("fakepath/path", speedy_params, speedy=True, overwrite=True)
         with self.assertRaises(TypeError):
-            resegment_reads("test_dna.fast5", speedy_params, speedy=False, overwrite=True)
+            resegment_reads(self.tmp_dna_file, speedy_params, speedy=False, overwrite=True)
 
-        for fast5_file in ["test_dna.fast5", "test_rna.fast5"]:
+        for fast5_file in [self.tmp_dna_file, self.tmp_rna_file1]:
             resegment_reads(fast5_file, params=minknow_params, speedy=False, overwrite=True,
                             analysis_path="ReSegmentBasecall_000")
             fasthandle = resegment_reads(fast5_file, params=speedy_params, speedy=True, overwrite=True,
@@ -504,11 +518,11 @@ class EventDetectTests(unittest.TestCase):
     def test_get_resegment_accuracy(self):
         # """Test get_resegment_accuracy"""
         minknow_params = dict(window_lengths=(5, 10), thresholds=(2.0, 1.1), peak_height=1.2)
-        f5fh = resegment_reads("test_rna.fast5", minknow_params, speedy=False, overwrite=True)
+        f5fh = resegment_reads(self.tmp_rna_file1, minknow_params, speedy=False, overwrite=True)
         self.assertAlmostEqual(get_resegment_accuracy(f5fh), 1.0)
 
     def test_create_minknow_events_from_fast5(self):
-        for path in ["test_rna.fast5", "test_dna.fast5"]:
+        for path in [self.tmp_dna_file, self.tmp_rna_file1]:
             events, f5handle = create_minknow_events_from_fast5(path)
             passing = check_numpy_table(events, req_fields=(
             'start', 'length', 'mean', 'stdv', 'model_state', 'move', 'p_model_state'))
@@ -534,7 +548,7 @@ class EventDetectTests(unittest.TestCase):
     def test_load_from_raw(self):
         path_to_bin = os.path.join(self.HOME, "bin")
         self.rna_handle3.close()
-        np_handle = NanoporeRead(os.path.abspath("test_rna3.fast5"))
+        np_handle = NanoporeRead(os.path.abspath(self.tmp_rna_file3))
         np_handle._initialize_metadata()
         alignment_file = os.path.join(self.HOME, "tests/minion_test_reads/RNA_edge_case.sam")
         saved_location = load_from_raw(np_handle, alignment_file, self.rna_model_file, path_to_bin)
@@ -546,19 +560,19 @@ class EventDetectTests(unittest.TestCase):
 
     def test_run_kmeralign_exe(self):
         path_to_bin = os.path.join(self.HOME, "bin")
-        rna_fast5_path = os.path.abspath("test_rna2.fast5")
+        rna_fast5_path = os.path.abspath(self.tmp_rna_file2)
         nuc_sequence = "CAUCCUGCCCUGUGUUAUCCAGUUAUGAGAUAAAAAAUGAAUAUAAGAGUGCUUGUCAUUAUAAAAGUUUUCCUUUUUAUUACCAUCCAAGCCACCAGCUGCCAGCCACCAGCAGCCAGCUGCCAGCACUAGCUUUUUUUUUUUAGCACUUAGUAUUUAGCAGCAUUUAUUAACAGGUACUUUAAGAAUGAUGAAGCAUUGUUUUAAUCUCACUGACUAUGAAGGUUUUAGUUUCUGCUUUUGCAAUUGUGUUUGUGAAAUUUGAAUACUUGCAGGCUUUGUAUGUGAAUAAUUUUAGCGGCUGGUUGGAGAUAAUCCUACGGGAAUUACUUAAAACUGUGCUUUAACUAAAAUGAAUGAGCUUUAAAAUCCCUCCUCCUACUCCAUCAUCAUCCCACUAUUCAUCUUAUCUCAUUAUCAUCAACCUAUCCCACAUCCCUAUCACCACAGCAAUCCAA"
         rna_model_file = self.rna_model_file
-        np_handle = NanoporeRead(os.path.abspath("test_rna3.fast5"))
+        np_handle = NanoporeRead(os.path.abspath(self.tmp_rna_file3))
         np_handle._initialize_metadata()
 
         dest = "/Analyses/SignalAlign_Basecall_1D_001/BaseCalled_template"
         self.rna_handle2.close()
 
-        status = run_kmeralign_exe(path_to_bin, rna_fast5_path, nuc_sequence, rna_model_file, dest)
-        rna_handle = Fast5("test_rna2.fast5", 'r+')
+        status = run_kmeralign_exe(rna_fast5_path, nuc_sequence, rna_model_file, dest, path_to_bin)
+        rna_handle = Fast5(self.tmp_rna_file2, 'r+')
 
-        events = np.array(rna_handle[dest+"/Events"])
+        events = np.array(rna_handle[dest])
 
         self.assertEqual(events[0]["raw_length"], 7)
         self.assertTrue(status)
@@ -566,10 +580,7 @@ class EventDetectTests(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):
         """Remove test fast5 file"""
-        os.remove("test_rna.fast5")
-        os.remove("test_rna2.fast5")
-        os.remove("test_rna3.fast5")
-        os.remove("test_dna.fast5")
+        shutil.rmtree(cls.tmp_directory)
 
 
 if __name__ == '__main__':

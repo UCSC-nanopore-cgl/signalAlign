@@ -25,7 +25,7 @@ RESEGMENT_STRAGEGIES     = [EVENT_DETECT_MINKNOW, EVENT_DETECT_SPEEDY]
 
 class NanoporeRead(object):
     def __init__(self, fast_five_file, twoD=False, event_table='', initialize=False, path_to_bin=None,
-                 alignment_file=None, model_file_location=None, force_load_from_raw=False):
+                 alignment_file=None, model_file_location=None, perform_kmer_event_alignment=None):
         # load the fast5
         self.filename = fast_five_file         # fast5 file path
         self.fastFive = None                   # fast5 object
@@ -61,7 +61,9 @@ class NanoporeRead(object):
         self.path_to_bin = path_to_bin         # path to bin
         self.alignment_file=alignment_file
         self.model_file_location=model_file_location
-        self.force_load_from_raw = force_load_from_raw
+        self.initialize_success = None         # set if initialize was attempted
+        # perform_kmer_event_alignment: True - always perform, False - never perform, None - perform if required
+        self.perform_kmer_event_alignment = perform_kmer_event_alignment
         # determination of 2D reads
         self.twoD = twoD                       # 2D read flag, necessary right now, and the client should know
         if type(self) == NanoporeRead:
@@ -117,8 +119,10 @@ class NanoporeRead(object):
 
         ok = self._initialize_metadata()
         ok &= self._initialize()
+        self.initialize_success = ok
 
-        if not ok: self.close()
+        if not ok:
+            self.close()
 
         return ok
 
@@ -154,12 +158,25 @@ class NanoporeRead(object):
         if not self.open():
             return False
 
-        if self.force_load_from_raw:
-            oned_root_address = load_from_raw(self, self.alignment_file, self.model_file_location, self.path_to_bin)
+        # parameter clarity
+        perform_kmer_event_aln_if_required = self.perform_kmer_event_alignment is None
+        perform_kmer_event_aln_always = self.perform_kmer_event_alignment == True
+
+        # are we required to perform kmer event realignment?
+        if perform_kmer_event_aln_always:
+            if self.event_table:
+                load_from_raw(self, self.alignment_file, self.model_file_location, self.path_to_bin,
+                              analysis_identifier=self.event_table)
+            else:
+                load_from_raw(self, self.alignment_file, self.model_file_location, self.path_to_bin)
 
         # get oneD directory and check if the table location exists in the fast5file
         if self.event_table:
             oned_root_address = self.get_latest_basecall_edition(self.event_table)
+            if not oned_root_address and perform_kmer_event_aln_if_required:
+                oned_root_address = load_from_raw(self, self.alignment_file, self.model_file_location, self.path_to_bin,
+                                                  analysis_identifier=self.event_table)
+        # TODO I think we should refactor (or remove) this block
         elif self.rna:
             oned_root_address = self.get_latest_basecall_edition(RESEGMENT_KEY)
             if not oned_root_address:
@@ -169,15 +186,15 @@ class NanoporeRead(object):
                 oned_root_address = self.get_latest_basecall_edition(RESEGMENT_KEY)
         else:
             oned_root_address = self.get_latest_basecall_edition(TEMPLATE_BASECALL_KEY)
+            if not oned_root_address and perform_kmer_event_aln_if_required:
+                oned_root_address = load_from_raw(self, self.alignment_file, self.model_file_location, self.path_to_bin)
 
         # sanity check
         if not oned_root_address:
-            oned_root_address = load_from_raw(self, self.alignment_file, self.model_file_location, self.path_to_bin)
-            if not oned_root_address:
-                self.logError("[NanoporeRead:_initialize] ERROR could not find 1D root address in {}"
-                              .format(self.filename))
-                self.close()
-                return False
+            self.logError("[NanoporeRead:_initialize] ERROR could not find 1D root address in {}"
+                          .format(self.filename))
+            self.close()
+            return False
 
         print("[NanoporeRead._initialize] oned_root_address {}".format(oned_root_address), file=sys.stderr)
         # get basecall version

@@ -11,7 +11,7 @@
 
 #define HOME "../" //this is based on where travis runs tests from
 
-#define EVENT_LOCATION "/Analyses"
+#define EVENT_LOCATION "/Analyses/UnittestEvents"
 
 static void test_fast5_get_raw_read_name(CuTest *testCase) {
     char* path = stString_concat(HOME, "tests/minion_test_reads/RNA_edge_cases/DEAMERNANOPORE_20170922_FAH26525_MN16450_sequencing_run_MA_821_R94_NA12878_mRNA_09_22_17_67136_read_61_ch_151_strand.fast5");
@@ -187,7 +187,7 @@ static void test_fast5_set_basecall_event_table(CuTest *testCase){
     //open and read
     fast5_handle = fast5_open(path);
     basecalled_event dst_buf[2];
-    status = fast5_get_basecall_events(fast5_handle, stString_concat(EVENT_LOCATION, "/Events"), dst_buf);
+    status = fast5_get_basecall_events(fast5_handle, EVENT_LOCATION, dst_buf);
     CuAssertIntEquals(testCase, 0, (int) status);
 
     CuAssertIntEquals(testCase, 0, (int) dst_buf[0].raw_start);
@@ -210,7 +210,7 @@ static void test_fast5_set_basecall_event_table(CuTest *testCase){
     CuAssertStrEquals(testCase, "TTACA", dst_buf[1].model_state);
     CuAssertIntEquals(testCase, 1, dst_buf[1].move);
 
-    H5Ldelete( fast5_handle, stString_concat(EVENT_LOCATION, "/Events"), H5P_DEFAULT );
+    H5Ldelete( fast5_handle, EVENT_LOCATION, H5P_DEFAULT );
 
     fast5_close(fast5_handle);
 
@@ -440,7 +440,7 @@ static void test_load_from_raw_rna(CuTest *testCase) {
 
     int new_event_n = 1220; //how many events are generated (empirically determined)
     basecalled_event new_events[new_event_n + 1];
-    fast5_get_basecall_events(fast5_handle, stString_concat(EVENT_LOCATION, "/Events"), new_events);
+    fast5_get_basecall_events(fast5_handle, EVENT_LOCATION, new_events);
 
     int old_event_n = 1719; //how many events were called
     basecalled_event old_events[old_event_n + 1];
@@ -452,7 +452,7 @@ static void test_load_from_raw_rna(CuTest *testCase) {
     CuAssertStrEquals(testCase, "AACCT", old_events[0].model_state);
     CuAssertStrEquals(testCase, "CCTAC", old_events[old_event_n - 1].model_state);
 
-    status = H5Ldelete( fast5_handle, stString_concat(EVENT_LOCATION, "/Events"), H5P_DEFAULT );
+    status = H5Ldelete( fast5_handle, EVENT_LOCATION, H5P_DEFAULT );
     CuAssertIntEquals(testCase, 0, (int) status);
     fast5_close(fast5_handle);
 }
@@ -468,7 +468,7 @@ static void test_load_from_raw_dna(CuTest *testCase){
 
     int new_event_n = 11020; //how many events are generated (empirically determined)
     basecalled_event new_events[new_event_n + 1];
-    fast5_get_basecall_events(fast5_handle, stString_concat(EVENT_LOCATION, "/Events"), new_events);
+    fast5_get_basecall_events(fast5_handle, EVENT_LOCATION, new_events);
 
     int old_event_n = 10922; //how many events were called
     basecalled_event old_events[old_event_n + 1];
@@ -479,7 +479,7 @@ static void test_load_from_raw_dna(CuTest *testCase){
     CuAssertStrEquals(testCase, "TGCAT", old_events[0].model_state);
     CuAssertStrEquals(testCase, "AAACT", old_events[old_event_n - 1].model_state);
 
-    status = H5Ldelete( fast5_handle, stString_concat(EVENT_LOCATION, "/Events"), H5P_DEFAULT );
+    status = H5Ldelete( fast5_handle, EVENT_LOCATION, H5P_DEFAULT );
     CuAssertIntEquals(testCase, 0, (int) status);
     fast5_close(fast5_handle);
 }
@@ -675,7 +675,7 @@ CuSuite *eventAlignerTestSuite(void) {
 
     return suite;
 }
-//
+
 //int main(int argc, char *argv[]) {
 //    // collect output and create a new test suite
 //    CuString *output = CuStringNew();

@@ -100,6 +100,7 @@ void* update_SignalMachineWithNanoporeParameters(NanoporeReadAdjustmentParameter
 
 // create adaptive banded alignment in C using our model
 stList* adaptive_banded_simple_event_align(event_table et, StateMachine *pore_model, stList* kmer_list);
+stList* adaptive_banded_simple_event_align2(event_table et, StateMachine *pore_model, stList* kmer_list, bool writeFailedAlignment);
 
 // convert event table into basecalled event table. Assume's start and length are "raw_start" and "raw_length"
 basecalled_event_table* event_table_to_basecalled_table(event_table *et, fast5_raw_scaling scaling, float start_time);
@@ -112,6 +113,7 @@ void rna_alignment_to_base_event_map(stList *event_alignment, basecalled_event_t
                                      stList *kmer_list, StateMachine *pore_model);
 
 herr_t load_from_raw(char* fast5_file_path, char* templateModelFile, char* sequence, char* path_to_embed);
+herr_t load_from_raw2(char* fast5_file_path, char* templateModelFile, char* sequence, char* path_to_embed, bool writeFailedAlignment);
 
 event_table reverse_events(event_table et);
 

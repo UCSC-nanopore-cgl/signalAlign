@@ -31,6 +31,7 @@ from py3helpers.seq_tools import create_fastq_line, check_fastq_line, ReverseCom
 
 EVENT_DETECT_SPEEDY = "speedy"
 EVENT_DETECT_MINKNOW = "minknow"
+EVENT_KMERALIGN_TMP = "SignalAlign_tmp"
 
 
 def create_speedy_event_table(signal, sampling_freq, start_time, min_width=5, max_width=80, min_gain_per_sample=0.008,
@@ -407,6 +408,10 @@ def generate_events_and_alignment(fast5_path, nucleotide_sequence, nucleotide_qu
     values = ["0.2.0", TimeStamp().posix_date()]
     attributes = merge_dicts([event_detection_params, dict(zip(keys, values)), f5fh.raw_attributes])
 
+    # do the alignment
+    # todo do_alignment(events, nucleotide_sequence)
+    # success = evaluate_success()
+
     # save to fast5 (if appropriate)
     saved_location = None
     if save_to_fast5:
@@ -550,18 +555,21 @@ def create_minknow_events_from_fast5(fast5_path, window_lengths=(3, 6), threshol
     return event_table, f5fh
 
 
-def load_from_raw(np_handle, alignment_file, model_file_location, path_to_bin):
+def load_from_raw(np_handle, alignment_file, model_file_location, path_to_bin="./",
+                  nucleotide_sequence=None, analysis_identifier=None):
     """Load a nanopore read from raw signal and an alignment file. Need a model to create banded alignment.
     :param np_handle: NanoporeRead class object
     :param alignment_file: sam/bam file
     :param model_file_location: path to model file
     :param path_to_bin: bath to signalAlign bin where executables are stored
+    :param nucleotide_sequence: nucleotide sequence (needed if no alignment file is available)
+    :param analysis_identifier: identifier for storage of event table and fastq
     :return: path to events in fast5 file or -1 if the task fails
     """
     assert os.path.isfile(model_file_location), \
         "Model_file_location must be a real path to a SignalAlign HMM model file"
-    assert os.path.isfile(alignment_file), \
-        "alignment_file must be a real path a SAM/BAM alignment file"
+    assert os.path.isfile(alignment_file) or nucleotide_sequence is not None, \
+        "alignment_file must be a real path a SAM/BAM alignment file, or nucleotide_sequence must be specified"
     assert os.path.exists(path_to_bin), \
         "path_to_bin must exist"
 
@@ -571,9 +579,16 @@ def load_from_raw(np_handle, alignment_file, model_file_location, path_to_bin):
     # grab read id
     read_id = np_handle.read_label
 
-    # get/build nucleotide sequence (accounting for hardclipping)
-    nucleotide_sequence, nucleotide_qualities, _, _ = \
-        get_full_nucleotide_read_from_alignment(alignment_file, read_id)
+    # get nucleotides and qualities
+    if nucleotide_sequence is None:
+        # get/build nucleotide sequence from alignment file (accounting for hardclipping)
+        nucleotide_sequence, nucleotide_qualities, _, _ = \
+            get_full_nucleotide_read_from_alignment(alignment_file, read_id)
+        if nucleotide_sequence is None:
+            print("[load_from_raw] nucleotides for {} not found in {}".format(read_id, alignment_file), file=sys.stderr)
+            return False
+    else:
+        nucleotide_qualities = None
     if nucleotide_qualities is None:
         nucleotide_qualities = "!" * len(nucleotide_sequence)
 
@@ -583,44 +598,67 @@ def load_from_raw(np_handle, alignment_file, model_file_location, path_to_bin):
         nucleotide_qualities = nucleotide_qualities[::-1]
 
     fastq = create_fastq_line(read_id, nucleotide_sequence, nucleotide_qualities)
-    # get new location
-    dest = np_handle.fastFive.get_analysis_path_new("Basecall_1D")
+
+    # get temp location
+    tmp_dest = np_handle.fastFive.get_analysis_events_path_new(EVENT_KMERALIGN_TMP)
     file_name = np_handle.filename
     np_handle.close()
     # run the c code which does the required stuff
-    #TODO return alignment info and add to attributes
-    status = run_kmeralign_exe(path_to_bin, file_name, nucleotide_sequence, model_file_location, dest)
+    status = run_kmeralign_exe(file_name, nucleotide_sequence, model_file_location, tmp_dest, path_to_bin)
     if status:
         np_handle.open()
+        if analysis_identifier is None: analysis_identifier = Fast5.__default_basecall_1d_analysis__
         # get attrs
         keys = ["signalAlign version", "time_stamp"]
         values = ["0.1.7", TimeStamp().posix_date()]
         attributes = merge_dicts([dict(zip(keys, values)), np_handle.fastFive.raw_attributes])
         # get events
-        np_handle.fastFive._add_attrs(attributes, np_handle.fastFive.get_analysis_latest("Basecall_1D"))
-        np_handle.fastFive.set_fastq(np_handle.fastFive.get_analysis_latest("Basecall_1D"), fastq)
-        return np_handle.fastFive.get_analysis_latest("Basecall_1D")
+        events = np_handle.fastFive.get_custom_analysis_events(EVENT_KMERALIGN_TMP)
+        # save events and fastq
+        saved_loc = save_event_table_and_fastq(np_handle.fastFive, events, fastq, attributes,
+                                               analysis_identifier=analysis_identifier)
+        return np_handle.fastFive.get_analysis_latest(analysis_identifier)
     else:
+        print("[load_from_raw] error performing kmeralign", file=sys.stderr)
         return False
 
 
-def run_kmeralign_exe(path_to_bin, fast5_path, nuc_sequence, model_file, dest):
+def run_kmeralign_exe(fast5_path, nuc_sequence, model_file, dest, path_to_bin="./", tmp_directory=None,
+                      delete_tmp_fasta=True, writeFailedAlignments=False):
     """Run kmerEventAlign. Generates alignment file
-    :param path_to_bin: path to SignalAlign bin with executables
     :param fast5_path: path to fast5
     :param nuc_sequence: nucleotide sequence to align
     :param model_file: signal align model file
     :param dest: location to place events.
                     ex.  passing "Analyses/Basecalled_1D_template" will create "Analyses/Basecalled_1D_template/Events"
+    :param path_to_bin: path to SignalAlign bin with executables
+    :param tmp_directory: if set, a fasta will be written here and used in kmerEventAlign invocation
+    :param delete_tmp_fasta: if set and fasta is written, fasta will be deleted afterwards
     :return:
     """
     executable = os.path.join(path_to_bin, "kmerEventAlign")
+    fasta_location = None
     try:
-        subprocess.check_call([executable, '-f', fast5_path, '-m', model_file, '-N', nuc_sequence, '-p', dest])
+        cmd = [executable, '-f', fast5_path, '-m', model_file, '-p', dest]
+        if writeFailedAlignments:
+            cmd.append('-w')
+        if tmp_directory is None:
+            cmd.extend(['-N', nuc_sequence])
+        else:
+            fasta_location = os.path.join(tmp_directory, "{}.fa".format(
+                ''.join(os.path.basename(fast5_path).split('.')[:-1])))
+            with open(fasta_location, 'w') as fa_out:
+                fa_out.write(">{}\n".format(os.path.basename(fast5_path)))
+                fa_out.write("{}\n".format(nuc_sequence))
+            cmd.extend(['-n', fasta_location])
+        subprocess.check_call(cmd)
         status = True
     except Exception as e:
         print("Exception in run_kmeralign: {}".format(e))
         status = False
+    finally:
+        if fasta_location is not None and os.path.isfile(fasta_location) and delete_tmp_fasta:
+            os.remove(fasta_location)
 
     return status
 
