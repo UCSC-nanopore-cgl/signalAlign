@@ -407,10 +407,6 @@ def generate_events_and_alignment(fast5_path, nucleotide_sequence, nucleotide_qu
     values = ["0.2.0", TimeStamp().posix_date()]
     attributes = merge_dicts([event_detection_params, dict(zip(keys, values)), f5fh.raw_attributes])
 
-    # do the alignment
-    # todo do_alignment(events, nucleotide_sequence)
-    # success = evaluate_success()
-
     # save to fast5 (if appropriate)
     saved_location = None
     if save_to_fast5:
@@ -592,6 +588,7 @@ def load_from_raw(np_handle, alignment_file, model_file_location, path_to_bin):
     file_name = np_handle.filename
     np_handle.close()
     # run the c code which does the required stuff
+    #TODO return alignment info and add to attributes
     status = run_kmeralign_exe(path_to_bin, file_name, nucleotide_sequence, model_file_location, dest)
     if status:
         np_handle.open()

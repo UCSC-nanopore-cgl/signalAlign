@@ -85,7 +85,7 @@ class Fast5(h5py.File):
 
     #todo fix the form of these
     __default_corrected_genome__ = '/Analyses/RawGenomeCorrected_000/BaseCalled_template'  # nanoraw
-    __default_signalalign_events__ = '/Analyses/SignalAlign_00{}'  # signalalign events
+    __default_signalalign_events__ = '/Analyses/SignalAlign_Basecall_1D_00{}'  # signalalign events
     __default_resegment_basecall__ = '/Analyses/ReSegmentBasecall_00{}'
     __default_eventalign_events__ = '/Analyses/EventAlign_00{}'
 
@@ -397,22 +397,22 @@ class Fast5(h5py.File):
         return events
 
     #todo fix path creation
-    def get_resegment_basecall(self, number=None):
-        """Get most recent resegmented basecall events table
-
-        :param number: manually select the resegment version
-
-        """
-        try:
-            if number:
-                path = self.__default_resegment_basecall__.format(number)
-            else:
-                path = self.check_path(self.__default_resegment_basecall__, latest=True)
-            reads = self[path]
-            events = reads['BaseCalled_template/Events']
-        except KeyError:
-            raise KeyError('Read does not contain required fields: {}'.format(path))
-        return np.asarray(events)
+    # def get_resegment_basecall(self, number=None):
+    #     """Get most recent resegmented basecall events table
+    #
+    #     :param number: manually select the resegment version
+    #
+    #     """
+    #     try:
+    #         if number:
+    #             path = self.__default_resegment_basecall__.format(number)
+    #         else:
+    #             path = self.check_path(self.__default_resegment_basecall__, latest=True)
+    #         reads = self[path]
+    #         events = reads['BaseCalled_template/Events']
+    #     except KeyError:
+    #         raise KeyError('Read does not contain required fields: {}'.format(path))
+    #     return np.asarray(events)
 
 
     def _get_read_data(self, read, indices=None):

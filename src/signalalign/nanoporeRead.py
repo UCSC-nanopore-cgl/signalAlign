@@ -25,7 +25,7 @@ RESEGMENT_STRAGEGIES     = [EVENT_DETECT_MINKNOW, EVENT_DETECT_SPEEDY]
 
 class NanoporeRead(object):
     def __init__(self, fast_five_file, twoD=False, event_table='', initialize=False, path_to_bin=None,
-                 alignment_file=None, model_file_location=None):
+                 alignment_file=None, model_file_location=None, force_load_from_raw=False):
         # load the fast5
         self.filename = fast_five_file         # fast5 file path
         self.fastFive = None                   # fast5 object
@@ -61,6 +61,7 @@ class NanoporeRead(object):
         self.path_to_bin = path_to_bin         # path to bin
         self.alignment_file=alignment_file
         self.model_file_location=model_file_location
+        self.force_load_from_raw = force_load_from_raw
         # determination of 2D reads
         self.twoD = twoD                       # 2D read flag, necessary right now, and the client should know
         if type(self) == NanoporeRead:
@@ -153,22 +154,17 @@ class NanoporeRead(object):
         if not self.open():
             return False
 
+        if self.force_load_from_raw:
+            oned_root_address = load_from_raw(self, self.alignment_file, self.model_file_location, self.path_to_bin)
+
         # get oneD directory and check if the table location exists in the fast5file
         if self.event_table:
             oned_root_address = self.get_latest_basecall_edition(self.event_table)
-            if not oned_root_address:
-                print("[SignalAlignment.run] Resegmenting read", file=sys.stderr)
-                resegment_reads(self.filename, speedy=False, overwrite=True, analysis_path=self.event_table)
-                oned_root_address = self.get_latest_basecall_edition(self.event_table)
         elif self.rna:
             oned_root_address = self.get_latest_basecall_edition(RESEGMENT_KEY)
-            # TODO fix bug for speedy stat split
             if not oned_root_address:
-                print("[SignalAlignment.run] Resegmenting read", file=sys.stderr)
-                # MINKNOW = dict(window_lengths=(5, 10), thresholds=(2.0, 1.1), peak_height=1.2)
-                DNAMINKNOW = dict(window_lengths=(3, 6), thresholds=(1.4, 9.0), peak_height=0.2)
+                print("[NanoporeRead._initialize] Resegmenting read", file=sys.stderr)
                 RNAMINKNOW = dict(window_lengths=(7, 14), thresholds=(2.5, 9.0), peak_height=1.0)
-                # SPEEDY = dict(min_width=5, max_width=80, min_gain_per_sample=0.008, window_width=800)
                 resegment_reads(self.filename, params=RNAMINKNOW, speedy=False, overwrite=True, analysis_path=RESEGMENT_KEY)
                 oned_root_address = self.get_latest_basecall_edition(RESEGMENT_KEY)
         else:
@@ -183,6 +179,7 @@ class NanoporeRead(object):
                 self.close()
                 return False
 
+        print("[NanoporeRead._initialize] oned_root_address {}".format(oned_root_address), file=sys.stderr)
         # get basecall version
         if not any(x in self.fastFive[oned_root_address].attrs.keys() for x in VERSION_KEY):
             self.logError("[NanoporeRead:_initialize] ERROR %s missing version" % self.filename)

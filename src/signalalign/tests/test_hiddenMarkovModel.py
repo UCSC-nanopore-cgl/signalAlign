@@ -150,6 +150,32 @@ class HiddenMarkovTests(unittest.TestCase):
         self.assertSequenceEqual(model.event_assignments, [])
         self.assertSequenceEqual(model.kmer_assignments, [])
 
+    def test_HDP_model_load(self):
+        hdp_model = os.path.join(self.HOME, "models/template.singleLevelFixedCanonical.nhdp")
+        hdp_handle = HdpModel(hdp_model)
+        kmer = "AACAT"
+        kmer_id = 19
+        self.assertEqual(kmer_id, hdp_handle.get_kmer_index(kmer))
+        query_x = 83.674161662792542
+        x = hdp_handle.linspace
+        y = hdp_handle.all_posterior_pred[kmer_id]
+        slope = hdp_handle.all_spline_slopes[kmer_id]
+        length = hdp_handle.grid_length
+        prob = hdp_handle.grid_spline_interp(query_x, x, y, slope, length)
+        self.assertEqual(prob, 0.29228949476718646)
+        query_x = 81.55860779063407
+        prob = hdp_handle.grid_spline_interp(query_x, x, y, slope, length)
+        self.assertEqual(prob, 0.12927539337648492)
+        kmer = "CATTT"
+        kmer_id = 319
+        self.assertEqual(kmer_id, hdp_handle.get_kmer_index(kmer))
+        y = hdp_handle.all_posterior_pred[kmer_id]
+        slope = hdp_handle.all_spline_slopes[kmer_id]
+        query_x = 80.605230545769458
+        prob = hdp_handle.grid_spline_interp(query_x, x, y, slope, length)
+        self.assertEqual(prob, 0.12328410496683605)
+
+
 
 if __name__ == '__main__':
     unittest.main()

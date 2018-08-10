@@ -18,7 +18,7 @@ from signalalign.utils.bwaWrapper import *
 from signalalign.utils.fileHandlers import FolderHandler
 from signalalign.utils.sequenceTools import fastaWrite, samtools_faidx_fasta, processReferenceFasta
 from signalalign.mea_algorithm import mea_alignment_from_signal_align, match_events_with_signalalign
-
+from py3helpers.utils import merge_dicts
 
 def create_signalAlignment_args(backward_reference=None, forward_reference=None, destination=None,
                                 stateMachineType="threeState", in_templateHmm=None,
@@ -29,8 +29,11 @@ def create_signalAlignment_args(backward_reference=None, forward_reference=None,
                                 track_memory_usage=False, get_expectations=False, output_format='full', embed=False,
                                 event_table=False,
                                 check_for_temp_file_existance=True,
-                                path_to_bin=''):
-    """Create alignment arguments for SignalAlign. Parameters are explained in SignalAlignment"""
+                                path_to_bin='', force_load_from_raw=False):
+    """
+    Create alignment arguments for SignalAlign. Every parameter except in_fast5.
+    Parameters are explained in SignalAlignment
+    """
     alignment_args = {
         "backward_reference": backward_reference,
         "forward_reference": forward_reference,
@@ -54,7 +57,8 @@ def create_signalAlignment_args(backward_reference=None, forward_reference=None,
         'embed': embed,
         'event_table': event_table,
         'check_for_temp_file_existance': check_for_temp_file_existance,
-        'path_to_bin': path_to_bin}
+        'path_to_bin': path_to_bin,
+        'force_load_from_raw': force_load_from_raw}
 
     return alignment_args
 
@@ -82,6 +86,7 @@ class SignalAlignment(object):
                  target_regions=None,
                  output_format="full",
                  embed=False,
+                 force_load_from_raw=False,
                  event_table=False,
                  check_for_temp_file_existance=True,
                  track_memory_usage=False,
@@ -113,6 +118,9 @@ class SignalAlignment(object):
         self.get_expectations = get_expectations  # option to gather expectations of transitions and emissions
         self.path_to_bin = path_to_bin
         self.path_to_signalMachine = os.path.join(path_to_bin, "signalMachine")  # path to signalMachine
+        self.force_load_from_raw = force_load_from_raw  # boolean option to force predictive alignment
+                                                                      # between kmers and nucleotide sequence
+        self.nucleotide_sequence = None
 
         assert os.path.exists(self.path_to_signalMachine), "Path to signalMachine does not exist"
         assert self.bwa_reference is not None or self.alignment_file is not None, \
@@ -144,7 +152,7 @@ class SignalAlignment(object):
         if self.get_expectations:
             assert self.in_templateHmm is not None, "Need template HMM files for model training"
             if self.twoD_chemistry:
-                assert self.in_complementHmm is not None, "Need compement HMM files for model training"
+                assert self.in_complementHmm is not None, "Need complement HMM files for model training"
         if not os.path.isfile(self.in_fast5):
             print("[SignalAlignment.run] ERROR: Did not find .fast5 at{file}".format(file=self.in_fast5))
             return False
@@ -156,7 +164,8 @@ class SignalAlignment(object):
                                     path_to_bin=self.path_to_bin)
         else:
             npRead = NanoporeRead(fast_five_file=self.in_fast5, event_table=self.event_table, initialize=True,
-                                  path_to_bin=self.path_to_bin, alignment_file=self.alignment_file, model_file_location=self.in_templateHmm)
+                                  path_to_bin=self.path_to_bin, alignment_file=self.alignment_file,
+                                  model_file_location=self.in_templateHmm, force_load_from_raw=self.force_load_from_raw)
         #todo need to validate / generate events and nucleotide read
         # read label
         read_label = npRead.read_label  # use this to identify the read throughout
@@ -422,6 +431,7 @@ class SignalAlignment(object):
                                                            minus=minus,
                                                            rna=npRead.is_read_rna())
                     npRead.write_data(labels, mae_path)
+                    # write SAM alignment
                     sam_string = str()
                     if os.path.isfile(temp_samfile_):
                         with open(temp_samfile_, 'r') as test:
@@ -549,7 +559,7 @@ def signal_alignment_service(work_queue, done_queue, service_name="signal_alignm
             done_queue.put("{}:{}".format(multithread.MEM_USAGE_KEY, ",".join(map(str, mem_usages))))
 
 
-def multithread_signal_alignment(signal_align_arguments, fast5_locations, worker_count, forward_reference=None):
+def multithread_signal_alignment(signal_align_arguments, fast5_locations, worker_count, forward_reference=None, debug=False):
     """Multiprocess SignalAlignment for a list of fast5 files given a set of alignment arguments.
 
     :param signal_align_arguments: signalAlignment arguments besides 'in_fast5'
@@ -575,6 +585,8 @@ def multithread_signal_alignment(signal_align_arguments, fast5_locations, worker
 
     # if we didn't get an alignment file then check for index file
     if 'alignment_file' not in signal_align_arguments or not signal_align_arguments['alignment_file']:
+        assert not signal_align_arguments['force_load_from_raw'], "Currently need to have alignment file to get " \
+                                                                  "sequence information if you want to load from raw"
         # ensure alignments can be generated (either from bwa on the reference or by an alignment file)
         bwa_reference = buildBwaIndex(signal_align_arguments["bwa_reference"],
                                       os.path.dirname(signal_align_arguments["bwa_reference"]),
@@ -588,7 +600,7 @@ def multithread_signal_alignment(signal_align_arguments, fast5_locations, worker
                           'degenerate', 'forward_reference'}
     optional_arguments = {'backward_reference', 'alignment_file', 'bwa_reference', 'twoD_chemistry',
                           'target_regions', 'output_format', 'embed', 'event_table', 'check_for_temp_file_existance',
-                          'track_memory_usage', 'get_expectations', 'path_to_bin'}
+                          'track_memory_usage', 'get_expectations', 'path_to_bin', 'force_load_from_raw'}
     missing_arguments = list(filter(lambda x: x not in signal_align_arguments.keys(), required_arguments))
     unexpected_arguments = list(filter(lambda x: x not in required_arguments and x not in optional_arguments,
                                        signal_align_arguments.keys()))
@@ -599,19 +611,26 @@ def multithread_signal_alignment(signal_align_arguments, fast5_locations, worker
     # run the signal_align_service
     print("[multithread_signal_alignment] running signal_alignment on {} fast5s with {} workers".format(
         len(fast5_locations), worker_count))
-    total, failure, messages = multithread.run_service(
-        signal_alignment_service, fast5_locations, signal_align_arguments, 'in_fast5', worker_count)
+    if debug:
+        for in_fast5 in fast5_locations:
+            f = merge_dicts([signal_align_arguments, {"in_fast5": in_fast5}])
+            alignment = SignalAlignment(**f)
+            success = alignment.run()
+    else:
 
-    # report memory usage
-    memory_stats = list()
-    for message in messages:
-        if message.startswith(multithread.MEM_USAGE_KEY):
-            memory_stats.extend(map(int, message.split(":")[1].split(",")))
-    if len(memory_stats) > 0:
-        kb_to_gb = lambda x: float(x) / (1 << 20)
-        print("[multithread_signal_alignment] memory avg: %3f Gb" % (kb_to_gb(np.mean(memory_stats))))
-        print("[multithread_signal_alignment] memory std: %3f Gb" % (kb_to_gb(np.std(memory_stats))))
-        print("[multithread_signal_alignment] memory max: %3f Gb" % (kb_to_gb(max(memory_stats))))
+        total, failure, messages = multithread.run_service(
+            signal_alignment_service, fast5_locations, signal_align_arguments, 'in_fast5', worker_count)
+
+        # report memory usage
+        memory_stats = list()
+        for message in messages:
+            if message.startswith(multithread.MEM_USAGE_KEY):
+                memory_stats.extend(map(int, message.split(":")[1].split(",")))
+        if len(memory_stats) > 0:
+            kb_to_gb = lambda x: float(x) / (1 << 20)
+            print("[multithread_signal_alignment] memory avg: %3f Gb" % (kb_to_gb(np.mean(memory_stats))))
+            print("[multithread_signal_alignment] memory std: %3f Gb" % (kb_to_gb(np.std(memory_stats))))
+            print("[multithread_signal_alignment] memory max: %3f Gb" % (kb_to_gb(max(memory_stats))))
 
     # fin
     print("[multithread_signal_alignment] fin")

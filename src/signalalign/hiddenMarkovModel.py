@@ -1,19 +1,41 @@
+#!/usr/bin/env python
 """hiddenMarkovModel.py contains objects for handling HMMs for SignalAlign"""
+########################################################################
+# File: hiddenMarkovModel.py
+#  executable: hiddenMarkovModel.py
+#
+# Author: Andrew Bailey
+# History: 08/10/18 Created
+########################################################################
 
 
 from __future__ import print_function
 import sys
 import os
 import numpy as np
-from scipy.stats import norm, invgauss
+import pandas as pd
+
+from itertools import product
+from scipy.stats import norm, invgauss, entropy
+from scipy.spatial.distance import euclidean
+from sklearn.neighbors import KernelDensity
+
+import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
+# from signalalign.train.trainModels import parse_alignment_file
+
 # Globals
 NORM_DIST_PARAMS = 2
 NB_MODEL_PARAMS = 5
+_SQRT2 = np.sqrt(2)
 
 
 class HmmModel(object):
-    def __init__(self, model_file):
+    def __init__(self, ont_model_file, hdp_model_file=None, rna=False):
         # TODO Need to create docs here
+        assert os.path.exists(ont_model_file)
+        self.rna = rna
+        self.ont_model_file = ont_model_file
         self.match_model_params = 5  # level_mean, level_sd, noise_mean, noise_sd, noise_lambda
         self.state_number = 3
         self.transitions = np.zeros(self.state_number**2)
@@ -23,9 +45,10 @@ class HmmModel(object):
         self.alphabet_size = 0
         self.alphabet = ""
         self.kmer_length = 0
-        self.kmer_index = dict()
-        self.has_model = False
+        self.has_ont_model = False
         self.normalized = False
+        self.sorted_kmer_tuple = tuple()
+        self.num_kmers = 0
         # HDP stuff here
         self.kmer_assignments = []
         self.event_assignments = []
@@ -40,12 +63,36 @@ class HmmModel(object):
         self.set_default_transitions()
 
         # bins for expectations
-        self.load_model(model_file)
+        self.load_model(self.ont_model_file)
         self.mean_expectations = np.zeros(self.symbol_set_size)
         self.sd_expectations = np.zeros(self.symbol_set_size)
         self.posteriors = np.zeros(self.symbol_set_size)
         self.observed = np.zeros(self.symbol_set_size, dtype=bool)
 
+        self.has_hdp_model = False
+        # Load HDP model if passed
+        if hdp_model_file:
+            assert os.path.exists(hdp_model_file)
+            self.hdp_path = hdp_model_file
+            self.splines_finalized = False
+            self.has_data = False
+            self.sample_gamma = False
+            self.num_dps = 0
+            self.mu = 0
+            self.nu = 0
+            self.alpha = 0
+            self.beta = 0
+            self.grid_start = 0
+            self.grid_stop = 0
+            self.grid_length = 0
+            self.gamma_alpha = 0
+            self.gamma_beta = 0
+            self.w = 0
+            self.s = 0
+            self.all_posterior_pred = []
+            self.all_spline_slopes = []
+
+            self._initialize_hdp_model()
 
     def normalize_transitions_expectations(self):
         """Normalize transitions from each state to the other states
@@ -143,7 +190,8 @@ class HmmModel(object):
             assert not np.any(self.event_model["SDs"] == 0.0), "signalHmm.load_model, this model has 0 E_means"
             assert not np.any(self.event_model["noise_means"] == 0.0), "signalHmm.load_model, this model has 0 E_noise_means"
             assert not np.any(self.event_model["noise_SDs"] == 0.0), "signalHmm.load_model, this model has 0 E_noise_SDs"
-            self.has_model = True
+            self._create_kmer_index_map()
+            self.has_ont_model = True
 
     def write(self, out_file):
         """Write out model file to out_file path
@@ -155,7 +203,7 @@ class HmmModel(object):
         #         gapX->match \t gapX->gapX \t gapX->gapY \t
         #         gapY->match \t gapY->gapX \t gapY->gapY \n
         # line 2: [level_mean] [level_sd] [noise_mean] [noise_sd] [noise_lambda ](.../kmer) \n
-        assert self.has_model, "Shouldn't be writing down a Hmm that has no Model"
+        assert self.has_ont_model, "Shouldn't be writing down a Hmm that has no Model"
         assert self.normalized, "Shouldn't be writing down a not normalized HMM"
 
         with open(out_file, 'w') as f:
@@ -178,21 +226,62 @@ class HmmModel(object):
                                   noise_lambda=self.event_model["noise_lambdas"][k]))
             f.write("\n")
 
+    @staticmethod
+    def _get_kmer_index(kmer, alphabet, kmer_length, alphabet_size):
+        """Get the model index for a given kmer
+
+        ex: get_kmer_index(AAAAA) = 0
+        :param kmer: nucleotide sequence
+        """
+        assert set(kmer).issubset(set(alphabet)) is True, "Nucleotide not found in model alphabet: kmer={}, " \
+                                                          "alphabet={}".format(kmer, alphabet)
+        assert len(kmer) == kmer_length, "Kmer length does not match model kmer length"
+
+        alphabet_dict = {base: index for index, base in enumerate(sorted(alphabet))}
+        kmer_index = 0
+        for index, nuc in enumerate(kmer):
+            kmer_index += alphabet_dict[nuc]*(alphabet_size**(kmer_length-index-1))
+        return kmer_index
+
     def get_kmer_index(self, kmer):
         """Get the model index for a given kmer
 
         ex: get_kmer_index(AAAAA) = 0
         :param kmer: nucleotide sequence
         """
-        assert set(kmer).issubset(set(self.alphabet)) is True, "Nucleotide not found in model alphabet: kmer={}, " \
-                                                               "alphabet={}".format(kmer, self.alphabet)
-        assert len(kmer) == self.kmer_length, "Kmer length does not match model kmer length"
+        return self._get_kmer_index(kmer, self.alphabet, self.kmer_length, self.alphabet_size)
 
-        alphabet_dict = {base: index for index, base in enumerate(sorted(self.alphabet))}
-        kmer_index = 0
-        for index, nuc in enumerate(kmer):
-            kmer_index += alphabet_dict[nuc]*(self.alphabet_size**(self.kmer_length-index-1))
-        return kmer_index
+    def _create_kmer_index_map(self):
+        """Create the kmer_to_index_map and index_to_kmer_map"""
+        sorted_kmer_list = []
+        for i, kmer_list in enumerate(product(self.alphabet, repeat=self.kmer_length)):
+            sorted_kmer_list.append(''.join(kmer_list))
+        self.sorted_kmer_tuple = tuple(sorted_kmer_list)
+        self.num_kmers = len(self.sorted_kmer_tuple)
+        return self.sorted_kmer_tuple
+
+    def index_to_kmer(self, index):
+        """Get kmer from a given index
+
+        ex: index_to_kmer(0) = "AAAAA"
+        :param index: number representing kmer
+        """
+        assert index < self.num_kmers, \
+            "The kmer index is out of bounds given the alphabet and kmer length. {} > {}".format(index, self.num_kmers)
+        return self.sorted_kmer_tuple[index]
+
+    def get_kmer_index2(self, kmer):
+        """Get the model index for a given kmer
+
+        ex: get_kmer_index(AAAAA) = 0
+        :param kmer: nucleotide sequence
+        """
+        assert set(kmer).issubset(set(alphabet)) is True, "Nucleotide not found in model alphabet: kmer={}, " \
+                                                          "alphabet={}".format(kmer, alphabet)
+        assert len(kmer) == kmer_length, "Kmer length does not match model kmer length"
+
+        return self.sorted_kmer_tuple.index(kmer)
+
 
     def get_event_mean_gaussian_parameters(self, kmer):
         """Get the model's Normal distribution parameters to model the mean of a specific kmer
@@ -365,3 +454,317 @@ class HmmModel(object):
         self.reset_assignments()
         print("[trainModels] NOTICE: Added {success} expectations files successfully, {problem} files had problems\n"
               "".format(success=files_added_successfully, problem=files_with_problems), file=sys.stderr)
+
+    def _initialize_hdp_model(self):
+        """Read in HDP model and make sure parameters match the ONT model"""
+        with open(self.hdp_path, 'r') as hdp_fh:
+            hdp_alphabet_size = int(hdp_fh.readline())
+            assert self.alphabet_size == hdp_alphabet_size, \
+                "ONT Alphabet size does not match HDP model ({} != {})".format(self.alphabet_size, hdp_alphabet_size)
+            hdp_alphabet = hdp_fh.readline().rstrip()
+            assert self.alphabet == hdp_alphabet, \
+                "ONT Alphabet size does not match HDP model ({} != {})".format(self.alphabet, hdp_alphabet)
+            hdp_kmer_length = int(hdp_fh.readline())
+            assert self.kmer_length == hdp_kmer_length, \
+                "ONT Kmer length size does not match HDP model ({} != {})".format(self.kmer_length, hdp_kmer_length)
+
+            self.splines_finalized = bool(int(hdp_fh.readline()))
+            self.has_data = bool(int(hdp_fh.readline()))
+            self.sample_gamma = bool(int(hdp_fh.readline()))
+            self.num_dps = int(hdp_fh.readline())
+            self.data = [float(x) for x in hdp_fh.readline().split()]
+            self.dp_ids = [int(x) for x in hdp_fh.readline().split()]
+            unpack_line = hdp_fh.readline().split()
+            self.mu = float(unpack_line[0])
+            self.nu = float(unpack_line[1])
+            self.alpha = float(unpack_line[2])
+            self.beta = float(unpack_line[3])
+            unpack_line = hdp_fh.readline().split()
+            self.grid_start = int(unpack_line[0])
+            self.grid_stop = int(unpack_line[1])
+            self.grid_length = int(unpack_line[2])
+            self.linspace = np.linspace(self.grid_start, self.grid_stop, num=self.grid_length)
+            self.gamma_params = [float(x) for x in hdp_fh.readline().split()]
+            if self.sample_gamma:
+                self.gamma_alpha = [float(x) for x in hdp_fh.readline().split()]
+                self.gamma_beta = [float(x) for x in hdp_fh.readline().split()]
+                self.w = [float(x) for x in hdp_fh.readline().split()]
+                self.s = [bool(int(x)) for x in hdp_fh.readline().split()]
+
+            for i in range(self.num_dps):
+                line = hdp_fh.readline().split()
+                parent_id = line[0]
+                num_factor_children = line[1]
+                if parent_id == '-':
+                    pass
+                    # print(num_factor_children)
+
+            for id in range(self.num_dps):
+                post_pred = [float(x) for x in hdp_fh.readline().split()]
+                self.all_posterior_pred.append(post_pred)
+
+            for id in range(self.num_dps):
+                spline_slopes = [float(x) for x in hdp_fh.readline().split()]
+                self.all_spline_slopes.append(spline_slopes)
+
+            line = hdp_fh.readline()
+            factor_list = []
+            while line:
+                items = line.split()
+                if int(items[0]) == 0:
+                    fctr = "SOMETHING"
+                    param_array = items[2].split(';')
+                if int(items[0]) == 1:
+                    # new_middle_factor
+                    fctr = items[2]
+                if int(items[0]) == 2:
+                    # new_data_pt_factor
+                    fctr = items[2]
+                factor_list.append(fctr)
+                if items[1] != '-':
+                    pass
+                line = hdp_fh.readline()
+            self.has_hdp_model = True
+
+    @staticmethod
+    def grid_spline_interp(query_x, x, y, slope, length):
+        # if event mean is below start of grid
+        if query_x <= x[0]:
+            return y[0] - slope[0] * (x[0] - query_x)
+        # if event mean is above end grid
+        elif query_x >= x[length - 1]:
+            n = length - 1
+            return y[n] + slope[n] * (query_x - x[n])
+        else:
+            dx = x[1] - x[0]
+            idx_left = int((query_x - x[0]) // dx)
+            idx_right = idx_left + 1
+
+            dy = y[idx_right] - y[idx_left]
+
+            a = slope[idx_left] * dx - dy
+            b = dy - slope[idx_right] * dx
+
+            t_left = (query_x - x[idx_left]) / dx
+            t_right = 1.0 - t_left
+
+            return t_right * y[idx_left] + t_left * y[idx_right] + t_left * t_right * (a * t_right + b * t_left)
+
+    def plot_kmer_distribution(self, kmer, alignment_file=None, alignment_file_data=None, savefig_dir=None):
+        """Plot the distribution of a kmer with ONT and/or HDP distributions"""
+        assert self.has_ont_model, "Must have ONT model loaded"
+        if savefig_dir:
+            assert os.path.exists(savefig_dir), "Save figure directory does not exist: {}".format(savefig_dir)
+        # keep track of handles and text depending on which models are loaded
+        handles1 = []
+        legend_text1 = []
+        handles2 = []
+        legend_text2 = []
+
+        normal_mean, normal_sd = self.get_event_mean_gaussian_parameters(kmer)
+
+        plt.figure(figsize=(12, 8))
+        panel1 = plt.axes([0.1, 0.1, .6, .8])
+        panel1.set_xlabel('pA')
+        panel1.set_ylabel('Density')
+        panel1.grid(color='black', linestyle='-', linewidth=1, alpha=0.5)
+        panel1.xaxis.set_major_locator(ticker.MultipleLocator(3))
+        min_x = normal_mean-(5*normal_sd)
+        max_x = normal_mean+(5*normal_sd)
+        panel1.set_xlim(min_x, max_x)
+        panel1.set_title(label=kmer)
+        # plot ont normal distribution
+        x = np.linspace(normal_mean - 4*normal_sd, normal_mean + 4*normal_sd, 200)
+        ont_handle, = panel1.plot(x, norm.pdf(x, normal_mean, normal_sd))
+        # panel1.plot([normal_mean, normal_mean], [0, norm.pdf(normal_mean, normal_mean, normal_sd)], lw=2)
+        ont_model_name = os.path.basename(self.ont_model_file)
+        txt_handle1, = panel1.plot([], [], ' ')
+        txt_handle2, = panel1.plot([], [], ' ')
+        txt_handle3, = panel1.plot([], [], ' ')
+
+        handles1.append(ont_handle)
+        legend_text1.append("ONT Normal Distribution")
+
+        handles2.extend([txt_handle1, txt_handle2, txt_handle3])
+        legend_text2.extend(["ONT Model: \n  {}".format(ont_model_name), "ONT Event Mean: {}".format(normal_mean), "ONT Event SD: {}".format(normal_sd)])
+
+        if self.has_hdp_model:
+            # plot HDP predicted distribution
+            kmer_id = self.get_kmer_index(kmer)
+            x = self.linspace
+            hdp_y = self.all_posterior_pred[kmer_id]
+            hdp_handle, = panel1.plot(x, hdp_y, '-')
+            # compute entropy and hellinger distance
+            ont_normal_dist = norm.pdf(self.linspace, normal_mean, normal_sd)
+            kl_distance = entropy(pk=hdp_y, qk=ont_normal_dist, base=2)
+            h_distance = hellinger2(p=hdp_y, q=ont_normal_dist)
+            # deal with some extra text
+            txt_handle4, = panel1.plot([], [], ' ')
+            txt_handle5, = panel1.plot([], [], ' ')
+            txt_handle6, = panel1.plot([], [], ' ')
+
+            hdp_model_name = os.path.basename(self.hdp_path)
+
+            handles1.append(hdp_handle)
+            legend_text1.append("HDP Distribution")
+
+            handles2.extend([txt_handle4, txt_handle5, txt_handle6])
+            legend_text2.extend(["HDP Model: \n  {}".format(hdp_model_name), "Kullback–Leibler divergence: {}".format(np.round(kl_distance, 4)),
+                                "Hellinger distance: {}".format(np.round(h_distance, 4))])
+
+        if alignment_file or alignment_file_data:
+            # option to parse file or not
+            if alignment_file:
+                data = parse_alignment_file(alignment_file)
+            else:
+                data = alignment_file_data
+
+            kmer_assignments = data.loc[data['kmer'] == kmer]
+            kmer_data = kmer_assignments["level_mean"]
+            # get event means and linspace in correct format
+            x = np.asarray(kmer_data).reshape(len(kmer_data), 1)
+            x_plot = self.linspace[:, np.newaxis]
+            # get estimate for data
+            kde = KernelDensity(kernel="gaussian", bandwidth=0.5).fit(x)
+            # estimate across the linspace
+            log_dens = kde.score_samples(x_plot)
+            kde_handle, = panel1.plot(x_plot[:, 0], np.exp(log_dens), '-')
+            raw_data_handle, = panel1.plot(x[:, 0], -0.005 - 0.01 * np.random.random(x.shape[0]), '+k')
+            # add to legend
+            handles1.extend([kde_handle, raw_data_handle])
+            legend_text1.extend(["Gaussian KDE Estimate", "Event Means: {} points".format(len(kmer_data))])
+            txt_handle7, = panel1.plot([], [], ' ')
+            if alignment_file:
+                alignment_file_name = os.path.basename(alignment_file)
+                handles2.append(txt_handle7)
+                legend_text2.append("RAW event data file: \n  {}".format(alignment_file_name))
+
+        # create legend
+        first_legend = panel1.legend(handles1, legend_text1, fancybox=True, shadow=True,
+                                     loc='lower left', bbox_to_anchor=(1, .8))
+        ax = plt.gca().add_artist(first_legend)
+
+        panel1.legend(handles2, legend_text2, loc='upper left', bbox_to_anchor=(1, 0.2))
+
+        # option to save figure or just show it
+        if savefig_dir:
+            base_name = "DNA_"
+            if self.rna:
+                base_name = "RNA_"
+            name = "{}{}.png".format(base_name, kmer)
+            out_path = os.path.join(savefig_dir, name)
+            plt.savefig(out_path)
+        else:
+            plt.show()
+
+    def get_kl_divergence(self, kmer):
+        """Get Kullback–Leibler divergence between the HDP and ONT models for a specific kmer"""
+        kmer_id = self.get_kmer_index(kmer)
+        hdp_y = self.all_posterior_pred[kmer_id]
+        if len(hdp_y) == 0:
+            # print("[Kullback–Leibler divergence] No HDP data for {}".format(kmer))
+            return None
+
+        normal_mean, normal_sd = self.get_event_mean_gaussian_parameters(kmer)
+        ont_normal_dist = norm.pdf(self.linspace, normal_mean, normal_sd)
+        kl_divergence = entropy(pk=hdp_y, qk=ont_normal_dist, base=2)
+        if kl_divergence == np.inf:
+            # print("[Kullback–Leibler divergence] Zero probability for {}".format(kmer))
+            return None
+
+        return kl_divergence
+
+    def get_hellinger_distance(self, kmer):
+        """Get Hellinger distance between the HDP and ONT models for a specific kmer"""
+        kmer_id = self.get_kmer_index(kmer)
+        hdp_y = self.all_posterior_pred[kmer_id]
+        if len(hdp_y) == 0:
+            # print("[Hellinger Distance] No HDP data for {}".format(kmer))
+            return None
+        normal_mean, normal_sd = self.get_event_mean_gaussian_parameters(kmer)
+        ont_normal_dist = norm.pdf(self.linspace, normal_mean, normal_sd)
+        h_distance = hellinger2(p=hdp_y, q=ont_normal_dist)
+        return h_distance
+
+    def get_median_delta(self, kmer):
+        """Calculate the difference between the max value of HDP and ONT kmer distributions"""
+        kmer_id = self.get_kmer_index(kmer)
+        hdp_y = self.all_posterior_pred[kmer_id]
+        if len(hdp_y) == 0:
+            # print("[Median Delta] No HDP data for {}".format(kmer))
+            return None
+        normal_mean, normal_sd = self.get_event_mean_gaussian_parameters(kmer)
+        delta = self.linspace[hdp_y.index(max(hdp_y))]-normal_mean
+        return abs(delta)
+
+    def compare_distributions(self):
+        """Calculate hellinger divergence and kl divergence between the HDP and ONT models for each kmer"""
+        hellinger_distances = []
+        kl_divergences = []
+        median_deltas = []
+        for kmer in self.sorted_kmer_tuple:
+            # if statements used if the HDP model does not have information on the kmer distribution
+            h_dist = self.get_hellinger_distance(kmer)
+            if h_dist:
+                hellinger_distances.append(h_dist)
+
+            kl_divergence = self.get_kl_divergence(kmer)
+            if kl_divergence:
+                kl_divergences.append(kl_divergence)
+                # print(kmer, kl_divergence)
+            median_delta = self.get_median_delta(kmer)
+            if median_delta:
+                if len(median_deltas) > 0 and median_delta > max(median_deltas):
+                    pass
+                    # print(kmer, median_delta)
+                median_deltas.append(median_delta)
+
+        return hellinger_distances, kl_divergences, median_deltas
+
+
+def hellinger2(p, q):
+    return euclidean(np.sqrt(p), np.sqrt(q)) / _SQRT2
+
+
+def parse_alignment_file(file_path):
+    """Parse the buildAlignment.tsv output file from CreateHdpTrainingData
+
+    :param file_path: path to alignment file
+    :return: panda DataFrame with column names "kmer", "strand", "level_mean", "prob"
+    """
+    assert os.path.exists(file_path), "File path does not exist: {}".format(file_path)
+    data = pd.read_table(file_path,
+                         usecols=(4, 9, 13, 12),
+                         names=["strand", "kmer", "prob", "level_mean"],
+                         dtype={"kmer": np.str, "strand": np.str, "level_mean": np.float64, "prob": np.float64},
+                         header=None)
+    return data
+
+
+def main():
+    rna_ont_model = "/Users/andrewbailey/CLionProjects/nanopore-RNN/submodules/signalAlign/models/testModelR9p4_5mer_acgt_RNA.model"
+    test_output_dir = "/Users/andrewbailey/CLionProjects/nanopore-RNN/submodules/signalAlign/test_plot_distributions"
+    rna_hdp_model = "/Users/andrewbailey/CLionProjects/nanopore-RNN/submodules/signalAlign/models/template.singleLevelFixedCanonical.nhdp"
+    savefig_dir = "/Users/andrewbailey/CLionProjects/nanopore-RNN/submodules/signalAlign/test_plot_distributions"
+    dna_ont_model = "/Users/andrewbailey/CLionProjects/nanopore-RNN/submodules/signalAlign/models/testModelR9_5mer_acegit_template.model"
+    dna_hdp_model = "/Users/andrewbailey/CLionProjects/nanopore-RNN/submodules/signalAlign/models/template.singleLevelPriorEcoli.nhdp"
+    # plot_rna_dna_ont_hdp_comparison(ont_model, hdp_model, dna_ont_model, dna_hdp_model)#, savefig_dir=savefig_dir)
+    alignment_file = "/Users/andrewbailey/CLionProjects/nanopore-RNN/submodules/signalAlign/test_plot_distributions/buildAlignment.tsv"
+    # dna_hmm_handle = HmmModel(dna_ont_model, dna_hdp_model)
+    #
+    # dna_hmm_handle.plot_kmer_distribution("TAAAA", alignment_file=alignment_file) #savefig_dir=savefig_dir
+
+    rna_hmm_handle = HmmModel(rna_ont_model, rna_hdp_model, rna=True)
+
+    rna_hmm_handle.plot_kmer_distribution("GGACT", alignment_file=alignment_file, savefig_dir=savefig_dir)
+
+    # ﻿ RRACH
+    #     R= A/G
+    #     H = A/C/T
+
+
+
+
+if __name__ == "__main__":
+    main()
+    raise SystemExit

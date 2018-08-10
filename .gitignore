@@ -24,3 +24,5 @@ hdf5-1.10.2/
 include
 lib
 share
+/test_plot_distributions/
+/test_train_hdp_model_output/

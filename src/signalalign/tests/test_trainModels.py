@@ -45,7 +45,7 @@ class TrainSignalAlignTest(unittest.TestCase):
         cls.r9_complement_model_file = os.path.join(cls.HOME, "models/testModelR9_acegt_complement.model")
         cls.r9_template_model_file = os.path.join(cls.HOME, "models/testModelR9_acegt_template.model")
 
-        cls.model = HmmModel(model_file=cls.model_file)
+        cls.model = HmmModel(ont_model_file=cls.model_file)
         cls.expectation_file = os.path.join(cls.HOME,
                                             "tests/test_expectation_files/4f9a316c-8bb3-410a-8cfc-026061f7e8db.template.expectations.tsv")
         cls.assignment_file = os.path.join(cls.HOME, "tests/test_assignment_files/d6160b0b-a35e-43b5-947f-adaa1abade28.sm.assignments.tsv")
@@ -425,7 +425,6 @@ class TrainSignalAlignTest(unittest.TestCase):
                 # Test EM training 3 rounds
                 template_hmm_model_path, complement_hmm_model_path, template_hdp_model_path, complement_hdp_model_path = \
                     TrainSignalAlign(fake_args).expectation_maximization_training()
-
 
 
 if __name__ == '__main__':

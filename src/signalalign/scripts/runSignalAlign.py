@@ -104,6 +104,8 @@ def parse_args():
                         help="Embed full output into fast5 file")
     parser.add_argument('--event_table', action='store', dest="event_table", default=False,
                         help="Specify event table")
+    parser.add_argument('--force_load_from_raw', action='store_true', dest="force_load_from_raw", default=False,
+                        help="Force infer kmer to event alignment. Must include alignment_file")
 
     args = parser.parse_args()
     return args
@@ -208,10 +210,13 @@ def main(args):
         "check_for_temp_file_existance": True,
         "track_memory_usage": False,
         "get_expectations": False,
-    }
+        'force_load_from_raw': args.force_load_from_raw}
+
+
+    # return alignment_args
     print("[runSignalAlign]:NOTICE: Got {} files to align".format(len(fast5s)), file=sys.stdout)
     # setup workers for multiprocessing
-    multithread_signal_alignment(alignment_args, fast5s, args.nb_jobs)
+    multithread_signal_alignment(alignment_args, fast5s, args.nb_jobs, debug=args.DEBUG)
 
     print("\n#  signalAlign - finished alignments\n", file=sys.stderr)
     print("\n#  signalAlign - finished alignments\n", file=sys.stdout)
