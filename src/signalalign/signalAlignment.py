@@ -598,12 +598,13 @@ def multithread_signal_alignment(signal_align_arguments, fast5_locations, worker
                           'degenerate', 'forward_reference'}
     optional_arguments = {'backward_reference', 'alignment_file', 'bwa_reference', 'twoD_chemistry',
                           'target_regions', 'output_format', 'embed', 'event_table', 'check_for_temp_file_existance',
-                          'track_memory_usage', 'get_expectations', 'path_to_bin'}
+                          'track_memory_usage', 'get_expectations', 'path_to_bin', 'perform_kmer_event_alignment'}
     missing_arguments = list(filter(lambda x: x not in signal_align_arguments.keys(), required_arguments))
     unexpected_arguments = list(filter(lambda x: x not in required_arguments and x not in optional_arguments,
                                        signal_align_arguments.keys()))
     assert len(missing_arguments) == 0 and len(unexpected_arguments) == 0, \
-        "Invalid arguments to signal_align.  Missing: {}, Invalid: {}".format(missing_arguments, unexpected_arguments)
+        "Invalid arguments to signal_align (this could be programmer error).  Missing: {}, Invalid: {}".format(
+            missing_arguments, unexpected_arguments)
     assert os.path.exists(signal_align_arguments['destination']), \
         "Destination path does not exist: {}".format(signal_align_arguments['destination'])
     # run the signal_align_service

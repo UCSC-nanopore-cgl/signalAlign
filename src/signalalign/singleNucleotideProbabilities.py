@@ -21,7 +21,8 @@ from signalalign.utils.fileHandlers import FolderHandler
 from signalalign.utils.sequenceTools import get_full_nucleotide_read_from_alignment, replace_periodic_reference_positions
 from signalalign.utils.multithread import *
 from signalalign.motif import getDegenerateEnum
-from signalalign.event_detection import save_event_table_and_fastq, run_kmeralign_exe, create_fastq_line
+# from signalalign.event_detection import save_event_table_and_fastq, run_kmeralign_exe, create_fastq_line
+from signalalign.event_detection import load_from_raw
 from signalalign.fast5 import Fast5
 
 
@@ -107,14 +108,14 @@ def resolvePath(p):
         return os.path.abspath(p)
 
 
-def organize_fast5s(fast5_locations, realign_all=True):
+def organize_fast5s(fast5_locations, realign_all=False):
     # gathered data
     fast5_to_read_id = dict()
     requires_event_calling = list()
 
     # examine each fast5
     for fast5 in fast5_locations:
-        npr = NanoporeRead(fast5)
+        npr = NanoporeRead(fast5, perform_kmer_event_alignment=False)
         success = npr._initialize_metadata()
         read_id = npr.read_label
         fast5_id = os.path.basename(fast5)[:-6]
@@ -498,7 +499,7 @@ def variant_caller(work_queue, done_queue, service_name="variant_caller"):
 
 def event_detection(work_queue, done_queue, alignment_file, model_file_location,
                     event_detection_strategy=None, event_detection_params=None,
-                    tmp_directory=None, writeFailedAlignments=True, service_name="event_detection"):
+                    tmp_directory=None, write_failed_alignments=True, service_name="event_detection"):
     # prep
     total_handled = 0
     failure_count = 0
@@ -508,40 +509,15 @@ def event_detection(work_queue, done_queue, alignment_file, model_file_location,
         for tmp in iter(work_queue.get, 'STOP'):
             # get data from iterator
             fast5, read_id = tmp['fast5']
+            np_handle = None
 
             # catch exceptions on each element
             try:
-                # get/build nucleotide sequence (accounting for hardclipping)
-                nucleotide_sequence, nucleotide_qualities, hardclip_front, hardclip_back = \
-                    get_full_nucleotide_read_from_alignment(alignment_file, read_id)
-                if nucleotide_qualities is None:
-                    nucleotide_qualities = "!" * len(nucleotide_sequence)
-                fastq = create_fastq_line(read_id, nucleotide_sequence, nucleotide_qualities)
-
-                # get new location
-                with closing(Fast5(fast5, read='r+')) as f5fh:
-                    dest = f5fh.get_analysis_events_path_new("SignalAlign")
-                    f5fh.ensure_path(dest)
-
-                # run our alignment script
-                status = run_kmeralign_exe(fast5, nucleotide_sequence, model_file_location, dest,
-                                           tmp_directory=tmp_directory, writeFailedAlignments=writeFailedAlignments)
-                if not status:
-                    raise Exception("run_kmer_align failed on read {} in {}".format(read_id, fast5))
-
-                # get events and save to "normal" location
-                with closing(Fast5(fast5, read='r+')) as f5fh:
-                    # get attrs
-                    keys = ["nanotensor version", "time_stamp"]
-                    values = ["0.2.0", TimeStamp().posix_date()]
-                    attributes = merge_dicts([dict(zip(keys, values)), f5fh.raw_attributes])
-                    # get events
-                    events = f5fh.get_custom_analysis_events("SignalAlign")
-                    if len(events) == 0:
-                        raise Exception("Failed to align events for {}".format(os.path.basename(fast5)))
-                    saved_location = save_event_table_and_fastq(f5fh, events, fastq, attributes=attributes)
-                    print("[{}] Saved {} events and {} nucleotides to {} in {}".format(
-                        service_name, len(events), len(nucleotide_sequence), saved_location, fast5))
+                np_handle = NanoporeRead(fast5, initialize=False)
+                success = load_from_raw(np_handle, alignment_file, model_file_location,
+                                        write_failed_alignments=write_failed_alignments)
+                if not success:
+                    raise Exception("load_from_raw failed on read {} in {}".format(read_id, fast5))
 
             except Exception as e:
                 # get error and log it
@@ -550,6 +526,9 @@ def event_detection(work_queue, done_queue, alignment_file, model_file_location,
                 print("[{}] ".format(service_name) + error)
                 done_queue.put(error)
                 failure_count += 1
+
+            finally:
+                if np_handle is not None: np_handle.close()
 
             # increment total handling
             total_handled += 1

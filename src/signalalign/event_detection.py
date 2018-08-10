@@ -31,7 +31,7 @@ from py3helpers.seq_tools import create_fastq_line, check_fastq_line, ReverseCom
 
 EVENT_DETECT_SPEEDY = "speedy"
 EVENT_DETECT_MINKNOW = "minknow"
-EVENT_KMERALIGN_TMP = "SignalAlign_tmp"
+EVENT_KMERALIGN_TMP = "KmerEventAlign_tmp"
 
 
 def create_speedy_event_table(signal, sampling_freq, start_time, min_width=5, max_width=80, min_gain_per_sample=0.008,
@@ -556,7 +556,7 @@ def create_minknow_events_from_fast5(fast5_path, window_lengths=(3, 6), threshol
 
 
 def load_from_raw(np_handle, alignment_file, model_file_location, path_to_bin="./",
-                  nucleotide_sequence=None, analysis_identifier=None):
+                  nucleotide_sequence=None, analysis_identifier=None, write_failed_alignments=False):
     """Load a nanopore read from raw signal and an alignment file. Need a model to create banded alignment.
     :param np_handle: NanoporeRead class object
     :param alignment_file: sam/bam file
@@ -564,6 +564,7 @@ def load_from_raw(np_handle, alignment_file, model_file_location, path_to_bin=".
     :param path_to_bin: bath to signalAlign bin where executables are stored
     :param nucleotide_sequence: nucleotide sequence (needed if no alignment file is available)
     :param analysis_identifier: identifier for storage of event table and fastq
+    :param write_failed_alignments: still write alignments that failed quality checks
     :return: path to events in fast5 file or -1 if the task fails
     """
     assert os.path.isfile(model_file_location), \
@@ -597,14 +598,21 @@ def load_from_raw(np_handle, alignment_file, model_file_location, path_to_bin=".
         nucleotide_sequence = nucleotide_sequence[::-1].replace("T", "U")
         nucleotide_qualities = nucleotide_qualities[::-1]
 
+    # get fastq (this is saved with the event table)
     fastq = create_fastq_line(read_id, nucleotide_sequence, nucleotide_qualities)
 
     # get temp location
+    tmp_root = np_handle.fastFive.get_analysis_new(EVENT_KMERALIGN_TMP)
     tmp_dest = np_handle.fastFive.get_analysis_events_path_new(EVENT_KMERALIGN_TMP)
+    assert tmp_dest.startswith(tmp_root), "Invalid analysis path management"
     file_name = np_handle.filename
     np_handle.close()
+
     # run the c code which does the required stuff
-    status = run_kmeralign_exe(file_name, nucleotide_sequence, model_file_location, tmp_dest, path_to_bin)
+    status = run_kmeralign_exe(file_name, nucleotide_sequence, model_file_location, tmp_dest, path_to_bin,
+                               write_failed_alignments=write_failed_alignments)
+
+    # alignment succeeded, save it to the appropriate location
     if status:
         np_handle.open()
         if analysis_identifier is None: analysis_identifier = Fast5.__default_basecall_1d_analysis__
@@ -612,19 +620,23 @@ def load_from_raw(np_handle, alignment_file, model_file_location, path_to_bin=".
         keys = ["signalAlign version", "time_stamp"]
         values = ["0.1.7", TimeStamp().posix_date()]
         attributes = merge_dicts([dict(zip(keys, values)), np_handle.fastFive.raw_attributes])
-        # get events
+        # get events (and delete tmp location)
         events = np_handle.fastFive.get_custom_analysis_events(EVENT_KMERALIGN_TMP)
+        np_handle.fastFive.delete(tmp_root, ignore=False)
         # save events and fastq
         saved_loc = save_event_table_and_fastq(np_handle.fastFive, events, fastq, attributes,
                                                analysis_identifier=analysis_identifier)
-        return np_handle.fastFive.get_analysis_latest(analysis_identifier)
+        return saved_loc
+
+    # alignment failed, remove offending location (if it exists) and report
     else:
         print("[load_from_raw] error performing kmeralign", file=sys.stderr)
+        np_handle.fastFive.delete(tmp_root, ignore=True)
         return False
 
 
 def run_kmeralign_exe(fast5_path, nuc_sequence, model_file, dest, path_to_bin="./", tmp_directory=None,
-                      delete_tmp_fasta=True, writeFailedAlignments=False):
+                      delete_tmp_fasta=True, write_failed_alignments=False):
     """Run kmerEventAlign. Generates alignment file
     :param fast5_path: path to fast5
     :param nuc_sequence: nucleotide sequence to align
@@ -640,7 +652,7 @@ def run_kmeralign_exe(fast5_path, nuc_sequence, model_file, dest, path_to_bin=".
     fasta_location = None
     try:
         cmd = [executable, '-f', fast5_path, '-m', model_file, '-p', dest]
-        if writeFailedAlignments:
+        if write_failed_alignments:
             cmd.append('-w')
         if tmp_directory is None:
             cmd.extend(['-N', nuc_sequence])
