@@ -32,8 +32,8 @@ class BandedAlignmentTests(unittest.TestCase):
         cls.HOME = '/'.join(os.path.abspath(__file__).split("/")[:-4])
         cls.rna_model_file = os.path.join(cls.HOME, "models/testModelR9p4_5mer_acgt_RNA.model")
         cls.dna_template_model_file = os.path.join(cls.HOME, "models/testModelR9p4_5mer_acegt_template.model")
-        cls.rna_model = HmmModel(model_file=cls.rna_model_file)
-        cls.dna_model = HmmModel(model_file=cls.dna_template_model_file)
+        cls.rna_model = HmmModel(ont_model_file=cls.rna_model_file)
+        cls.dna_model = HmmModel(ont_model_file=cls.dna_template_model_file)
 
         cls.tmp_directory = tempfile.mkdtemp()
 
@@ -155,6 +155,7 @@ class BandedAlignmentTests(unittest.TestCase):
         dna_name = "LomanLabz_PC_20161025_FNFAB42699_MN17633_sequencing_run_20161025_E_coli_native_450bps_82361_ch92_read1108_strand.fast5"
         dna_src = os.path.join(self.HOME, "tests/minion_test_reads/1D", dna_name)
         self.run_alignment_comparison(dna_src, dna=True)
+
 
 if __name__ == '__main__':
     unittest.main()

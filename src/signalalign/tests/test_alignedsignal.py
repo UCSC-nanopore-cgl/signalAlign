@@ -11,7 +11,7 @@
 import unittest
 import os
 import numpy as np
-from nanotensor.alignedsignal import *
+from signalalign.alignedsignal import *
 
 
 class CreateLabelsTest(unittest.TestCase):
@@ -20,15 +20,9 @@ class CreateLabelsTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         super(CreateLabelsTest, cls).setUpClass()
-        cls.HOME = '/'.join(os.path.abspath(__file__).split("/")[:-2])
-        cls.dna_file = os.path.join(cls.HOME,
-                                    "tests/test_files/minion-reads/canonical/miten_PC_20160820_FNFAD20259_MN17223_sequencing_run_AMS_158_R9_WGA_Ecoli_08_20_16_43623_ch100_read280_strand.fast5")
-        cls.modified_file = os.path.join(cls.HOME,
-                                         "tests/test_files/minion-reads/methylated/DEAMERNANOPORE_20160805_FNFAD19383_MN16450_sequencing_run_MA_821_R9_gEcoli_MG1655_08_05_16_89825_ch100_read5189_strand.fast5")
-        cls.rna_file = os.path.join(cls.HOME,
-                                    "tests/test_files/minion-reads/rna_reads/DEAMERNANOPORE_20170922_FAH26525_MN16450_sequencing_run_MA_821_R94_NA12878_mRNA_09_22_17_67136_read_61_ch_151_strand.fast5")
+        cls.HOME = '/'.join(os.path.abspath(__file__).split("/")[:-4])
         cls.fasta = os.path.join(cls.HOME,
-                                 "tests/test_files/ecoli_k12_mg1655.fa")
+                                 "tests/test_sequences/E.coli_K12.fasta")
 
     # TODO
     def test_initialize(self):
@@ -76,9 +70,9 @@ class CreateLabelsTest(unittest.TestCase):
         self.assertSequenceEqual([0, 0, 1, 2, 3, 3, 3, 3], cigar_labels['raw_start'].tolist())
         self.assertSequenceEqual([6, 7, 8, 9, 10, 11, 12, 13], cigar_labels['reference_index'].tolist())
 
-        test_header = "@SQ	SN:Chromosome	LN:4641652 \n@PG	ID:bwa	PN:bwa	VN:0.7.15-r1142-dirty	CL:bwa mem -x ont2d /Users/andrewbailey/CLionProjects/nanopore-RNN/signalAlign/bin/test_output/tempFiles_alignment/temp_bwaIndex /Users/andrewbailey/CLionProjects/nanopore-RNN/signalAlign/bin/test_output/tempFiles_alignment/tempFiles_miten_PC_20160820_FNFAD20259_MN17223_mux_scan_AMS_158_R9_WGA_Ecoli_08_20_16_83098_ch138_read23_strand/temp_seq_5048dffc-a463-4d84-bd3b-90ca183f488a.fa\n"
+        test_header = "@SQ	SN:gi_ecoli	LN:4641652 \n@PG	ID:bwa	PN:bwa	VN:0.7.15-r1142-dirty	CL:bwa mem -x ont2d /Users/andrewbailey/CLionProjects/nanopore-RNN/signalAlign/bin/test_output/tempFiles_alignment/temp_bwaIndex /Users/andrewbailey/CLionProjects/nanopore-RNN/signalAlign/bin/test_output/tempFiles_alignment/tempFiles_miten_PC_20160820_FNFAD20259_MN17223_mux_scan_AMS_158_R9_WGA_Ecoli_08_20_16_83098_ch138_read23_strand/temp_seq_5048dffc-a463-4d84-bd3b-90ca183f488a.fa\n"
 
-        no_mdz = "r001\t163\tChromosome\t1\t30\t7M\t=\t37\t39\tAGCTTTC\t*\tXX:B:S,12561,2,20,112"  # \tMD:Z:6T"
+        no_mdz = "r001\t163\tgi_ecoli\t1\t30\t7M\t=\t37\t39\tAGCTTTC\t*\tXX:B:S,12561,2,20,112"  # \tMD:Z:6T"
         events = np.zeros(4, dtype=[('raw_start', int), ('raw_length', int), ('move', int),
                                     ('p_model_state', float), ('model_state', 'S5')])
         events["raw_start"] = [0, 1, 2, 3]

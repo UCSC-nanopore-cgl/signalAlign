@@ -6,20 +6,16 @@ import re
 from signalalign.fast5 import Fast5
 
 from itertools import islice
-from signalalign.event_detection import load_from_raw, resegment_reads, EVENT_DETECT_MINKNOW, \
-    EVENT_DETECT_SPEEDY
+from signalalign.event_detection import load_from_raw
 
 
 TEMPLATE_BASECALL_KEY   = Fast5.__default_basecall_1d_analysis__ #"/Analyses/Basecall_1D_00{}"
-RESEGMENT_KEY           = "SignalAlign_Basecall_1D_000" #"/Analyses/ReSegmentBasecall_00{}"
 TWOD_BASECALL_KEY       = Fast5.__default_basecall_2d_analysis__ #"/Analyses/Basecall_2D_00{}"
 TWOD_BASECALL_KEY_0     = os.path.join(Fast5.__base_analysis__, TWOD_BASECALL_KEY + "_000") #"/Analyses/Basecall_2D_000"
 METADATA_PATH_KEY       = Fast5.__tracking_id_path__ #"/UniqueGlobalKey/tracking_id"
 READS_KEY               = Fast5.__raw_path__ #"/Raw/Reads/"
 VERSION_KEY             = ("version", "dragonet version", "nanotensor version", "signalAlign version")
 SUPPORTED_1D_VERSIONS   = ("1.0.1", "1.2.1", "1.2.4", "1.23.0", "1.22.4", "2.1.0", "0.2.0", "0.1.7")
-
-RESEGMENT_STRAGEGIES     = [EVENT_DETECT_MINKNOW, EVENT_DETECT_SPEEDY]
 
 # promethion read_name: self.fast5['PreviousReadInfo'].attrs['previous_read_id'].decode()
 
@@ -176,14 +172,6 @@ class NanoporeRead(object):
             if not oned_root_address and perform_kmer_event_aln_if_required:
                 oned_root_address = load_from_raw(self, self.alignment_file, self.model_file_location, self.path_to_bin,
                                                   analysis_identifier=self.event_table)
-        # TODO I think we should refactor (or remove) this block
-        elif self.rna:
-            oned_root_address = self.get_latest_basecall_edition(RESEGMENT_KEY)
-            if not oned_root_address:
-                print("[NanoporeRead._initialize] Resegmenting read", file=sys.stderr)
-                RNAMINKNOW = dict(window_lengths=(7, 14), thresholds=(2.5, 9.0), peak_height=1.0)
-                resegment_reads(self.filename, params=RNAMINKNOW, speedy=False, overwrite=True, analysis_path=RESEGMENT_KEY)
-                oned_root_address = self.get_latest_basecall_edition(RESEGMENT_KEY)
         else:
             oned_root_address = self.get_latest_basecall_edition(TEMPLATE_BASECALL_KEY)
             if not oned_root_address and perform_kmer_event_aln_if_required:

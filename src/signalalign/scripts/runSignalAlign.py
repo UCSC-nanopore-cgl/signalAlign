@@ -12,7 +12,7 @@ from argparse import ArgumentParser
 from random import shuffle
 from multiprocessing import Process, current_process, Manager
 
-from signalalign.signalAlignment import multithread_signal_alignment
+from signalalign.signalAlignment import multithread_signal_alignment, create_signalAlignment_args
 from signalalign.utils.sequenceTools import processReferenceFasta
 from signalalign.utils.fileHandlers import FolderHandler
 from signalalign.utils.bwaWrapper import buildBwaIndex
@@ -104,8 +104,9 @@ def parse_args():
                         help="Embed full output into fast5 file")
     parser.add_argument('--event_table', action='store', dest="event_table", default=False,
                         help="Specify event table")
-    parser.add_argument('--force_load_from_raw', action='store_true', dest="force_load_from_raw", default=False,
-                        help="Force infer kmer to event alignment. Must include alignment_file")
+    parser.add_argument('--force_kmer_event_alignment', action='store_true', dest="perform_kmer_event_alignment",
+                        default=None, help="If passed, force SignalAlign to infer kmer to event alignment. "
+                                           "Must include alignment_file")
 
     args = parser.parse_args()
     return args
@@ -187,31 +188,29 @@ def main(args):
 
     # change paths to the source directory
     os.chdir(signalAlignSourceDir())
-    alignment_args = {
-        "destination": temp_dir_path,
-        "stateMachineType": args.stateMachineType,
-        "bwa_reference": args.bwa_reference,
-        "in_templateHmm": args.in_T_Hmm,
-        "in_complementHmm": args.in_C_Hmm,
-        "in_templateHdp": args.templateHDP,
-        "in_complementHdp": args.complementHDP,
-        "output_format": args.outFmt,
-        "threshold": args.threshold,
-        "diagonal_expansion": args.diag_expansion,
-        "constraint_trim": args.constraint_trim,
-        "degenerate": getDegenerateEnum(args.degenerate),
-        "twoD_chemistry": args.twoD,
-        "target_regions": args.target_regions,
-        "embed": args.embed,
-        "event_table": args.event_table,
-        "backward_reference": args.backward_reference,
-        "forward_reference": args.forward_reference,
-        "alignment_file": args.alignment_file,
-        "check_for_temp_file_existance": True,
-        "track_memory_usage": False,
-        "get_expectations": False,
-        'force_load_from_raw': args.force_load_from_raw}
-
+    alignment_args = create_signalAlignment_args(destination=temp_dir_path,
+                                                 stateMachineType=args.stateMachineType,
+                                                 bwa_reference=args.bwa_reference,
+                                                 in_templateHmm=args.in_T_Hmm,
+                                                 in_complementHmm=args.in_C_Hmm,
+                                                 in_templateHdp=args.templateHDP,
+                                                 in_complementHdp=args.complementHDP,
+                                                 output_format=args.outFmt,
+                                                 threshold=args.threshold,
+                                                 diagonal_expansion=args.diag_expansion,
+                                                 constraint_trim=args.constraint_trim,
+                                                 degenerate=getDegenerateEnum(args.degenerate),
+                                                 twoD_chemistry=args.twoD,
+                                                 target_regions=args.target_regions,
+                                                 embed=args.embed,
+                                                 event_table=args.event_table,
+                                                 backward_reference=args.backward_reference,
+                                                 forward_reference=args.forward_reference,
+                                                 alignment_file=args.alignment_file,
+                                                 check_for_temp_file_existance=True,
+                                                 track_memory_usage=False,
+                                                 get_expectations=False,
+                                                 perform_kmer_event_alignment=args.perform_kmer_event_alignment)
 
     # return alignment_args
     print("[runSignalAlign]:NOTICE: Got {} files to align".format(len(fast5s)), file=sys.stdout)

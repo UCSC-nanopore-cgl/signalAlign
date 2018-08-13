@@ -32,7 +32,7 @@ class HiddenMarkovTests(unittest.TestCase):
         cls.model_file = os.path.join(cls.HOME, "models/testModelR9p4_5mer_acgt_RNA.model")
         cls.r9_model_file = os.path.join(cls.HOME, "models/testModelR9_acegt_complement.model")
 
-        cls.model = HmmModel(model_file=cls.model_file)
+        cls.model = HmmModel(ont_model_file=cls.model_file)
         cls.expectation_file = os.path.join(cls.HOME,
                                             "tests/test_expectation_files/4f9a316c-8bb3-410a-8cfc-026061f7e8db.template.expectations.tsv")
 
@@ -89,16 +89,16 @@ class HiddenMarkovTests(unittest.TestCase):
 
     def test_HmmModel(self):
         hdp_model_file = os.path.join(self.HOME, "models/testModelR9p4_5mer_acgt_RNA.model")
-        model = HmmModel(model_file=hdp_model_file)
+        model = HmmModel(ont_model_file=hdp_model_file)
         self.assertIsInstance(model, HmmModel)
 
-        model = HmmModel(model_file=self.model_file)
+        model = HmmModel(ont_model_file=self.model_file)
         self.assertIsInstance(model, HmmModel)
 
     def test_add_expectations_file(self):
-        model = HmmModel(model_file=self.r9_model_file)
+        model = HmmModel(ont_model_file=self.r9_model_file)
         model.add_expectations_file(self.expectation_file)
-        model = HmmModel(model_file=self.r9_model_file)
+        model = HmmModel(ont_model_file=self.r9_model_file)
         model.add_expectations_file(self.expectation_file)
         self.assertRaises(AssertionError, self.model.add_expectations_file, self.expectation_file)
 
@@ -112,12 +112,12 @@ class HiddenMarkovTests(unittest.TestCase):
             test_expecations_file = os.path.join(tempdir, "fake.expectations.tsv")
             copyfile(self.expectation_file, test_expecations_file)
             files = [test_expecations_file]
-            model = HmmModel(model_file=self.r9_model_file)
+            model = HmmModel(ont_model_file=self.r9_model_file)
             model.add_and_normalize_expectations(files, os.path.join(tempdir, "fake.hmm"))
 
     def test_normalize_transitions_expectations(self):
         hdp_model_file = os.path.join(self.HOME, "models/testModelR9_acegt_complement.model")
-        model = HmmModel(model_file=hdp_model_file)
+        model = HmmModel(ont_model_file=hdp_model_file)
         model.add_expectations_file(self.expectation_file)
         model.add_expectations_file(self.expectation_file)
         model.add_expectations_file(self.expectation_file)
@@ -129,13 +129,13 @@ class HiddenMarkovTests(unittest.TestCase):
     def test_write(self):
         with tempfile.TemporaryDirectory() as tempdir:
             test_hmm_file = os.path.join(tempdir, "fake.model.hmm")
-            model = HmmModel(model_file=self.model_file)
+            model = HmmModel(ont_model_file=self.model_file)
             self.assertRaises(AssertionError, model.write, test_hmm_file)
             model.normalized = True
             model.write(test_hmm_file)
 
     def test_normalise(self):
-        model = HmmModel(model_file=self.r9_model_file)
+        model = HmmModel(ont_model_file=self.r9_model_file)
         model.add_expectations_file(self.expectation_file)
         model.add_expectations_file(self.expectation_file)
         model.add_expectations_file(self.expectation_file)
@@ -144,7 +144,7 @@ class HiddenMarkovTests(unittest.TestCase):
         self.assertTrue(model.normalized)
 
     def test_reset_assignments(self):
-        model = HmmModel(model_file=self.r9_model_file)
+        model = HmmModel(ont_model_file=self.r9_model_file)
         model.add_expectations_file(self.expectation_file)
         model.reset_assignments()
         self.assertSequenceEqual(model.event_assignments, [])
@@ -152,7 +152,7 @@ class HiddenMarkovTests(unittest.TestCase):
 
     def test_HDP_model_load(self):
         hdp_model = os.path.join(self.HOME, "models/template.singleLevelFixedCanonical.nhdp")
-        hdp_handle = HdpModel(hdp_model)
+        hdp_handle = HmmModel(ont_model_file=self.model_file, hdp_model_file=hdp_model)
         kmer = "AACAT"
         kmer_id = 19
         self.assertEqual(kmer_id, hdp_handle.get_kmer_index(kmer))

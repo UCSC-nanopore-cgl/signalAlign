@@ -18,6 +18,7 @@ from signalalign.utils.bwaWrapper import *
 from signalalign.utils.fileHandlers import FolderHandler
 from signalalign.utils.sequenceTools import fastaWrite, samtools_faidx_fasta, processReferenceFasta
 from signalalign.mea_algorithm import mea_alignment_from_signal_align, match_events_with_signalalign
+from py3helpers.utils import merge_dicts
 
 
 def create_signalAlignment_args(backward_reference=None, forward_reference=None, destination=None,
@@ -29,7 +30,7 @@ def create_signalAlignment_args(backward_reference=None, forward_reference=None,
                                 track_memory_usage=False, get_expectations=False, output_format='full', embed=False,
                                 event_table=False,
                                 check_for_temp_file_existance=True,
-                                path_to_bin=''):
+                                path_to_bin='./', perform_kmer_event_alignment=None):
     """Create alignment arguments for SignalAlign. Parameters are explained in SignalAlignment"""
     alignment_args = {
         "backward_reference": backward_reference,
@@ -54,7 +55,8 @@ def create_signalAlignment_args(backward_reference=None, forward_reference=None,
         'embed': embed,
         'event_table': event_table,
         'check_for_temp_file_existance': check_for_temp_file_existance,
-        'path_to_bin': path_to_bin}
+        'path_to_bin': path_to_bin,
+        'perform_kmer_event_alignment': perform_kmer_event_alignment}
 
     return alignment_args
 
@@ -580,7 +582,7 @@ def multithread_signal_alignment(signal_align_arguments, fast5_locations, worker
         samtools_faidx_fasta(signal_align_arguments["backward_reference"], log="multithread_signal_alignment")
 
     # bwa_reference and alignment_file must be specified
-    assert ('bwa_reference'  in signal_align_arguments and signal_align_arguments["bwa_reference"]  is not None) or \
+    assert ('bwa_reference'  in signal_align_arguments and signal_align_arguments["bwa_reference"] is not None) or \
            ('alignment_file' in signal_align_arguments and signal_align_arguments['alignment_file'] is not None), \
         "Must specify bwa_reference or alignment_file"
 
@@ -599,7 +601,7 @@ def multithread_signal_alignment(signal_align_arguments, fast5_locations, worker
                           'degenerate', 'forward_reference'}
     optional_arguments = {'backward_reference', 'alignment_file', 'bwa_reference', 'twoD_chemistry',
                           'target_regions', 'output_format', 'embed', 'event_table', 'check_for_temp_file_existance',
-                          'track_memory_usage', 'get_expectations', 'path_to_bin'}
+                          'track_memory_usage', 'get_expectations', 'path_to_bin', 'perform_kmer_event_alignment'}
     missing_arguments = list(filter(lambda x: x not in signal_align_arguments.keys(), required_arguments))
     unexpected_arguments = list(filter(lambda x: x not in required_arguments and x not in optional_arguments,
                                        signal_align_arguments.keys()))
