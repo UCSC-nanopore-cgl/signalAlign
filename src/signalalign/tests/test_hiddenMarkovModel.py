@@ -151,7 +151,7 @@ class HiddenMarkovTests(unittest.TestCase):
         self.assertSequenceEqual(model.kmer_assignments, [])
 
     def test_HDP_model_load(self):
-        hdp_model = os.path.join(self.HOME, "models/template.singleLevelFixedCanonical.nhdp")
+        hdp_model = os.path.join(self.HOME, "models/template_RNA.singleLevelFixedCanonical.nhdp")
         hdp_handle = HmmModel(ont_model_file=self.model_file, hdp_model_file=hdp_model)
         kmer = "AACAT"
         kmer_id = 19
