@@ -198,9 +198,9 @@ class NanoporeRead(object):
             self.close()
             return False
         if "version" in self.fastFive[oned_root_address].attrs.keys():
-            self.version = bytes.decode(self.fastFive[oned_root_address].attrs["version"])
+            self.version = self.bytes_to_string(self.fastFive[oned_root_address].attrs["version"])
         elif "dragonet version" in self.fastFive[oned_root_address].attrs.keys():
-            self.version = bytes.decode(self.fastFive[oned_root_address].attrs["dragonet version"])
+            self.version = self.bytes_to_string(self.fastFive[oned_root_address].attrs["dragonet version"])
         elif "nanotensor version" in self.fastFive[oned_root_address].attrs.keys():
             self.version = self.fastFive[oned_root_address].attrs["nanotensor version"]
         else:

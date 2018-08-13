@@ -80,9 +80,6 @@ class SignalAlignAlignmentTest(unittest.TestCase):
         if extra_args is not None:
             alignment_command += extra_args
 
-        # null_output = open(os.devnull, 'w')
-        # result = call(alignment_command, shell=True, bufsize=-1, stdout=null_output, stderr=null_output)
-
         result = call(alignment_command, shell=True, bufsize=-1)
 
         self.assertTrue(result == 0, "error running signalAlign alignments command was {}"
@@ -113,16 +110,6 @@ class SignalAlignAlignmentTest(unittest.TestCase):
                                                                                   f=alignment))
             # assertign this at the end gives a better explanation of what's wrong
             self.assertEqual(len(obs), len(expected))
-
-    # def test_zymo_reads(self):
-    #     zymo_true_alignments = os.path.join(SIGNALALIGN_ROOT,
-    #                                         'tests/test_alignments/zymo_C_test_alignments_sm3/tempFiles_alignment/')
-    #     self.check_alignments(true_alignments=zymo_true_alignments,
-    #                           reads=ZYMO_C_READS,
-    #                           reference=ZYMO_REFERENCE,
-    #                           kmer_length=6,
-    #                           contig_name="ZYMO",
-    #                           extra_args="--2d --debug")
 
     def test_pUC_r9_reads_5mer(self):
         pUC_true_alignments = os.path.join(SIGNALALIGN_ROOT, "tests/test_alignments/pUC_5mer_tempFiles_alignment/")
