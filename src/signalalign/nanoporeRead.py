@@ -20,7 +20,7 @@ SUPPORTED_1D_VERSIONS   = ("1.0.1", "1.2.1", "1.2.4", "1.23.0", "1.22.4", "2.1.0
 # promethion read_name: self.fast5['PreviousReadInfo'].attrs['previous_read_id'].decode()
 
 class NanoporeRead(object):
-    def __init__(self, fast_five_file, twoD=False, event_table='', initialize=False, path_to_bin=None,
+    def __init__(self, fast_five_file, twoD=False, event_table='', initialize=False, path_to_bin="./",
                  alignment_file=None, model_file_location=None, perform_kmer_event_alignment=None):
         # load the fast5
         self.filename = fast_five_file         # fast5 file path
@@ -161,10 +161,14 @@ class NanoporeRead(object):
         # are we required to perform kmer event realignment?
         if perform_kmer_event_aln_always:
             if self.event_table:
-                load_from_raw(self, self.alignment_file, self.model_file_location, self.path_to_bin,
-                              analysis_identifier=self.event_table)
+                ok = load_from_raw(self, self.alignment_file, self.model_file_location, self.path_to_bin,
+                                   analysis_identifier=self.event_table)
             else:
-                load_from_raw(self, self.alignment_file, self.model_file_location, self.path_to_bin)
+                ok = load_from_raw(self, self.alignment_file, self.model_file_location, self.path_to_bin)
+            if not ok:
+                self.logError("[NanoporeRead:_initialize] kmer event alignment failed for {}".format(self.filename))
+                self.close()
+                return False
 
         # get oneD directory and check if the table location exists in the fast5file
         if self.event_table:
@@ -191,9 +195,9 @@ class NanoporeRead(object):
             self.close()
             return False
         if "version" in self.fastFive[oned_root_address].attrs.keys():
-            self.version = bytes.decode(self.fastFive[oned_root_address].attrs["version"])
+            self.version = self.bytes_to_string(self.fastFive[oned_root_address].attrs["version"])
         elif "dragonet version" in self.fastFive[oned_root_address].attrs.keys():
-            self.version = bytes.decode(self.fastFive[oned_root_address].attrs["dragonet version"])
+            self.version = self.bytes_to_string(self.fastFive[oned_root_address].attrs["dragonet version"])
         elif "nanotensor version" in self.fastFive[oned_root_address].attrs.keys():
             self.version = self.fastFive[oned_root_address].attrs["nanotensor version"]
         else:
