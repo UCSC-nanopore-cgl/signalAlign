@@ -97,7 +97,7 @@ def exonerateCigarWithStrandOrientation(aligned_segment, samfile):
 
 def defaultModelFromVersion(version, strand, pop1_complement=False):
     def default_template_model_from_version(version):
-        supported_versions = ["1.15.0", "1.19.0", "1.20.0", "1.22.2", "1.22.4", "1.23.0", "0.2.0"]
+        supported_versions = ["1.15.0", "1.19.0", "1.20.0", "1.22.2", "1.22.4", "1.23.0", "0.2.0", "0.1.7"]
         assert version in supported_versions, "got version {}".format(version)
         version_index = supported_versions.index(version)
         if version_index <= 2:

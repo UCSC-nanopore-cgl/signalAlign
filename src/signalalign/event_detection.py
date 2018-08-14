@@ -618,7 +618,7 @@ def load_from_raw(np_handle, alignment_file, model_file_location, path_to_bin=".
         if analysis_identifier is None: analysis_identifier = Fast5.__default_basecall_1d_analysis__
         # get attrs
         keys = ["signalAlign version", "time_stamp"]
-        values = ["0.1.7", TimeStamp().posix_date()]
+        values = ["0.2.0", TimeStamp().posix_date()]
         attributes = merge_dicts([dict(zip(keys, values)), np_handle.fastFive.raw_attributes])
         # get events (and delete tmp location)
         events = np_handle.fastFive.get_custom_analysis_events(EVENT_KMERALIGN_TMP)

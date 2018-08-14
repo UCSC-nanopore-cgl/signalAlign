@@ -179,7 +179,7 @@ class SignalAlignment(object):
         if not (self.check_for_temp_file_existance and os.path.isfile(npRead_)):
             # TODO is this totally fucked for RNA because of 3'-5' mapping?
             fH = open(npRead_, "w")
-            ok = npRead.Write(out_file=fH, initialize=True)
+            ok = npRead.Write(out_file=fH)
             fH.close()
             if not ok:
                 self.failStop("[SignalAlignment.run] File: %s did not pass initial checks" % self.read_name, npRead)
@@ -562,13 +562,15 @@ def signal_alignment_service(work_queue, done_queue, service_name="signal_alignm
             done_queue.put("{}:{}".format(multithread.MEM_USAGE_KEY, ",".join(map(str, mem_usages))))
 
 
-def multithread_signal_alignment(signal_align_arguments, fast5_locations, worker_count, forward_reference=None, debug=False):
+def multithread_signal_alignment(signal_align_arguments, fast5_locations, worker_count, forward_reference=None,
+                                 debug=False):
     """Multiprocess SignalAlignment for a list of fast5 files given a set of alignment arguments.
 
     :param signal_align_arguments: signalAlignment arguments besides 'in_fast5'
     :param fast5_locations: paths to fast5 files
     :param worker_count: number of workers
     :param forward_reference: path to forward reference for signalAlign alignment
+    :param debug: option to iterate over each read so that the error messages are not suppressed
     """
     # don't modify the signal_align_arguments
     signal_align_arguments = dict(**signal_align_arguments)

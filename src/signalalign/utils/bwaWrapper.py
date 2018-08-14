@@ -144,8 +144,10 @@ def getGuideAlignmentFromAlignmentFile(alignment_location, read_name=None, targe
     # get reads from alignment file (sam or bam)
     with closing(pysam.AlignmentFile(alignment_location, 'rb' if alignment_location.endswith("bam") else 'r')) as aln:
         for aligned_segment in aln.fetch():
-            if aligned_segment.is_secondary or aligned_segment.is_unmapped: continue
-            if read_name is not None and aligned_segment.qname != read_name: continue
+            if aligned_segment.is_secondary or aligned_segment.is_unmapped:
+                continue
+            if read_name is not None and aligned_segment.qname != read_name and read_name not in aligned_segment.qname:
+                continue
 
             n_aligned_segments += 1
             if n_aligned_segments == 1:

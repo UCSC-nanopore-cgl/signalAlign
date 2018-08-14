@@ -61,7 +61,7 @@ extensions.append(Extension('kmeralign',
                             extra_objects=extra_objects))
 
 setup(name="signalAlign",
-      version="0.1.7",
+      version="0.2.0",
       description="A library for signal-level analysis of ONT data",
       author="Art Rand / Andrew Bailey / Trevor Pesout",
       author_email="andbaile@ucsc.edu",

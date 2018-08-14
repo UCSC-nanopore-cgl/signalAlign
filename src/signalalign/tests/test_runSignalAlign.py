@@ -74,7 +74,7 @@ class SignalAlignAlignmentTest(unittest.TestCase):
         assert len(glob.glob(os.path.join(reads, "*.fast5"))) > 0, "Didn't find test MinION reads"
         assert os.path.isfile(reference), "Didn't find reference sequence"
         run_signal_align = os.path.join(BIN_PATH, "runSignalAlign")
-        alignment_command = "{runsignalalign} -d={reads} --bwa_reference={ref} -smt=threeState -o={testDir} --debug " \
+        alignment_command = "{runsignalalign} --debug -d={reads} --bwa_reference={ref} -smt=threeState -o={testDir} " \
                             "".format(runsignalalign=run_signal_align, reads=reads, ref=reference,
                                       testDir="./signalAlign_unittest/")
         if extra_args is not None:
@@ -196,11 +196,11 @@ def add_all_tests_to_Suite(test_suite, test_class):
 
 def main():
     testSuite = unittest.TestSuite()
-    # testSuite.addTest(LibTest('test_signalAlign_library'))
-    # testSuite.addTest(SignalAlignAlignmentTest('test_pUC_r9_reads_5mer'))
-    # testSuite.addTest(SignalAlignAlignmentTest('test_pUC_r9_reads_6mer'))
-    # testSuite.addTest(SignalAlignAlignmentTest('test_Ecoli1D_reads_5mer'))
-    # testSuite.addTest(SignalAlignAlignmentTest('test_RNA_edge_alignments_reads_5mer'))
+    testSuite.addTest(LibTest('test_signalAlign_library'))
+    testSuite.addTest(SignalAlignAlignmentTest('test_pUC_r9_reads_5mer'))
+    testSuite.addTest(SignalAlignAlignmentTest('test_pUC_r9_reads_6mer'))
+    testSuite.addTest(SignalAlignAlignmentTest('test_Ecoli1D_reads_5mer'))
+    testSuite.addTest(SignalAlignAlignmentTest('test_RNA_edge_alignments_reads_5mer'))
     testSuite.addTest(SignalAlignAlignmentTest('test_signal_files_without_events'))
 
     # deprecated

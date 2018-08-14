@@ -111,7 +111,8 @@ class NanoporeRead(object):
             return False
 
     def Initialize(self):
-        if not self.open(): return False
+        if not self.open():
+            return False
 
         ok = self._initialize_metadata()
         ok &= self._initialize()
@@ -333,7 +334,7 @@ class NanoporeRead(object):
         ok = False not in [template_events_check, oneD_event_map_check]
         return ok
 
-    def Write(self, out_file, initialize=True):
+    def Write(self, out_file, initialize=False):
         if initialize:
             ok = self.Initialize()
             if not ok:
