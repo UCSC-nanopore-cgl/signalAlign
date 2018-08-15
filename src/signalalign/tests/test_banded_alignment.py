@@ -23,6 +23,7 @@ from contextlib import closing
 from signalalign import nanoporeRead
 from signalalign.hiddenMarkovModel import HmmModel
 
+
 class BandedAlignmentTests(unittest.TestCase):
     UNIT_TEST_NAME = "PyUnittest"
 
@@ -147,10 +148,10 @@ class BandedAlignmentTests(unittest.TestCase):
         self.run_alignment_comparison(dna_src, dna=True)
 
     # todo: the alignment needs too much memory for the travis node (Malloc failed with a request for: 2684354520 bytes)
-    # def test_kmeralign_dna2(self):
-    #     dna_name = "LomanLabz_PC_20161025_FNFAB42699_MN17633_sequencing_run_20161025_E_coli_native_450bps_82361_ch6_read347_strand.fast5"
-    #     dna_src = os.path.join(self.HOME, "tests/minion_test_reads/1D", dna_name)
-    #     self.run_alignment_comparison(dna_src, dna=True)
+    def test_kmeralign_dna2(self):
+        dna_name = "LomanLabz_PC_20161025_FNFAB42699_MN17633_sequencing_run_20161025_E_coli_native_450bps_82361_ch6_read347_strand.fast5"
+        dna_src = os.path.join(self.HOME, "tests/minion_test_reads/1D", dna_name)
+        self.run_alignment_comparison(dna_src, dna=True)
 
     def test_kmeralign_dna3(self):
         dna_name = "LomanLabz_PC_20161025_FNFAB42699_MN17633_sequencing_run_20161025_E_coli_native_450bps_82361_ch92_read1108_strand.fast5"

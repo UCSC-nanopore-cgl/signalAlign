@@ -46,70 +46,70 @@ class SignalAlignmentTest(unittest.TestCase):
         cls.template_hmm = os.path.join(cls.HOME, "models/testModelR9_acgt_template.model")
         cls.path_to_bin = os.path.join(cls.HOME, 'bin')
 
-    # def test_create_signalAlignment_args(self):
-    #     expected_args = {"backward_reference", "forward_reference", "destination", "stateMachineType", "in_templateHmm",
-    #                      "in_complementHmm", "in_templateHdp", "in_complementHdp", "threshold", "diagonal_expansion",
-    #                      "constraint_trim", "target_regions", "degenerate", "twoD_chemistry", "alignment_file",
-    #                      "bwa_reference",
-    #                      'track_memory_usage', 'get_expectations', 'output_format', 'embed', 'event_table',
-    #                      'check_for_temp_file_existance', 'path_to_bin', 'perform_kmer_event_alignment'}
-    #     args = create_signalAlignment_args()
-    #     self.assertSetEqual(set(args.keys()), expected_args)
-    #
-    # def test_create_sa_sample_args(self):
-    #     expected_args = {"fofns", "fast5_dirs", "positions_file", "motifs", "bwa_reference", "fw_reference",
-    #                      "bw_reference", "name", "number_of_kmer_assignments", "probability_threshold",
-    #                      "kmers_from_reference", 'alignment_file'}
-    #     args = create_sa_sample_args()
-    #     self.assertSetEqual(set(args.keys()), expected_args)
-    #
-    # def test_parseFofn(self):
-    #     with tempfile.TemporaryDirectory() as tempdir:
-    #         test_out = os.path.join(tempdir, "test.fofn")
-    #         with open(test_out, 'w+') as fofn_file:
-    #             for path in self.fast5_paths:
-    #                 print(path, file=fofn_file)
-    #
-    #         files = parseFofn(test_out)
-    #         self.assertSequenceEqual(files, self.fast5_paths)
-    #         with open(test_out, 'w+') as fofn_file:
-    #             for x in range(10):
-    #                 print("Something else", file=fofn_file)
-    #         self.assertRaises(AssertionError, parseFofn, test_out)
-    #         self.assertRaises(AssertionError, parseFofn, "fake_file")
-    #
-    # # TODO use new reads to test
-    # def test_get_2d_length(self):
-    #     lengths = [397, 9896, 7983, 11457]
-    #     for i, fast5path in enumerate(sorted(self.fast5_paths)):
-    #         self.assertEqual(lengths[i], (get_2d_length(fast5path)))
-    #
-    # # TODO use new reads to test
-    # def test_get_1d_length(self):
-    #     lengths = [388, 9616, 9868, 10614]
-    #     print(self.fast5_paths)
-    #     for i, fast5path in enumerate(sorted(self.fast5_paths)):
-    #         self.assertEqual(lengths[i], (get_1d_length(fast5path)))
-    #
-    # def test_trim_num_files_in_sample(self):
-    #     with tempfile.TemporaryDirectory() as tempdir:
-    #         working_folder = FolderHandler()
-    #         working_folder.open_folder(os.path.join(tempdir, "test_dir"))
-    #         test_args = create_sa_sample_args(fast5_dirs=[self.fast5_dir], name="some_name",
-    #                                           fw_reference=self.ecoli_reference)
-    #         sample = SignalAlignSample(working_folder=working_folder, **test_args)
-    #         n_bases = 10000
-    #         fast5_files = trim_num_files_in_sample(sample, n_bases, False, verbose=False)
-    #         bases = 0
-    #         for fast5_file in fast5_files:
-    #             bases += get_1d_length(fast5_file)
-    #         self.assertLessEqual(bases, n_bases)
-    #         fast5_files = trim_num_files_in_sample(sample, n_bases, True, verbose=False)
-    #         bases = 0
-    #         for fast5_file in fast5_files:
-    #             bases += get_2d_length(fast5_file)
-    #         self.assertLessEqual(bases, n_bases)
-    #         self.assertRaises(AssertionError, trim_num_files_in_sample, sample, 1, False, verbose=False)
+    def test_create_signalAlignment_args(self):
+        expected_args = {"backward_reference", "forward_reference", "destination", "stateMachineType", "in_templateHmm",
+                         "in_complementHmm", "in_templateHdp", "in_complementHdp", "threshold", "diagonal_expansion",
+                         "constraint_trim", "target_regions", "degenerate", "twoD_chemistry", "alignment_file",
+                         "bwa_reference",
+                         'track_memory_usage', 'get_expectations', 'output_format', 'embed', 'event_table',
+                         'check_for_temp_file_existance', 'path_to_bin', 'perform_kmer_event_alignment'}
+        args = create_signalAlignment_args()
+        self.assertSetEqual(set(args.keys()), expected_args)
+
+    def test_create_sa_sample_args(self):
+        expected_args = {"fofns", "fast5_dirs", "positions_file", "motifs", "bwa_reference", "fw_reference",
+                         "bw_reference", "name", "number_of_kmer_assignments", "probability_threshold",
+                         "kmers_from_reference", 'alignment_file'}
+        args = create_sa_sample_args()
+        self.assertSetEqual(set(args.keys()), expected_args)
+
+    def test_parseFofn(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            test_out = os.path.join(tempdir, "test.fofn")
+            with open(test_out, 'w+') as fofn_file:
+                for path in self.fast5_paths:
+                    print(path, file=fofn_file)
+
+            files = parseFofn(test_out)
+            self.assertSequenceEqual(files, self.fast5_paths)
+            with open(test_out, 'w+') as fofn_file:
+                for x in range(10):
+                    print("Something else", file=fofn_file)
+            self.assertRaises(AssertionError, parseFofn, test_out)
+            self.assertRaises(AssertionError, parseFofn, "fake_file")
+
+    # TODO use new reads to test
+    def test_get_2d_length(self):
+        lengths = [397, 9896, 7983, 11457]
+        for i, fast5path in enumerate(sorted(self.fast5_paths)):
+            self.assertEqual(lengths[i], (get_2d_length(fast5path)))
+
+    # TODO use new reads to test
+    def test_get_1d_length(self):
+        lengths = [388, 9616, 9868, 10614]
+        print(self.fast5_paths)
+        for i, fast5path in enumerate(sorted(self.fast5_paths)):
+            self.assertEqual(lengths[i], (get_1d_length(fast5path)))
+
+    def test_trim_num_files_in_sample(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            working_folder = FolderHandler()
+            working_folder.open_folder(os.path.join(tempdir, "test_dir"))
+            test_args = create_sa_sample_args(fast5_dirs=[self.fast5_dir], name="some_name",
+                                              fw_reference=self.ecoli_reference)
+            sample = SignalAlignSample(working_folder=working_folder, **test_args)
+            n_bases = 10000
+            fast5_files = trim_num_files_in_sample(sample, n_bases, False, verbose=False)
+            bases = 0
+            for fast5_file in fast5_files:
+                bases += get_1d_length(fast5_file)
+            self.assertLessEqual(bases, n_bases)
+            fast5_files = trim_num_files_in_sample(sample, n_bases, True, verbose=False)
+            bases = 0
+            for fast5_file in fast5_files:
+                bases += get_2d_length(fast5_file)
+            self.assertLessEqual(bases, n_bases)
+            self.assertRaises(AssertionError, trim_num_files_in_sample, sample, 1, False, verbose=False)
 
     def test_signal_file_and_alignment(self):
         signal_file_reads = os.path.join(self.HOME, "tests/minion_test_reads/no_event_data_1D_ecoli")
@@ -157,7 +157,7 @@ class SignalAlignmentTest(unittest.TestCase):
             mea = f5fh.get_signalalign_events(mea=True)
             sam = f5fh.get_signalalign_events(sam=True)
             self.assertEqual(mea[0]["raw_start"], 153)
-            self.assertEqual(sam[0], "@")
+            self.assertEqual(sam[0], "9")
             self.assertEqual(len(os.listdir(working_folder.path)), 2)
             self.assertEqual(sorted(os.listdir(working_folder.path))[0], "9e4d14b1-8167-44ef-9fdb-5c29dd0763fd.sm.backward.tsv")
 

@@ -137,28 +137,12 @@ def buildBwaIndex(reference, dest, output=None, log=None):
 
 
 def getGuideAlignmentFromAlignmentFile(alignment_location, read_name=None, target_regions=None):
-    # data we care about
-    n_aligned_segments = 0
-    query_name, flag, reference_name, reference_pos, sam_cigar = None, None, None, None, None
-
     # get reads from alignment file (sam or bam)
-    with closing(pysam.AlignmentFile(alignment_location, 'rb' if alignment_location.endswith("bam") else 'r')) as aln:
-        for aligned_segment in aln.fetch():
-            if aligned_segment.is_secondary or aligned_segment.is_unmapped:
-                continue
-            if read_name is not None and aligned_segment.qname != read_name and read_name not in aligned_segment.qname:
-                continue
-
-            n_aligned_segments += 1
-            if n_aligned_segments == 1:
-                query_name = aligned_segment.qname
-                flag = aligned_segment.flag
-                reference_name = aln.getrname(aligned_segment.rname)
-                reference_pos = aligned_segment.pos + 1  # pysam gives the 0-based leftmost start
-                sam_cigar = aligned_segment.cigarstring
-                # if we're looking through a large sam file, no need to report on the number of alignments
-                if read_name is not None:
-                    break
+    aligned_segment, n_aligned_segments, reference_name = get_aligned_segment_from_alignment_file(alignment_location, read_name)
+    query_name = aligned_segment.qname
+    flag = aligned_segment.flag
+    reference_pos = aligned_segment.pos + 1  # pysam gives the 0-based leftmost start
+    sam_cigar = aligned_segment.cigarstring
 
     # couldn't find anything
     if n_aligned_segments == 0:
@@ -245,3 +229,26 @@ def generateGuideAlignment(reference_fasta, query, temp_sam_path, target_regions
         return None
 
     return getGuideAlignmentFromAlignmentFile(temp_sam_path, target_regions=target_regions)
+
+
+def get_aligned_segment_from_alignment_file(alignment_location, read_name):
+    """Find an AlignedSegment from an alignment file via the pysam.AlignmentFile interface
+
+    :param alignment_location: sam or bam file
+    :param read_name: name of the read you want the alignment information
+    :return: the pysam AlignedSegment object
+    """
+    # get reads from alignment file (sam or bam)
+    n_aligned_segments = 0
+    correct_segment = None
+    with closing(pysam.AlignmentFile(alignment_location, 'rb' if alignment_location.endswith("bam") else 'r')) as aln:
+        for aligned_segment in aln.fetch():
+            if aligned_segment.is_secondary or aligned_segment.is_unmapped:
+                continue
+            if read_name is not None and aligned_segment.qname != read_name and read_name not in aligned_segment.qname:
+                continue
+            n_aligned_segments += 1
+            correct_segment = aligned_segment
+        reference_name = aln.getrname(correct_segment.rname)
+
+    return correct_segment, n_aligned_segments, reference_name

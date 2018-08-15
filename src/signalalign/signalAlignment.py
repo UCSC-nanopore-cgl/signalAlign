@@ -435,13 +435,13 @@ class SignalAlignment(object):
                                                            rna=npRead.is_read_rna())
                     npRead.write_data(labels, mae_path)
                     # write SAM alignment
-                    sam_string = str()
-                    if os.path.isfile(temp_samfile_):
-                        with open(temp_samfile_, 'r') as test:
-                            for line in test:
-                                sam_string += line
+                    if self.alignment_file:
+                        aligned_segment, _, _ = get_aligned_segment_from_alignment_file(self.alignment_file, read_label)
+                    else:
+                        aligned_segment, _, _ = get_aligned_segment_from_alignment_file(temp_samfile_, read_label)
+
+                    sam_string = aligned_segment.tostring()
                     sam_path = npRead._join_path(signal_align_path, "sam")
-                    # print(sam_string)
                     npRead.write_data(data=sam_string, location=sam_path, compression=None)
 
         # self.temp_folder.remove_folder()
