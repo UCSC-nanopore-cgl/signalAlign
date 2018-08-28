@@ -486,8 +486,8 @@ class EventDetectTests(unittest.TestCase):
 
         new_table = time_to_index(event_table, sampling_freq=sampling_freq, start_time=start_time)
         # compare elementwise
-        self.assertSequenceEqual(new_table["start"][0:100].tolist(), start[0:100].tolist())
-        self.assertSequenceEqual(new_table["length"][0:100].tolist(), length[0:100].tolist())
+        self.assertSequenceEqual(new_table["raw_start"][0:100].tolist(), start[0:100].tolist())
+        self.assertSequenceEqual(new_table["raw_length"][0:100].tolist(), length[0:100].tolist())
 
         with self.assertRaises(AssertionError):
             time_to_index(event_table, start_time=start_time)

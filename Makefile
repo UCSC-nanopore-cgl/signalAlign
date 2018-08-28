@@ -160,4 +160,4 @@ hs :
 	cd htslib && make
 
 
-.FORCE:
+.FORCE: python_setup

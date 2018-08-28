@@ -11,11 +11,14 @@
 import unittest
 import os
 import numpy as np
+import tempfile
+import shutil
 from signalalign.alignedsignal import *
+from signalalign.signalAlignment import SignalAlignment, create_signalAlignment_args
+from py3helpers.utils import merge_dicts
 
 
 class CreateLabelsTest(unittest.TestCase):
-    """Test the class CreateLabels"""
 
     @classmethod
     def setUpClass(cls):
@@ -23,16 +26,81 @@ class CreateLabelsTest(unittest.TestCase):
         cls.HOME = '/'.join(os.path.abspath(__file__).split("/")[:-4])
         cls.fasta = os.path.join(cls.HOME,
                                  "tests/test_sequences/E.coli_K12.fasta")
+        dna_file = os.path.join(cls.HOME,
+                                "tests/minion_test_reads/1D/LomanLabz_PC_20161025_FNFAB42699_MN17633_sequencing_run_20161025_E_coli_native_450bps_82361_ch112_read108_strand.fast5")
+        rna_file = os.path.join(cls.HOME,
+                                "tests/minion_test_reads/RNA_no_events/DEAMERNANOPORE_20170922_FAH26525_MN16450_sequencing_run_MA_821_R94_NA12878_mRNA_09_22_17_67136_read_61_ch_151_strand.fast5")
+        old_rna_file = os.path.join(cls.HOME,
+                                    "tests/minion_test_reads/RNA_edge_cases/DEAMERNANOPORE_20170922_FAH26525_MN16450_sequencing_run_MA_821_R94_NA12878_mRNA_09_22_17_67136_read_61_ch_151_strand.fast5")
 
-    # TODO
+        rna_reference = os.path.join(cls.HOME, "tests/test_sequences/fake_rna_reversed.fa")
+        dna_reference = os.path.join(cls.HOME, "tests/test_sequences/E.coli_K12.fasta")
+        cls.tmp_directory = tempfile.mkdtemp()
+        cls.tmp_directory = "/Users/andrewbailey/CLionProjects/nanopore-RNN/submodules/signalAlign/tests/minion_test_reads/delete_me_after_debugging"
+        # get file locations
+        cls.tmp_dna_file = os.path.join(str(cls.tmp_directory), 'test_dna.fast5')
+        cls.tmp_rna_file = os.path.join(str(cls.tmp_directory), 'test_rna.fast5')
+        cls.tmp_rna_file2 = os.path.join(str(cls.tmp_directory), 'test_rna2.fast5')
+
+        # run signalAlign on one file
+        cls.rna_model_file = os.path.join(cls.HOME, "models/testModelR9p4_5mer_acgt_RNA.model")
+        cls.dna_model_file = os.path.join(cls.HOME, "models/testModelR9_acegt_template.model")
+        cls.rna_sam = os.path.join(cls.HOME, "tests/minion_test_reads/RNA_edge_case.sam")
+        cls.dna_sam = os.path.join(cls.HOME, "tests/minion_test_reads/oneD_alignments.sam")
+        cls.bin_path = os.path.join(cls.HOME, "bin")
+
+        # TODO uncomment this for final push
+        # # copy file to tmp directory
+        # shutil.copy(dna_file, cls.tmp_dna_file)
+        # shutil.copy(rna_file, cls.tmp_rna_file)
+        # shutil.copy(old_rna_file, cls.tmp_rna_file2)
+        #
+        # args = create_signalAlignment_args(destination=cls.tmp_directory,
+        #                                    in_templateHmm=cls.rna_model_file,
+        #                                    alignment_file=cls.rna_sam,
+        #                                    forward_reference=rna_reference,
+        #                                    embed=True,
+        #                                    path_to_bin=cls.bin_path)
+        # sa_h = SignalAlignment(**merge_dicts([args, {'in_fast5': cls.tmp_rna_file}]))
+        # sa_h.run()
+        #
+        # args = create_signalAlignment_args(destination=cls.tmp_directory,
+        #                                    in_templateHmm=cls.rna_model_file,
+        #                                    alignment_file=cls.rna_sam,
+        #                                    bwa_reference=rna_reference,
+        #                                    forward_reference=rna_reference,
+        #                                    embed=True,
+        #                                    path_to_bin=cls.bin_path)
+        # sa_h = SignalAlignment(**merge_dicts([args, {'in_fast5': cls.tmp_rna_file2}]))
+        # sa_h.run()
+        #
+        # args = create_signalAlignment_args(destination=cls.tmp_directory,
+        #                                    in_templateHmm=cls.dna_model_file,
+        #                                    alignment_file=cls.dna_sam,
+        #                                    forward_reference=dna_reference,
+        #                                    embed=True,
+        #                                    path_to_bin=cls.bin_path)
+        # sa_h = SignalAlignment(**merge_dicts([args, {'in_fast5': cls.tmp_dna_file}]))
+        # sa_h.run()
+
     def test_initialize(self):
-        """Test initialize function in CreateLabels"""
-        # handle = CreateLabels(self.dna_file)
+        handle = CreateLabels(self.tmp_dna_file)
+        handle2 = CreateLabels(self.tmp_rna_file)
+        self.assertEqual(handle.aligned_signal.raw_signal[0], 1172)
+        self.assertEqual(handle2.aligned_signal.raw_signal[0], 647)
 
-    # TODO
-    def test_add_signal_align_predictions(self):
-        """Test add_signal_align_predictions function"""
-        pass
+    def test_add_basecall_alignment(self):
+        handle2 = CreateLabels(self.tmp_rna_file2)
+        handle2.add_basecall_alignment()
+        self.assertEqual(handle2.aligned_signal.guide["basecall"]["basecalled_alignment0"][0][0], 2270)
+
+        handle2 = CreateLabels(self.tmp_rna_file)
+        handle2.add_basecall_alignment()
+        self.assertEqual(handle2.aligned_signal.guide["basecall"]["basecalled_alignment0"][0][0], 2270)
+
+        handle = CreateLabels(self.tmp_dna_file)
+        handle.add_basecall_alignment()
+        self.assertEqual(handle.aligned_signal.guide["basecall"]["basecalled_alignment0"][0][0], 762)
 
     # TODO
     def test_add_mea_labels(self):
@@ -49,7 +117,7 @@ class CreateLabelsTest(unittest.TestCase):
     def test_create_labels_from_guide_alignment(self):
         """Test create_labels_from_guide_alignment"""
         # make sure alignments track correct reference indexes
-        test_sam = "@SQ	SN:ref	LN:45\n@SQ	SN:ref2	LN:40\nr001	163	ref	7	30	8M	=	37	39	GATTACTG	*	XX:B:S,12561,2,20,112	MD:Z:6A1"
+        test_sam = "r001	163	ref	7	30	8M	=	37	39	GATTACTG	*	XX:B:S,12561,2,20,112	MD:Z:6A1"
         events = np.zeros(4, dtype=[('raw_start', int), ('raw_length', int), ('move', int),
                                     ('p_model_state', float), ('model_state', 'S5')])
         events["raw_start"] = [0, 1, 2, 3]
@@ -82,9 +150,9 @@ class CreateLabelsTest(unittest.TestCase):
         events["model_state"] = ["AGCTT", "GCTTT", "GCTTT", "CTTTC"]
 
         with self.assertRaises(AssertionError):
-            create_labels_from_guide_alignment(events=events, sam_string=test_header + no_mdz)
+            create_labels_from_guide_alignment(events=events, sam_string=no_mdz)
 
-        cigar_labels = create_labels_from_guide_alignment(events=events, sam_string=test_header + no_mdz, kmer_index=1,
+        cigar_labels = create_labels_from_guide_alignment(events=events, sam_string=no_mdz, kmer_index=1,
                                                           one_ref_indexing=False, reference_path=self.fasta)[0]
         self.assertEqual("AGCTTTT", ''.join([bytes.decode(x) for x in cigar_labels['kmer']]))
         self.assertSequenceEqual([0, 0, 1, 3, 3, 3, 3], cigar_labels['raw_start'].tolist())
@@ -145,7 +213,7 @@ class AlignedSignalTest(unittest.TestCase):
 
         self.handle.add_label(label, name="test", label_type='label')
         self.handle.add_label(label, name="test2", label_type='prediction')
-        self.handle.add_label(label, name="test3", label_type='guide')
+        self.handle.add_label(label, name="test3", label_type='guide', guide_name="something")
         # catch wrong label type
         with self.assertRaises(AssertionError):
             self.handle.add_label(label, name="test3", label_type='fake')
@@ -188,7 +256,7 @@ class AlignedSignalTest(unittest.TestCase):
         handle.add_label(label, name="test", label_type='label')
         handle.add_label(label, name="test2", label_type='label')
         handle.add_label(label, name="test2", label_type='prediction')
-        handle.add_label(label, name="test3", label_type='guide')
+        handle.add_label(label, name="test3", label_type='guide', guide_name="something2")
         # make sure we generate the correct mappings
         test = handle.generate_label_mapping(name='test')
         for i, return_tuple in enumerate(test):

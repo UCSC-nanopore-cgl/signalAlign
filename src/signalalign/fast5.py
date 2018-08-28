@@ -363,7 +363,6 @@ class Fast5(h5py.File):
             raise IndexError('File does not contain analysis with name: {}'.format(name))
         return events
 
-    #todo fix path creation
     def get_signalalign_events(self, mea=False, sam=False):
         """Get signal align events, sam or mea alignment"""
         assert (not mea or not sam), "Both mea and sam cannot be set to True"
@@ -371,14 +370,17 @@ class Fast5(h5py.File):
             path = self.check_path(self.__default_signalalign_events__, latest=True)
             reads = self[path]
             if mea:
-                events = np.asarray(reads['MEA_alignment_labels'])
+                field = "MEA_alignment_labels"
+                events = np.asarray(reads[field])
             elif sam:
-                events = str(np.asarray(reads['sam']))
+                field = "sam"
+                events = str(np.asarray(reads[field]))
             else:
-                events = np.asarray(reads['full'])
+                field = "full"
+                events = np.asarray(reads[field])
 
         except KeyError:
-            raise KeyError('Read does not contain required fields: {}'.format(path))
+            raise KeyError('Read does not contain required fields: {}'.format(os.path.join(path, field)))
         return events
 
     #todo fix path creation

@@ -18,6 +18,7 @@ import subprocess
 import numpy as np
 import h5py
 import traceback
+import numpy.lib.recfunctions as rfn
 from shutil import which
 from contextlib import closing
 from collections import defaultdict
@@ -475,6 +476,8 @@ def index_to_time(basecall_events, sampling_freq=0, start_time=0):
 def time_to_index(event_table, sampling_freq=0, start_time=0):
     """Convert start and lengths from time to raw signal indexes
 
+    note: fields 'start' and 'length' will be converted to 'raw_start' and 'raw_length'
+
     :param event_table: basecall events from albacore/metricore basecalled event table
     :param sampling_freq: sampling frequency of experiment
     :param start_time: start time of experiment via fasta5 file
@@ -484,13 +487,14 @@ def time_to_index(event_table, sampling_freq=0, start_time=0):
         .format(event_table["start"].dtype)
     assert sampling_freq != 0, "Must set sampling frequency"
     assert start_time != 0, "Must set start time"
-
     event_table["start"] = np.round((event_table["start"] - (start_time / float(sampling_freq))) * sampling_freq)
     event_table["length"] = np.round(event_table["length"] * sampling_freq)
+    # change filed types and rename fields
     event_table = change_np_field_type(event_table, 'start', int)
     event_table = change_np_field_type(event_table, 'length', int)
+    final_table = rfn.rename_fields(event_table, {'start': 'raw_start', 'length': 'raw_length'})
 
-    return event_table
+    return final_table
 
 
 def sequence_from_events(events):
@@ -569,7 +573,7 @@ def load_from_raw(np_handle, alignment_file, model_file_location, path_to_bin=".
     """
     assert os.path.isfile(model_file_location), \
         "Model_file_location must be a real path to a SignalAlign HMM model file"
-    assert os.path.isfile(alignment_file) or nucleotide_sequence is not None, \
+    assert os.path.isfile(str(alignment_file)) or nucleotide_sequence is not None, \
         "alignment_file must be a real path a SAM/BAM alignment file, or nucleotide_sequence must be specified"
     assert os.path.exists(path_to_bin), \
         "path_to_bin must exist"

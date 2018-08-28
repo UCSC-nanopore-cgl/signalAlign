@@ -14,11 +14,12 @@ from random import shuffle
 import signalalign.utils.multithread as multithread
 from signalalign import defaultModelFromVersion, parseFofn
 from signalalign.nanoporeRead import NanoporeRead, NanoporeRead2D
+from signalalign.event_detection import time_to_index
 from signalalign.utils.bwaWrapper import *
 from signalalign.utils.fileHandlers import FolderHandler
 from signalalign.utils.sequenceTools import fastaWrite, samtools_faidx_fasta, processReferenceFasta
 from signalalign.mea_algorithm import mea_alignment_from_signal_align, match_events_with_signalalign
-from py3helpers.utils import merge_dicts
+from py3helpers.utils import merge_dicts, check_numpy_table
 
 
 def create_signalAlignment_args(backward_reference=None, forward_reference=None, destination=None,
@@ -151,7 +152,8 @@ class SignalAlignment(object):
             if self.twoD_chemistry:
                 assert self.in_complementHmm is not None, "Need complement HMM files for model training"
         if not os.path.isfile(self.in_fast5):
-            print("[SignalAlignment.run] ERROR: Did not find .fast5 at{file}".format(file=self.in_fast5), file=sys.stderr)
+            print("[SignalAlignment.run] ERROR: Did not find .fast5 at{file}".format(file=self.in_fast5),
+                  file=sys.stderr)
             return False
 
         # prep
@@ -167,7 +169,8 @@ class SignalAlignment(object):
                                   perform_kmer_event_alignment=self.perform_kmer_event_alignment)
         # sanity check
         if not npRead.initialize_success:
-            self.failStop("[SignalAlignment.run] ERROR: NanoporeRead failed initialization: {}".format(self.in_fast5), npRead)
+            self.failStop("[SignalAlignment.run] ERROR: NanoporeRead failed initialization: {}".format(self.in_fast5),
+                          npRead)
             return False
 
         # read label
@@ -409,18 +412,15 @@ class SignalAlignment(object):
         # save to fast5 file (if appropriate)
         if self.embed:
             print("[SignalAlignment.run] embedding into Fast5 ")
-
+            # load output data and grab new analysis path
             data = self.read_in_signal_align_tsv(posteriors_file_path, file_type=self.output_format)
-            npRead = NanoporeRead(fast_five_file=self.in_fast5, twoD=self.twoD_chemistry, event_table=self.event_table)
-            npRead.Initialize()
             signal_align_path = npRead.fastFive.get_analysis_new("SignalAlign")
             assert signal_align_path, "There is no path in Fast5 file: {}".format("/Analyses/SignalAlign_00{}")
             output_path = npRead._join_path(signal_align_path, self.output_format)
             npRead.write_data(data, output_path)
-
-            # Todo add attributes to signalalign output
+            # TODO add attributes to signalalign output
             if self.output_format == "full":
-                print("[SignalAlignment.run] writing maximum expected alignment ")
+                print("[SignalAlignment.run] writing maximum expected alignment")
                 alignment = mea_alignment_from_signal_align(None, events=data)
                 mae_path = npRead._join_path(signal_align_path, "MEA_alignment_labels")
                 events = npRead.get_template_events()
@@ -429,8 +429,17 @@ class SignalAlignment(object):
                         minus = True
                     else:
                         minus = False
+                    try:
+                        template_events = np.asanyarray(npRead.template_events)
+                        check_numpy_table(template_events, req_fields=('raw_start', 'raw_length'))
+                    # if events do not have raw_start or raw_lengths
+                    except KeyError:
+                        template_events = time_to_index(np.asanyarray(npRead.template_events),
+                                                        sampling_freq=npRead.fastFive.sample_rate,
+                                                        start_time=npRead.fastFive.raw_attributes["start_time"])
+
                     labels = match_events_with_signalalign(sa_events=alignment,
-                                                           event_detections=np.asanyarray(npRead.template_events),
+                                                           event_detections=template_events,
                                                            minus=minus,
                                                            rna=npRead.is_read_rna())
                     npRead.write_data(labels, mae_path)
@@ -443,7 +452,10 @@ class SignalAlignment(object):
                     sam_string = aligned_segment.tostring()
                     sam_path = npRead._join_path(signal_align_path, "sam")
                     npRead.write_data(data=sam_string, location=sam_path, compression=None)
-
+                else:
+                    print("[SignalAlignment.run] ERROR:  maximum expected alignment")
+        npRead.close()
+        # TODO add this back and fix errors
         # self.temp_folder.remove_folder()
         return True
 
@@ -584,7 +596,7 @@ def multithread_signal_alignment(signal_align_arguments, fast5_locations, worker
         samtools_faidx_fasta(signal_align_arguments["backward_reference"], log="multithread_signal_alignment")
 
     # bwa_reference and alignment_file must be specified
-    assert ('bwa_reference'  in signal_align_arguments and signal_align_arguments["bwa_reference"] is not None) or \
+    assert ('bwa_reference' in signal_align_arguments and signal_align_arguments["bwa_reference"] is not None) or \
            ('alignment_file' in signal_align_arguments and signal_align_arguments['alignment_file'] is not None), \
         "Must specify bwa_reference or alignment_file"
 

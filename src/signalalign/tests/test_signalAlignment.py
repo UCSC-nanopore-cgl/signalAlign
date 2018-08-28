@@ -161,6 +161,34 @@ class SignalAlignmentTest(unittest.TestCase):
             self.assertEqual(len(os.listdir(working_folder.path)), 2)
             self.assertEqual(sorted(os.listdir(working_folder.path))[0], "9e4d14b1-8167-44ef-9fdb-5c29dd0763fd.sm.backward.tsv")
 
+        # DNA WITH events
+        signal_file_reads = os.path.join(self.HOME, "tests/minion_test_reads/1D")
+        template_model = os.path.join(self.HOME, "models/testModelR9p4_5mer_acegt_template.model")
+        ecoli_reference = os.path.join(self.HOME, "tests/test_sequences/E.coli_K12.fasta")
+        signal_file_guide_alignment = os.path.join(self.HOME, "tests/minion_test_reads/oneD_alignments.sam")
+
+        with tempfile.TemporaryDirectory() as tempdir:
+            new_dir = os.path.join(tempdir, "new_dir")
+            working_folder = FolderHandler()
+            working_folder.open_folder(os.path.join(tempdir, "test_dir"))
+
+            shutil.copytree(signal_file_reads, new_dir)
+
+            args = create_signalAlignment_args(alignment_file=signal_file_guide_alignment, bwa_reference=ecoli_reference,
+                                               forward_reference=ecoli_reference, in_templateHmm=template_model,
+                                               path_to_bin=self.path_to_bin, destination=working_folder.path,
+                                               embed=True)
+            final_args = merge_dicts([args, dict(in_fast5=os.path.join(new_dir, "LomanLabz_PC_20161025_FNFAB42699_MN17633_sequencing_run_20161025_E_coli_native_450bps_82361_ch6_read347_strand.fast5"))])
+            handle = SignalAlignment(**final_args)
+            handle.run()
+            f5fh = Fast5(os.path.join(new_dir, "LomanLabz_PC_20161025_FNFAB42699_MN17633_sequencing_run_20161025_E_coli_native_450bps_82361_ch6_read347_strand.fast5"))
+            mea = f5fh.get_signalalign_events(mea=True)
+            sam = f5fh.get_signalalign_events(sam=True)
+            self.assertEqual(mea[0]["raw_start"], 153)
+            self.assertEqual(sam[0], "9")
+            self.assertEqual(len(os.listdir(working_folder.path)), 2)
+            self.assertEqual(sorted(os.listdir(working_folder.path))[0], "9e4d14b1-8167-44ef-9fdb-5c29dd0763fd.sm.backward.tsv")
+
     def test_multithread_signal_alignment(self):
         with tempfile.TemporaryDirectory() as tempdir:
             working_folder = FolderHandler()

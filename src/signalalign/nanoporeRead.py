@@ -3,11 +3,11 @@ from __future__ import print_function
 import sys
 import os
 import re
-from signalalign.fast5 import Fast5
-
+import numpy as np
 from itertools import islice
+from signalalign.fast5 import Fast5
 from signalalign.event_detection import load_from_raw
-
+from py3helpers.utils import check_numpy_table
 
 TEMPLATE_BASECALL_KEY   = Fast5.__default_basecall_1d_analysis__ #"/Analyses/Basecall_1D_00{}"
 TWOD_BASECALL_KEY       = Fast5.__default_basecall_2d_analysis__ #"/Analyses/Basecall_2D_00{}"
@@ -18,6 +18,7 @@ VERSION_KEY             = ("version", "dragonet version", "nanotensor version", 
 SUPPORTED_1D_VERSIONS   = ("1.0.1", "1.2.1", "1.2.4", "1.23.0", "1.22.4", "2.1.0", "0.2.0", "0.1.7")
 
 # promethion read_name: self.fast5['PreviousReadInfo'].attrs['previous_read_id'].decode()
+
 
 class NanoporeRead(object):
     def __init__(self, fast_five_file, twoD=False, event_table='', initialize=False, path_to_bin="./",
@@ -174,14 +175,20 @@ class NanoporeRead(object):
         # get oneD directory and check if the table location exists in the fast5file
         if self.event_table:
             oned_root_address = self.get_latest_basecall_edition(self.event_table)
+
             if not oned_root_address and perform_kmer_event_aln_if_required:
                 oned_root_address = load_from_raw(self, self.alignment_file, self.model_file_location, self.path_to_bin,
                                                   analysis_identifier=self.event_table)
         else:
             oned_root_address = self.get_latest_basecall_edition(TEMPLATE_BASECALL_KEY)
+            # if we cant find analysis then perform kmer_event_alignment
             if not oned_root_address and perform_kmer_event_aln_if_required:
                 oned_root_address = load_from_raw(self, self.alignment_file, self.model_file_location, self.path_to_bin)
-
+            # Some RNA reads have incorrectly formatted basecall tables so we check and then force load_from_raw
+            if oned_root_address and self.rna and perform_kmer_event_aln_if_required:
+                if not self.check_if_event_table_format(oned_root_address):
+                    oned_root_address = load_from_raw(self, self.alignment_file, self.model_file_location,
+                                                      self.path_to_bin)
         # sanity check
         if not oned_root_address:
             self.logError("[NanoporeRead:_initialize] ERROR could not find 1D root address in {}"
@@ -235,6 +242,22 @@ class NanoporeRead(object):
             return False
 
         return True
+
+    def check_if_event_table_format(self, oned_root_address):
+        """Check if the 'start' and 'length' values are in the time scale, NOT the index scale
+        :param oned_root_address: Basecalled analysis path
+        :return: boolean if start and length are correct format
+        """
+        template_event_table_address = os.path.join(oned_root_address, "BaseCalled_template/Events")
+        if template_event_table_address in self.fastFive:
+            template_events = np.asarray(self.fastFive[template_event_table_address])
+        check_numpy_table(template_events, req_fields=('start', 'length'))
+        if template_events["start"].dtype is np.dtype('uint64'):
+            return False
+        else:
+            return True
+
+
 
     @staticmethod
     def make_event_map(events, kmer_length):

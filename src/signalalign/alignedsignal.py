@@ -15,8 +15,8 @@ import numpy as np
 from timeit import default_timer as timer
 from collections import defaultdict, namedtuple
 from py3helpers.utils import check_numpy_table
-from py3helpers.seq_tools import ReferenceHandler, initialize_pysam_wrapper, ReverseComplement, get_minimap_alignment
-
+from py3helpers.seq_tools import ReferenceHandler, ReverseComplement, get_minimap_alignment, \
+    initialize_aligned_segment_wrapper
 from signalalign.fast5 import Fast5
 from signalalign.mea_algorithm import maximum_expected_accuracy_alignment, mea_slow, \
     mea_slower, create_random_prob_matrix, get_mea_params_from_events, match_events_with_signalalign
@@ -71,6 +71,7 @@ class AlignedSignal(object):
                                                               'kmer', 'posterior_probability']
         :param name: name of the label for signal
         :param label_type: type of label  :['label', 'prediction', 'guide']
+        :param guide_name: must pass your own label via guide_name if label_type is guide
         """
         assert label_type in ['label', 'prediction', 'guide'], \
             "{} not in ['label', 'prediction', 'guide']: Must select an acceptable type".format(label_type)
@@ -82,7 +83,8 @@ class AlignedSignal(object):
         assert min(label["raw_start"]) >= 0, "Raw start cannot be less than 0"
         assert 0 <= max(label["posterior_probability"]) <= 1, \
             "posterior_probability must be between zero and one {}".format(row["posterior_probability"])
-
+        if label_type == 'guide':
+            assert guide_name is not None, "If label_type is 'guide', you must pass in a guide_name"
         # make sure last label can actually index the signal correctly
         try:
             self.scaled_signal[label[-1]["raw_start"]:label[-1]["raw_start"] + label[-1]["raw_length"]]
@@ -137,7 +139,11 @@ class CreateLabels(Fast5):
     """Create an Aligned Signal object from a fast5 file with """
 
     def __init__(self, fast5_path):
-        """Initialize fast5 object and keep track of AlignedSignal object"""
+        """Initialize fast5 object and keep track of AlignedSignal object
+        :param fast5_path: path to fast5 file
+        :param reference: path to reference so we can run signalAlign
+        :param alignment_file: alignment file to run signalAlign or for alignment info
+        """
         self.fast5_path = fast5_path
         super(CreateLabels, self).__init__(fast5_path)
         self.aligned_signal = self._initialize()
@@ -145,12 +151,7 @@ class CreateLabels(Fast5):
         self.rna = self.is_read_rna()
 
     def _initialize(self):
-        """Initialize AlignedSignal class.
-
-        Will create an AlignedSignal class with required fields filled out
-
-        :param fast5_path: path to fast5 file
-        """
+        """Initialize AlignedSignal class by adding the raw and scaled signal"""
         scaled_signal = self.get_read(raw=True, scale=True)
         raw_signal = self.get_read(raw=True, scale=False)
         # add raw signal information to AlignedSignal
@@ -160,7 +161,6 @@ class CreateLabels(Fast5):
 
     def add_mea_labels(self):
         """Gather mea_alignment labels information from fast5 file."""
-        # TODO call signalalign if not called
         mea_alignment = self.get_signalalign_events(mea=True)
         # rna reference positions are on 5' edge aka right side of kmer
         if self.rna:
@@ -173,11 +173,10 @@ class CreateLabels(Fast5):
 
     def add_signal_align_predictions(self):
         """Create prediction using probabilities from full output format from signalAlign"""
-        # TODO call signalalign if not called
         sa_events = self.get_signalalign_events()
         # cut out duplicates
         sa_events = np.unique(sa_events)
-        events = self.get_resegment_basecall()
+        events = self.get_basecall_data()
         predictions = match_events_with_signalalign(sa_events=sa_events, event_detections=events)
         # rna reference positions are on 5' edge aka right side of kmer
         if self.rna:
@@ -187,19 +186,31 @@ class CreateLabels(Fast5):
         self.aligned_signal.add_label(predictions, name="full_signalalign", label_type='prediction')
         return True
 
-    def add_guide_alignment(self):
-        """Add guide alignment labels to signal_label handle"""
-        test_sam = self.get_signalalign_events(sam=True)
-        events = self.get_resegment_basecall()
-        cigar_labels = create_labels_from_guide_alignment(events=events, sam_string=test_sam,
+    def add_basecall_alignment(self, sam=None):
+        """Add the original basecalled event table and add the 'guide' alignment labels to signal_label handle
+        :param sam: correctly formatted SAM string
+        :return: True if the correct labels are added to the AlignedSignal internal class object
+        """
+        if not sam:
+            sam = self.get_signalalign_events(sam=True)
+
+        events = self.get_basecall_data()
+        try:
+            check_numpy_table(events, req_fields=('raw_start', 'raw_length'))
+        # if events do not have raw_start or raw_lengths
+        except KeyError:
+            events = time_to_index(events,
+                                   sampling_freq=self.sample_rate,
+                                   start_time=self.raw_attributes["start_time"])
+
+        cigar_labels = create_labels_from_guide_alignment(events=events, sam_string=sam,
                                                           kmer_index=self.kmer_index)
         for i, block in enumerate(cigar_labels):
-            # print(block)
-            self.aligned_signal.add_label(block, name="guide_alignment{}".format(i), label_type='guide',
-                                          guide_name="resegment")
+            self.aligned_signal.add_label(block, name="basecalled_alignment{}".format(i), label_type='guide',
+                                          guide_name="basecall")
         return True
 
-    def add_basecall_event_table_alignment(self, event_table_path):
+    def add_basecall_event_table_alignment(self, event_table_path=None):
         """Add guide alignment labels to signal_label handle"""
         assert event_table_path in self, "Event table path {}: is not in fast5.".format(event_table_path)
         test_sam = self.get_signalalign_events(sam=True)
@@ -214,7 +225,6 @@ class CreateLabels(Fast5):
 
     def add_nanoraw_labels(self, reference):
         """Add nanoraw labels to signal_label handle"""
-        # TODO call nanoraw from here
         events, corr_start_rel_to_raw = self.get_corrected_events()
         events["start"] += corr_start_rel_to_raw
         sequence = ''.join([bytes.decode(x) for x in events['base']])
@@ -237,7 +247,6 @@ class CreateLabels(Fast5):
     def add_eventalign_labels(self):
         """Add eventalign labels"""
         section = "template"
-        # TODO call eventalign from here
         ea_events = self.get_eventalign_events(section=section)
         events = self.get_basecall_data(section=section)
         sampling_freq = self.sample_rate
@@ -264,10 +273,17 @@ def create_labels_from_guide_alignment(events, sam_string, rna=False, reference_
     :param one_ref_indexing: boolean zero or 1 based indexing for reference
     """
     # test if the required fields are in structured numpy array
-    check_numpy_table(events, req_fields=('raw_start', 'model_state', 'p_model_state', 'raw_length', 'move'))
+    try:
+        check_numpy_table(events, req_fields=('raw_start', 'model_state', 'p_model_state', 'raw_length', 'move'))
+    except IndexError:
+        assert basecall_events["start"].dtype is np.dtype('uint64'), "Event 'start' should be np.int32 type: {}" \
+            .format(basecall_events["start"].dtype)
+        events = time_to_index(events, sampling_freq=self.sample_rate, start_time=self.raw_attributes['start_time'])
+
     assert type(one_ref_indexing) is bool, "one_ref_indexing must be a boolean"
 
-    psam_h = initialize_pysam_wrapper(sam_string, reference_path=reference_path)
+    psam_h = initialize_aligned_segment_wrapper(sam_string, reference_path=reference_path)
+
     # create an indexed map of the events and their corresponding bases
     bases, base_raw_starts, base_raw_lengths, probs = index_bases_from_events(events, kmer_index=kmer_index)
 
@@ -460,7 +476,6 @@ def embed_eventalign_events(fast5_dir, reference, output_dir, threads=1, overwri
                                             threads=threads,
                                             overwrite=overwrite)
     attributes = None
-    #TODO add attributes to event table
     for template, complement, fast5path in event_generator:
         print(fast5path)
         print("template", template)
@@ -570,7 +585,6 @@ def main():
     # ea_events = f5handle.get_eventalign_events(section=section)
     # print(ea_events.dtype)
     # print(ea_events)
-    # TODO  match labels with events and raw signal
     #
     # events = f5handle.get_basecall_data(section=section)
     # sampling_freq = f5handle.sample_rate
