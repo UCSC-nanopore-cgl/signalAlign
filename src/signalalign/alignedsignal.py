@@ -177,6 +177,14 @@ class CreateLabels(Fast5):
         # cut out duplicates
         sa_events = np.unique(sa_events)
         events = self.get_basecall_data()
+        try:
+            check_numpy_table(events, req_fields=('raw_start', 'raw_length'))
+            # if events do not have raw_start or raw_lengths
+        except KeyError:
+            events = time_to_index(events,
+                                   sampling_freq=self.sample_rate,
+                                   start_time=self.raw_attributes["start_time"])
+
         predictions = match_events_with_signalalign(sa_events=sa_events, event_detections=events)
         # rna reference positions are on 5' edge aka right side of kmer
         if self.rna:
@@ -186,15 +194,20 @@ class CreateLabels(Fast5):
         self.aligned_signal.add_label(predictions, name="full_signalalign", label_type='prediction')
         return True
 
-    def add_basecall_alignment(self, sam=None):
+    def add_basecall_alignment(self, sam=None, event_table_path=None):
         """Add the original basecalled event table and add the 'guide' alignment labels to signal_label handle
         :param sam: correctly formatted SAM string
+        :param event_table_path: grab event table from direct path given
         :return: True if the correct labels are added to the AlignedSignal internal class object
         """
         if not sam:
             sam = self.get_signalalign_events(sam=True)
 
-        events = self.get_basecall_data()
+        if event_table_path:
+            events = np.array(self[event_table_path])
+        else:
+            events = self.get_basecall_data()
+
         try:
             check_numpy_table(events, req_fields=('raw_start', 'raw_length'))
         # if events do not have raw_start or raw_lengths
@@ -208,19 +221,6 @@ class CreateLabels(Fast5):
         for i, block in enumerate(cigar_labels):
             self.aligned_signal.add_label(block, name="basecalled_alignment{}".format(i), label_type='guide',
                                           guide_name="basecall")
-        return True
-
-    def add_basecall_event_table_alignment(self, event_table_path=None):
-        """Add guide alignment labels to signal_label handle"""
-        assert event_table_path in self, "Event table path {}: is not in fast5.".format(event_table_path)
-        test_sam = self.get_signalalign_events(sam=True)
-        events = np.array(self[event_table_path])
-        cigar_labels = create_labels_from_guide_alignment(events=events, sam_string=test_sam,
-                                                          kmer_index=self.kmer_index)
-        for i, block in enumerate(cigar_labels):
-            # print(block)
-            self.aligned_signal.add_label(block, name="{}{}".format(event_table_path, i), label_type='guide',
-                                          guide_name=event_table_path)
         return True
 
     def add_nanoraw_labels(self, reference):
@@ -544,107 +544,6 @@ def match_events_with_eventalign(events=None, event_detections=None, minus=False
     return label
 
 
-def main():
-    """Main docstring"""
-    start = timer()
-
-
-
-    # sam = "/Users/andrewbailey/CLionProjects/nanopore-RNN/signalAlign/bin/test_output/tempFiles_alignment/tempFiles_miten_PC_20160820_FNFAD20259_MN17223_mux_scan_AMS_158_R9_WGA_Ecoli_08_20_16_83098_ch138_read23_strand/temp_sam_file_5048dffc-a463-4d84-bd3b-90ca183f488a.sam"\
-    # dna_read = "/Users/andrewbailey/CLionProjects/nanopore-RNN/test_files/minion-reads/canonical/miten_PC_20160820_FNFAD20259_MN17223_sequencing_run_AMS_158_R9_WGA_Ecoli_08_20_16_43623_ch100_read280_strand.fast5"
-    # dna_read = "/Users/andrewbailey/CLionProjects/nanopore-RNN/nanotensor/tests/test_files/minion-reads/canonical/miten_PC_20160820_FNFAD20259_MN17223_sequencing_run_AMS_158_R9_WGA_Ecoli_08_20_16_43623_ch100_read280_strand.fast5"
-    # dna_read2 = "/Users/andrewbailey/CLionProjects/nanopore-RNN/test_files/minion-reads/canonical/miten_PC_20160820_FNFAD20259_MN17223_mux_scan_AMS_158_R9_WGA_Ecoli_08_20_16_83098_ch138_read23_strand.fast5"
-    # dna_read3 = "/Users/andrewbailey/CLionProjects/nanopore-RNN/test_files/minion-reads/canonical/over_run/miten_PC_20160820_FNFAD20259_MN17223_mux_scan_AMS_158_R9_WGA_Ecoli_08_20_16_83098_ch138_read23_strand.fast5"
-    # dna_read4 = "/Users/andrewbailey/CLionProjects/nanopore-RNN/test_files/minion-reads/canonical/consortium_r94_human_dna/rel3-fast5-chr1.part04/DEAMERNANOPORE_20161206_FNFAB49164_MN16450_sequencing_run_MA_821_R9_4_NA12878_12_06_16_71094_ch190_read404_strand.fast5"
-    # reference = "/Users/andrewbailey/CLionProjects/nanopore-RNN/test_files/reference-sequences/ecoli_k12_mg1655.fa"
-    # reference2 = "/Users/andrewbailey/CLionProjects/nanopore-RNN/test_files/reference-sequences/fake_rna.fa"
-    # out_ref = "/Users/andrewbailey/CLionProjects/nanopore-RNN/test_files/reference-sequences/fake_rna_reversed.fa"
-
-    # ReverseComplement().convert_write_fasta(reference2, out_ref, complement=False, reverse=True)
-    # rh = ReferenceHandler(reference)
-    # seq = rh.get_sequence(chromosome_name="Chromosome", start=623200, stop=623216)
-    # print(seq)
-    # print("CCACGGGTCCGTCTGG")
-    # print("Reference")
-    # print(seq)
-    # print(ReverseComplement().complement(seq))
-    # print("Query")
-    # print("CCACGGGTCCGTCTGG")
-    # print(ReverseComplement().complement("CCACGGGTCCGTCTGG"))
-    # seq = rh.get_sequence(chromosome_name="Chromosome", start=623200-5, stop=623200)
-    # print(seq)
-
-    # fast5_dir = "/Users/andrewbailey/CLionProjects/nanopore-RNN/nanotensor/tests/test_files/minion-reads/canonical/"
-    # output_dir = "/Users/andrewbailey/data/test_event_align_output"
-    # fast5_dir2 = "/Users/andrewbailey/CLionProjects/nanopore-RNN/test_files/minion-reads/canonical/consortium_r94_human_dna/rel3-fast5-chr1.part04/"
-    #
-    # embed_eventalign_events(fast5_dir2, reference, output_dir, threads=1, overwrite=True)
-    #
-    # f5handle = Fast5(dna_read4)
-    # section = "template"
-    # ea_events = f5handle.get_eventalign_events(section=section)
-    # print(ea_events.dtype)
-    # print(ea_events)
-    #
-    # events = f5handle.get_basecall_data(section=section)
-    # sampling_freq = f5handle.sample_rate
-    # start_time = f5handle.raw_attributes['start_time']
-    #
-    # events = time_to_index(events, sampling_freq=sampling_freq, start_time=start_time)
-    # lables = match_events_with_eventalign(events=ea_events, event_detections=events)
-    # handle = Fast5(dna_read2)
-    # events, corr_start_rel_to_raw = handle.get_corrected_events()
-    # events["start"] += corr_start_rel_to_raw
-    # sequence = ''.join([bytes.decode(x) for x in events['base']])
-    # hit = get_minimap_alignment(reference, sequence, preset='map-ont')
-    # print(hit.r_st)
-    # print(hit.r_en)
-    # print(hit.strand)
-    # if str(hit.cigar_str) == str(len(sequence))+'M':
-    #     print("Yes")
-    # print(events.dtype)
-    # cigar_label = np.zeros(len(sequence), dtype=[('raw_start', int), ('raw_length', int), ('reference_index', int),
-    #                                               ('posterior_probability', float), ('kmer', 'S5')])
-    # # assign labels
-    # cigar_label['raw_start'] = events["start"]
-    # cigar_label['raw_length'] = events["length"]
-    # cigar_label['reference_index'] = list(range(hit.r_st, hit.r_en))
-    # cigar_label['kmer'] = events['base']
-    # cigar_label['posterior_probability'] = [1 for _ in range(hit.r_st, hit.r_en)]
-    #
-    # print(cigar_label)
-    # events = handle.get_resegment_basecall()
-
-    # kmer_length = 5
-    # def make_map(events):
-    #     event_map = [0]
-    #     previous_prob = 0
-    #     for i, line in islice(enumerate(events), 1, None):
-    #         print(i, line)
-    #         move = line['move']
-    #         this_prob = line['p_model_state']
-    #         if move == 1:
-    #             event_map.append(i)
-    #         if move > 1:
-    #             for skip in range(move - 1):
-    #                 event_map.append(i - 1)
-    #             event_map.append(i)
-    #         if move == 0:
-    #             if this_prob > previous_prob:
-    #                 event_map[-1] = i
-    #         previous_prob = this_prob
-    #     final_event_index = [event_map[-1]]
-    #     padding = final_event_index * (kmer_length - 1)
-    #     event_map = event_map + padding
-    #     return event_map
-    # # print(events)
-    # print(len(seq))
-    # print(len(make_map(events)))
-
-    stop = timer()
-    print("Running Time = {} seconds".format(stop - start), file=sys.stderr)
-
-
 if __name__ == "__main__":
-    main()
+    print("This is a library of functions")
     raise SystemExit

@@ -14,6 +14,7 @@ import numpy as np
 import tempfile
 import shutil
 from signalalign.alignedsignal import *
+from signalalign.visualization.plot_labelled_read import PlotSignal
 from signalalign.signalAlignment import SignalAlignment, create_signalAlignment_args
 from py3helpers.utils import merge_dicts
 
@@ -36,7 +37,7 @@ class CreateLabelsTest(unittest.TestCase):
         rna_reference = os.path.join(cls.HOME, "tests/test_sequences/fake_rna_reversed.fa")
         dna_reference = os.path.join(cls.HOME, "tests/test_sequences/E.coli_K12.fasta")
         cls.tmp_directory = tempfile.mkdtemp()
-        cls.tmp_directory = "/Users/andrewbailey/CLionProjects/nanopore-RNN/submodules/signalAlign/tests/minion_test_reads/delete_me_after_debugging"
+        # cls.tmp_directory = "/Users/andrewbailey/CLionProjects/nanopore-RNN/submodules/signalAlign/tests/minion_test_reads/delete_me_after_debugging"
         # get file locations
         cls.tmp_dna_file = os.path.join(str(cls.tmp_directory), 'test_dna.fast5')
         cls.tmp_rna_file = os.path.join(str(cls.tmp_directory), 'test_rna.fast5')
@@ -49,39 +50,38 @@ class CreateLabelsTest(unittest.TestCase):
         cls.dna_sam = os.path.join(cls.HOME, "tests/minion_test_reads/oneD_alignments.sam")
         cls.bin_path = os.path.join(cls.HOME, "bin")
 
-        # TODO uncomment this for final push
-        # # copy file to tmp directory
-        # shutil.copy(dna_file, cls.tmp_dna_file)
-        # shutil.copy(rna_file, cls.tmp_rna_file)
-        # shutil.copy(old_rna_file, cls.tmp_rna_file2)
-        #
-        # args = create_signalAlignment_args(destination=cls.tmp_directory,
-        #                                    in_templateHmm=cls.rna_model_file,
-        #                                    alignment_file=cls.rna_sam,
-        #                                    forward_reference=rna_reference,
-        #                                    embed=True,
-        #                                    path_to_bin=cls.bin_path)
-        # sa_h = SignalAlignment(**merge_dicts([args, {'in_fast5': cls.tmp_rna_file}]))
-        # sa_h.run()
-        #
-        # args = create_signalAlignment_args(destination=cls.tmp_directory,
-        #                                    in_templateHmm=cls.rna_model_file,
-        #                                    alignment_file=cls.rna_sam,
-        #                                    bwa_reference=rna_reference,
-        #                                    forward_reference=rna_reference,
-        #                                    embed=True,
-        #                                    path_to_bin=cls.bin_path)
-        # sa_h = SignalAlignment(**merge_dicts([args, {'in_fast5': cls.tmp_rna_file2}]))
-        # sa_h.run()
-        #
-        # args = create_signalAlignment_args(destination=cls.tmp_directory,
-        #                                    in_templateHmm=cls.dna_model_file,
-        #                                    alignment_file=cls.dna_sam,
-        #                                    forward_reference=dna_reference,
-        #                                    embed=True,
-        #                                    path_to_bin=cls.bin_path)
-        # sa_h = SignalAlignment(**merge_dicts([args, {'in_fast5': cls.tmp_dna_file}]))
-        # sa_h.run()
+        # copy file to tmp directory
+        shutil.copy(dna_file, cls.tmp_dna_file)
+        shutil.copy(rna_file, cls.tmp_rna_file)
+        shutil.copy(old_rna_file, cls.tmp_rna_file2)
+
+        args = create_signalAlignment_args(destination=cls.tmp_directory,
+                                           in_templateHmm=cls.rna_model_file,
+                                           alignment_file=cls.rna_sam,
+                                           forward_reference=rna_reference,
+                                           embed=True,
+                                           path_to_bin=cls.bin_path)
+        sa_h = SignalAlignment(**merge_dicts([args, {'in_fast5': cls.tmp_rna_file}]))
+        sa_h.run()
+
+        args = create_signalAlignment_args(destination=cls.tmp_directory,
+                                           in_templateHmm=cls.rna_model_file,
+                                           alignment_file=cls.rna_sam,
+                                           bwa_reference=rna_reference,
+                                           forward_reference=rna_reference,
+                                           embed=True,
+                                           path_to_bin=cls.bin_path)
+        sa_h = SignalAlignment(**merge_dicts([args, {'in_fast5': cls.tmp_rna_file2}]))
+        sa_h.run()
+
+        args = create_signalAlignment_args(destination=cls.tmp_directory,
+                                           in_templateHmm=cls.dna_model_file,
+                                           alignment_file=cls.dna_sam,
+                                           forward_reference=dna_reference,
+                                           embed=True,
+                                           path_to_bin=cls.bin_path)
+        sa_h = SignalAlignment(**merge_dicts([args, {'in_fast5': cls.tmp_dna_file}]))
+        sa_h.run()
 
     def test_initialize(self):
         handle = CreateLabels(self.tmp_dna_file)
@@ -102,17 +102,38 @@ class CreateLabelsTest(unittest.TestCase):
         handle.add_basecall_alignment()
         self.assertEqual(handle.aligned_signal.guide["basecall"]["basecalled_alignment0"][0][0], 762)
 
-    # TODO
     def test_add_mea_labels(self):
         """Test add mea labels"""
-        pass
+        handle2 = CreateLabels(self.tmp_rna_file2)
+        handle2.add_mea_labels()
+        self.assertSequenceEqual(handle2.aligned_signal.label["mea_signalalign"][0].tolist(),
+                                 [2442, 15, 671, 1., b'CCTCC'])
 
-    # TODO
-    def test_add_guide_alignment(self):
-        """Test add guide alignemnt """
-        pass
-        # handle = CreateLabels(self.dna_file)
-        # handle.add_guide_alignment()
+        handle2 = CreateLabels(self.tmp_rna_file)
+        handle2.add_mea_labels()
+        self.assertSequenceEqual(handle2.aligned_signal.label["mea_signalalign"][0].tolist(),
+                                 [2442, 15, 671, 1., b'CCTCC'])
+
+        handle2 = CreateLabels(self.tmp_dna_file)
+        handle2.add_mea_labels()
+        self.assertSequenceEqual(handle2.aligned_signal.label["mea_signalalign"][0].tolist(),
+                                 [774, 3, 3560630, 1.0, b'CGTTT'])
+
+    def test_add_signal_align_predictions(self):
+        handle2 = CreateLabels(self.tmp_rna_file2)
+        handle2.add_signal_align_predictions()
+        self.assertSequenceEqual(handle2.aligned_signal.prediction["full_signalalign"][0].tolist(),
+                                 [2442, 15, 671, 1.0, b'CCTCC'])
+
+        handle2 = CreateLabels(self.tmp_rna_file)
+        handle2.add_signal_align_predictions()
+        self.assertSequenceEqual(handle2.aligned_signal.prediction["full_signalalign"][0].tolist(),
+                                 [2442, 15, 671, 1.0, b'CCTCC'])
+
+        handle2 = CreateLabels(self.tmp_dna_file)
+        handle2.add_signal_align_predictions()
+        self.assertSequenceEqual(handle2.aligned_signal.prediction["full_signalalign"][0].tolist(),
+                                 [774, 3, 3560630, 1.0, b'CGTTT'])
 
     def test_create_labels_from_guide_alignment(self):
         """Test create_labels_from_guide_alignment"""
@@ -184,6 +205,29 @@ class CreateLabelsTest(unittest.TestCase):
         self.assertSequenceEqual(base_raw_lengths, [1, 1, 1, 1, 1, 1, 1, 1])
         self.assertSequenceEqual(probs, [1, 1, 1, 1, 1, 1, 1, 1])
         self.assertSequenceEqual(base_raw_starts, [0, 0, 0, 0, 0, 1, 2, 3])
+
+    def test_plot_labelled_read(self):
+        cl_handle = CreateLabels(self.tmp_rna_file2)
+        cl_handle.add_mea_labels()
+        cl_handle.add_signal_align_predictions()
+        cl_handle.add_basecall_alignment()
+
+        ps = PlotSignal(cl_handle.aligned_signal)
+        save_fig_path = "{}.png".format(os.path.join(self.tmp_directory,
+                                                     os.path.splitext(os.path.basename(self.tmp_rna_file2))[0]))
+
+        ps.plot_alignment(save_fig_path=save_fig_path)
+
+        cl_handle = CreateLabels(self.tmp_dna_file)
+        cl_handle.add_mea_labels()
+        cl_handle.add_signal_align_predictions()
+        cl_handle.add_basecall_alignment()
+
+        ps = PlotSignal(cl_handle.aligned_signal)
+        save_fig_path = "{}.png".format(os.path.join(self.tmp_directory,
+                                                     os.path.splitext(os.path.basename(self.tmp_dna_file))[0]))
+
+        ps.plot_alignment(save_fig_path=save_fig_path)
 
 
 class AlignedSignalTest(unittest.TestCase):

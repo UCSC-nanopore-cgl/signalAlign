@@ -367,6 +367,7 @@ class Fast5(h5py.File):
         """Get signal align events, sam or mea alignment"""
         assert (not mea or not sam), "Both mea and sam cannot be set to True"
         try:
+            field = ""
             path = self.check_path(self.__default_signalalign_events__, latest=True)
             reads = self[path]
             if mea:

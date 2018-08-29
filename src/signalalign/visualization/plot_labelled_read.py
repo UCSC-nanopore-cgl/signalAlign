@@ -11,12 +11,47 @@
 from __future__ import print_function
 import sys
 import os
-from collections import defaultdict
-from timeit import default_timer as timer
 import matplotlib.pyplot as plt
 import matplotlib.patches as mplpatches
 import numpy as np
+
+from collections import defaultdict
+from timeit import default_timer as timer
+from argparse import ArgumentParser
 from signalalign.alignedsignal import AlignedSignal, CreateLabels
+from py3helpers.utils import list_dir
+
+
+def parse_args():
+    parser = ArgumentParser(description=__doc__)
+    group = parser.add_mutually_exclusive_group(required=True)
+
+    group.add_argument('--dir', '-d', action='store',
+                       dest='dir', default=None,
+                       help="Path to directory of fast5 files to plot")
+
+    group.add_argument('--f5_path', action='store', default=None,
+                       dest='f5_path',
+                       help="Path to a specific fast5 file to plot")
+
+    parser.add_argument('--basecall', action='store_true', default=False,
+                        dest='basecall', required=False,
+                        help="Option to plot the most recent basecalled data aligned to reference")
+
+    parser.add_argument('--mea', action='store_true', default=False,
+                        dest='mea', required=False,
+                        help="Option to plot the maximum expected accuracy alignment from signalalign")
+
+    parser.add_argument('--sa_full', action='store_true', default=False,
+                        dest='sa_full', required=False,
+                        help="Option to plot all of the posterior probabilities from the signalalign output")
+
+    parser.add_argument('--output_dir', action='store',
+                        dest='output_dir', required=False, type=str,
+                        help="If set, will write out to output directory otherwise the graph is just shown")
+
+    args = parser.parse_args()
+    return args
 
 
 class PlotSignal(object):
@@ -45,22 +80,19 @@ class PlotSignal(object):
             self.names.append(name)
             self.predictions.append([prediction['raw_start'], prediction['reference_index'],
                                      prediction['posterior_probability']])
-        # TODO make it possible to add multiple guide alignments
         for whole_guide_name, guide in self.signal_h.guide.items():
             for _, sub_guide in guide.items():
                 self.guide_alignments[whole_guide_name].append([sub_guide['raw_start'], sub_guide['reference_index']])
             # gather tail ends of alignments
             self.names.append(whole_guide_name)
 
-    def plot_alignment(self):
+    def plot_alignment(self, save_fig_path=None):
         """Plot the alignment between events and reference with the guide alignment and mea alignment
-
-        signal: normalized signal
-        posterior_matrix: matrix with col = reference , rows=events
-        guide_cigar: guide alignment before signal align
-        events: doing stuff
-        mea_alignment: final alignment between events and reference
+        :param save_fig_path: if passed, will write image to path
         """
+        if save_fig_path:
+            assert os.path.exists(os.path.dirname(save_fig_path)), \
+                "Output directory does not exist: {}".format(save_fig_path)
 
         self.get_alignments()
 
@@ -75,7 +107,7 @@ class PlotSignal(object):
         panel1.grid(color='black', linestyle='-', linewidth=1)
 
         handles = list()
-        colors = get_spaced_colors(len(self.names)+1)
+        colors = get_spaced_colors(len(self.names) + 1)
         color_selection = 1
         # plot signal alignments
         for i, alignment in enumerate(self.alignments):
@@ -115,71 +147,67 @@ class PlotSignal(object):
 
         box = panel1.get_position()
         panel1.set_position([box.x0, box.y0 + box.height * 0.1,
-                            box.width, box.height * 0.9])
+                             box.width, box.height * 0.9])
 
         # Put a legend below current axis
         panel1.legend(handles, self.names, loc='upper center', bbox_to_anchor=(0.5, -0.05),
-                        fancybox=True, shadow=True, ncol=len(colors))
+                      fancybox=True, shadow=True, ncol=len(colors))
 
         # panel1.legend(handles, self.names, loc='upper right')
-
-        plt.show()
+        if save_fig_path:
+            plt.savefig(save_fig_path)
+        else:
+            plt.show()
 
 
 def get_spaced_colors(n):
-    max_value = 16581375 #255**3
+    max_value = 16581375  # 255**3
     interval = int(max_value / n)
     colors = [hex(I)[2:].zfill(6) for I in range(0, max_value, interval)]
-    return [(int(i[:2], 16)/255, int(i[2:4], 16)/255, int(i[4:], 16)/255, 1) for i in colors]
+    return [(int(i[:2], 16) / 255, int(i[2:4], 16) / 255, int(i[4:], 16) / 255, 1) for i in colors]
 
 
 def main():
-    """Main docstring"""
+    """Plot event to reference labelled ONT nanopore reads """
     start = timer()
-    # sam = "/Users/andrewbailey/CLionProjects/nanopore-RNN/signalAlign/bin/`output/tempFiles_alignment/tempFiles_miten_PC_20160820_FNFAD20259_MN17223_mux_scan_AMS_158_R9_WGA_Ecoli_08_20_16_83098_ch138_read23_strand/temp_sam_file_5048dffc-a463-4d84-bd3b-90ca183f488a.sam"\
 
-    rna_read = "/Users/andrewbailey/CLionProjects/nanopore-RNN/test_files/minion-reads/rna_reads/DEAMERNANOPORE_20170922_FAH26525_MN16450_sequencing_run_MA_821_R94_NA12878_mRNA_09_22_17_67136_read_36_ch_218_strand.fast5"
-    # dna_read = "/Users/andrewbailey/CLionProjects/nanopore-RNN/test_files/minion-reads/canonical/miten_PC_20160820_FNFAD20259_MN17223_sequencing_run_AMS_158_R9_WGA_Ecoli_08_20_16_43623_ch100_read280_strand.fast5"
-    dna_read = "/Users/andrewbailey/CLionProjects/nanopore-RNN/nanotensor/tests/test_files/minion-reads/canonical/miten_PC_20160820_FNFAD20259_MN17223_sequencing_run_AMS_158_R9_WGA_Ecoli_08_20_16_43623_ch100_read280_strand.fast5"
-    dna_read2 = "/Users/andrewbailey/CLionProjects/nanopore-RNN/test_files/minion-reads/canonical/miten_PC_20160820_FNFAD20259_MN17223_mux_scan_AMS_158_R9_WGA_Ecoli_08_20_16_83098_ch138_read23_strand.fast5"
-    # dna_read3 = "/Users/andrewbailey/CLionProjects/nanopore-RNN/test_files/minion-reads/canonical/over_run/miten_PC_20160820_FNFAD20259_MN17223_mux_scan_AMS_158_R9_WGA_Ecoli_08_20_16_83098_ch138_read23_strand.fast5"
+    args = parse_args()
+    assert args.mea or args.sa_full or args.basecall, "--mea, --sa_full or --basecall must be set."
 
-    reference = "/Users/andrewbailey/CLionProjects/nanopore-RNN/test_files/reference-sequences/ecoli_k12_mg1655.fa"
+    if args.dir:
+        for f5_path in list_dir(args.dir, ext="fast5"):
+            save_fig_path = None
+            cl_handle = CreateLabels(f5_path)
+            if args.output_dir:
+                save_fig_path = "{}.png".format(os.path.join(args.output_dir,
+                                                             os.path.splitext(os.path.basename(f5_path))[0]))
+            if args.mea:
+                cl_handle.add_mea_labels()
+            if args.sa_full:
+                cl_handle.add_signal_align_predictions()
+            if args.basecall:
+                cl_handle.add_basecall_alignment()
 
-    read_dir = "/Users/andrewbailey/data/directRNA_withEvents/0"
-    for read in os.listdir(read_dir):
-        path = os.path.join(read_dir, read)
-        print(path)
-        cl_handle = CreateLabels(path)
-        cl_handle.add_guide_alignment()
-        cl_handle.add_mea_labels()
-        cl_handle.add_basecall_event_table_alignment("Analyses/Basecall_1D_002/BaseCalled_template/Events")
+            print("Plotting {}".format(args.f5_path))
+            ps = PlotSignal(cl_handle.aligned_signal)
+            ps.plot_alignment(save_fig_path=save_fig_path)
 
+    else:
+        save_fig_path = None
+        cl_handle = CreateLabels(args.f5_path)
+        if args.output_dir:
+            save_fig_path = "{}.png".format(os.path.join(args.output_dir,
+                                                         os.path.splitext(os.path.basename(args.f5_path))[0]))
+        if args.mea:
+            cl_handle.add_mea_labels()
+        if args.sa_full:
+            cl_handle.add_signal_align_predictions()
+        if args.basecall:
+            cl_handle.add_basecall_alignment()
+
+        print("Plotting {}".format(args.f5_path))
         ps = PlotSignal(cl_handle.aligned_signal)
-        print("Plotting {}".format(path))
-        ps.plot_alignment()
-
-
-    # rna_read = "/Users/andrewbailey/data/directRNA_withEvents/0/DEAMERNANOPORE_20170922_FAH26525_MN16450_mux_scan_MA_821_R94_NA12878_mRNA_09_22_17_34495_read_114_ch_43_strand.fast5"
-    # cl_handle = CreateLabels(rna_read)
-    # cl_handle.add_guide_alignment()
-    # cl_handle.add_mea_labels()
-    # cl_handle.add_basecall_event_table_alignment("Analyses/Basecall_1D_002/BaseCalled_template/Events")
-    #
-    # ps = PlotSignal(cl_handle.aligned_signal)
-    # print("Plotting {}".format(rna_read))
-    # ps.plot_alignment()
-
-    # test = CreateLabels(rna_read)
-    # test.add_guide_alignment()
-    # test.add_mea_labels()
-    # test.add_signal_align_predictions()
-    # test.add_nanoraw_labels(reference)
-    # test.add_eventalign_labels()
-    # ps = PlotSignal(test.aligned_signal)
-    # print("Plotting")
-    # ps.plot_alignment()
-
+        ps.plot_alignment(save_fig_path=save_fig_path)
 
     stop = timer()
     print("Running Time = {} seconds".format(stop - start), file=sys.stderr)
