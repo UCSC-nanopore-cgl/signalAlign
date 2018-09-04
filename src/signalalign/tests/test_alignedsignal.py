@@ -49,39 +49,39 @@ class CreateLabelsTest(unittest.TestCase):
         cls.rna_sam = os.path.join(cls.HOME, "tests/minion_test_reads/RNA_edge_case.sam")
         cls.dna_sam = os.path.join(cls.HOME, "tests/minion_test_reads/oneD_alignments.sam")
         cls.bin_path = os.path.join(cls.HOME, "bin")
-        #
-        # # copy file to tmp directory
-        # shutil.copy(dna_file, cls.tmp_dna_file)
-        # shutil.copy(rna_file, cls.tmp_rna_file)
-        # shutil.copy(old_rna_file, cls.tmp_rna_file2)
-        #
-        # args = create_signalAlignment_args(destination=cls.tmp_directory,
-        #                                    in_templateHmm=cls.rna_model_file,
-        #                                    alignment_file=cls.rna_sam,
-        #                                    forward_reference=rna_reference,
-        #                                    embed=True,
-        #                                    path_to_bin=cls.bin_path)
-        # sa_h = SignalAlignment(**merge_dicts([args, {'in_fast5': cls.tmp_rna_file}]))
-        # sa_h.run()
-        #
-        # args = create_signalAlignment_args(destination=cls.tmp_directory,
-        #                                    in_templateHmm=cls.rna_model_file,
-        #                                    alignment_file=cls.rna_sam,
-        #                                    bwa_reference=rna_reference,
-        #                                    forward_reference=rna_reference,
-        #                                    embed=True,
-        #                                    path_to_bin=cls.bin_path)
-        # sa_h = SignalAlignment(**merge_dicts([args, {'in_fast5': cls.tmp_rna_file2}]))
-        # sa_h.run()
-        #
-        # args = create_signalAlignment_args(destination=cls.tmp_directory,
-        #                                    in_templateHmm=cls.dna_model_file,
-        #                                    alignment_file=cls.dna_sam,
-        #                                    forward_reference=dna_reference,
-        #                                    embed=True,
-        #                                    path_to_bin=cls.bin_path)
-        # sa_h = SignalAlignment(**merge_dicts([args, {'in_fast5': cls.tmp_dna_file}]))
-        # sa_h.run()
+
+        # copy file to tmp directory
+        shutil.copy(dna_file, cls.tmp_dna_file)
+        shutil.copy(rna_file, cls.tmp_rna_file)
+        shutil.copy(old_rna_file, cls.tmp_rna_file2)
+
+        args = create_signalAlignment_args(destination=cls.tmp_directory,
+                                           in_templateHmm=cls.rna_model_file,
+                                           alignment_file=cls.rna_sam,
+                                           forward_reference=rna_reference,
+                                           embed=True,
+                                           path_to_bin=cls.bin_path)
+        sa_h = SignalAlignment(**merge_dicts([args, {'in_fast5': cls.tmp_rna_file}]))
+        sa_h.run()
+
+        args = create_signalAlignment_args(destination=cls.tmp_directory,
+                                           in_templateHmm=cls.rna_model_file,
+                                           alignment_file=cls.rna_sam,
+                                           bwa_reference=rna_reference,
+                                           forward_reference=rna_reference,
+                                           embed=True,
+                                           path_to_bin=cls.bin_path)
+        sa_h = SignalAlignment(**merge_dicts([args, {'in_fast5': cls.tmp_rna_file2}]))
+        sa_h.run()
+
+        args = create_signalAlignment_args(destination=cls.tmp_directory,
+                                           in_templateHmm=cls.dna_model_file,
+                                           alignment_file=cls.dna_sam,
+                                           forward_reference=dna_reference,
+                                           embed=True,
+                                           path_to_bin=cls.bin_path)
+        sa_h = SignalAlignment(**merge_dicts([args, {'in_fast5': cls.tmp_dna_file}]))
+        sa_h.run()
 
     def test_initialize(self):
         handle = CreateLabels(self.tmp_dna_file)
