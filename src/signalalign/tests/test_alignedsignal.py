@@ -36,8 +36,8 @@ class CreateLabelsTest(unittest.TestCase):
 
         rna_reference = os.path.join(cls.HOME, "tests/test_sequences/fake_rna_reversed.fa")
         dna_reference = os.path.join(cls.HOME, "tests/test_sequences/E.coli_K12.fasta")
-        # cls.tmp_directory = tempfile.mkdtemp()
-        cls.tmp_directory = "/Users/andrewbailey/CLionProjects/nanopore-RNN/submodules/signalAlign/tests/minion_test_reads/delete_me_after_debugging"
+        cls.tmp_directory = tempfile.mkdtemp()
+        # cls.tmp_directory = "/Users/andrewbailey/CLionProjects/nanopore-RNN/submodules/signalAlign/tests/minion_test_reads/delete_me_after_debugging"
         # get file locations
         cls.tmp_dna_file = os.path.join(str(cls.tmp_directory), 'test_dna.fast5')
         cls.tmp_rna_file = os.path.join(str(cls.tmp_directory), 'test_rna.fast5')
