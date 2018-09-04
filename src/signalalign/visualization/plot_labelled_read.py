@@ -11,8 +11,15 @@
 from __future__ import print_function
 import sys
 import os
+import matplotlib
+import colorsys
+
+# matplotlib.use('Agg')
+
 import matplotlib.pyplot as plt
 import matplotlib.patches as mplpatches
+from matplotlib.collections import LineCollection
+
 import numpy as np
 
 from collections import defaultdict
@@ -50,6 +57,9 @@ def parse_args():
                         dest='output_dir', required=False, type=str,
                         help="If set, will write out to output directory otherwise the graph is just shown")
 
+    parser.add_argument('--plot_alpha', action='store_true', default=False, dest="plot_alpha", required=False,
+                        help="If set, will plot probability information as the alpha associated with each data point")
+
     args = parser.parse_args()
     return args
 
@@ -67,6 +77,7 @@ class PlotSignal(object):
         self.names = []
         self.alignments = []
         self.predictions = []
+        self.event_starts = None
         self.guide_alignments = defaultdict(list)
 
     def get_alignments(self):
@@ -78,17 +89,23 @@ class PlotSignal(object):
         # predictions can have multiple alignments for each event and are not a path
         for name, prediction in self.signal_h.prediction.items():
             self.names.append(name)
-            self.predictions.append([prediction['raw_start'], prediction['reference_index'],
+            self.predictions.append([prediction['raw_start'], prediction['raw_length'], prediction['reference_index'],
                                      prediction['posterior_probability']])
+        # guides are continuous paths but are an accumulation of multiple match groups
         for whole_guide_name, guide in self.signal_h.guide.items():
             for _, sub_guide in guide.items():
                 self.guide_alignments[whole_guide_name].append([sub_guide['raw_start'], sub_guide['reference_index']])
             # gather tail ends of alignments
             self.names.append(whole_guide_name)
+        # add raw starts
+        if self.signal_h.raw_starts is not None:
+            self.event_starts = self.signal_h.raw_starts
 
-    def plot_alignment(self, save_fig_path=None):
+    def plot_alignment(self, save_fig_path=None, plot_alpha=False, plot_lines=False):
         """Plot the alignment between events and reference with the guide alignment and mea alignment
-        :param save_fig_path: if passed, will write image to path
+        :param plot_lines: boolean option, if set to true, lines will be plotted instead of points
+        :param save_fig_path: if set, will write image to path
+        :param plot_alpha: boolean option, if set to false will ignore probability information associated with data points
         """
         if save_fig_path:
             assert os.path.exists(os.path.dirname(save_fig_path)), \
@@ -111,16 +128,29 @@ class PlotSignal(object):
         color_selection = 1
         # plot signal alignments
         for i, alignment in enumerate(self.alignments):
-            handle, = panel1.plot(alignment[0], alignment[1], color=colors[color_selection][:3], alpha=0.8)
+            handle, = panel1.plot(alignment[0], alignment[1], color=colors[color_selection], alpha=0.8)
             color_selection += 1
             handles.append(handle)
 
         # plot predictions (signal align outputs)
         for i, prediction in enumerate(self.predictions):
-            rgba_colors = np.zeros((len(prediction[0]), 4))
-            rgba_colors[:, 3] = prediction[2].tolist()
-            handle = panel1.scatter(prediction[0].tolist(), prediction[1].tolist(), marker='.', c=rgba_colors)
+            rgba_colors = np.tile(np.array(colors[color_selection]), (len(prediction[0]), 1))
+            if plot_alpha or self.names[color_selection-1] == "full_signalalign":
+                rgba_colors = np.insert(rgba_colors, 3, prediction[3].tolist(), axis=1)
+            # rgba_colors[:, 3] = prediction[2].tolist()
+            if plot_lines:
+                lines = list(zip(list(zip(prediction[0].tolist(), [x+(i*0.01) for x in prediction[2].tolist()])),
+                                 list(zip([x + y for x, y in zip(prediction[0].tolist(), prediction[1].tolist())],
+                                          [x+(i*.01) for x in prediction[2].tolist()]))))
+                line_segments = LineCollection(lines,
+                                               linestyles='solid',
+                                               colors=rgba_colors)
+                handle = panel1.add_collection(line_segments)
+            else:
+                handle = panel1.scatter(prediction[0].tolist(), [x+(i*.01) for x in prediction[2].tolist()], marker='.',
+                                        c=rgba_colors)
             handles.append(handle)
+            color_selection += 1
 
         # plot original basecalled events
         if self.guide_alignments:
@@ -132,12 +162,8 @@ class PlotSignal(object):
 
         panel2.set_xlabel('Time')
         panel2.set_ylabel('Current (pA)')
-        if len(self.predictions) > 0:
-            panel2.set_xticks(self.predictions[0][0], minor=True)
-        elif len(self.alignments) > 0:
-            panel2.set_xticks(self.alignments[0][0], minor=True)
-        else:
-            panel2.set_xticks(self.signal_h.scaled_signal, minor=True)
+        if self.event_starts is not None:
+            panel2.set_xticks(self.event_starts, minor=True)
 
         panel2.axvline(linewidth=0.1, color="k")
 
@@ -161,10 +187,14 @@ class PlotSignal(object):
 
 
 def get_spaced_colors(n):
-    max_value = 16581375  # 255**3
-    interval = int(max_value / n)
-    colors = [hex(I)[2:].zfill(6) for I in range(0, max_value, interval)]
-    return [(int(i[:2], 16) / 255, int(i[2:4], 16) / 255, int(i[4:], 16) / 255, 1) for i in colors]
+    """Create n evenly spaced RGB colors
+    :param n: number of colors needed
+
+    source: https://stackoverflow.com/questions/876853/generating-color-ranges-in-python
+    """
+    hsv_tuples = [(x*1.0/n, 0.5, 0.5) for x in range(n)]
+    rgb_tuples = map(lambda x: colorsys.hsv_to_rgb(*x), hsv_tuples)
+    return list(rgb_tuples)
 
 
 def main():
@@ -190,7 +220,7 @@ def main():
 
             print("Plotting {}".format(args.f5_path))
             ps = PlotSignal(cl_handle.aligned_signal)
-            ps.plot_alignment(save_fig_path=save_fig_path)
+            ps.plot_alignment(save_fig_path=save_fig_path, plot_alpha=args.plot_alpha)
 
     else:
         save_fig_path = None
@@ -203,11 +233,11 @@ def main():
         if args.sa_full:
             cl_handle.add_signal_align_predictions()
         if args.basecall:
-            cl_handle.add_basecall_alignment()
+            cl_handle.add_basecall_alignment_prediction()
 
         print("Plotting {}".format(args.f5_path))
         ps = PlotSignal(cl_handle.aligned_signal)
-        ps.plot_alignment(save_fig_path=save_fig_path)
+        ps.plot_alignment(save_fig_path=save_fig_path, plot_alpha=False, plot_lines=True)
 
     stop = timer()
     print("Running Time = {} seconds".format(stop - start), file=sys.stderr)

@@ -151,12 +151,14 @@ class SignalAlignAlignmentTest(unittest.TestCase):
                                                  "tests/test_alignments/RNA_edge_case_tempFiles_alignment/")
         edge_case_reads = os.path.join(SIGNALALIGN_ROOT, "tests/minion_test_reads/RNA_edge_cases/")
         edge_case_reference = os.path.join(SIGNALALIGN_ROOT, "tests/test_sequences/fake_rna_reversed.fa")
+        rna_alignments = os.path.join(SIGNALALIGN_ROOT, "tests/minion_test_reads/RNA_edge_cases/rna_edges_reversed.sam")
         self.check_alignments(true_alignments=edge_case_true_alignments,
                               reads=edge_case_reads,
                               reference=edge_case_reference,
                               kmer_length=5,
                               contig_name="rna_fake_reversed",
-                              extra_args="-T=../models/testModelR9p4_5mer_acgt_RNA.model ")
+                              extra_args="-T=../models/testModelR9p4_5mer_acgt_RNA.model "
+                                         "--alignment_file {}".format(rna_alignments))
 
     def test_signal_files_without_events(self):
         """Test if signalAlign can handle signal files without event information"""
@@ -196,12 +198,12 @@ def add_all_tests_to_Suite(test_suite, test_class):
 
 def main():
     testSuite = unittest.TestSuite()
-    testSuite.addTest(LibTest('test_signalAlign_library'))
-    testSuite.addTest(SignalAlignAlignmentTest('test_pUC_r9_reads_5mer'))
-    testSuite.addTest(SignalAlignAlignmentTest('test_pUC_r9_reads_6mer'))
-    testSuite.addTest(SignalAlignAlignmentTest('test_Ecoli1D_reads_5mer'))
+    # testSuite.addTest(LibTest('test_signalAlign_library'))
+    # testSuite.addTest(SignalAlignAlignmentTest('test_pUC_r9_reads_5mer'))
+    # testSuite.addTest(SignalAlignAlignmentTest('test_pUC_r9_reads_6mer'))
+    # testSuite.addTest(SignalAlignAlignmentTest('test_Ecoli1D_reads_5mer'))
     testSuite.addTest(SignalAlignAlignmentTest('test_RNA_edge_alignments_reads_5mer'))
-    testSuite.addTest(SignalAlignAlignmentTest('test_signal_files_without_events'))
+    # testSuite.addTest(SignalAlignAlignmentTest('test_signal_files_without_events'))
 
     # deprecated
     # testSuite.addTest(SignalAlignAlignmentTest('test_zymo_reads'))

@@ -268,9 +268,9 @@ def get_mea_params_from_events(events):
 
     :param events: events table with required fields"""
     check_numpy_table(events, req_fields=('contig', 'reference_index', 'reference_kmer', 'strand', 'event_index',
-                                         'event_mean', 'event_noise', 'event_duration', 'aligned_kmer',
-                                         'scaled_mean_current', 'scaled_noise', 'posterior_probability',
-                                         'descaled_event_mean', 'ont_model_mean', 'path_kmer'))
+                                          'event_mean', 'event_noise', 'event_duration', 'aligned_kmer',
+                                          'scaled_mean_current', 'scaled_noise', 'posterior_probability',
+                                          'descaled_event_mean', 'ont_model_mean', 'path_kmer'))
     # get min/max args
     ref_start = min(events["reference_index"])
     ref_end = max(events["reference_index"])
@@ -388,7 +388,7 @@ def match_events_with_signalalign(sa_events=None, event_detections=None, minus=F
     assert event_detections is not None, "Must pass event_detections events"
 
     check_numpy_table(sa_events, req_fields=('reference_index', 'event_index',
-                                            'reference_kmer', 'posterior_probability'))
+                                             'reference_kmer', 'posterior_probability'))
 
     check_numpy_table(event_detections, req_fields=('raw_start', 'raw_length'))
 
@@ -417,6 +417,9 @@ def match_events_with_signalalign(sa_events=None, event_detections=None, minus=F
             kmers = [flip.reverse(convert_to_str(x)) for x in sa_events["reference_kmer"]]
         else:
             kmers = sa_events["reference_kmer"]
+
+    assert (kmers == sa_events["path_kmer"]).all()
+
     label['kmer'] = kmers
     label['posterior_probability'] = sa_events["posterior_probability"]
     np.sort(label, order='raw_start', kind='mergesort')
@@ -780,4 +783,3 @@ def mea_slow(posterior_matrix, shortest_ref_per_event, return_all=False):
                 highest_prob = x[3]
                 best_forward_edge = x
         return best_forward_edge
-

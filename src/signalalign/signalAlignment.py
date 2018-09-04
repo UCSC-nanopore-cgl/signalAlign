@@ -494,7 +494,8 @@ class SignalAlignment(object):
             nanopore_read.close()
         print(message, file=sys.stderr)
 
-    def read_in_signal_align_tsv(self, tsv_path, file_type):
+    @staticmethod
+    def read_in_signal_align_tsv(tsv_path, file_type):
         """Read in tsv file"""
         assert file_type in ("full", "assignments", "variantCaller")
         with open(tsv_path, 'r') as tsvin:

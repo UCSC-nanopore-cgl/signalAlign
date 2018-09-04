@@ -43,6 +43,8 @@ class AlignedSignal(object):
         self.prediction = defaultdict()
         # guides are sections that we are confident in (guide alignments)
         self.guide = defaultdict(defaultdict)
+        # place to store event starts
+        self.raw_starts = None
 
     def add_raw_signal(self, signal):
         """Add raw signal to class
@@ -64,6 +66,10 @@ class AlignedSignal(object):
         assert type(signal[0]) == float, "scaled signal must be a float"
         self.scaled_signal = signal
 
+    def add_raw_starts(self, raw_starts):
+        """Add event start indices to the class"""
+        self.raw_starts = np.asarray(raw_starts)
+
     def add_label(self, label, name, label_type, guide_name=None):
         """Add labels to class.
 
@@ -76,7 +82,7 @@ class AlignedSignal(object):
         assert label_type in ['label', 'prediction', 'guide'], \
             "{} not in ['label', 'prediction', 'guide']: Must select an acceptable type".format(label_type)
         check_numpy_table(label, req_fields=('raw_start', 'raw_length', 'reference_index',
-                                            'kmer', 'posterior_probability'))
+                                             'kmer', 'posterior_probability'))
 
         # label.sort(order=['raw_start'], kind='mergesort')
         # check the labels are in the correct format
@@ -194,7 +200,46 @@ class CreateLabels(Fast5):
         self.aligned_signal.add_label(predictions, name="full_signalalign", label_type='prediction')
         return True
 
-    def add_basecall_alignment(self, sam=None, event_table_path=None):
+    def add_basecall_alignment_prediction(self, sam=None, event_table_path=None):
+        """Add the original basecalled event table and add matches and missmatches to 'prediction'
+            alignment labels to signal_label handle
+        :param sam: correctly formatted SAM string
+        :param event_table_path: grab event table from direct path given
+        :return: True if the correct labels are added to the AlignedSignal internal class object
+        """
+        if not sam:
+            sam = self.get_signalalign_events(sam=True)
+
+        if event_table_path:
+            events = np.array(self[event_table_path])
+        else:
+            events = self.get_basecall_data()
+
+        try:
+            check_numpy_table(events, req_fields=('raw_start', 'raw_length'))
+        # if events do not have raw_start or raw_lengths
+        except KeyError:
+            events = time_to_index(events,
+                                   sampling_freq=self.sample_rate,
+                                   start_time=self.raw_attributes["start_time"])
+
+        matches, mismatches, raw_starts = match_cigar_with_basecall_guide(events=events, sam_string=sam,
+                                                                          kmer_index=self.kmer_index)
+        # # rna reference positions are on 5' edge aka right side of kmer
+        # if self.rna:
+        #     matches["reference_index"] -= self.kmer_index
+        #     mismatches["reference_index"] -= self.kmer_index
+        # else:
+        #     mismatches["reference_index"] += self.kmer_index
+        #     matches["reference_index"] += self.kmer_index
+
+        self.aligned_signal.add_label(matches, name="matches_guide_alignment", label_type='prediction')
+        self.aligned_signal.add_label(mismatches, name="mismatches_guide_alignment", label_type='prediction')
+        self.aligned_signal.add_raw_starts(raw_starts)
+
+        return True
+
+    def add_basecall_alignment_guide(self, sam=None, event_table_path=None):
         """Add the original basecalled event table and add the 'guide' alignment labels to signal_label handle
         :param sam: correctly formatted SAM string
         :param event_table_path: grab event table from direct path given
@@ -508,12 +553,12 @@ def match_events_with_eventalign(events=None, event_detections=None, minus=False
     assert event_detections is not None, "Must pass event_detections events"
 
     check_numpy_table(events, req_fields=('position', 'event_index',
-                                            'reference_kmer'))
+                                          'reference_kmer'))
 
     check_numpy_table(event_detections, req_fields=('start', 'length'))
 
     label = np.zeros(len(events), dtype=[('raw_start', int), ('raw_length', int), ('reference_index', int),
-                                            ('posterior_probability', float), ('kmer', 'S6')])
+                                         ('posterior_probability', float), ('kmer', 'S6')])
 
     label['raw_start'] = [event_detections[x]["start"] for x in events["event_index"]]
     label['raw_length'] = [event_detections[x]["length"] for x in events["event_index"]]
@@ -542,6 +587,94 @@ def match_events_with_eventalign(events=None, event_detections=None, minus=False
     # np.sort(label, order='raw_start', kind='mergesort')
 
     return label
+
+
+def match_cigar_with_basecall_guide(events, sam_string, kmer_index, rna=False, reference_path=None,
+                                    one_ref_indexing=False):
+    """Create labeled signal from a guide alignment with only matches being reported
+
+    :param events: path to fast5 file
+    :param sam_string: sam alignment string
+    :param rna: if read is rna, reverse again
+    :param reference_path: if sam_string has MDZ field the reference sequence can be inferred, otherwise, it is needed
+    :param kmer_index: index of the kmer to select for reference to event mapping
+    :param one_ref_indexing: boolean zero or 1 based indexing for reference
+    """
+    try:
+        check_numpy_table(events, req_fields=('raw_start', 'model_state', 'p_model_state', 'raw_length', 'move'))
+    except IndexError:
+        assert basecall_events["start"].dtype is np.dtype('uint64'), "Event 'start' should be np.int32 type: {}" \
+            .format(basecall_events["start"].dtype)
+        events = time_to_index(events, sampling_freq=self.sample_rate, start_time=self.raw_attributes['start_time'])
+
+    assert type(one_ref_indexing) is bool, "one_ref_indexing must be a boolean"
+
+    psam_h = initialize_aligned_segment_wrapper(sam_string, reference_path=reference_path)
+
+    # create an indexed map of the events and their corresponding bases
+    bases, base_raw_starts, base_raw_lengths, probs = index_bases_from_events(events, kmer_index=kmer_index)
+
+    # # check if string mapped to reverse strand
+    # if psam_h.alignment_segment.is_reverse:
+    #     probs = probs[::-1]
+    #     base_raw_starts = base_raw_starts[::-1]
+    #     # rna reads go 3' to 5' so we dont need to reverse if it mapped to reverse strand
+    #     if not rna:
+    #         bases = ReverseComplement().reverse(''.join(bases))
+    # # reverse if it mapped to forward strand and RNA
+    # elif rna:
+    #     bases = ReverseComplement().reverse(''.join(bases))
+
+    # all 'matches' and 'mismatches'
+    matches_map = psam_h.seq_alignment.matches_map
+    # zero indexed reference start
+    ref_start = psam_h.alignment_segment.reference_start + one_ref_indexing
+    # set labels
+    matches_raw_start = []
+    matches_raw_length = []
+    matches_reference_index = []
+    matches_kmer = []
+    matches_posterior_probability = []
+
+    mismatches_raw_start = []
+    mismatches_raw_length = []
+    mismatches_reference_index = []
+    mismatches_kmer = []
+    mismatches_posterior_probability = []
+
+    for i, alignment in enumerate(matches_map):
+        if alignment.query_base == alignment.reference_base:
+            matches_raw_start.append(base_raw_starts[alignment.query_index])
+            matches_raw_length.append(base_raw_lengths[alignment.query_index])
+            matches_reference_index.append(alignment.reference_index + ref_start)
+            matches_kmer.append(alignment.reference_base)
+            matches_posterior_probability.append(probs[alignment.query_index])
+        else:
+            mismatches_raw_start.append(base_raw_starts[alignment.query_index])
+            mismatches_raw_length.append(base_raw_lengths[alignment.query_index])
+            mismatches_reference_index.append(alignment.reference_index + ref_start)
+            mismatches_kmer.append(alignment.reference_base)
+            mismatches_posterior_probability.append(probs[alignment.query_index])
+
+    matches = np.zeros(len(matches_raw_start), dtype=[('raw_start', int), ('raw_length', int), ('reference_index', int),
+                                                      ('posterior_probability', float), ('kmer', 'S5')])
+    mismatches = np.zeros(len(mismatches_raw_start),
+                          dtype=[('raw_start', int), ('raw_length', int), ('reference_index', int),
+                                 ('posterior_probability', float), ('kmer', 'S5')])
+    # assign labels
+    matches['raw_start'] = matches_raw_start
+    matches['raw_length'] = matches_raw_length
+    matches['reference_index'] = matches_reference_index
+    matches['kmer'] = matches_kmer
+    matches['posterior_probability'] = matches_posterior_probability
+
+    mismatches['raw_start'] = mismatches_raw_start
+    mismatches['raw_length'] = mismatches_raw_length
+    mismatches['reference_index'] = mismatches_reference_index
+    mismatches['kmer'] = mismatches_kmer
+    mismatches['posterior_probability'] = mismatches_posterior_probability
+
+    return matches, mismatches, events["raw_start"]
 
 
 if __name__ == "__main__":
