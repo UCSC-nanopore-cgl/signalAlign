@@ -104,6 +104,9 @@ def parse_args():
                         help="Embed full output into fast5 file")
     parser.add_argument('--event_table', action='store', dest="event_table", default=False,
                         help="Specify event table")
+    parser.add_argument('--allow_unsupported_nanopore_read_versions', action='store_false',
+                        dest="enforce_supported_versions", default=True,
+                        help="Will attempt to complete execution with unsupported nanopore read versions")
 
     args = parser.parse_args()
     return args
@@ -184,7 +187,7 @@ def main(args):
         fast5s = fast5s[:nb_files]
 
     # change paths to the source directory
-    os.chdir(signalAlignSourceDir())
+    # os.chdir(signalAlignSourceDir())
     alignment_args = {
         "destination": temp_dir_path,
         "stateMachineType": args.stateMachineType,
@@ -208,6 +211,7 @@ def main(args):
         "check_for_temp_file_existance": True,
         "track_memory_usage": False,
         "get_expectations": False,
+        "enforce_supported_versions": args.enforce_supported_versions
     }
     print("[runSignalAlign]:NOTICE: Got {} files to align".format(len(fast5s)), file=sys.stdout)
     # setup workers for multiprocessing

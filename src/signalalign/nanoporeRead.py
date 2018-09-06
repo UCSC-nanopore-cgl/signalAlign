@@ -17,7 +17,8 @@ TWOD_BASECALL_KEY_0     = os.path.join(Fast5.__base_analysis__, TWOD_BASECALL_KE
 METADATA_PATH_KEY       = Fast5.__tracking_id_path__ #"/UniqueGlobalKey/tracking_id"
 READS_KEY               = Fast5.__raw_path__ #"/Raw/Reads/"
 VERSION_KEY             = ("version", "dragonet version", "nanotensor version", "signalAlign version")
-SUPPORTED_1D_VERSIONS   = ("1.0.1", "1.2.1", "1.2.4", "1.23.0", "1.22.4", "2.1.0", "0.2.0", "0.1.7")
+SUPPORTED_1D_VERSIONS   = ("1.0.1", "1.2.1", "1.2.4", "1.23.0", "1.22.4", "2.1.0", "0.2.0", "0.1.7", "2.3.1")
+SUPPORTED_2D_VERSIONS   = ("1.15.0", "1.19.0", "1.20.0", "1.22.2", "1.22.4", "1.23.0")
 
 RESEGMENT_STRAGEGIES     = [EVENT_DETECT_MINKNOW, EVENT_DETECT_SPEEDY]
 
@@ -25,7 +26,8 @@ RESEGMENT_STRAGEGIES     = [EVENT_DETECT_MINKNOW, EVENT_DETECT_SPEEDY]
 
 class NanoporeRead(object):
     def __init__(self, fast_five_file, twoD=False, event_table='', initialize=False, path_to_bin="./",
-                 alignment_file=None, model_file_location=None, perform_kmer_event_alignment=None):
+                 alignment_file=None, model_file_location=None, perform_kmer_event_alignment=None,
+                 enforce_supported_versions=True):
         # load the fast5
         self.filename = fast_five_file         # fast5 file path
         self.fastFive = None                   # fast5 object
@@ -64,8 +66,11 @@ class NanoporeRead(object):
         self.initialize_success = None         # set if initialize was attempted
         # perform_kmer_event_alignment: True - always perform, False - never perform, None - perform if required
         self.perform_kmer_event_alignment = perform_kmer_event_alignment
-        # determination of 2D reads
         self.twoD = twoD                       # 2D read flag, necessary right now, and the client should know
+        # if set, unsupported versions will cause failure
+        self.enforce_supported_versions = enforce_supported_versions
+
+
         if type(self) == NanoporeRead:
             if twoD:
                 raise Exception("The 'twoD' initialization flag is deprecated for NanoporeRead.  "
@@ -208,8 +213,12 @@ class NanoporeRead(object):
 
         if self.version not in SUPPORTED_1D_VERSIONS:
             self.logError("[NanoporeRead:_initialize] ERROR %s unsupported version %s " % (self.filename, self.version))
-            self.close()
-            return False
+            if self.enforce_supported_versions:
+                self.close()
+                return False
+            else:
+                self.logError(
+                    "[NanoporeRead:_initialize] unexpected behavior may be due to unexpected nanopore read version")
 
         self.template_event_table_address = os.path.join(oned_root_address, "BaseCalled_template/Events")
         self.template_model_address       = os.path.join(oned_root_address, "BaseCalled_template/Model")
@@ -519,12 +528,15 @@ class NanoporeRead2D(NanoporeRead):
 
         self.version = bytes.decode(self.fastFive[twoD_address].attrs["dragonet version"])
 
-        supported_versions = ["1.15.0", "1.19.0", "1.20.0", "1.22.2", "1.22.4", "1.23.0"]
-        if self.version not in supported_versions:
-            self.logError("[NanoporeRead::initialize_twoD]Unsupported Version {} (1.15.0, 1.19.0, 1.20.0, "
-                          "1.22.2, 1.22.4, 1.23.0 supported)".format(self.version))
-            self.close()
-            return False
+        if self.version not in SUPPORTED_2D_VERSIONS:
+            self.logError("[NanoporeRead::initialize_twoD] Unsupported Version {} ({} supported)".format(
+                self.version, SUPPORTED_2D_VERSIONS))
+            if self.enforce_supported_versions:
+                self.close()
+                return False
+            else:
+                self.logError(
+                    "[NanoporeRead:_initialize] unexpected behavior may be due to unexpected nanopore read version")
 
         if self.version == "1.15.0":
             oneD_address = self.get_latest_basecall_edition(TWOD_BASECALL_KEY)
