@@ -60,7 +60,7 @@ def parse_args():
     # optional arguments
     parser.add_argument("--2d", action='store_true', dest="twoD", default=False, help="flag, specify if using 2D reads")
     parser.add_argument('--in_template_hmm', '-T', action='store', dest='in_T_Hmm',
-                        required=False, type=str, default=None,
+                        required=True, type=str, default=None,
                         help="input HMM for template events, if you don't want the default")
     parser.add_argument('--in_complement_hmm', '-C', action='store', dest='in_C_Hmm',
                         required=False, type=str, default=None,
@@ -123,8 +123,9 @@ def main(args):
     args = parse_args()
 
     command_line = " ".join(sys.argv[:])
-    print("Command Line: {cmdLine}\n".format(cmdLine=command_line), file=sys.stderr)
+    print(os.getcwd())
 
+    print("Command Line: {cmdLine}\n".format(cmdLine=command_line), file=sys.stderr)
     # get absolute paths to inputs
     args.files_dir = resolvePath(args.files_dir)
     args.forward_reference = resolvePath(args.forward_ref)
@@ -138,6 +139,7 @@ def main(args):
     args.fofn = resolvePath(args.fofn)
     args.target_regions = resolvePath(args.target_regions)
     args.ambiguity_positions = resolvePath(args.ambiguity_positions)
+    args.alignment_file = resolvePath(args.alignment_file)
     start_message = """
 #   Starting Signal Align
 #   Aligning files from: {fileDir}

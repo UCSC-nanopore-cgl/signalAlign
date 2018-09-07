@@ -86,7 +86,7 @@ class MeaTest(unittest.TestCase):
         # """Create random alignment matrix for mae alignment"""
         max_size = 40
         for j in range(20):
-            row, col = np.random.randint(int(max_size/2), max_size, 2)
+            row, col = np.random.randint(int(max_size / 2), max_size, 2)
             # create random inputs
             posterior_matrix, shortest_ref_per_event = create_random_prob_matrix(row=row, col=col)
             # test 3 implementations
@@ -143,22 +143,22 @@ class MeaTest(unittest.TestCase):
                         [0, event1[0], 0, 0],
                         [0, 0, event1[0], 0],
                         [0, 0, 0, event1[0]]]
-        events = get_events_from_path(event_matrix, path)
+        events = get_events_from_path(event_matrix, path, dtype=event1.dtype)
         self.assertSequenceEqual(events.tolist(), event1.tolist())
         event_matrix = [[0, 0, 0, 0],
                         [0, 0, 0, 0],
                         [0, 0, 0, 0]]
 
-        self.assertRaises(IndexError, get_events_from_path, event_matrix, path)
+        self.assertRaises(IndexError, get_events_from_path, event_matrix, path, event1.dtype)
 
     def test_get_mea_params_from_events(self):
         # """Test get_mea_params_from_events"""
         for _ in range(20):
             max_size = 20
-            row, col = np.random.randint(int(max_size/2), max_size, 2)
+            row, col = np.random.randint(int(max_size / 2), max_size, 2)
             # create random probability matrix
             true_posterior_matrix, true_shortest_ref_per_event = create_random_prob_matrix(row=row, col=col,
-                                                                                                gaps=False)
+                                                                                           gaps=False)
             # print(true_posterior_matrix.T)
             # print(true_shortest_ref_per_event)
             # generate events and event matrix to match
@@ -191,50 +191,57 @@ class MeaTest(unittest.TestCase):
         # reverse complement
 
         alignment = np.zeros(4, dtype=[('reference_index', int), ('event_index', int), ('posterior_probability', float),
-                                       ('reference_kmer', 'S5')])
+                                       ('path_kmer', 'S5')])
 
         alignment["reference_index"] = [0, 1, 2, 3]
         alignment["event_index"] = [0, 1, 2, 3]
         alignment["posterior_probability"] = [1, 1, 1, 1]
-        alignment["reference_kmer"] = ["AAGG", "AGGC", "AGGC", "GGCT"]
+        alignment["path_kmer"] = ["AAGG", "AGGC", "AGGC", "GGCT"]
 
         event_detects = np.zeros(4, dtype=[('raw_start', int), ('raw_length', int)])
         event_detects["raw_start"] = [10, 11, 12, 13]
         event_detects["raw_length"] = [1, 1, 1, 1]
 
         labels = match_events_with_signalalign(sa_events=alignment,
-                                               event_detections=event_detects,
-                                               minus=False,
-                                               rna=False)
-        # DNA, plus strand
+                                               event_detections=event_detects)
+
         self.assertSequenceEqual([bytes.decode(x) for x in labels["kmer"]], ["AAGG", "AGGC", "AGGC", "GGCT"])
         self.assertSequenceEqual(labels["raw_start"].tolist(), [10, 11, 12, 13])
 
-        # DNA, minus strand
-        labels = match_events_with_signalalign(sa_events=alignment,
-                                               event_detections=event_detects,
-                                               minus=True,
-                                               rna=False)
+    def test_add_events_to_signalalign(self):
+        events = np.zeros(4, dtype=[('reference_index', '<i8'), ('reference_kmer', 'S5'),
+                                    ('strand', 'S1'),
+                                    ('event_index', '<i8'), ('event_mean', '<f8'), ('event_noise', '<f8'),
+                                    ('event_duration', '<f8'), ('aligned_kmer', 'S5'),
+                                    ('scaled_mean_current', '<f8'), ('scaled_noise', '<f8'),
+                                    ('posterior_probability', '<f8'), ('descaled_event_mean', '<f8'),
+                                    ('ont_model_mean', '<f8'), ('path_kmer', 'S5')])
+        events["event_index"] = [0, 1, 2, 3]
+        event_detects = np.zeros(4, dtype=[('raw_start', int), ('raw_length', int)])
+        event_detects["raw_start"] = [10, 11, 12, 13]
+        event_detects["raw_length"] = [1, 1, 1, 1]
 
-        self.assertSequenceEqual([bytes.decode(x) for x in labels["kmer"]], ["CCTT", "GCCT", "GCCT", "AGCC"])
-        self.assertSequenceEqual(labels["raw_start"].tolist(), [10, 11, 12, 13])
+        new_data = add_events_to_signalalign(sa_events=events, event_detections=event_detects)
+        self.assertSequenceEqual(new_data["raw_start"].tolist(), [10, 11, 12, 13])
+        self.assertSequenceEqual(new_data["raw_length"].tolist(), [1, 1, 1, 1])
 
-        labels = match_events_with_signalalign(sa_events=alignment,
-                                               event_detections=event_detects,
-                                               minus=False,
-                                               rna=True)
-        # RNA, plus strand
-        self.assertSequenceEqual([bytes.decode(x) for x in labels["kmer"]], ["GGAA", "CGGA", "CGGA", "TCGG"])
-        self.assertSequenceEqual(labels["raw_start"].tolist(), [10, 11, 12, 13])
+    def test_create_label_from_events(self):
+        events = np.zeros(4, dtype=[('reference_index', '<i8'), ('path_kmer', 'S5'),
+                                    ('strand', 'S1'),
+                                    ('event_index', '<i8'), ('event_mean', '<f8'), ('event_noise', '<f8'),
+                                    ('event_duration', '<f8'), ('aligned_kmer', 'S5'),
+                                    ('scaled_mean_current', '<f8'), ('scaled_noise', '<f8'),
+                                    ('posterior_probability', '<f8'), ('descaled_event_mean', '<f8'),
+                                    ('raw_start', '<f8'), ('raw_length', 'S5')])
+        events["raw_start"] = [10, 11, 12, 13]
+        events["raw_length"] = [1, 1, 1, 1]
 
-        labels = match_events_with_signalalign(sa_events=alignment,
-                                               event_detections=event_detects,
-                                               minus=True,
-                                               rna=True)
-        # RNA, minus strand # just complement
-        self.assertSequenceEqual([bytes.decode(x) for x in labels["kmer"]], ["TTCC", "TCCG", "TCCG", "CCGA"])
-        self.assertSequenceEqual(labels["raw_start"].tolist(), [10, 11, 12, 13])
-        self.assertTrue(True)
+        new_data = create_label_from_events(events)
+
+        self.assertSequenceEqual(new_data["raw_start"].tolist(), [10, 11, 12, 13])
+        self.assertSequenceEqual(new_data["raw_length"].tolist(), [1, 1, 1, 1])
+        with self.assertRaises(ValueError):
+            fail = new_data["strand"]
 
 
 if __name__ == '__main__':

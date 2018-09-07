@@ -87,6 +87,7 @@ class Fast5(h5py.File):
     __default_corrected_genome__ = '/Analyses/RawGenomeCorrected_000/BaseCalled_template'  # nanoraw
     __default_signalalign_events__ = '/Analyses/SignalAlign_00{}'  # signalalign events
     __default_eventalign_events__ = '/Analyses/EventAlign_00{}'
+    __default_template_1d_basecall_events__ = '/Analyses/Basecall_1D_00{}/BaseCalled_template/Events'
 
     __default_event_table_fields__ = ('start', 'length', 'mean', 'stdv')
 
@@ -363,12 +364,19 @@ class Fast5(h5py.File):
             raise IndexError('File does not contain analysis with name: {}'.format(name))
         return events
 
-    def get_signalalign_events(self, mea=False, sam=False):
-        """Get signal align events, sam or mea alignment"""
+    def get_signalalign_events(self, mea=False, sam=False, override_path=None):
+        """Get signal align events, sam or mea alignment
+        :param mea: boolean option to grab the MEA_alignment_labels
+        :param sam: boolean option to grab sam file
+        :param override_path: if passed, will look for alignment events at that path
+        """
         assert (not mea or not sam), "Both mea and sam cannot be set to True"
         try:
             field = ""
-            path = self.check_path(self.__default_signalalign_events__, latest=True)
+            if override_path:
+                path = override_path
+            else:
+                path = self.check_path(self.__default_signalalign_events__, latest=True)
             reads = self[path]
             if mea:
                 field = "MEA_alignment_labels"
@@ -384,7 +392,22 @@ class Fast5(h5py.File):
             raise KeyError('Read does not contain required fields: {}'.format(os.path.join(path, field)))
         return events
 
-    #todo fix path creation
+    def get_signalalign_basecall_path(self, override_path=None):
+        """Get basecalled events used for signalAlign input
+        :param override_path: if passed, will look for alignment events at that path
+        """
+        try:
+            if override_path:
+                path = override_path
+            else:
+                path = self.check_path(self.__default_signalalign_events__, latest=True)
+            attributes = self[path].attrs
+            basecall_path = attributes["basecall_events"]
+        except KeyError:
+            raise KeyError('Read does not contain required fields: {}'.format(path))
+        return basecall_path
+
+    # todo fix path creation
     def get_eventalign_events(self, section=__default_section__):
         """Get signal align events, sam or mea alignment"""
         assert section in [self.__template_section__, self.__complement_section__], \

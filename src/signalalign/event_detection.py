@@ -18,6 +18,7 @@ import subprocess
 import numpy as np
 import h5py
 import traceback
+import tempfile
 import numpy.lib.recfunctions as rfn
 from shutil import which
 from contextlib import closing
@@ -461,7 +462,7 @@ def index_to_time(basecall_events, sampling_freq=0, start_time=0):
     :param start_time: start time of experiment via fasta5 file
     """
     check_numpy_table(basecall_events, req_fields=('start', 'length'))
-    assert basecall_events["start"].dtype is np.dtype('uint64'), "Event start should be np.int32 type: {}" \
+    assert basecall_events["start"].dtype is np.dtype('uint64'), "Event start should be uint64 type: {}" \
         .format(basecall_events["start"].dtype)
     assert sampling_freq != 0, "Must set sampling frequency"
     assert start_time != 0, "Must set start time"
@@ -483,7 +484,7 @@ def time_to_index(event_table, sampling_freq=0, start_time=0):
     :param start_time: start time of experiment via fasta5 file
     """
     check_numpy_table(event_table, req_fields=('start', 'length'))
-    assert event_table["start"].dtype is not np.dtype('uint64'), "Event start should not be np.int32 type: {}" \
+    assert event_table["start"].dtype is not np.dtype('uint64'), "Event start should not be uint64 type: {}" \
         .format(event_table["start"].dtype)
     assert sampling_freq != 0, "Must set sampling frequency"
     assert start_time != 0, "Must set start time"
@@ -574,7 +575,8 @@ def load_from_raw(np_handle, alignment_file, model_file_location, path_to_bin=".
     assert os.path.isfile(model_file_location), \
         "Model_file_location must be a real path to a SignalAlign HMM model file"
     assert os.path.isfile(str(alignment_file)) or nucleotide_sequence is not None, \
-        "alignment_file must be a real path a SAM/BAM alignment file, or nucleotide_sequence must be specified"
+        "alignment_file must be a real path a SAM/BAM alignment file, or nucleotide_sequence must be specified." \
+        " alignment_file: {}, nucleotide_sequence:{}".format(alignment_file, nucleotide_sequence)
     assert os.path.exists(path_to_bin), \
         "path_to_bin must exist"
 
@@ -611,11 +613,11 @@ def load_from_raw(np_handle, alignment_file, model_file_location, path_to_bin=".
     assert tmp_dest.startswith(tmp_root), "Invalid analysis path management"
     file_name = np_handle.filename
     np_handle.close()
-
+    tmp_directory = tempfile.mkdtemp()
     # run the c code which does the required stuff
     status = run_kmeralign_exe(file_name, nucleotide_sequence, model_file_location, tmp_dest, path_to_bin,
-                               write_failed_alignments=write_failed_alignments)
-
+                               write_failed_alignments=write_failed_alignments, tmp_directory=tmp_directory)
+    os.removedirs(tmp_directory)
     # alignment succeeded, save it to the appropriate location
     if status:
         np_handle.open()

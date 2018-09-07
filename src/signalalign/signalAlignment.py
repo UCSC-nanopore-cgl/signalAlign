@@ -18,7 +18,8 @@ from signalalign.event_detection import time_to_index
 from signalalign.utils.bwaWrapper import *
 from signalalign.utils.fileHandlers import FolderHandler
 from signalalign.utils.sequenceTools import fastaWrite, samtools_faidx_fasta, processReferenceFasta
-from signalalign.mea_algorithm import mea_alignment_from_signal_align, match_events_with_signalalign
+from signalalign.mea_algorithm import mea_alignment_from_signal_align, match_events_with_signalalign, \
+    add_events_to_signalalign, create_label_from_events
 from py3helpers.utils import merge_dicts, check_numpy_table
 
 
@@ -156,6 +157,21 @@ class SignalAlignment(object):
                   file=sys.stderr)
             return False
 
+        # input (match) models
+        if self.in_templateHmm is None:
+            self.in_templateHmm = defaultModelFromVersion(strand="template", version=npRead.version)
+        if self.twoD_chemistry and self.in_complementHmm is None:
+            pop1_complement = npRead.complement_model_id == "complement_median68pA_pop1.model"
+            self.in_complementHmm = defaultModelFromVersion(strand="complement", version=npRead.version,
+                                                            pop1_complement=pop1_complement)
+
+        assert self.in_templateHmm is not None
+        if self.twoD_chemistry:
+            if self.in_complementHmm is None:
+                self.failStop("[SignalAlignment.run] ERROR Need to have complement HMM for 2D analysis", npRead)
+                return False
+
+
         # prep
         self.openTempFolder("tempFiles_%s" % self.read_name)
         if self.twoD_chemistry:
@@ -280,21 +296,6 @@ class SignalAlignment(object):
             return False
 
         # flags
-
-        # input (match) models
-        if self.in_templateHmm is None:
-            self.in_templateHmm = defaultModelFromVersion(strand="template", version=npRead.version)
-        if self.twoD_chemistry and self.in_complementHmm is None:
-            pop1_complement = npRead.complement_model_id == "complement_median68pA_pop1.model"
-            self.in_complementHmm = defaultModelFromVersion(strand="complement", version=npRead.version,
-                                                            pop1_complement=pop1_complement)
-
-        assert self.in_templateHmm is not None
-        if self.twoD_chemistry:
-            if self.in_complementHmm is None:
-                self.failStop("[SignalAlignment.run] ERROR Need to have complement HMM for 2D analysis", npRead)
-                return False
-
         template_model_flag = "-T {} ".format(self.in_templateHmm)
         if self.twoD_chemistry:
             complement_model_flag = "-C {} ".format(self.in_complementHmm)
@@ -414,46 +415,44 @@ class SignalAlignment(object):
             print("[SignalAlignment.run] embedding into Fast5 ")
             # load output data and grab new analysis path
             data = self.read_in_signal_align_tsv(posteriors_file_path, file_type=self.output_format)
+            events = npRead.get_template_events()
+            if events:
+                try:
+                    template_events = np.asanyarray(npRead.template_events)
+                    check_numpy_table(template_events, req_fields=('raw_start', 'raw_length'))
+                # if events do not have raw_start or raw_lengths
+                except KeyError:
+                    template_events = time_to_index(template_events,
+                                                    sampling_freq=npRead.fastFive.sample_rate,
+                                                    start_time=npRead.fastFive.raw_attributes["start_time"])
+
+                sa_events = add_events_to_signalalign(sa_events=data, event_detections=template_events)
+
             signal_align_path = npRead.fastFive.get_analysis_new("SignalAlign")
             assert signal_align_path, "There is no path in Fast5 file: {}".format("/Analyses/SignalAlign_00{}")
+
             output_path = npRead._join_path(signal_align_path, self.output_format)
-            npRead.write_data(data, output_path)
-            # TODO add attributes to signalalign output
+            npRead.write_data(sa_events, output_path)
+            attributes = dict(basecall_events=npRead.template_event_table_address)
+            npRead.fastFive._add_attrs(attributes, signal_align_path)
+
             if self.output_format == "full":
                 print("[SignalAlignment.run] writing maximum expected alignment")
-                alignment = mea_alignment_from_signal_align(None, events=data)
+                alignment = mea_alignment_from_signal_align(None, events=sa_events)
                 mae_path = npRead._join_path(signal_align_path, "MEA_alignment_labels")
-                events = npRead.get_template_events()
-                if events:
-                    if strand == "-":
-                        minus = True
-                    else:
-                        minus = False
-                    try:
-                        template_events = np.asanyarray(npRead.template_events)
-                        check_numpy_table(template_events, req_fields=('raw_start', 'raw_length'))
-                    # if events do not have raw_start or raw_lengths
-                    except KeyError:
-                        template_events = time_to_index(np.asanyarray(npRead.template_events),
-                                                        sampling_freq=npRead.fastFive.sample_rate,
-                                                        start_time=npRead.fastFive.raw_attributes["start_time"])
-
-                    labels = match_events_with_signalalign(sa_events=alignment,
-                                                           event_detections=template_events,
-                                                           minus=minus,
-                                                           rna=npRead.is_read_rna())
-                    npRead.write_data(labels, mae_path)
-                    # write SAM alignment
-                    if self.alignment_file:
-                        aligned_segment, _, _ = get_aligned_segment_from_alignment_file(self.alignment_file, read_label)
-                    else:
-                        aligned_segment, _, _ = get_aligned_segment_from_alignment_file(temp_samfile_, read_label)
-
-                    sam_string = aligned_segment.tostring()
-                    sam_path = npRead._join_path(signal_align_path, "sam")
-                    npRead.write_data(data=sam_string, location=sam_path, compression=None)
+                labels = create_label_from_events(alignment)
+                npRead.write_data(labels, mae_path)
+                # write SAM alignment
+                if self.alignment_file:
+                    aligned_segment, _, _ = get_aligned_segment_from_alignment_file(self.alignment_file, read_label)
                 else:
-                    print("[SignalAlignment.run] ERROR:  maximum expected alignment")
+                    aligned_segment, _, _ = get_aligned_segment_from_alignment_file(temp_samfile_, read_label)
+
+                sam_string = aligned_segment.tostring()
+                sam_path = npRead._join_path(signal_align_path, "sam")
+                npRead.write_data(data=sam_string, location=sam_path, compression=None)
+            else:
+                print("[SignalAlignment.run] ERROR:  maximum expected alignment")
         npRead.close()
         # TODO add this back and fix errors
         # self.temp_folder.remove_folder()

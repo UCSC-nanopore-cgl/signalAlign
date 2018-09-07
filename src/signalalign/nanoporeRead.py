@@ -97,7 +97,6 @@ class NanoporeRead(object):
         if self.fastFive:
             self.fastFive.close()
 
-
     def get_latest_basecall_edition(self, address, new=False):
         if address.startswith(Fast5.__base_analysis__):
             address = address.replace(Fast5.__base_analysis__, "").lstrip("/")
@@ -163,8 +162,7 @@ class NanoporeRead(object):
         # are we required to perform kmer event realignment?
         if perform_kmer_event_aln_always:
             if self.event_table:
-                ok = load_from_raw(self, self.alignment_file, self.model_file_location, self.path_to_bin,
-                                   analysis_identifier=self.event_table)
+                ok = load_from_raw(self, self.alignment_file, self.model_file_location, self.path_to_bin)
             else:
                 ok = load_from_raw(self, self.alignment_file, self.model_file_location, self.path_to_bin)
             if not ok:
@@ -177,8 +175,7 @@ class NanoporeRead(object):
             oned_root_address = self.get_latest_basecall_edition(self.event_table)
 
             if not oned_root_address and perform_kmer_event_aln_if_required:
-                oned_root_address = load_from_raw(self, self.alignment_file, self.model_file_location, self.path_to_bin,
-                                                  analysis_identifier=self.event_table)
+                oned_root_address = load_from_raw(self, self.alignment_file, self.model_file_location, self.path_to_bin)
         else:
             oned_root_address = self.get_latest_basecall_edition(TEMPLATE_BASECALL_KEY)
             # if we cant find analysis then perform kmer_event_alignment

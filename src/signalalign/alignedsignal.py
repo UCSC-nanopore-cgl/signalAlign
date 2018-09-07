@@ -19,8 +19,9 @@ from py3helpers.seq_tools import ReferenceHandler, ReverseComplement, get_minima
     initialize_aligned_segment_wrapper
 from signalalign.fast5 import Fast5
 from signalalign.mea_algorithm import maximum_expected_accuracy_alignment, mea_slow, \
-    mea_slower, create_random_prob_matrix, get_mea_params_from_events, match_events_with_signalalign
-from signalalign.event_detection import time_to_index
+    mea_slower, create_random_prob_matrix, get_mea_params_from_events, match_events_with_signalalign, \
+    create_label_from_events
+from signalalign.event_detection import time_to_index, index_to_time
 from itertools import islice
 
 
@@ -165,63 +166,122 @@ class CreateLabels(Fast5):
         aligned_signal.add_raw_signal(raw_signal)
         return aligned_signal
 
-    def add_mea_labels(self):
-        """Gather mea_alignment labels information from fast5 file."""
-        mea_alignment = self.get_signalalign_events(mea=True)
+    def add_mea_labels(self, number=None):
+        """Gather mea_alignment labels information from fast5 file.
+        :param number: integer representing which signal align predictions to plot
+        """
+        if number is not None:
+            assert type(number) is int, "Number must be an integer"
+            path = self.__default_signalalign_events__.format(number)
+            mea_alignment = self.get_signalalign_events(mea=True, override_path=path)
+            print("mea_alignment path: {}".format(path))
+
+            name = "mea_signalalign_{}".format(number)
+        else:
+            mea_alignment = self.get_signalalign_events(mea=True)
+            name = "mea_signalalign"
         # rna reference positions are on 5' edge aka right side of kmer
         if self.rna:
             mea_alignment["reference_index"] -= self.kmer_index
         else:
             mea_alignment["reference_index"] += self.kmer_index
 
-        self.aligned_signal.add_label(mea_alignment, name="mea_signalalign", label_type='label')
+        self.aligned_signal.add_label(mea_alignment, name=name, label_type='label')
         return True
 
-    def add_signal_align_predictions(self):
-        """Create prediction using probabilities from full output format from signalAlign"""
-        sa_events = self.get_signalalign_events()
-        # cut out duplicates
-        sa_events = np.unique(sa_events)
-        events = self.get_basecall_data()
-        try:
-            check_numpy_table(events, req_fields=('raw_start', 'raw_length'))
-            # if events do not have raw_start or raw_lengths
-        except KeyError:
-            events = time_to_index(events,
-                                   sampling_freq=self.sample_rate,
-                                   start_time=self.raw_attributes["start_time"])
+    def add_signal_align_predictions(self, number=None, add_basecall=False):
+        """Create prediction using probabilities from full output format from signalAlign
+        :param number: integer representing which signal align predictions to plot
+        :param add_basecall: if set to true, will add basecalled event table
+        """
+        if number is not None:
+            assert type(number) is int, "Number must be an integer"
+            path = self.__default_signalalign_events__.format(number)
+            sa_events = self.get_signalalign_events(override_path=path)
+            basecall_events_path = self.get_signalalign_basecall_path(override_path=path)
+            print("sa_events path: {}".format(path))
+            print("basecall_events_path: {}".format(basecall_events_path))
 
-        predictions = match_events_with_signalalign(sa_events=sa_events, event_detections=events)
+            name = "full_signalalign_{}".format(number)
+        else:
+            sa_events = self.get_signalalign_events()
+            basecall_events_path = self.get_signalalign_basecall_path()
+            name = "full_signalalign"
+        # cut out duplicates
+        # sa_events = np.unique(sa_events)
+        if add_basecall:
+            try:
+                events = self[basecall_events_path][()]
+            except:
+                raise ValueError('Could not retrieve basecall_1D data from {}'.format(events_path))
+            self.add_basecall_alignment_prediction(my_events=events,
+                                                   number=basecall_events_path[24])
+        # try:
+        #     check_numpy_table(events, req_fields=('raw_start', 'raw_length'))
+        #     # if events do not have raw_start or raw_lengths
+        # except KeyError:
+        #     events = time_to_index(events,
+        #                            sampling_freq=self.sample_rate,
+        #                            start_time=self.raw_attributes["start_time"])
+        predictions = create_label_from_events(sa_events)
+
+        # predictions = match_events_with_signalalign(sa_events=sa_events, event_detections=events)
         # rna reference positions are on 5' edge aka right side of kmer
         if self.rna:
             predictions["reference_index"] -= self.kmer_index
         else:
             predictions["reference_index"] += self.kmer_index
-        self.aligned_signal.add_label(predictions, name="full_signalalign", label_type='prediction')
+        self.aligned_signal.add_label(predictions, name=name, label_type='prediction')
         return True
 
-    def add_basecall_alignment_prediction(self, sam=None, event_table_path=None):
+    def add_basecall_alignment_prediction(self, sam=None, number=None, add_mismatches=False, my_events=None):
         """Add the original basecalled event table and add matches and missmatches to 'prediction'
             alignment labels to signal_label handle
         :param sam: correctly formatted SAM string
-        :param event_table_path: grab event table from direct path given
+        :param number: integer representing which signal align predictions to plot
+        :param add_mismatches: boolean option to add mismatches to labels
+        :param my_events: if you want to pass the event table in directly
         :return: True if the correct labels are added to the AlignedSignal internal class object
         """
         if not sam:
             sam = self.get_signalalign_events(sam=True)
+        matches_name = "matches_guide_alignment"
+        mismatches_name = "mismatches_guide_alignment"
 
-        if event_table_path:
-            events = np.array(self[event_table_path])
+        if my_events is not None:
+            events = my_events
+            if number is not None:
+                matches_name = "matches_guide_alignment_{}".format(number)
+                mismatches_name = "mismatches_guide_alignment_{}".format(number)
+
         else:
-            events = self.get_basecall_data()
-
+            if number is not None:
+                assert type(number) is int, "Number must be an integer"
+                events_path = self.__default_template_1d_basecall_events__.format(number)
+                try:
+                    events = self[events_path][()]
+                except:
+                    raise ValueError('Could not retrieve basecall_1D data from {}'.format(events_path))
+                matches_name = "matches_guide_alignment_{}".format(number)
+                mismatches_name = "mismatches_guide_alignment_{}".format(number)
+            else:
+                events = self.get_basecall_data()
         try:
             check_numpy_table(events, req_fields=('raw_start', 'raw_length'))
         # if events do not have raw_start or raw_lengths
         except KeyError:
-            events = time_to_index(events,
-                                   sampling_freq=self.sample_rate,
-                                   start_time=self.raw_attributes["start_time"])
+            try:
+                events = time_to_index(events,
+                                       sampling_freq=self.sample_rate,
+                                       start_time=self.raw_attributes["start_time"])
+            # catch error for dumb rna data from ONT
+            except AssertionError:
+                events = index_to_time(events,
+                                       sampling_freq=self.sample_rate,
+                                       start_time=self.raw_attributes["start_time"])
+                events = time_to_index(events,
+                                       sampling_freq=self.sample_rate,
+                                       start_time=self.raw_attributes["start_time"])
 
         matches, mismatches, raw_starts = match_cigar_with_basecall_guide(events=events, sam_string=sam,
                                                                           kmer_index=self.kmer_index)
@@ -233,8 +293,9 @@ class CreateLabels(Fast5):
         #     mismatches["reference_index"] += self.kmer_index
         #     matches["reference_index"] += self.kmer_index
 
-        self.aligned_signal.add_label(matches, name="matches_guide_alignment", label_type='prediction')
-        self.aligned_signal.add_label(mismatches, name="mismatches_guide_alignment", label_type='prediction')
+        self.aligned_signal.add_label(matches, name=matches_name, label_type='prediction')
+        if add_mismatches:
+            self.aligned_signal.add_label(mismatches, name=mismatches_name, label_type='prediction')
         self.aligned_signal.add_raw_starts(raw_starts)
 
         return True
@@ -613,20 +674,9 @@ def match_cigar_with_basecall_guide(events, sam_string, kmer_index, rna=False, r
 
     # create an indexed map of the events and their corresponding bases
     bases, base_raw_starts, base_raw_lengths, probs = index_bases_from_events(events, kmer_index=kmer_index)
-
-    # # check if string mapped to reverse strand
-    # if psam_h.alignment_segment.is_reverse:
-    #     probs = probs[::-1]
-    #     base_raw_starts = base_raw_starts[::-1]
-    #     # rna reads go 3' to 5' so we dont need to reverse if it mapped to reverse strand
-    #     if not rna:
-    #         bases = ReverseComplement().reverse(''.join(bases))
-    # # reverse if it mapped to forward strand and RNA
-    # elif rna:
-    #     bases = ReverseComplement().reverse(''.join(bases))
-
     # all 'matches' and 'mismatches'
     matches_map = psam_h.seq_alignment.matches_map
+    ref_len = len(psam_h.get_reference_sequence())
     # zero indexed reference start
     ref_start = psam_h.alignment_segment.reference_start + one_ref_indexing
     # set labels
@@ -646,15 +696,21 @@ def match_cigar_with_basecall_guide(events, sam_string, kmer_index, rna=False, r
         if alignment.query_base == alignment.reference_base:
             matches_raw_start.append(base_raw_starts[alignment.query_index])
             matches_raw_length.append(base_raw_lengths[alignment.query_index])
-            matches_reference_index.append(alignment.reference_index + ref_start)
             matches_kmer.append(alignment.reference_base)
             matches_posterior_probability.append(probs[alignment.query_index])
+            if psam_h.alignment_segment.is_reverse:
+                matches_reference_index.append(ref_start + ref_len - alignment.reference_index)
+            else:
+                matches_reference_index.append(ref_start + alignment.reference_index)
         else:
             mismatches_raw_start.append(base_raw_starts[alignment.query_index])
             mismatches_raw_length.append(base_raw_lengths[alignment.query_index])
-            mismatches_reference_index.append(alignment.reference_index + ref_start)
             mismatches_kmer.append(alignment.reference_base)
             mismatches_posterior_probability.append(probs[alignment.query_index])
+            if psam_h.alignment_segment.is_reverse:
+                mismatches_reference_index.append(ref_start + ref_len - alignment.reference_index)
+            else:
+                mismatches_reference_index.append(ref_start + alignment.reference_index)
 
     matches = np.zeros(len(matches_raw_start), dtype=[('raw_start', int), ('raw_length', int), ('reference_index', int),
                                                       ('posterior_probability', float), ('kmer', 'S5')])
@@ -675,6 +731,21 @@ def match_cigar_with_basecall_guide(events, sam_string, kmer_index, rna=False, r
     mismatches['posterior_probability'] = mismatches_posterior_probability
 
     return matches, mismatches, events["raw_start"]
+
+
+def get_highest_single_digit_integer_from_string(in_string):
+    """Get the highest single digit integer from a string """
+    items = set(in_string)
+    ints = set("1234567890")
+    items &= ints
+    max_i = -1
+    if len(items) == 0:
+        return None
+    else:
+        for i in items:
+            if int(i) > max_i:
+                max_i = int(i)
+        return max_i
 
 
 if __name__ == "__main__":
