@@ -31,8 +31,6 @@ before_install:
 - sudo apt-get install liblzma-dev
 - sudo apt-get install autotools-dev
 - sudo apt-get install autoconf libopenblas-dev libhdf5-serial-dev cmake make libcunit1-dev
-- sudo apt-get install python-dev python-pip
-- pip install numpy
 - pip install google-compute-engine
 #- pip install tensorflow
 - git clone https://github.com/lh3/bwa.git
@@ -50,7 +48,8 @@ install:
 - if [[ "$TRAVIS_PYTHON_VERSION" == "2.7" ]]; then
     wget https://repo.continuum.io/miniconda/Miniconda2-latest-Linux-x86_64.sh -O miniconda.sh;
   else
-    wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh;
+#    wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh; ## this fails during numpy install
+    wget https://repo.continuum.io/miniconda/Miniconda3-3.6.0-Linux-x86_64.sh -O miniconda.sh;
   fi
 - bash miniconda.sh -b -p $HOME/miniconda
 - export PATH="$HOME/miniconda/bin:$PATH"
