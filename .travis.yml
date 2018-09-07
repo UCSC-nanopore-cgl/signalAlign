@@ -31,6 +31,8 @@ before_install:
 - sudo apt-get install liblzma-dev
 - sudo apt-get install autotools-dev
 - sudo apt-get install autoconf libopenblas-dev libhdf5-serial-dev cmake make libcunit1-dev
+- sudo apt-get install python-dev python-pip
+- pip install numpy
 - pip install google-compute-engine
 #- pip install tensorflow
 - git clone https://github.com/lh3/bwa.git
