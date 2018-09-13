@@ -157,21 +157,6 @@ class SignalAlignment(object):
                   file=sys.stderr)
             return False
 
-        # input (match) models
-        if self.in_templateHmm is None:
-            self.in_templateHmm = defaultModelFromVersion(strand="template", version=npRead.version)
-        if self.twoD_chemistry and self.in_complementHmm is None:
-            pop1_complement = npRead.complement_model_id == "complement_median68pA_pop1.model"
-            self.in_complementHmm = defaultModelFromVersion(strand="complement", version=npRead.version,
-                                                            pop1_complement=pop1_complement)
-
-        assert self.in_templateHmm is not None
-        if self.twoD_chemistry:
-            if self.in_complementHmm is None:
-                self.failStop("[SignalAlignment.run] ERROR Need to have complement HMM for 2D analysis", npRead)
-                return False
-
-
         # prep
         self.openTempFolder("tempFiles_%s" % self.read_name)
         if self.twoD_chemistry:
@@ -188,6 +173,20 @@ class SignalAlignment(object):
             self.failStop("[SignalAlignment.run] ERROR: NanoporeRead failed initialization: {}".format(self.in_fast5),
                           npRead)
             return False
+
+        # validate input models and get defaults if appropriate
+        if self.in_templateHmm is None:
+            self.in_templateHmm = defaultModelFromVersion(strand="template", version=npRead.version)
+        if self.twoD_chemistry and self.in_complementHmm is None:
+            pop1_complement = npRead.complement_model_id == "complement_median68pA_pop1.model"
+            self.in_complementHmm = defaultModelFromVersion(strand="complement", version=npRead.version,
+                                                            pop1_complement=pop1_complement)
+        assert self.in_templateHmm is not None
+        if self.twoD_chemistry:
+            if self.in_complementHmm is None:
+                self.failStop("[SignalAlignment.run] ERROR Need to have complement HMM for 2D analysis", npRead)
+                return False
+
 
         # read label
         read_label = npRead.read_label  # use this to identify the read throughout
@@ -437,7 +436,7 @@ class SignalAlignment(object):
             npRead.fastFive._add_attrs(attributes, signal_align_path)
 
             if self.output_format == "full":
-                print("[SignalAlignment.run] writing maximum expected alignment")
+                print("[SignalAlignment.run] getting maximum expected alignment")
                 alignment = mea_alignment_from_signal_align(None, events=sa_events)
                 mae_path = npRead._join_path(signal_align_path, "MEA_alignment_labels")
                 labels = create_label_from_events(alignment)
@@ -574,7 +573,7 @@ def signal_alignment_service(work_queue, done_queue, service_name="signal_alignm
             done_queue.put("{}:{}".format(multithread.MEM_USAGE_KEY, ",".join(map(str, mem_usages))))
 
 
-def multithread_signal_alignment(signal_align_arguments, fast5_locations, worker_count, forward_reference=None,
+def multithread_signal_alignment(signal_align_arguments, fast5_locations, worker_count=1, forward_reference=None,
                                  debug=False):
     """Multiprocess SignalAlignment for a list of fast5 files given a set of alignment arguments.
 
@@ -589,6 +588,8 @@ def multithread_signal_alignment(signal_align_arguments, fast5_locations, worker
     if not forward_reference:
         assert "forward_reference" in signal_align_arguments, "Must specify forward_reference path"
         forward_reference = signal_align_arguments['forward_reference']
+    elif "forward_reference" not in signal_align_arguments or signal_align_arguments['forward_reference'] is None:
+        signal_align_arguments['forward_reference'] = forward_reference
 
     # Samtools Index reference files for quick access
     samtools_faidx_fasta(forward_reference, log="multithread_signal_alignment")

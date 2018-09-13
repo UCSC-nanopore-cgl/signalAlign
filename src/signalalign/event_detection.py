@@ -574,11 +574,13 @@ def load_from_raw(np_handle, alignment_file, model_file_location, path_to_bin=".
     """
     assert os.path.isfile(model_file_location), \
         "Model_file_location must be a real path to a SignalAlign HMM model file"
-    assert os.path.isfile(str(alignment_file)) or nucleotide_sequence is not None, \
-        "alignment_file must be a real path a SAM/BAM alignment file, or nucleotide_sequence must be specified." \
-        " alignment_file: {}, nucleotide_sequence:{}".format(alignment_file, nucleotide_sequence)
     assert os.path.exists(path_to_bin), \
         "path_to_bin must exist"
+    if not os.path.isfile(str(alignment_file)) and nucleotide_sequence is None:
+        nucleotide_sequence = np_handle.get_template_read(initalize_bypass=True)
+        assert nucleotide_sequence, "alignment_file must be a real path a SAM/BAM alignment file, or " \
+                                    "nucleotide_sequence must be specified (retrieval attempted from fast5. " \
+                                    "alignment_file: {}, nucleotide_sequence:{}".format(alignment_file, nucleotide_sequence)
 
     # check if file is open
     if not np_handle.open():

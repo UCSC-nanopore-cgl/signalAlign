@@ -161,6 +161,7 @@ class NanoporeRead(object):
 
         # are we required to perform kmer event realignment?
         if perform_kmer_event_aln_always:
+
             if self.event_table:
                 ok = load_from_raw(self, self.alignment_file, self.model_file_location, self.path_to_bin)
             else:
@@ -223,7 +224,7 @@ class NanoporeRead(object):
             self.close()
             return False
 
-        self.template_read        = self.bytes_to_string(self.fastFive[fastq_sequence_address][()]).split('\n')[1]
+        self.template_read = self.bytes_to_string(self.fastFive[fastq_sequence_address][()]).split('\n')[1]
         if self.rna:
             # reverse and replace "U"
             self.template_read = self.template_read.replace("U", "T")[::-1]
@@ -315,6 +316,33 @@ class NanoporeRead(object):
         if self.template_event_table_address in self.fastFive:
             self.template_events = self.fastFive[self.template_event_table_address]
             return True
+        return False
+
+    def get_template_read(self, initalize_bypass=True):
+        # if we have it, return it
+        if self.template_read is not None and len(self.template_read) > 0:
+            return self.template_read
+
+        # if we haven't (successfully) initialized, try to get it in the same way as init
+        if not self.initialize_success and initalize_bypass:
+            # get configured root address
+            oned_root_address = False
+            if self.event_table:
+                oned_root_address = self.get_latest_basecall_edition(self.event_table)
+            if not oned_root_address:
+                oned_root_address = self.get_latest_basecall_edition(TEMPLATE_BASECALL_KEY)
+                if not oned_root_address: return False
+
+            # try to get fastq address
+            fastq_sequence_address = os.path.join(oned_root_address, "BaseCalled_template/Fastq")
+            if fastq_sequence_address not in self.fastFive:
+                return False
+
+            # set and return the read (initialize will overwrite this if run)
+            self.template_read = self.bytes_to_string(self.fastFive[fastq_sequence_address][()]).split('\n')[1]
+            self.template_read_length = len(self.template_read)
+            return self.template_read
+
         return False
 
     def get_model_adjustments(self):

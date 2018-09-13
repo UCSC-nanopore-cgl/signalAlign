@@ -13,6 +13,7 @@ import sys
 import os
 import colorsys
 import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 import matplotlib.patches as mplpatches
 from matplotlib.collections import LineCollection
 
@@ -213,7 +214,8 @@ MEA = 'm'
 SA_FULL = 's'
 BASECALL = 'b'
 EVENT_INDEX = 'e'
-MEA_BASECALL_DIFF = 'd'
+SA_ALIGNMENT_DIFF = 'd'
+ABS_SA_ALIGNMENT_DIFF = 'D'
 RAW_START = 'r'
 def analyze_event_skips(mea_events, sa_full_events, basecall_events,
                         generate_plot=True):
@@ -246,9 +248,9 @@ def analyze_event_skips(mea_events, sa_full_events, basecall_events,
     # finding distance to basecall
     sa_event_summary = dict()
     for i, raw_start in enumerate(all_event_keys):
-        assert all_event_keys[i] == raw_start
-        if SA_FULL not in raw_start_to_event[raw_start]:
-            continue
+        # skip events only aligned in orig basecall
+        if SA_FULL not in raw_start_to_event[raw_start]: continue
+
         # get sa_full event
         sa_full = raw_start_to_event[raw_start][SA_FULL]
 
@@ -284,7 +286,8 @@ def analyze_event_skips(mea_events, sa_full_events, basecall_events,
             SA_FULL: sa_full,
             MEA: MEA in raw_start_to_event[raw_start],
             EVENT_INDEX: raw_start_to_event_idx[raw_start],
-            MEA_BASECALL_DIFF: difference,
+            SA_ALIGNMENT_DIFF: difference,
+            ABS_SA_ALIGNMENT_DIFF: abs(difference),
             RAW_START: raw_start
         }
 
@@ -294,34 +297,32 @@ def analyze_event_skips(mea_events, sa_full_events, basecall_events,
 
     # separate based on mea and not mea
     summaries__mea_event_idx = list(map(lambda x: x[EVENT_INDEX], list(filter(lambda x: x[MEA], summaries))))
-    summaries__mea_difference = list(map(lambda x: x[MEA_BASECALL_DIFF], list(filter(lambda x: x[MEA], summaries))))
+    summaries__mea_difference = list(map(lambda x: x[SA_ALIGNMENT_DIFF], list(filter(lambda x: x[MEA], summaries))))
     summaries__no_mea_event_idx = list(map(lambda x: x[EVENT_INDEX], list(filter(lambda x: not x[MEA], summaries))))
-    summaries__no_mea_difference = list(map(lambda x: x[MEA_BASECALL_DIFF], list(filter(lambda x: not x[MEA], summaries))))
+    summaries__no_mea_difference = list(map(lambda x: x[SA_ALIGNMENT_DIFF], list(filter(lambda x: not x[MEA], summaries))))
 
     # plot it if appropriate
     if generate_plot is not None and generate_plot:
-        import matplotlib.pyplot as plt
         plt.plot(summaries__mea_event_idx, summaries__mea_difference, color='blue', label='MEA')
         plt.scatter(summaries__no_mea_event_idx, summaries__no_mea_difference, color='red', label='Not MEA', alpha=.5, s=10)
         plt.xlabel("Event Index")
-        plt.ylabel("Max Prob SA Event Alignment")
+        plt.ylabel("Reference Alignment Difference: (SignalAlignRefPos - CigarStringRefPos)")
         plt.legend()
 
         if type(generate_plot) == str:
             plt.savefig(generate_plot)
+            plt.close()
         else:
             plt.show()
-        plt.close()
 
     return summaries
 
 
-def main():
+def main(args=None):
     """Plot event to reference labelled ONT nanopore reads """
     start = timer()
 
-    args = parse_args()
-    assert args.mea or args.sa_full or args.basecall, "--mea, --sa_full or --basecall must be set."
+    args = args if args is not None else parse_args()
 
     if args.dir:
         f5_locations = list_dir(args.dir, ext="fast5")
@@ -358,7 +359,7 @@ def main():
                 basecall.sort(key=lambda x: x['raw_start'])
                 basecall_list.append(basecall)
 
-        max_analysis_index = min(map(lambda x: len(x), [mea_list, sa_full_list, basecall_list]))
+        max_analysis_index = min(map(lambda x: len(x), [mea_list, sa_full_list])) if args.basecall else []
         for i in range(max_analysis_index):
             print("Analyzing events for index {}".format(i))
             analyze_event_skips(mea_list[i], sa_full_list[i], basecall_list[i])

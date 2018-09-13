@@ -189,7 +189,7 @@ def main(args):
         fast5s = fast5s[:nb_files]
 
     # change paths to the source directory
-    os.chdir(signalAlignSourceDir())
+    # os.chdir(signalAlignSourceDir())
     alignment_args = create_signalAlignment_args(destination=temp_dir_path,
                                                  stateMachineType=args.stateMachineType,
                                                  bwa_reference=args.bwa_reference,

@@ -187,7 +187,7 @@ class CreateLabels(Fast5):
             mea_alignment["reference_index"] += self.kmer_index
 
         self.aligned_signal.add_label(mea_alignment, name=name, label_type='label')
-        return True
+        return mea_alignment
 
     def add_signal_align_predictions(self, number=None, add_basecall=False):
         """Create prediction using probabilities from full output format from signalAlign
@@ -232,7 +232,7 @@ class CreateLabels(Fast5):
         else:
             predictions["reference_index"] += self.kmer_index
         self.aligned_signal.add_label(predictions, name=name, label_type='prediction')
-        return True
+        return predictions
 
     def add_basecall_alignment_prediction(self, sam=None, number=None, add_mismatches=False, my_events=None):
         """Add the original basecalled event table and add matches and missmatches to 'prediction'
@@ -298,7 +298,7 @@ class CreateLabels(Fast5):
             self.aligned_signal.add_label(mismatches, name=mismatches_name, label_type='prediction')
         self.aligned_signal.add_raw_starts(raw_starts)
 
-        return True
+        return matches, mismatches
 
     def add_basecall_alignment_guide(self, sam=None, event_table_path=None):
         """Add the original basecalled event table and add the 'guide' alignment labels to signal_label handle
