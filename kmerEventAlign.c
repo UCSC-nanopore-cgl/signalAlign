@@ -12,6 +12,7 @@ void usage() {
     fprintf(stderr, "-N: raw nucleotide string\n");
     fprintf(stderr, "-n: file with nucleotide string\n");
     fprintf(stderr, "    (exactly one of -N or -n must be set)\n");
+    fprintf(stderr, "-w: write failed alignments\n");
 }
 
 
