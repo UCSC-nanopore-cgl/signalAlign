@@ -41,6 +41,12 @@ def parse_args(args=None):
     parser.add_argument('--alignment_distance_threshold', '-d', action='store', dest='aln_dist_threshold',
                         required=False, type=int, default=10,
                         help="alignment distance threshold after which aligned events will be flagged")
+    parser.add_argument('--force_kmer_event_alignment', '-k', action='store_true', dest="perform_kmer_event_alignment",
+                        default=None, help="Forces SignalAlign to infer kmer-to-event alignment "
+                                           "(by default, it will perform only if missing event table). ")
+    parser.add_argument('--prevent_kmer_event_alignment', '-K', action='store_false', dest="perform_kmer_event_alignment",
+                        help="Prevents SignalAlign from infer kmer-to-event alignment "
+                             "(event if the fast5 is missing the event table). ")
 
     # signal align arguments
     parser.add_argument('--ref', '-r', action='store',
@@ -83,6 +89,7 @@ def parse_args(args=None):
         raise Exception("Exactly one of --file_directory and --fast5_glob must be set")
 
     return args
+
 
 def main(args):
     start = timer()
@@ -145,7 +152,8 @@ def main(args):
         track_memory_usage=False,
         get_expectations=False,
 
-        perform_kmer_event_alignment=False,
+        perform_kmer_event_alignment=args.perform_kmer_event_alignment,
+        # perform_kmer_event_alignment=False,
         # perform_kmer_event_alignment=True,
 
         # discarded signal align args
@@ -182,15 +190,15 @@ def main(args):
         # print stats on all event summaries
         total_events = len(event_summaries)
         bucket_size = 5.0
-        max_event_aln_bucket = int(math.floor(max(list(map(lambda x: abs(x[SA_ALIGNMENT_DIFF]), event_summaries))) / bucket_size))
+        max_event_aln_bucket = int(math.floor(max(list(map(lambda x: x[ABS_SA_ALIGNMENT_DIFF], event_summaries))) / bucket_size))
         aln_distance_buckets = {x:0 for x in range(0, max_event_aln_bucket + 1)}
         for summary in event_summaries:
-            aln_distance_buckets[abs(math.floor(summary[SA_ALIGNMENT_DIFF] / bucket_size))] += 1
+            aln_distance_buckets[abs(math.floor(summary[ABS_SA_ALIGNMENT_DIFF] / bucket_size))] += 1
         max_bucket_count = math.log2(max(aln_distance_buckets.values()))
         print("Aligned Events: Absolute distance counts between SA aligned position and guide alignment position (log2)")
         running_total = 1.0 * total_events
         for x in range(0, max_event_aln_bucket + 1):
-            hash_count = int(32.0 * math.log2(aln_distance_buckets[x]) / max_bucket_count)
+            hash_count = int(32.0 * math.log2(aln_distance_buckets[x]) / max_bucket_count) if aln_distance_buckets[x] != 0 else 0
             print("\t{:3d} to {:3d}: {} {:2.3f} {} \t raw_count:{:5d}  percentile: {:.5f}".format(
                 int(x * bucket_size), int((x + 1) * bucket_size - 1), "#" * hash_count, math.log2(aln_distance_buckets[x]),
                 " " * (32 - hash_count), aln_distance_buckets[x], running_total / total_events))
