@@ -107,6 +107,9 @@ def parse_args():
     parser.add_argument('--force_kmer_event_alignment', action='store_true', dest="perform_kmer_event_alignment",
                         default=None, help="If passed, force SignalAlign to infer kmer to event alignment. "
                                            "Must include alignment_file")
+    parser.add_argument('--allow_unsupported_nanopore_read_versions', action='store_false',
+                        dest="enforce_supported_versions", default=True,
+                        help="Will attempt to complete execution with unsupported nanopore read versions")
 
     args = parser.parse_args()
     return args
@@ -188,33 +191,34 @@ def main(args):
         shuffle(fast5s)
         fast5s = fast5s[:nb_files]
 
-    # change paths to the source directory
-    # os.chdir(signalAlignSourceDir())
-    alignment_args = create_signalAlignment_args(destination=temp_dir_path,
-                                                 stateMachineType=args.stateMachineType,
-                                                 bwa_reference=args.bwa_reference,
-                                                 in_templateHmm=args.in_T_Hmm,
-                                                 in_complementHmm=args.in_C_Hmm,
-                                                 in_templateHdp=args.templateHDP,
-                                                 in_complementHdp=args.complementHDP,
-                                                 output_format=args.outFmt,
-                                                 threshold=args.threshold,
-                                                 diagonal_expansion=args.diag_expansion,
-                                                 constraint_trim=args.constraint_trim,
-                                                 degenerate=getDegenerateEnum(args.degenerate),
-                                                 twoD_chemistry=args.twoD,
-                                                 target_regions=args.target_regions,
-                                                 embed=args.embed,
-                                                 event_table=args.event_table,
-                                                 backward_reference=args.backward_reference,
-                                                 forward_reference=args.forward_reference,
-                                                 alignment_file=args.alignment_file,
-                                                 check_for_temp_file_existance=True,
-                                                 track_memory_usage=False,
-                                                 get_expectations=False,
-                                                 perform_kmer_event_alignment=args.perform_kmer_event_alignment)
-
     # return alignment_args
+    alignment_args = {
+        "destination": temp_dir_path,
+        "stateMachineType": args.stateMachineType,
+        "bwa_reference": args.bwa_reference,
+        "in_templateHmm": args.in_T_Hmm,
+        "in_complementHmm": args.in_C_Hmm,
+        "in_templateHdp": args.templateHDP,
+        "in_complementHdp": args.complementHDP,
+        "output_format": args.outFmt,
+        "threshold": args.threshold,
+        "diagonal_expansion": args.diag_expansion,
+        "constraint_trim": args.constraint_trim,
+        "degenerate": getDegenerateEnum(args.degenerate),
+        "twoD_chemistry": args.twoD,
+        "target_regions": args.target_regions,
+        "embed": args.embed,
+        "event_table": args.event_table,
+        "backward_reference": args.backward_reference,
+        "forward_reference": args.forward_reference,
+        "alignment_file": args.alignment_file,
+        "check_for_temp_file_existance": True,
+        "track_memory_usage": False,
+        "get_expectations": False,
+        "perform_kmer_event_alignment": args.perform_kmer_event_alignment,
+        "enforce_supported_versions": args.enforce_supported_versions
+    }
+
     print("[runSignalAlign]:NOTICE: Got {} files to align".format(len(fast5s)), file=sys.stdout)
     # setup workers for multiprocessing
     multithread_signal_alignment(alignment_args, fast5s, args.nb_jobs, debug=args.DEBUG)

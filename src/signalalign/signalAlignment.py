@@ -92,7 +92,9 @@ class SignalAlignment(object):
                  get_expectations=False,
                  path_to_bin='./',
                  # True: always perform, False: never perform, None: perform if required
-                 perform_kmer_event_alignment=None):
+                 perform_kmer_event_alignment=None,
+                 # parameter for nanopore reads
+                 enforce_supported_versions=True):
         self.in_fast5 = in_fast5  # fast5 file to align
         self.destination = destination  # place where the alignments go, should already exist
         self.stateMachineType = stateMachineType  # flag for signalMachine
@@ -120,6 +122,7 @@ class SignalAlignment(object):
         self.path_to_bin = path_to_bin
         self.path_to_signalMachine = os.path.join(path_to_bin, "signalMachine")  # path to signalMachine
         self.perform_kmer_event_alignment = perform_kmer_event_alignment
+        self.enforce_supported_versions = enforce_supported_versions
 
         assert os.path.exists(self.path_to_signalMachine), "Path to signalMachine does not exist"
         assert self.bwa_reference is not None or self.alignment_file is not None, \
@@ -161,12 +164,12 @@ class SignalAlignment(object):
         self.openTempFolder("tempFiles_%s" % self.read_name)
         if self.twoD_chemistry:
             npRead = NanoporeRead2D(fast_five_file=self.in_fast5, event_table=self.event_table, initialize=True,
-                                    path_to_bin=self.path_to_bin,
+                                    path_to_bin=self.path_to_bin, enforce_supported_versions=self.enforce_supported_versions,
                                     perform_kmer_event_alignment=self.perform_kmer_event_alignment)
         else:
             npRead = NanoporeRead(fast_five_file=self.in_fast5, event_table=self.event_table, initialize=True,
                                   path_to_bin=self.path_to_bin, alignment_file=self.alignment_file,
-                                  model_file_location=self.in_templateHmm,
+                                  model_file_location=self.in_templateHmm, enforce_supported_versions=self.enforce_supported_versions,
                                   perform_kmer_event_alignment=self.perform_kmer_event_alignment)
         # sanity check
         if not npRead.initialize_success:
@@ -616,7 +619,8 @@ def multithread_signal_alignment(signal_align_arguments, fast5_locations, worker
                           'degenerate', 'forward_reference'}
     optional_arguments = {'backward_reference', 'alignment_file', 'bwa_reference', 'twoD_chemistry',
                           'target_regions', 'output_format', 'embed', 'event_table', 'check_for_temp_file_existance',
-                          'track_memory_usage', 'get_expectations', 'path_to_bin', 'perform_kmer_event_alignment'}
+                          'track_memory_usage', 'get_expectations', 'path_to_bin', 'perform_kmer_event_alignment',
+                          'enforce_supported_versions'}
     missing_arguments = list(filter(lambda x: x not in signal_align_arguments.keys(), required_arguments))
     unexpected_arguments = list(filter(lambda x: x not in required_arguments and x not in optional_arguments,
                                        signal_align_arguments.keys()))
