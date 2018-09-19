@@ -137,6 +137,7 @@ class SignalAlignAlignmentTest(unittest.TestCase):
             self.assertTrue(signal_align_event_count >= intial_event_count,
                             "SignalAlign produced {} events, less than inital count {}".format(
                                 signal_align_event_count, intial_event_count))
+            # this is a magic number
             self.assertTrue(signal_align_event_count <= intial_event_count * 3,
                             "SignalAlign produced {} events, more than 3x the initial count {}".format(
                                 signal_align_event_count, intial_event_count))

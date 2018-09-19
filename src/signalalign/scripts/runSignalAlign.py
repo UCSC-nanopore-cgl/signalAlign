@@ -171,10 +171,14 @@ def main(args):
         sys.exit(1)
 
     # make directory to put temporary files
+    if not os.path.isdir(args.out):
+        print("Creating output directory: {}".format(args.out), file=sys.stdout)
+        os.mkdir(args.out)
     temp_folder = FolderHandler()
     temp_dir_path = temp_folder.open_folder(os.path.join(args.out, "tempFiles_alignment"))
     temp_dir_path = resolvePath(temp_dir_path)
-    #
+
+    # generate reference sequence if not specified
     if not args.forward_reference or not args.backward_reference:
         args.forward_reference, args.backward_reference = processReferenceFasta(fasta=args.bwa_reference,
                                                                                 motifs=args.motifs,
