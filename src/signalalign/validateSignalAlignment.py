@@ -12,7 +12,6 @@ import math
 import tempfile
 
 from timeit import default_timer as timer
-from argparse import ArgumentParser
 from signalalign.alignedsignal import CreateLabels
 from signalalign.signalAlignment import multithread_signal_alignment, create_signalAlignment_args
 from signalalign.visualization.plot_labelled_read import *

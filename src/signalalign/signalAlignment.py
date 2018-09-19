@@ -180,10 +180,15 @@ class SignalAlignment(object):
         # validate input models and get defaults if appropriate
         if self.in_templateHmm is None:
             self.in_templateHmm = defaultModelFromVersion(strand="template", version=npRead.version)
+            print("[SignalAlignment.run] Inferred template HMM {} from np read version {}".format(
+                self.in_templateHmm, npRead.version))
+
         if self.twoD_chemistry and self.in_complementHmm is None:
             pop1_complement = npRead.complement_model_id == "complement_median68pA_pop1.model"
             self.in_complementHmm = defaultModelFromVersion(strand="complement", version=npRead.version,
                                                             pop1_complement=pop1_complement)
+            print("[SignalAlignment.run] Inferred complement HMM {} from np read version {}".format(
+                self.in_complementHmm, npRead.version))
         assert self.in_templateHmm is not None
         if self.twoD_chemistry:
             if self.in_complementHmm is None:

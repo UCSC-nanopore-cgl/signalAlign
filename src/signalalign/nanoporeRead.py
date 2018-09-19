@@ -324,7 +324,7 @@ class NanoporeRead(object):
     def get_template_events(self):
         if self.template_event_table_address in self.fastFive:
             self.template_events = self.fastFive[self.template_event_table_address]
-            return True
+            return self.template_events
         return False
 
     def get_template_read(self, initalize_bypass=True):
@@ -798,7 +798,7 @@ class NanoporeRead2D(NanoporeRead):
     def get_complement_events(self):
         if self.complement_event_table_address in self.fastFive:
             self.complement_events = self.fastFive[self.complement_event_table_address]
-            return True
+            return self.complement_events
         return False
 
     def get_model_adjustments(self):
