@@ -14,7 +14,7 @@ from random import shuffle
 import signalalign.utils.multithread as multithread
 from signalalign import defaultModelFromVersion, parseFofn
 from signalalign.nanoporeRead import NanoporeRead, NanoporeRead2D
-from signalalign.event_detection import time_to_index
+# from signalalign.event_detection import time_to_index
 from signalalign.utils.bwaWrapper import *
 from signalalign.utils.fileHandlers import FolderHandler
 from signalalign.utils.sequenceTools import fastaWrite, samtools_faidx_fasta, processReferenceFasta
@@ -428,10 +428,12 @@ class SignalAlignment(object):
                     template_events = np.asanyarray(npRead.template_events)
                     check_numpy_table(template_events, req_fields=('raw_start', 'raw_length'))
                 # if events do not have raw_start or raw_lengths
-                except KeyError:
-                    template_events = time_to_index(template_events,
-                                                    sampling_freq=npRead.fastFive.sample_rate,
-                                                    start_time=npRead.fastFive.raw_attributes["start_time"])
+                except KeyError as e:
+                    raise e
+                    #TODO this should not be used
+                    # template_events = time_to_index(template_events,
+                    #                                 sampling_freq=npRead.fastFive.sample_rate,
+                    #                                 start_time=npRead.fastFive.raw_attributes["start_time"])
 
                 sa_events = add_events_to_signalalign(sa_events=data, event_detections=template_events)
 

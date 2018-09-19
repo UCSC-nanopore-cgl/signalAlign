@@ -21,9 +21,14 @@ from signalalign.fast5 import Fast5
 from signalalign.mea_algorithm import maximum_expected_accuracy_alignment, mea_slow, \
     mea_slower, create_random_prob_matrix, get_mea_params_from_events, match_events_with_signalalign, \
     create_label_from_events
-from signalalign.event_detection import time_to_index, index_to_time
+# from signalalign.event_detection import time_to_index, index_to_time
 from itertools import islice
 
+#TODO see if these get used, and if not remove them.  otherwise, fix them
+def time_to_index(event_table, sampling_freq=0, start_time=0):
+    raise Exception("This function is deprecated; you should find a better way to assert raw_start and raw_length fields")
+def index_to_time(event_table, sampling_freq=0, start_time=0):
+    raise Exception("This function is deprecated; you should find a better way to assert start and length fields")
 
 class AlignedSignal(object):
     """Labeled nanopore signal data"""
