@@ -14,7 +14,7 @@ from random import shuffle
 import signalalign.utils.multithread as multithread
 from signalalign import defaultModelFromVersion, parseFofn
 from signalalign.nanoporeRead import NanoporeRead, NanoporeRead2D
-# from signalalign.event_detection import time_to_index
+from signalalign.event_detection import add_raw_start_and_raw_length_to_events
 from signalalign.utils.bwaWrapper import *
 from signalalign.utils.fileHandlers import FolderHandler
 from signalalign.utils.sequenceTools import fastaWrite, samtools_faidx_fasta, processReferenceFasta
@@ -157,8 +157,8 @@ class SignalAlignment(object):
         if not os.path.isfile(self.in_fast5):
             print("[SignalAlignment.run] ERROR: Did not find fast5 at {file}".format(file=self.in_fast5),
                   file=sys.stderr)
-            raise Exception("Missing fast5: {}".format(self.in_fast5))
-            # return False
+            # raise Exception("Missing fast5: {}".format(self.in_fast5))
+            return False
 
         # prep
         self.openTempFolder("tempFiles_%s" % self.read_name)
@@ -429,16 +429,15 @@ class SignalAlignment(object):
                     check_numpy_table(template_events, req_fields=('raw_start', 'raw_length'))
                 # if events do not have raw_start or raw_lengths
                 except KeyError as e:
-                    raise e
-                    #TODO this should not be used
-                    # template_events = time_to_index(template_events,
-                    #                                 sampling_freq=npRead.fastFive.sample_rate,
-                    #                                 start_time=npRead.fastFive.raw_attributes["start_time"])
+                    template_events = add_raw_start_and_raw_length_to_events(
+                        template_events, sampling_freq=npRead.fastFive.sample_rate,
+                        start_time=npRead.fastFive.raw_attributes["start_time"])
+                    check_numpy_table(template_events, req_fields=('raw_start', 'raw_length'))
 
                 sa_events = add_events_to_signalalign(sa_events=data, event_detections=template_events)
 
             signal_align_path = npRead.fastFive.get_analysis_new("SignalAlign")
-            assert signal_align_path, "There is no path in Fast5 file: {}".format("/Analyses/SignalAlign_00{}")
+            assert signal_align_path, "There is no path in Fast5 file with identifier: SignalAlign"
 
             output_path = npRead._join_path(signal_align_path, self.output_format)
             npRead.write_data(sa_events, output_path)

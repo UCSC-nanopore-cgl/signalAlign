@@ -19,7 +19,7 @@ import numpy as np
 import h5py
 import traceback
 import tempfile
-import numpy.lib.recfunctions as rfn
+from numpy.lib.recfunctions import append_fields
 from shutil import which
 from contextlib import closing
 from collections import defaultdict
@@ -273,7 +273,7 @@ EVENT_KMERALIGN_TMP = "KmerEventAlign_tmp"
 #     return new_events[start_index:end_index]
 
 #TODO actually remove this
-def check_event_table_time(event_table):
+def check_event_table_time(event_table, min_difference = 0.0000001):
     """Check if event table has correct math for start and length timing for each event
 
     :param event_table: event table with "start" and "length" columns
@@ -282,7 +282,7 @@ def check_event_table_time(event_table):
 
     prev_end = event_table[0]["start"] + event_table[0]["length"]
     for event in event_table[1:]:
-        if prev_end != event["start"]:
+        if prev_end - event["start"] > min_difference:
             return False
         prev_end = event["start"] + event["length"]
 
@@ -558,6 +558,44 @@ def get_resegment_accuracy(fast5handle, section="template"):
 #                                              thresholds=thresholds, peak_height=peak_height)
 #
 #     return event_table, f5fh
+
+
+def add_raw_start_and_raw_length_to_events(basecall_events, sampling_freq, start_time):
+    check_numpy_table(basecall_events, req_fields=('start', 'length'))
+    assert basecall_events["start"].dtype == np.dtype('float64'), "Event start should be float64 type: {}" \
+        .format(basecall_events["start"].dtype)
+    assert basecall_events["length"].dtype == np.dtype('float64'), "Event length should be float64 type: {}" \
+        .format(basecall_events["length"].dtype)
+    assert sampling_freq >= 0, "Invalid sampling frequency: {}".format(sampling_freq)
+    assert start_time != 0, "Invalid start time: {}".format(start_time)
+
+    calc_raw_start = lambda x: np.uint64(np.round((basecall_events[x]["start"] -
+                                                   (start_time / float(sampling_freq))) * sampling_freq))
+    calc_raw_length = lambda x: np.uint64(np.round(basecall_events[x]["length"] * sampling_freq))
+    raw_starts = list(map(calc_raw_start, range(len(basecall_events))))
+    raw_lengths = list(map(calc_raw_length, range(len(basecall_events))))
+    basecall_events = append_fields(basecall_events, "raw_start", raw_starts, usemask=False)
+    basecall_events = append_fields(basecall_events, "raw_length", raw_lengths, usemask=False)
+    return basecall_events
+
+
+def add_start_and_length_to_events(basecall_events, sampling_freq, start_time):
+    check_numpy_table(basecall_events, req_fields=('raw_start', 'raw_length'))
+    assert basecall_events["raw_start"].dtype == np.dtype('uint64'), "Event raw_start should be uint64 type: {}" \
+        .format(basecall_events["raw_start"].dtype)
+    assert basecall_events["raw_length"].dtype == np.dtype('uint64'), "Event raw_length should be uint64 type: {}" \
+        .format(basecall_events["raw_length"].dtype)
+    assert sampling_freq >= 0, "Invalid sampling frequency: {}".format(sampling_freq)
+    assert start_time != 0, "Invalid start time: {}".format(start_time)
+
+    calc_start = lambda x: np.float64((basecall_events[x]["raw_start"] / float(sampling_freq)) +
+                                      (start_time / float(sampling_freq)))
+    calc_length = lambda x: np.float64(basecall_events[x]["raw_length"] / float(sampling_freq))
+    starts = list(map(calc_start, range(len(basecall_events))))
+    lengths = list(map(calc_length, range(len(basecall_events))))
+    basecall_events = append_fields(basecall_events, "start", starts, usemask=False)
+    basecall_events = append_fields(basecall_events, "length", lengths, usemask=False)
+    return basecall_events
 
 
 def load_from_raw(np_handle, alignment_file, model_file_location, path_to_bin="./",

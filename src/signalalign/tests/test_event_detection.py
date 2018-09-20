@@ -15,6 +15,8 @@ import unittest
 from signalalign.nanoporeRead import NanoporeRead
 import tempfile
 import shutil
+from numpy.lib.recfunctions import rename_fields
+import math
 
 
 class EventDetectTests(unittest.TestCase):
@@ -489,49 +491,51 @@ class EventDetectTests(unittest.TestCase):
     #         event_table = self.dna_handle.get_basecall_data()
     #         index_to_time(event_table, sampling_freq=sampling_freq, start_time=start_time)
 
-    #TODO actually remove this
-    # def test_time_to_index(self):
-    #     # """test time_to_index method"""
-    #     # get input data
-    #
-    #     sampling_freq = self.dna_handle.sample_rate
-    #     start_time = self.dna_handle.raw_attributes['start_time']
-    #     event_table = self.dna_handle.get_basecall_data()
-    #     # run method
-    #     start = np.round((event_table["start"] - (start_time / float(sampling_freq))) * sampling_freq)
-    #     length = np.round(event_table["length"] * sampling_freq)
-    #
-    #     new_table = time_to_index(event_table, sampling_freq=sampling_freq, start_time=start_time)
-    #     # compare elementwise
-    #     self.assertSequenceEqual(new_table["raw_start"][0:100].tolist(), start[0:100].tolist())
-    #     self.assertSequenceEqual(new_table["raw_length"][0:100].tolist(), length[0:100].tolist())
-    #
-    #     with self.assertRaises(AssertionError):
-    #         time_to_index(event_table, start_time=start_time)
-    #     with self.assertRaises(AssertionError):
-    #         time_to_index(event_table, sampling_freq=sampling_freq)
-    #     with self.assertRaises(KeyError):
-    #         time_to_index(np.array([1, 2, 3]), sampling_freq=sampling_freq, start_time=start_time)
-    #     with self.assertRaises(TypeError):
-    #         time_to_index("Numpy", sampling_freq=sampling_freq, start_time=start_time)
-    #     with self.assertRaises(AssertionError):
-    #         event_table = self.rna_handle.get_basecall_data()
-    #         # print(event_table.dtype)
-    #         # print(event_table["start"].dtype)
-    #         # print(event_table["start"].dtype is not np.dtype('uint64'))
-    #         time_to_index(event_table, sampling_freq=sampling_freq, start_time=start_time)
+    def test_add_start_and_length_modifications(self):
+        """test add_raw_start_and_raw_length_to_events and add_start_and_length_to_events methods"""
 
-    #TODO actually remove this
-    # def test_check_event_table_time(self):
-    #     # """test check_event_table_time"""
-    #     events = np.empty(3, dtype=[('start', float), ('length', float)])
-    #     events["start"] = [0, 1, 2]
-    #     events["length"] = [1, 1, 1]
-    #     self.assertTrue(check_event_table_time(events))
-    #     events = np.empty(3, dtype=[('start', float), ('length', float)])
-    #     events["start"] = [0, 2, 2]
-    #     events["length"] = [1, 1, 1]
-    #     self.assertFalse(check_event_table_time(events))
+        # get input data
+        sampling_freq = self.dna_handle.sample_rate
+        start_time = self.dna_handle.raw_attributes['start_time']
+        event_table = self.dna_handle.get_basecall_data()
+        self.assertTrue(check_event_table_time(event_table), "Invalid initial start times")
+
+        # add raw fields
+        event_table = add_raw_start_and_raw_length_to_events(event_table, start_time, sampling_freq)
+        raw_starts = event_table['raw_start'].tolist()
+        raw_lengths = event_table['raw_length'].tolist()
+
+        # save old fields
+        event_table = rename_fields(event_table, {'start': 'original_start', 'length': 'original_length'})
+
+        # add non-raw fields
+        event_table = add_start_and_length_to_events(event_table, start_time, sampling_freq)
+        self.assertTrue(check_event_table_time(event_table, min_difference=1.0/sampling_freq), "Invalid modified start times")
+
+        # get fields
+        original_starts = event_table['original_start'].tolist()
+        original_lengths = event_table['original_length'].tolist()
+        starts = event_table['start'].tolist()
+        lengths = event_table['length'].tolist()
+
+        # compare elementwise
+        places = int(math.log10(sampling_freq)) + 1
+        for original_start, start in zip(original_starts, starts):
+            self.assertAlmostEqual(original_start, start, places=places)
+        for original_length, length in zip(original_lengths, lengths):
+            self.assertAlmostEqual(original_length, length, places=places)
+
+
+    def test_check_event_table_time(self):
+        # """test check_event_table_time"""
+        events = np.empty(3, dtype=[('start', float), ('length', float)])
+        events["start"] = [0, 1, 2]
+        events["length"] = [1, 1, 1]
+        self.assertTrue(check_event_table_time(events))
+        events = np.empty(3, dtype=[('start', float), ('length', float)])
+        events["start"] = [0, 2, 2]
+        events["length"] = [1, 1, 1]
+        self.assertFalse(check_event_table_time(events))
 
     #TODO actually remove this
     # def test_get_resegment_accuracy(self):
