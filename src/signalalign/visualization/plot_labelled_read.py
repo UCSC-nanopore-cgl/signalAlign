@@ -26,6 +26,15 @@ from signalalign.alignedsignal import AlignedSignal, CreateLabels
 from py3helpers.utils import list_dir
 
 
+MEA = 'm'
+SA_FULL = 's'
+BASECALL = 'b'
+EVENT_INDEX = 'e'
+SA_ALIGNMENT_DIFF = 'd'
+ABS_SA_ALIGNMENT_DIFF = 'D'
+RAW_START = 'r'
+
+
 def parse_args():
     parser = ArgumentParser(description=__doc__)
     group = parser.add_mutually_exclusive_group(required=True)
@@ -210,13 +219,6 @@ def get_spaced_colors(n):
     return list(rgb_tuples)
 
 
-MEA = 'm'
-SA_FULL = 's'
-BASECALL = 'b'
-EVENT_INDEX = 'e'
-SA_ALIGNMENT_DIFF = 'd'
-ABS_SA_ALIGNMENT_DIFF = 'D'
-RAW_START = 'r'
 def analyze_event_skips(mea_events, sa_full_events, basecall_events,
                         generate_plot=True):
     # prep

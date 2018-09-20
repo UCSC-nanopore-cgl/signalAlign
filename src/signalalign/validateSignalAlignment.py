@@ -16,6 +16,14 @@ from signalalign.alignedsignal import CreateLabels
 from signalalign.signalAlignment import multithread_signal_alignment, create_signalAlignment_args
 from signalalign.visualization.plot_labelled_read import *
 
+
+EVENTS="events"
+EVENT_COUNT="event_count"
+PEAK_DISTANCE="peak_distance"
+MEA_PEAK_DISTANCE="mea_peak_distance"
+CENTER_EVENT_ID= "ff_event_id"
+CENTER_EVENT_START="ff_event_raw_start"
+
 def parse_args(args=None):
     parser = ArgumentParser(description=__doc__)
 
@@ -76,8 +84,6 @@ def parse_args(args=None):
                         help="size of kmers in fast5 file")
 
     # misc execution parameters
-    parser.add_argument('--jobs', '-j', action='store', dest='nb_jobs', required=False,
-                        default=1, type=int, help="number of jobs to run concurrently")
     parser.add_argument('--verbose', '-v', action='store_true', dest='verbose', required=False,
                         default=False, help="prints extra information")
 
@@ -90,87 +96,19 @@ def parse_args(args=None):
     return args
 
 
-def main(args):
+def get_all_event_summaries(fast5s, alignment_args, aln_dist_threshold=10, generate_plot=True, verbose=False):
     start = timer()
 
-    args = parse_args()
-
-    # make directory to put temporary files
-    if args.out is None:
-        output_root = tempfile.TemporaryDirectory()
-    else:
-        if not os.path.isdir(args.out):
-            os.mkdir(args.out)
-        output_root = args.out
-    temp_root = FolderHandler()
-    temp_fast5_dir = temp_root.open_folder(os.path.join(output_root, "temp_fast5"))
-    temp_signal_align_dir = os.path.join(output_root, "temp_signalAlign")
-    if os.path.isdir(temp_signal_align_dir):
-        shutil.rmtree(temp_signal_align_dir)
-        assert not os.path.isdir(temp_signal_align_dir)
-    temp_signal_align = temp_root.open_folder(temp_signal_align_dir)
-
-    # input files
-    input_glob = args.fast5_glob if args.fast5_glob is not None else os.path.join(args.files_dir, "*.fast5")
-    orig_fast5s = glob.glob(input_glob)
-    if len(orig_fast5s) == 0:
-        print("[validateSignalAlignment] Did not find any files matching {}".format(input_glob), file=sys.stderr)
-        sys.exit(1)
-    fast5s = list()
-    for file in orig_fast5s:
-        dest = os.path.join(temp_fast5_dir, os.path.basename(file))
-        shutil.copy(file, dest)
-        fast5s.append(dest)
-    print("[validateSignalAlignment] Found {} files".format(len(fast5s)), file=sys.stdout)
-
-
-
-    # general sanity checks
-    if not os.path.isfile(args.ref):
-        print("[validateSignalAlignment] Did not find valid reference file", file=sys.stderr)
-        sys.exit(1)
-
-    alignment_args = create_signalAlignment_args(
-        # signal align args
-        destination=temp_signal_align,
-        stateMachineType=args.stateMachineType,
-        bwa_reference=args.ref,
-        in_templateHmm=args.in_T_Hmm,
-        in_complementHmm=args.in_C_Hmm,
-        in_templateHdp=args.templateHDP,
-        in_complementHdp=args.complementHDP,
-        threshold=args.threshold,
-        diagonal_expansion=args.diag_expansion,
-        constraint_trim=args.constraint_trim,
-        degenerate=getDegenerateEnum(args.degenerate),
-
-        # params required for validation
-        output_format='full',
-        embed=True,
-        check_for_temp_file_existance=True,
-        track_memory_usage=False,
-        get_expectations=False,
-
-        perform_kmer_event_alignment=args.perform_kmer_event_alignment,
-        # perform_kmer_event_alignment=False,
-        # perform_kmer_event_alignment=True,
-
-        # discarded signal align args
-        # twoD_chemistry=args.twoD,
-        # event_table=EVENT_TABLE,
-        # alignment_file=args.alignment_file,
-        # perform_kmer_event_alignment=args.perform_kmer_event_alignment,
-        # backward_reference=args.backward_reference,
-        # forward_reference=args.forward_reference,
-
-    )
+    # argments required for this to work
+    alignment_args['output_format'] = 'full'
+    alignment_args['embed'] = True
+    alignment_args['check_for_temp_file_existance'] = False
 
     # run signal align
     print("\n[validateSignalAlignment]: running signalAlign in preparation for validation", file=sys.stdout)
-    multithread_signal_alignment(alignment_args, fast5s, worker_count=args.nb_jobs, forward_reference=args.ref,
-                                 debug=True)
+    multithread_signal_alignment(alignment_args, fast5s)
 
-
+    all_event_summaries = dict()
     print("\n[validateSignalAlignment]: performing validation", file=sys.stdout)
     for f5_path in fast5s:
         print("[validateSignalAlignment]: validating {}".format(f5_path), file=sys.stdout)
@@ -184,7 +122,8 @@ def main(args):
         basecall.extend(mismatches)
         basecall.sort(key=lambda x: x['raw_start'])
 
-        event_summaries = analyze_event_skips(mea, sa_full, basecall)
+        event_summaries = analyze_event_skips(mea, sa_full, basecall, generate_plot=generate_plot)
+        all_event_summaries[f5_path] = event_summaries
 
         # print stats on all event summaries
         total_events = len(event_summaries)
@@ -204,14 +143,14 @@ def main(args):
             running_total -= aln_distance_buckets[x]
 
         # gather stats on consecutive events
-        if args.verbose: print("Consecutive events flagged by distance threshold")
+        if verbose: print("Consecutive events flagged by distance threshold")
         total_failed_events = 0
         all_flagged_event_sets = list()
 
         current_flagged_events = None
         for summary in event_summaries:
             # starting or in a flagged section
-            if summary[ABS_SA_ALIGNMENT_DIFF] > args.aln_dist_threshold:
+            if summary[ABS_SA_ALIGNMENT_DIFF] > aln_dist_threshold:
                 if current_flagged_events is None:
                     current_flagged_events = list()
                 current_flagged_events.append(summary)
@@ -231,7 +170,7 @@ def main(args):
                 }
                 all_flagged_event_sets.append(flagged_event_summary)
                 current_flagged_events = None
-                if args.verbose:
+                if verbose:
                     print("\tFlaggedEventSet:\tcount:{:3d}\tpeak_dist:{:3d}\tpeak_mea_dist:{:3d}\tcenter_event:{:5d}\tcenter_event_start:{:7d}\t".format(
                         flagged_event_summary[EVENT_COUNT], flagged_event_summary[PEAK_DISTANCE],
                         flagged_event_summary[MEA_PEAK_DISTANCE], flagged_event_summary[CENTER_EVENT_ID],
@@ -250,17 +189,68 @@ def main(args):
             # maybe do some analysis of all these?
             pass
 
-
-
     stop = timer()
     print("Running Time = {} seconds".format(stop - start), file=sys.stderr)
+    return all_event_summaries
 
-EVENTS="events"
-EVENT_COUNT="event_count"
-PEAK_DISTANCE="peak_distance"
-MEA_PEAK_DISTANCE="mea_peak_distance"
-CENTER_EVENT_ID= "ff_event_id"
-CENTER_EVENT_START="ff_event_raw_start"
+
+def main():
+
+    args = parse_args()
+
+    # general sanity checks
+    if not os.path.isfile(args.ref):
+        print("[validateSignalAlignment] Did not find valid reference file", file=sys.stderr)
+        sys.exit(1)
+
+    # make directory to put temporary files and output location
+    output_location = args.out
+    if output_location is None:
+        output_root = tempfile.TemporaryDirectory()
+    else:
+        if not os.path.isdir(output_location):
+            os.mkdir(output_location)
+        output_root = output_location
+    temp_root = FolderHandler()
+    temp_fast5_dir = temp_root.open_folder(os.path.join(output_root, "temp_fast5"))
+    temp_signal_align_dir = os.path.join(output_root, "temp_signalAlign")
+    if os.path.isdir(temp_signal_align_dir):
+        shutil.rmtree(temp_signal_align_dir)
+        assert not os.path.isdir(temp_signal_align_dir)
+    temp_signal_align = temp_root.open_folder(temp_signal_align_dir)
+
+    # get input files
+    input_glob = args.fast5_glob if args.fast5_glob is not None else os.path.join(args.files_dir, "*.fast5")
+    orig_fast5s = glob.glob(input_glob)
+    if len(orig_fast5s) == 0:
+        print("[validateSignalAlignment] Did not find any files matching {}".format(input_glob), file=sys.stderr)
+        sys.exit(1)
+    fast5s = list()
+    for file in orig_fast5s:
+        dest = os.path.join(temp_fast5_dir, os.path.basename(file))
+        shutil.copy(file, dest)
+        fast5s.append(dest)
+    print("[validateSignalAlignment] Found {} files".format(len(fast5s)), file=sys.stdout)
+
+    alignment_args = create_signalAlignment_args(
+        # signal align args
+        destination=temp_signal_align,
+        stateMachineType=args.stateMachineType,
+        bwa_reference=args.ref,
+        forward_reference=args.ref,
+        in_templateHmm=args.in_T_Hmm,
+        in_complementHmm=args.in_C_Hmm,
+        in_templateHdp=args.templateHDP,
+        in_complementHdp=args.complementHDP,
+        threshold=args.threshold,
+        diagonal_expansion=args.diag_expansion,
+        constraint_trim=args.constraint_trim,
+        degenerate=getDegenerateEnum(args.degenerate),
+        perform_kmer_event_alignment=args.perform_kmer_event_alignment,
+    )
+
+    get_all_event_summaries(fast5s, alignment_args, aln_dist_threshold=args.aln_dist_threshold, verbose=args.verbose)
+
 
 if __name__ == "__main__":
-    sys.exit(main(sys.argv[1:]))
+    sys.exit(main())

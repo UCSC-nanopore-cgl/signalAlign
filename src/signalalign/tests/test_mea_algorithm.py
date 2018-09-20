@@ -19,6 +19,7 @@ from py3helpers.utils import time_it
 
 
 class MeaTest(unittest.TestCase):
+    HOME = '/'.join(os.path.abspath(__file__).split("/")[:-4])
     """Test the functions in mea_algorithm.py"""
 
     def test_maximum_expected_accuracy_alignment(self):
@@ -242,6 +243,59 @@ class MeaTest(unittest.TestCase):
         self.assertSequenceEqual(new_data["raw_length"].tolist(), [1, 1, 1, 1])
         with self.assertRaises(ValueError):
             fail = new_data["strand"]
+
+    def test_mea_alignment_close_to_guide(self):
+        from signalalign.validateSignalAlignment import get_all_event_summaries, ABS_SA_ALIGNMENT_DIFF, MEA
+        from signalalign.utils.fileHandlers import FolderHandler
+        from signalalign.signalAlignment import create_signalAlignment_args
+        import shutil
+        import tempfile
+        import glob
+
+        ecoli_reference = os.path.join(MeaTest.HOME, "tests/test_sequences/E.coli_K12.fasta")
+        fast5_dir = os.path.join(MeaTest.HOME, "tests/minion_test_reads/1D")
+        template_hmm = os.path.join(MeaTest.HOME, "models/testModelR9_acgt_template.model")
+        path_to_bin = os.path.join(MeaTest.HOME, 'bin')
+        threshold = 10
+
+        # make directory to put temporary files and output location
+        output_root = tempfile.TemporaryDirectory()
+        temp_root = FolderHandler()
+        temp_fast5_dir = temp_root.open_folder(os.path.join(output_root.name, "temp_fast5"))
+        temp_signal_align_dir = os.path.join(output_root.name, "temp_signalAlign")
+        if os.path.isdir(temp_signal_align_dir):
+            shutil.rmtree(temp_signal_align_dir)
+            assert not os.path.isdir(temp_signal_align_dir)
+        temp_signal_align = temp_root.open_folder(temp_signal_align_dir)
+
+        # get input files
+        orig_fast5s = glob.glob(os.path.join(fast5_dir, "*.fast5"))
+        self.assertTrue(len(orig_fast5s) > 0, "Incorrect fast5 location: {}".format(fast5_dir))
+        fast5s = list()
+        for file in orig_fast5s:
+            dest = os.path.join(temp_fast5_dir, os.path.basename(file))
+            shutil.copy(file, dest)
+            fast5s.append(dest)
+
+        # get alignment args
+        alignment_args = create_signalAlignment_args(bwa_reference=ecoli_reference,
+                                                     in_templateHmm=template_hmm,
+                                                     destination=temp_signal_align_dir,
+                                                     forward_reference=ecoli_reference,
+                                                     path_to_bin=path_to_bin)
+
+        # get summaries
+        all_event_summaries = get_all_event_summaries(fast5s, alignment_args, aln_dist_threshold=threshold,
+                                                      generate_plot=False, verbose=False)
+
+        for fast5 in all_event_summaries.keys():
+            f5_name = os.path.basename(fast5)
+            event_summaries = all_event_summaries[fast5]
+            max_mea_aln_diff = max(list(map(lambda x: x[ABS_SA_ALIGNMENT_DIFF],
+                                        list(filter(lambda x: x[MEA], event_summaries)))))
+            self.assertTrue(max_mea_aln_diff <= threshold,
+                            "MEA produced alignment greater than {} positions from guide alignment for {}".format(
+                                max_mea_aln_diff, f5_name))
 
 
 if __name__ == '__main__':
