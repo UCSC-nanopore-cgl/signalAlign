@@ -177,6 +177,8 @@ def main(args):
     temp_folder = FolderHandler()
     temp_dir_path = temp_folder.open_folder(os.path.join(args.out, "tempFiles_alignment"))
     temp_dir_path = resolvePath(temp_dir_path)
+    print(args.out)
+    print(temp_dir_path)
 
     # generate reference sequence if not specified
     if not args.forward_reference or not args.backward_reference:

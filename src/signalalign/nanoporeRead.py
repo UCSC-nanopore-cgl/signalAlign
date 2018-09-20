@@ -166,32 +166,26 @@ class NanoporeRead(object):
 
         # are we required to perform kmer event realignment?
         if perform_kmer_event_aln_always:
-
-            if self.event_table:
-                ok = load_from_raw(self, self.alignment_file, self.model_file_location, self.path_to_bin)
-            else:
-                ok = load_from_raw(self, self.alignment_file, self.model_file_location, self.path_to_bin)
-            if not ok:
-                self.logError("[NanoporeRead:_initialize] kmer event alignment failed for {}".format(self.filename))
+            oned_root_address = self.generate_new_event_table()
+            if not oned_root_address:
+                self.logError("[NanoporeRead:_initialize] required kmer event alignment failed for {}".format(
+                    self.filename))
                 self.close()
                 return False
-
-        # get oneD directory and check if the table location exists in the fast5file
-        if self.event_table:
-            oned_root_address = self.get_latest_basecall_edition(self.event_table)
-
-            if not oned_root_address and perform_kmer_event_aln_if_required:
-                oned_root_address = load_from_raw(self, self.alignment_file, self.model_file_location, self.path_to_bin)
         else:
-            oned_root_address = self.get_latest_basecall_edition(TEMPLATE_BASECALL_KEY)
-            # if we cant find analysis then perform kmer_event_alignment
+            # try to find current basecall address
+            oned_root_address = self.get_latest_basecall_edition(self.event_table if self.event_table else TEMPLATE_BASECALL_KEY)
+            # if not found, generate
             if not oned_root_address and perform_kmer_event_aln_if_required:
-                oned_root_address = load_from_raw(self, self.alignment_file, self.model_file_location, self.path_to_bin)
-            # Some RNA reads have incorrectly formatted basecall tables so we check and then force load_from_raw
-            if oned_root_address and self.rna and perform_kmer_event_aln_if_required:
-                if not self.check_if_event_table_format(oned_root_address):
-                    oned_root_address = load_from_raw(self, self.alignment_file, self.model_file_location,
-                                                      self.path_to_bin)
+                oned_root_address = self.generate_new_event_table()
+
+        # Some RNA reads have incorrectly formatted basecall tables so we check and then force load_from_raw
+        if oned_root_address and self.rna and not self.has_valid_event_table_format(oned_root_address):
+            self.logError("[NanoporeRead:_initialize] WARN invalid event table format for RNA read")
+            if perform_kmer_event_aln_if_required:
+                oned_root_address = load_from_raw(self, self.alignment_file, self.model_file_location,
+                                                  self.path_to_bin)
+
         # sanity check
         if not oned_root_address:
             self.logError("[NanoporeRead:_initialize] ERROR could not find 1D root address in {}"
@@ -238,7 +232,7 @@ class NanoporeRead(object):
             # reverse and replace "U"
             self.template_read = self.template_read.replace("U", "T")[::-1]
 
-        self.kmer_length          = 0 if len(self.fastFive[self.template_event_table_address]) == 0 else \
+        self.kmer_length = -1 if len(self.fastFive[self.template_event_table_address]) == 0 else \
             len(self.bytes_to_string(self.fastFive[self.template_event_table_address][0]['model_state']))
         self.template_read_length = len(self.template_read)
         if self.template_read_length <= 0 or self.kmer_length <= 0:
@@ -250,7 +244,16 @@ class NanoporeRead(object):
 
         return True
 
-    def check_if_event_table_format(self, oned_root_address):
+    def generate_new_event_table(self):
+        oned_root_address = load_from_raw(self, self.alignment_file, self.model_file_location, self.path_to_bin,
+                                          analysis_identifier=self.event_table if self.event_table else None)
+        if oned_root_address:
+            self.logError("[NanoporeRead:generate_new_event_table] INFO generated event table at {}".format(oned_root_address))
+        else:
+            self.logError("[NanoporeRead:generate_new_event_table] ERROR failed to generat event table")
+        return oned_root_address
+
+    def has_valid_event_table_format(self, oned_root_address):
         """Check if the 'start' and 'length' values are in the time scale, NOT the index scale
         :param oned_root_address: Basecalled analysis path
         :return: boolean if start and length are correct format
@@ -263,8 +266,6 @@ class NanoporeRead(object):
             return False
         else:
             return True
-
-
 
     @staticmethod
     def make_event_map(events, kmer_length):
