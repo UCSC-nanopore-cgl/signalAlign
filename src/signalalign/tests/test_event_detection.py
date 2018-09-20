@@ -574,7 +574,10 @@ class EventDetectTests(unittest.TestCase):
         np_handle._initialize_metadata()
         alignment_file = os.path.join(self.HOME, "tests/minion_test_reads/RNA_edge_case.sam")
         saved_location = load_from_raw(np_handle, alignment_file, self.rna_model_file, path_to_bin)
-
+        # close and reopen
+        np_handle.close()
+        np_handle = NanoporeRead(os.path.abspath(self.tmp_rna_file3))
+        # get events and validate
         events = np.array(np_handle.fastFive["/Analyses/Basecall_1D_001/BaseCalled_template/Events"])
         self.assertEqual(events[0]["raw_length"], 7)
         self.assertTrue("/Analyses/Basecall_1D_001/BaseCalled_template/Fastq" in np_handle.fastFive)

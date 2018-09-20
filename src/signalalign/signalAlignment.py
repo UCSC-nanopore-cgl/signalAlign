@@ -155,9 +155,10 @@ class SignalAlignment(object):
             if self.twoD_chemistry:
                 assert self.in_complementHmm is not None, "Need complement HMM files for model training"
         if not os.path.isfile(self.in_fast5):
-            print("[SignalAlignment.run] ERROR: Did not find .fast5 at{file}".format(file=self.in_fast5),
+            print("[SignalAlignment.run] ERROR: Did not find fast5 at {file}".format(file=self.in_fast5),
                   file=sys.stderr)
-            return False
+            raise Exception("Missing fast5: {}".format(self.in_fast5))
+            # return False
 
         # prep
         self.openTempFolder("tempFiles_%s" % self.read_name)
