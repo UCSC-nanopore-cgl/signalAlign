@@ -18,6 +18,7 @@ from signalalign.fast5 import Fast5
 from py3helpers.utils import list_dir, check_numpy_table
 from py3helpers.seq_tools import ReverseComplement
 from collections import defaultdict
+from numpy.lib.recfunctions import append_fields
 import traceback
 
 
@@ -268,9 +269,9 @@ def get_mea_params_from_events(events):
 
     :param events: events table with required fields"""
     check_numpy_table(events, req_fields=('contig', 'reference_index', 'reference_kmer', 'strand', 'event_index',
-                                         'event_mean', 'event_noise', 'event_duration', 'aligned_kmer',
-                                         'scaled_mean_current', 'scaled_noise', 'posterior_probability',
-                                         'descaled_event_mean', 'ont_model_mean', 'path_kmer'))
+                                          'event_mean', 'event_noise', 'event_duration', 'aligned_kmer',
+                                          'scaled_mean_current', 'scaled_noise', 'posterior_probability',
+                                          'descaled_event_mean', 'ont_model_mean', 'path_kmer'))
     # get min/max args
     ref_start = min(events["reference_index"])
     ref_end = max(events["reference_index"])
@@ -336,58 +337,103 @@ def mea_alignment_from_signal_align(fast5_path, events=None):
     # get raw index values from alignment data structure
     best_path = get_indexes_from_best_path(mea_alignments)
     # corrected_path = fix_path_indexes(best_path)
-    final_event_table = get_events_from_path(event_matrix, best_path)
+    final_event_table = get_events_from_path(event_matrix, best_path, dtype=events.dtype)
     return final_event_table
 
 
-def get_events_from_path(event_matrix, path):
+def get_events_from_path(event_matrix, path, dtype):
     """Return an event table from a list of index pairs generated from the mea alignment
 
     :param event_matrix: matrix [ref x event] with event info at positions in matrix
     :param path: [[ref_pos, event_pos]...] to gather events
+    :param dtype: data types of the event matrix
     """
-    events = np.zeros(0, dtype=[('contig', 'S10'), ('reference_index', '<i8'), ('reference_kmer', 'S5'),
-                                ('strand', 'S1'),
-                                ('event_index', '<i8'), ('event_mean', '<f8'), ('event_noise', '<f8'),
-                                ('event_duration', '<f8'), ('aligned_kmer', 'S5'),
-                                ('scaled_mean_current', '<f8'), ('scaled_noise', '<f8'),
-                                ('posterior_probability', '<f8'), ('descaled_event_mean', '<f8'),
-                                ('ont_model_mean', '<f8'), ('path_kmer', 'S5')])
-    events_dtype = events.dtype
+    # events = np.zeros(0, dtype=[('contig', 'S10'), ('reference_index', '<i8'), ('reference_kmer', 'S5'),
+    #                             ('strand', 'S1'),
+    #                             ('event_index', '<i8'), ('event_mean', '<f8'), ('event_noise', '<f8'),
+    #                             ('event_duration', '<f8'), ('aligned_kmer', 'S5'),
+    #                             ('scaled_mean_current', '<f8'), ('scaled_noise', '<f8'),
+    #                             ('posterior_probability', '<f8'), ('descaled_event_mean', '<f8'),
+    #                             ('ont_model_mean', '<f8'), ('path_kmer', 'S5')])
+
+    events = np.zeros(0, dtype=dtype)
     # for each pair, access event info from matrix
     for index_pair in path:
         ref_pos = index_pair[0]
         event_pos = index_pair[1]
         try:
-            events = np.append(events, np.array(event_matrix[event_pos][ref_pos], dtype=events_dtype))
+            events = np.append(events, np.array(event_matrix[event_pos][ref_pos], dtype=dtype))
         except IndexError:
             traceback.print_exc(file=sys.stderr)
             raise IndexError("Selected non event location in event matrix. Check path for correct indexes")
     return events
 
 
-def match_events_with_signalalign(sa_events=None, event_detections=None, minus=False, rna=False):
+def add_events_to_signalalign(sa_events=None, event_detections=None):
+    """Match event index with event detection data and keep the entirety of the signalAlign event output"""
+    assert sa_events is not None, "Must pass signal alignment events"
+    assert event_detections is not None, "Must pass event_detections events"
+
+    raw_starts = [event_detections[x]["raw_start"] for x in sa_events["event_index"]]
+    raw_lengths = [event_detections[x]["raw_length"] for x in sa_events["event_index"]]
+    new_data = append_fields(sa_events, "raw_start", raw_starts, usemask=False)
+    new_data = append_fields(new_data, "raw_length", raw_lengths, usemask=False)
+
+    return new_data
+
+
+def create_label_from_events(mea_events):
+    """Trim input events to just required fields
+
+        req_fields: 'reference_index'', 'path_kmer', 'posterior_probability', 'raw_start', 'raw_length'
+
+    :param mea_events: events table reference_index', 'event_index', 'aligned_kmer', 'posterior_probability
+    """
+    check_numpy_table(mea_events, req_fields=('reference_index',
+                                              'path_kmer', 'posterior_probability',
+                                              'raw_start', 'raw_length'))
+
+    label = np.zeros(len(mea_events), dtype=[('raw_start', int), ('raw_length', int), ('reference_index', int),
+                                             ('posterior_probability', float), ('kmer', 'S5')])
+
+    label['raw_start'] = mea_events["raw_start"]
+    label['raw_length'] = mea_events["raw_length"]
+    label['reference_index'] = mea_events["reference_index"]
+    label['kmer'] = [convert_to_str(x) for x in mea_events["path_kmer"]]
+    label['posterior_probability'] = mea_events["posterior_probability"]
+    np.sort(label, order='raw_start', kind='mergesort')
+
+    return label
+
+
+def convert_to_str(string):
+    """Helper function to catch bytes as strings"""
+    if type(string) is str:
+        return string
+    else:
+        return bytes.decode(string)
+
+
+def match_events_with_signalalign(sa_events=None, event_detections=None):
     """Match event index with event detection data to label segments of signal for each kmer
 
     # RNA is sequenced 3'-5'
     # reversed for fasta/q sequence
-    # if mapped to reverse strand
+    # if mapped to minus strand
     # reverse reverse complement = complement
 
     # DNA is sequenced 5'-3'
-    # if mapped to reverse strand
+    # if mapped to minus strand
     # reverse complement
 
     :param sa_events: events table reference_index', 'event_index', 'aligned_kmer', 'posterior_probability
     :param event_detections: event detection event table
-    :param minus: boolean option to for minus strand mapping
-    :param rna: boolean for RNA read
     """
     assert sa_events is not None, "Must pass signal alignment events"
     assert event_detections is not None, "Must pass event_detections events"
 
     check_numpy_table(sa_events, req_fields=('reference_index', 'event_index',
-                                            'reference_kmer', 'posterior_probability'))
+                                             'path_kmer', 'posterior_probability'))
 
     check_numpy_table(event_detections, req_fields=('raw_start', 'raw_length'))
 
@@ -398,25 +444,7 @@ def match_events_with_signalalign(sa_events=None, event_detections=None, minus=F
     label['raw_length'] = [event_detections[x]["raw_length"] for x in sa_events["event_index"]]
     label['reference_index'] = sa_events["reference_index"]
 
-    def convert_to_str(string):
-        """Helper function to catch bytes as strings"""
-        if type(string) is str:
-            return string
-        else:
-            return bytes.decode(string)
-
-    flip = ReverseComplement()
-    if minus:
-        if rna:
-            kmers = [flip.complement(convert_to_str(x)) for x in sa_events["reference_kmer"]]
-        else:
-            kmers = [flip.reverse_complement(convert_to_str(x)) for x in sa_events["reference_kmer"]]
-    else:
-        if rna:
-            kmers = [flip.reverse(convert_to_str(x)) for x in sa_events["reference_kmer"]]
-        else:
-            kmers = sa_events["reference_kmer"]
-    label['kmer'] = kmers
+    label['kmer'] = [convert_to_str(x) for x in sa_events["path_kmer"]]
     label['posterior_probability'] = sa_events["posterior_probability"]
     np.sort(label, order='raw_start', kind='mergesort')
 
@@ -779,67 +807,3 @@ def mea_slow(posterior_matrix, shortest_ref_per_event, return_all=False):
                 highest_prob = x[3]
                 best_forward_edge = x
         return best_forward_edge
-
-
-def main():
-    """Main docstring"""
-    start1 = timer()
-
-    # m, l = create_random_prob_matrix(row=3, col=3)
-    # print(m.shape)
-
-    # posterior_matrix = [[0.2, 0.3, 0.2, 0.2, 0.1],
-    #                     [0.2, 0.5, 0.3, 0.0, 0.0],
-    #                     [0.3, 0.1, 0.0, 0.3, 0.3],
-    #                     [0.0, 0.0, 0.0, 0.4, 0.1],
-    #                     [0.0, 0.0, 0.0, 0.2, 0.5],
-    #                     ]
-    #
-    # # correct input
-    # shortest_ref_per_event = [0, 0, 0, 3, 3]
-    # # best_edge = binary_search_for_edge([[0, 1, .1, .1], [1, 1, .1, .1], [2, 1, .1, .1], [3, 1, .1, .1], [4, 1, .1, .1], [5, 1, .1, .1], [6, 1, .1, .1]], 6.1, 2, 0.1)
-    # # print(best_edge)
-    #
-    # forward_edges = maximum_expected_accuracy_alignment_edits(posterior_matrix, shortest_ref_per_event, return_all=True)
-    # # print(forward_edges)
-    # forward_edges2 = maximum_expected_accuracy_alignment(posterior_matrix, shortest_ref_per_event, return_all=True)
-    # print("COMPARE")
-    #
-    # for x, y in zip(forward_edges, forward_edges2):
-    #     print(x)
-    #     print(y)
-    #     print("NEW PAIR")
-    # fast5_path = "/Users/andrewbailey/CLionProjects/nanopore-RNN/test_files/minion-reads/canonical"
-    # files = list_dir(fast5_path, ext='fast5')
-    # for file1 in files:
-    #     start = timer()
-    #     print(file1)
-    #     f5fh = Fast5(file1)
-    #     mae_events = f5fh.get_signalalign_events(mae=True)
-    #     event_detection = f5fh.get_resegment_basecall()
-    #     # events = mea_alignment_from_signal_align(file1)
-    #     label = match_events_with_signalalign(mae_events, event_detection)
-    #     print(label)
-    #     event1 = 0
-    #     for event in label:
-    #         if type(event1) is int:
-    #             event1 = event
-    #         else:
-    #             if event1["raw_start"]+event1["raw_length"] == event["raw_start"]:
-    #                 pass
-    #             else:
-    #                 print(event1["raw_start"]+event1["raw_length"])
-    #                 print(event["raw_start"])
-    #                 print("error")
-    #             event1 = event
-    #     # break
-    #     stop = timer()
-    #     print("Total Time = {} seconds".format(stop - start), file=sys.stderr)
-
-    stop = timer()
-    print("Running Time = {} seconds".format(stop - start1), file=sys.stderr)
-
-
-if __name__ == "__main__":
-    main()
-    raise SystemExit

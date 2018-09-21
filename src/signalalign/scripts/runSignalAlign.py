@@ -12,7 +12,7 @@ from argparse import ArgumentParser
 from random import shuffle
 from multiprocessing import Process, current_process, Manager
 
-from signalalign.signalAlignment import multithread_signal_alignment
+from signalalign.signalAlignment import multithread_signal_alignment, create_signalAlignment_args
 from signalalign.utils.sequenceTools import processReferenceFasta
 from signalalign.utils.fileHandlers import FolderHandler
 from signalalign.utils.bwaWrapper import buildBwaIndex
@@ -46,12 +46,14 @@ def parse_args():
     parser.add_argument('--backward_ref', action='store',
                         dest='backward_ref', required=False, type=str,
                         help="backward reference sequence for SignalAlignment align to, in FASTA")
+
+    parser.add_argument('--alignment_file', action='store',
+                        dest='alignment_file', required=False, type=str,
+                        help="SAM or BAM file of alignments if FAST5s do not have fasta info or events")
+
     parser.add_argument('--bwa_reference', '-r', action='store',
                         dest='bwa_reference', required=True, type=str,
                         help="Reference sequence required for generating guide alignment")
-
-    parser.add_argument("--bwt", action='store', dest="bwt", default=None,
-                        help="path to BWT files. example: ../ref.fasta")
     parser.add_argument('--output_location', '-o', action='store', dest='out',
                         required=True, type=str, default=None,
                         help="directory to put the alignments")
@@ -102,18 +104,15 @@ def parse_args():
                         help="Embed full output into fast5 file")
     parser.add_argument('--event_table', action='store', dest="event_table", default=False,
                         help="Specify event table")
+    parser.add_argument('--force_kmer_event_alignment', action='store_true', dest="perform_kmer_event_alignment",
+                        default=None, help="If passed, force SignalAlign to infer kmer to event alignment. "
+                                           "Must include alignment_file")
+    parser.add_argument('--allow_unsupported_nanopore_read_versions', action='store_false',
+                        dest="enforce_supported_versions", default=True,
+                        help="Will attempt to complete execution with unsupported nanopore read versions")
 
     args = parser.parse_args()
     return args
-
-
-def aligner(work_queue, done_queue):
-    try:
-        for f in iter(work_queue.get, 'STOP'):
-            alignment = SignalAlignment(**f)
-            alignment.run()
-    except Exception as e:
-        done_queue.put("%s failed with %s" % (current_process().name, e))
 
 
 def concat_variant_call_files(path):
@@ -127,8 +126,9 @@ def main(args):
     args = parse_args()
 
     command_line = " ".join(sys.argv[:])
-    print("Command Line: {cmdLine}\n".format(cmdLine=command_line), file=sys.stderr)
+    print(os.getcwd())
 
+    print("Command Line: {cmdLine}\n".format(cmdLine=command_line), file=sys.stderr)
     # get absolute paths to inputs
     args.files_dir = resolvePath(args.files_dir)
     args.forward_reference = resolvePath(args.forward_ref)
@@ -142,6 +142,7 @@ def main(args):
     args.fofn = resolvePath(args.fofn)
     args.target_regions = resolvePath(args.target_regions)
     args.ambiguity_positions = resolvePath(args.ambiguity_positions)
+    args.alignment_file = resolvePath(args.alignment_file)
     start_message = """
 #   Starting Signal Align
 #   Aligning files from: {fileDir}
@@ -170,9 +171,16 @@ def main(args):
         sys.exit(1)
 
     # make directory to put temporary files
+    if not os.path.isdir(args.out):
+        print("Creating output directory: {}".format(args.out), file=sys.stdout)
+        os.mkdir(args.out)
     temp_folder = FolderHandler()
-    temp_dir_path = temp_folder.open_folder(args.out + "/tempFiles_alignment")
-    #
+    temp_dir_path = temp_folder.open_folder(os.path.join(args.out, "tempFiles_alignment"))
+    temp_dir_path = resolvePath(temp_dir_path)
+    print(args.out)
+    print(temp_dir_path)
+
+    # generate reference sequence if not specified
     if not args.forward_reference or not args.backward_reference:
         args.forward_reference, args.backward_reference = processReferenceFasta(fasta=args.bwa_reference,
                                                                                 motifs=args.motifs,
@@ -190,8 +198,7 @@ def main(args):
         shuffle(fast5s)
         fast5s = fast5s[:nb_files]
 
-    # change paths to the source directory
-    os.chdir(signalAlignSourceDir())
+    # return alignment_args
     alignment_args = {
         "destination": temp_dir_path,
         "stateMachineType": args.stateMachineType,
@@ -211,14 +218,17 @@ def main(args):
         "event_table": args.event_table,
         "backward_reference": args.backward_reference,
         "forward_reference": args.forward_reference,
-        "alignment_file": None,
+        "alignment_file": args.alignment_file,
         "check_for_temp_file_existance": True,
         "track_memory_usage": False,
         "get_expectations": False,
+        "perform_kmer_event_alignment": args.perform_kmer_event_alignment,
+        "enforce_supported_versions": args.enforce_supported_versions
     }
+
     print("[runSignalAlign]:NOTICE: Got {} files to align".format(len(fast5s)), file=sys.stdout)
     # setup workers for multiprocessing
-    multithread_signal_alignment(alignment_args, fast5s, args.nb_jobs)
+    multithread_signal_alignment(alignment_args, fast5s, args.nb_jobs, debug=args.DEBUG)
 
     print("\n#  signalAlign - finished alignments\n", file=sys.stderr)
     print("\n#  signalAlign - finished alignments\n", file=sys.stdout)

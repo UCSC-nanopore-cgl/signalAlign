@@ -61,6 +61,7 @@ class Fast5(h5py.File):
     __default_basecall_1d_events__ = 'BaseCalled_{}/Events'
     __default_basecall_1d_model__ = 'BaseCalled_{}/Model'
     __default_basecall_1d_summary__ = 'Summary/basecall_1d_{}'
+    __default_basecall_1d__ = 'BaseCalled_{}'
 
     __default_alignment_analysis__ = 'Alignment'
 
@@ -85,8 +86,8 @@ class Fast5(h5py.File):
     #todo fix the form of these
     __default_corrected_genome__ = '/Analyses/RawGenomeCorrected_000/BaseCalled_template'  # nanoraw
     __default_signalalign_events__ = '/Analyses/SignalAlign_00{}'  # signalalign events
-    __default_resegment_basecall__ = '/Analyses/ReSegmentBasecall_00{}'
     __default_eventalign_events__ = '/Analyses/EventAlign_00{}'
+    __default_template_1d_basecall_events__ = '/Analyses/Basecall_1D_00{}/BaseCalled_template/Events'
 
     __default_event_table_fields__ = ('start', 'length', 'mean', 'stdv')
 
@@ -351,24 +352,62 @@ class Fast5(h5py.File):
         return np.asarray(events), corr_start_rel_to_raw
 
     #todo fix path creation
-    def get_signalalign_events(self, mea=False, sam=False):
-        """Get signal align events, sam or mea alignment"""
-        assert (not mea or not sam), "Both mea and sam cannot be set to True"
+    def get_custom_analysis_events(self, name):
+        """Get events stored in a custom path"""
+        path = None
         try:
-            path = self.check_path(self.__default_signalalign_events__, latest=True)
-            reads = self[path]
-            if mea:
-                events = np.asarray(reads['MEA_alignment_labels'])
-            elif sam:
-                events = str(np.asarray(reads['sam']))
-            else:
-                events = np.asarray(reads['full'])
-
+            path = self.get_analysis_events_path_latest(name)
+            events = np.asarray(self[path])
         except KeyError:
-            raise KeyError('Read does not contain required fields: {}'.format(path))
+            raise KeyError('File does not contain events at: {}'.format(path))
+        except IndexError:
+            raise IndexError('File does not contain analysis with name: {}'.format(name))
         return events
 
-    #todo fix path creation
+    def get_signalalign_events(self, mea=False, sam=False, override_path=None):
+        """Get signal align events, sam or mea alignment
+        :param mea: boolean option to grab the MEA_alignment_labels
+        :param sam: boolean option to grab sam file
+        :param override_path: if passed, will look for alignment events at that path
+        """
+        assert (not mea or not sam), "Both mea and sam cannot be set to True"
+        try:
+            field = ""
+            if override_path:
+                path = override_path
+            else:
+                path = self.check_path(self.__default_signalalign_events__, latest=True)
+            reads = self[path]
+            if mea:
+                field = "MEA_alignment_labels"
+                events = np.asarray(reads[field])
+            elif sam:
+                field = "sam"
+                events = str(np.asarray(reads[field]))
+            else:
+                field = "full"
+                events = np.asarray(reads[field])
+
+        except KeyError:
+            raise KeyError('Read does not contain required fields: {}'.format(os.path.join(path, field)))
+        return events
+
+    def get_signalalign_basecall_path(self, override_path=None):
+        """Get basecalled events used for signalAlign input
+        :param override_path: if passed, will look for alignment events at that path
+        """
+        try:
+            if override_path:
+                path = override_path
+            else:
+                path = self.check_path(self.__default_signalalign_events__, latest=True)
+            attributes = self[path].attrs
+            basecall_path = attributes["basecall_events"]
+        except KeyError:
+            raise KeyError('Read does not contain required fields: {}'.format(path))
+        return basecall_path
+
+    # todo fix path creation
     def get_eventalign_events(self, section=__default_section__):
         """Get signal align events, sam or mea alignment"""
         assert section in [self.__template_section__, self.__complement_section__], \
@@ -381,25 +420,6 @@ class Fast5(h5py.File):
         except KeyError:
             raise KeyError('Read does not contain required fields: {}'.format(path))
         return events
-
-    #todo fix path creation
-    def get_resegment_basecall(self, number=None):
-        """Get most recent resegmented basecall events table
-
-        :param number: manually select the resegment version
-
-        """
-        try:
-            if number:
-                path = self.__default_resegment_basecall__.format(number)
-            else:
-                path = self.check_path(self.__default_resegment_basecall__, latest=True)
-            reads = self[path]
-            events = reads['BaseCalled_template/Events']
-        except KeyError:
-            raise KeyError('Read does not contain required fields: {}'.format(path))
-        return np.asarray(events)
-
 
     def _get_read_data(self, read, indices=None):
         """Private accessor to read event data"""
@@ -709,6 +729,28 @@ class Fast5(h5py.File):
             )
             counter = 0
         return '{}_{:03d}'.format(root, counter)
+
+    def get_analysis_events_path_new(self, name, section=__default_section__):
+        return self._join_path(self.get_analysis_new(name), self.__default_basecall_1d_events__.format(section))
+
+    def get_analysis_path_new(self, name, section=__default_section__):
+        return self._join_path(self.get_analysis_new(name), self.__default_basecall_1d__.format(section))
+
+    def get_analysis_events_path_latest(self, name, section=__default_section__):
+        return self._join_path(self.get_analysis_latest(name), self.__default_basecall_1d_events__.format(section))
+
+    def ensure_path(self, path, include_last_element=False):
+        # get directory parts we want to find or create
+        parts = path.lstrip("/").split("/")
+        if not include_last_element:
+            parts = parts[:-1]
+
+        # iterate over all parts, ensuring directory structure exists
+        curr_path = "/"
+        for part in parts:
+            curr_path = os.path.join(curr_path, part)
+            if curr_path not in self:
+                self.create_group(curr_path)
 
     # The remaining are methods to read and write data as chimaera produces
     #    It is necessarily all a bit nasty, but should provide a more

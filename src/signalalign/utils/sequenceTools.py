@@ -614,16 +614,17 @@ def processReferenceFasta(fasta, work_folder, motifs=None, positions_file=None):
     return fw_fasta_path, bw_fasta_path
 
 
-def get_full_nucleotide_read_from_alignment(alignment_location, read_name):
+def get_full_nucleotide_read_from_alignment(alignment_location, read_name, hardclip_character=None):
     sequence, qualities, hardclipped_start, hardclipped_end = None, None, 0, 0
     with closing(pysam.AlignmentFile(alignment_location, 'rb' if alignment_location.endswith("bam") else 'r')) as aln:
         for aligned_segment in aln.fetch():
-            if aligned_segment.qname != read_name: continue
+            if read_name not in aligned_segment.qname:
+                continue
             BAM_CHARD_CLIP = 5
 
             # get data and sanity check
             sequence = aligned_segment.query_sequence.upper()
-            qualities = aligned_segment.query_qualities
+            qualities = aligned_segment.qual
             cigar_tuples = aligned_segment.cigartuples
             if cigar_tuples is None or len(cigar_tuples) == 0:
                 print("[get_full_nucleotide_read_from_alignment] no alignment found for {} in {}".format(
@@ -633,14 +634,16 @@ def get_full_nucleotide_read_from_alignment(alignment_location, read_name):
             # check for hard clipping
             if cigar_tuples[0][0] == BAM_CHARD_CLIP:
                 hardclipped_start = cigar_tuples[0][1]
-                sequence = ("N" * hardclipped_start) + sequence
-                if qualities is not None and len(qualities) != 0:
-                    qualities = ("!" * hardclipped_start) + qualities
+                if hardclip_character is not None:
+                    sequence = (hardclip_character * hardclipped_start) + sequence
+                    if qualities is not None and len(qualities) != 0:
+                        qualities = ("!" * hardclipped_start) + qualities
             if cigar_tuples[-1][0] == BAM_CHARD_CLIP:
                 hardclipped_end = cigar_tuples[-1][1]
-                sequence = sequence + ("N" * hardclipped_end)
-                if qualities is not None and len(qualities) != 0:
-                    qualities = qualities + ("!" * hardclipped_end)
+                if hardclip_character is not None:
+                    sequence = sequence + (hardclip_character * hardclipped_end)
+                    if qualities is not None and len(qualities) != 0:
+                        qualities = qualities + ("!" * hardclipped_end)
 
             # check for reverse mapping
             if aligned_segment.is_reverse:

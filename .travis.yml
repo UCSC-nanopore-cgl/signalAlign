@@ -30,7 +30,7 @@ before_install:
 - sudo apt-get install libbz2-dev
 - sudo apt-get install liblzma-dev
 - sudo apt-get install autotools-dev
-- sudo apt-get install autoconf
+- sudo apt-get install autoconf libopenblas-dev libhdf5-serial-dev cmake make libcunit1-dev
 - pip install google-compute-engine
 #- pip install tensorflow
 - git clone https://github.com/lh3/bwa.git
@@ -48,7 +48,7 @@ install:
 - if [[ "$TRAVIS_PYTHON_VERSION" == "2.7" ]]; then
     wget https://repo.continuum.io/miniconda/Miniconda2-latest-Linux-x86_64.sh -O miniconda.sh;
   else
-    wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh;
+    wget https://repo.continuum.io/miniconda/Miniconda3-4.5.4-Linux-x86_64.sh -O miniconda.sh;
   fi
 - bash miniconda.sh -b -p $HOME/miniconda
 - export PATH="$HOME/miniconda/bin:$PATH"
@@ -78,6 +78,11 @@ install:
 #- pip install -U numpy
 #- pip install -U h5py
 #- cd nanotensor
+
+before_script: # configure a headless display to test plot generation
+- "export DISPLAY=:99.0"
+- "sh -e /etc/init.d/xvfb start"
+- sleep 3 # give xvfb some time to start
 
 script:
 - export PATH=$PATH:$PWD/bin

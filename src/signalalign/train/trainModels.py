@@ -11,7 +11,7 @@ import numpy as np
 from timeit import default_timer as timer
 from argparse import ArgumentParser
 from shutil import copyfile
-from subprocess import Popen
+from subprocess import check_call
 
 from py3helpers.utils import create_dot_dict, merge_lists, all_string_permutations, save_json, load_json, \
     count_lines_in_file
@@ -311,7 +311,6 @@ class TrainSignalAlign(object):
     def train_hdp(self):
         """Train hdp.... duh?
         :param outpath: output file path
-        :param number_of_assignments: total number of assignments to collect FOR EACH GROUP
         :param build_alignment: path to alignment file
         :param num_alignments: number of alignments in alignment file
         :param threshold:
@@ -406,8 +405,8 @@ class TrainSignalAlign(object):
                                               leaf=self.args.hdp_args.leaf_gamma)
 
         print("[[trainModels_buildHdpUtil] Command: {}\n".format(build_initial_hdp_command))
-        procs = Popen(build_initial_hdp_command.split(), stdout=sys.stdout, stderr=sys.stderr)
-        procs.wait()
+        check_call(build_initial_hdp_command.split())
+
         print("[trainModels_buildHdpUtil] - finished training HDP emissions routine")
 
         # check if the HDP created models
@@ -695,7 +694,8 @@ def main():
             print("{config} not found".format(config=args.config))
             exit(1)
         # run training
-        TrainSignalAlign(args.config).expectation_maximization_training()
+        config_args = create_dot_dict(load_json(args.config))
+        TrainSignalAlign(config_args).expectation_maximization_training()
     else:
         print("Error, try: `trainModels run --config path/to/config.json`")
 

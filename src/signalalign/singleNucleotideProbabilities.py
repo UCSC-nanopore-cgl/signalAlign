@@ -13,6 +13,7 @@ import pysam
 from argparse import ArgumentParser
 from random import shuffle
 from contextlib import closing
+from py3helpers.utils import TimeStamp, merge_dicts
 from signalalign.nanoporeRead import NanoporeRead
 from signalalign.signalAlignment import multithread_signal_alignment
 from signalalign.scripts.alignmentAnalysisLib import CallMethylation
@@ -20,7 +21,9 @@ from signalalign.utils.fileHandlers import FolderHandler
 from signalalign.utils.sequenceTools import get_full_nucleotide_read_from_alignment, replace_periodic_reference_positions
 from signalalign.utils.multithread import *
 from signalalign.motif import getDegenerateEnum
-from signalalign.event_detection import generate_events_and_alignment
+# from signalalign.event_detection import save_event_table_and_fastq, run_kmeralign_exe, create_fastq_line
+from signalalign.event_detection import load_from_raw
+from signalalign.fast5 import Fast5
 
 
 READ_NAME_KEY = "read_name"
@@ -105,19 +108,19 @@ def resolvePath(p):
         return os.path.abspath(p)
 
 
-def organize_fast5s(fast5_locations):
+def organize_fast5s(fast5_locations, realign_all=False):
     # gathered data
     fast5_to_read_id = dict()
     requires_event_calling = list()
 
     # examine each fast5
     for fast5 in fast5_locations:
-        npr = NanoporeRead(fast5)
-        success = npr.Initialize()
+        npr = NanoporeRead(fast5, perform_kmer_event_alignment=False)
+        success = npr._initialize_metadata()
         read_id = npr.read_label
         fast5_id = os.path.basename(fast5)[:-6]
         fast5_to_read_id[fast5_id] = read_id
-        if not success:
+        if not success or realign_all:
             requires_event_calling.append((fast5, read_id))
         npr.close()
 
@@ -494,8 +497,9 @@ def variant_caller(work_queue, done_queue, service_name="variant_caller"):
         done_queue.put("{}:{}".format(FAILURE_KEY, failure_count))
 
 
-def event_detection(work_queue, done_queue, alignment_file, event_detection_strategy=None, event_detection_params=None,
-                    service_name="event_detection"):
+def event_detection(work_queue, done_queue, alignment_file, model_file_location,
+                    event_detection_strategy=None, event_detection_params=None,
+                    tmp_directory=None, write_failed_alignments=True, service_name="event_detection"):
     # prep
     total_handled = 0
     failure_count = 0
@@ -503,15 +507,17 @@ def event_detection(work_queue, done_queue, alignment_file, event_detection_stra
     #catch overall exceptions
     try:
         for tmp in iter(work_queue.get, 'STOP'):
+            # get data from iterator
             fast5, read_id = tmp['fast5']
+            np_handle = None
+
             # catch exceptions on each element
             try:
-                nucleotide, qualities, hardcode_front, hardcode_back = get_full_nucleotide_read_from_alignment(
-                    alignment_file, read_id)
-                success, _, _ = generate_events_and_alignment(fast5, nucleotide, nucleotide_qualities=qualities,
-                                                              save_to_fast5=False, overwrite=False)
+                np_handle = NanoporeRead(fast5, initialize=False)
+                success = load_from_raw(np_handle, alignment_file, model_file_location,
+                                        write_failed_alignments=write_failed_alignments)
                 if not success:
-                    failure_count += 1
+                    raise Exception("load_from_raw failed on read {} in {}".format(read_id, fast5))
 
             except Exception as e:
                 # get error and log it
@@ -520,6 +526,9 @@ def event_detection(work_queue, done_queue, alignment_file, event_detection_stra
                 print("[{}] ".format(service_name) + error)
                 done_queue.put(error)
                 failure_count += 1
+
+            finally:
+                if np_handle is not None: np_handle.close()
 
             # increment total handling
             total_handled += 1
@@ -547,6 +556,8 @@ def discover_single_nucleotide_probabilities(args, working_folder, kmer_length, 
     fast5_to_read, requires_event_calling = organize_fast5s(list_of_fast5s)
     print("[info] built map of fast5 identifiers to read ids with {} elements".format(len(fast5_to_read)))
 
+    # Decided to process the Fast5's on the fly.
+
     # promethION fast5s do not come with events, need to do event calling
     if len(requires_event_calling) > 0:
         # log and error checking
@@ -557,10 +568,12 @@ def discover_single_nucleotide_probabilities(args, working_folder, kmer_length, 
             sys.exit(1)
 
         # prep for event detection
+        event_detect_tmp_dir = os.path.join(working_folder.path, "event_detection_tmp")
+        if not os.path.isdir(event_detect_tmp_dir): os.mkdir(event_detect_tmp_dir)
         event_detection_service_args = {
             'alignment_file': args.alignment_file,
-            'event_detection_strategy': None,
-            'event_detection_params': None
+            'model_file_location': alignment_args['in_templateHmm'],
+            'tmp_directory': event_detect_tmp_dir
         }
 
         # do event detection
@@ -597,7 +610,7 @@ def discover_single_nucleotide_probabilities(args, working_folder, kmer_length, 
             substitution_ref = replace_periodic_reference_positions(reference_location, sub_fasta_path, step_size, s)
             alignment_args['forward_reference'] = substitution_ref
             # run alignment
-            multithread_signal_alignment(alignment_args, list_of_fast5s, workers)
+            alignments = multithread_signal_alignment(alignment_args, list_of_fast5s, workers)
 
             # get alignments
             alignments = [x for x in glob.glob(os.path.join(working_folder.path, "*.tsv")) if os.stat(x).st_size != 0]
