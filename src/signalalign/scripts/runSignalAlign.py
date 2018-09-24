@@ -175,7 +175,7 @@ def main(args):
         print("Creating output directory: {}".format(args.out), file=sys.stdout)
         os.mkdir(args.out)
     temp_folder = FolderHandler()
-    temp_dir_path = temp_folder.open_folder(os.path.join(args.out, "tempFiles_alignment"))
+    temp_dir_path = temp_folder.open_folder(os.path.join(os.path.abspath(args.out), "tempFiles_alignment"))
     temp_dir_path = resolvePath(temp_dir_path)
     print(args.out)
     print(temp_dir_path)

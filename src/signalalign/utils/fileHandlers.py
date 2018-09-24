@@ -52,7 +52,7 @@ class FolderHandler(object):
             self.open = False
             return
         if os.listdir(self.path) == []:
-            os.removedirs(self.path)
+            os.rmdir(self.path)
             self.open = False
             return
 

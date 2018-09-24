@@ -233,6 +233,7 @@ def load_from_raw(np_handle, alignment_file, model_file_location, path_to_bin=".
     # alignment failed, remove offending location (if it exists) and report
     else:
         print("[load_from_raw] error performing kmeralign", file=sys.stderr)
+        np_handle.open()
         np_handle.fastFive.delete(tmp_root, ignore=True)
         return False
 
