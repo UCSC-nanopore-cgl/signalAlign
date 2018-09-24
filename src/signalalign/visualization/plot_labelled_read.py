@@ -331,7 +331,6 @@ def main(args=None):
     else:
         f5_locations = [args.f5_path]
 
-
     for f5_path in f5_locations:
         save_fig_path = None
         cl_handle = CreateLabels(f5_path)

@@ -474,10 +474,11 @@ def index_bases_from_events(events, kmer_index=2):
                         bases.append(char_moves[x])
                         base_raw_lengths.append(event['raw_length'])
                     except IndexError:
-                        print(event["model_state"])
-                        print(event['move'])
-                        print(char_moves)
-                        print(kmer_index)
+                        pass
+                        # print(event["model_state"])
+                        # print(event['move'])
+                        # print(char_moves)
+                        # print(kmer_index)
     # gather last bases for the last event
     base_raw_starts.extend([event['raw_start'] for _ in event['model_state'][kmer_index + 1:]])
     probs.extend([event['p_model_state'] for _ in event['model_state'][kmer_index + 1:]])
