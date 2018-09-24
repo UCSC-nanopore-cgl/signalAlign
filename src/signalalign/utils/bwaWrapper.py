@@ -243,7 +243,7 @@ def get_aligned_segment_from_alignment_file(alignment_location, read_name):
     correct_segment = None
     with closing(pysam.AlignmentFile(alignment_location, 'rb' if alignment_location.endswith("bam") else 'r')) as aln:
         for aligned_segment in aln.fetch():
-            if aligned_segment.is_secondary or aligned_segment.is_unmapped:
+            if aligned_segment.is_secondary or aligned_segment.is_unmapped or aligned_segment.is_supplementary:
                 continue
             if read_name is not None and aligned_segment.qname != read_name and read_name not in aligned_segment.qname:
                 continue

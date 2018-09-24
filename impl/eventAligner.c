@@ -877,7 +877,7 @@ for(int col = 0; col <= 10; ++col) {
 
     bool failed = false;
     char *errMsg = NULL;
-    if (avg_log_emission < min_average_log_emission || !spanned || max_gap > max_gap_threshold) {
+    if (avg_log_emission < min_average_log_emission || !spanned || max_gap > max_gap_threshold || events_per_kmer > 5.0) {
         failed = true;
         errMsg = stString_print("FAILED\tavg_emission:%s;spanned:%s;max_gap:%s;writing:%s",
                                 (avg_log_emission < min_average_log_emission ?

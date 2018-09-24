@@ -27,6 +27,7 @@ class CreateLabelsTest(unittest.TestCase):
         cls.HOME = '/'.join(os.path.abspath(__file__).split("/")[:-4])
         cls.fasta = os.path.join(cls.HOME,
                                  "tests/test_sequences/E.coli_K12.fasta")
+        dna_file2 = "/Users/andrewbailey/data/oneD_human_r94/original_copies/DEAMERNANOPORE_20161117_FNFAB43577_MN16450_sequencing_run_MA_821_R9_4_NA12878_11_17_16_89607_ch36_read292_strand.fast5"
         dna_file = os.path.join(cls.HOME,
                                 "tests/minion_test_reads/1D/LomanLabz_PC_20161025_FNFAB42699_MN17633_sequencing_run_20161025_E_coli_native_450bps_82361_ch112_read108_strand.fast5")
         rna_file = os.path.join(cls.HOME,
@@ -35,17 +36,21 @@ class CreateLabelsTest(unittest.TestCase):
                                     "tests/minion_test_reads/RNA_edge_cases/DEAMERNANOPORE_20170922_FAH26525_MN16450_sequencing_run_MA_821_R94_NA12878_mRNA_09_22_17_67136_read_61_ch_151_strand.fast5")
 
         rna_reference = os.path.join(cls.HOME, "tests/test_sequences/fake_rna_reversed.fa")
-        dna_reference = os.path.join(cls.HOME, "tests/test_sequences/E.coli_K12.fasta")
+        ecoli_dna_reference = os.path.join(cls.HOME, "tests/test_sequences/E.coli_K12.fasta")
         # cls.tmp_directory = tempfile.mkdtemp()
         cls.tmp_directory = "/Users/andrewbailey/CLionProjects/nanopore-RNN/submodules/signalAlign/tests/minion_test_reads/delete_me_after_debugging"
         # get file locations
         cls.tmp_dna_file = os.path.join(str(cls.tmp_directory), 'test_dna.fast5')
+        cls.tmp_dna_file2 = os.path.join(str(cls.tmp_directory), 'test_dna2.fast5')
+
         cls.tmp_rna_file = os.path.join(str(cls.tmp_directory), 'test_rna.fast5')
         cls.tmp_rna_file2 = os.path.join(str(cls.tmp_directory), 'test_rna2.fast5')
 
         # run signalAlign on one file
         cls.rna_model_file = os.path.join(cls.HOME, "models/testModelR9p4_5mer_acgt_RNA.model")
-        cls.dna_model_file = os.path.join(cls.HOME, "models/testModelR9_acegt_template.model")
+        cls.dna_model_file_94 = os.path.join(cls.HOME, "models/testModelR9p4_5mer_acegt_template.model")
+        cls.dna_model_file = os.path.join(cls.HOME, "models/testModelR9_acgt_template.model")
+        cls.dna_model_file_73 = os.path.join(cls.HOME, "models/testModelR73_acegt_template.model")
         cls.rna_sam = os.path.join(cls.HOME, "tests/minion_test_reads/RNA_edge_case.sam")
         cls.dna_sam = os.path.join(cls.HOME, "tests/minion_test_reads/oneD_alignments.sam")
         cls.bin_path = os.path.join(cls.HOME, "bin")
@@ -54,7 +59,9 @@ class CreateLabelsTest(unittest.TestCase):
         # shutil.copy(dna_file, cls.tmp_dna_file)
         # shutil.copy(rna_file, cls.tmp_rna_file)
         # shutil.copy(old_rna_file, cls.tmp_rna_file2)
-
+        # shutil.copy(dna_file2, cls.tmp_dna_file2)
+        cls.dna_sam2 = "/Users/andrewbailey/data/oneD_human_r94/oneD_human_r94.sam"
+        human_reference = "/Users/andrewbailey/data/references/human_dna/GRCh38_full_analysis_set_plus_decoy_hla.fa"
         # args = create_signalAlignment_args(destination=cls.tmp_directory,
         #                                    in_templateHmm=cls.rna_model_file,
         #                                    alignment_file=cls.rna_sam,
@@ -76,10 +83,23 @@ class CreateLabelsTest(unittest.TestCase):
         # sa_h = SignalAlignment(**merge_dicts([args, {'in_fast5': cls.tmp_rna_file2}]))
         # sa_h.run()
 
+        # args = create_signalAlignment_args(destination=cls.tmp_directory,
+        #                                    in_templateHmm=cls.dna_model_file_94,
+        #                                    alignment_file=cls.dna_sam2,
+        #                                    forward_reference=human_reference,
+        #                                    embed=True,
+        #                                    path_to_bin=cls.bin_path,
+        #                                    # event_table="Basecall_1D_000",
+        #                                    perform_kmer_event_alignment=True,
+        #                                    diagonal_expansion=50)
+        # sa_h = SignalAlignment(**merge_dicts([args, {'in_fast5': cls.tmp_dna_file2}]))
+        # sa_h.run()
+
+
         args = create_signalAlignment_args(destination=cls.tmp_directory,
-                                           in_templateHmm=cls.dna_model_file,
+                                           in_templateHmm=cls.dna_model_file_94,
                                            alignment_file=cls.dna_sam,
-                                           forward_reference=dna_reference,
+                                           forward_reference=ecoli_dna_reference,
                                            embed=True,
                                            path_to_bin=cls.bin_path,
                                            # event_table="Basecall_1D_000",

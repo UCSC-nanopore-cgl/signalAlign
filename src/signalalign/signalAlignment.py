@@ -289,12 +289,14 @@ class SignalAlignment(object):
                 posteriors_file_path = os.path.join(self.destination, read_label + model_label + ".tsv")
             else:
                 posteriors_file_path = os.path.join(self.destination, read_label + model_label + ".assignments.tsv")
-
         # sanity check
         else:
             self.failStop("[SignalAlignment.run] ERROR Unexpected strand {}".format(strand), npRead)
             return False
 
+        if os.path.isfile(posteriors_file_path):
+            print("[SignalAlignment.run] NOTICE: Removing previous alignment file {}".format(posteriors_file_path))
+            os.remove(posteriors_file_path)
         # flags
         template_model_flag = "-T {} ".format(self.in_templateHmm)
         if self.twoD_chemistry:
@@ -625,15 +627,17 @@ def multithread_signal_alignment(signal_align_arguments, fast5_locations, worker
     assert os.path.exists(signal_align_arguments['destination']), \
         "Destination path does not exist: {}".format(signal_align_arguments['destination'])
     # run the signal_align_service
-    print("[multithread_signal_alignment] running signal_alignment on {} fast5s with {} workers".format(
-        len(fast5_locations), worker_count))
     if debug:
+        print("[multithread_signal_alignment] running signal_alignment on {} fast5s with 1 worker".format(
+            len(fast5_locations)))
+
         for in_fast5 in fast5_locations:
             f = merge_dicts([signal_align_arguments, {"in_fast5": in_fast5}])
             alignment = SignalAlignment(**f)
             success = alignment.run()
     else:
-
+        print("[multithread_signal_alignment] running signal_alignment on {} fast5s with {} workers".format(
+            len(fast5_locations), worker_count))
         total, failure, messages = multithread.run_service(
             signal_alignment_service, fast5_locations, signal_align_arguments, 'in_fast5', worker_count)
 

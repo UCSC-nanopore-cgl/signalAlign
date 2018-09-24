@@ -169,7 +169,7 @@ def main(args):
 
     # make directory to put temporary files
     temp_folder = FolderHandler()
-    temp_dir_path = temp_folder.open_folder(args.out + "/tempFiles_alignment")
+    temp_dir_path = temp_folder.open_folder(os.path.join(os.path.abspath(args.out), "tempFiles_alignment"))
     #
     if not args.forward_reference or not args.backward_reference:
         args.forward_reference, args.backward_reference = processReferenceFasta(fasta=args.bwa_reference,
