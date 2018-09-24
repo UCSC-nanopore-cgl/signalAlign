@@ -13,6 +13,7 @@ import sys
 import os
 import colorsys
 import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 import matplotlib.patches as mplpatches
 from matplotlib.collections import LineCollection
 
@@ -23,6 +24,15 @@ from timeit import default_timer as timer
 from argparse import ArgumentParser
 from signalalign.alignedsignal import AlignedSignal, CreateLabels
 from py3helpers.utils import list_dir
+
+
+MEA = 'm'
+SA_FULL = 's'
+BASECALL = 'b'
+EVENT_INDEX = 'e'
+SA_ALIGNMENT_DIFF = 'd'
+ABS_SA_ALIGNMENT_DIFF = 'D'
+RAW_START = 'r'
 
 
 def parse_args():
@@ -195,6 +205,7 @@ class PlotSignal(object):
             plt.savefig(save_fig_path)
         else:
             plt.show()
+            pass
 
 
 def get_spaced_colors(n):
@@ -208,53 +219,156 @@ def get_spaced_colors(n):
     return list(rgb_tuples)
 
 
-def main():
+def analyze_event_skips(mea_events, sa_full_events, basecall_events,
+                        generate_plot=True):
+    # prep
+    raw_start = lambda x: x['raw_start'] if 'raw_start' in x else x[0]
+    event_rank = lambda x: x['posterior_probability'] if 'posterior_probability' in x else x[3]
+    aligned_position = lambda x: x['reference_index'] if 'reference_index' in x else x[2]
+
+    # build datastructure holding all events by raw start
+    raw_start_to_event = dict()
+    def add_event(event, type):
+        key = raw_start(event)
+        if key not in raw_start_to_event:
+            raw_start_to_event[key] = dict()
+        if type in raw_start_to_event[key]:
+            if event_rank(raw_start_to_event[key][type]) > event_rank(event):
+                return
+        raw_start_to_event[key][type] = event
+    list(map(lambda x: add_event(x, MEA), mea_events))
+    list(map(lambda x: add_event(x, SA_FULL), sa_full_events))
+    list(map(lambda x: add_event(x, BASECALL), basecall_events))
+
+    # enumerating events
+    all_event_keys = list(raw_start_to_event.keys())
+    all_event_keys.sort()
+    raw_start_to_event_idx = {s:i for i, s in enumerate(all_event_keys)}
+    event_idx_to_raw_start = {i:s for i, s in enumerate(all_event_keys)}
+    max_event_idx = max(event_idx_to_raw_start.keys())
+
+    # finding distance to basecall
+    sa_event_summary = dict()
+    for i, raw_start in enumerate(all_event_keys):
+        # skip events only aligned in orig basecall
+        if SA_FULL not in raw_start_to_event[raw_start]: continue
+
+        # get sa_full event
+        sa_full = raw_start_to_event[raw_start][SA_FULL]
+
+        # aligned distance is easy
+        if BASECALL in raw_start_to_event[raw_start]:
+            difference = aligned_position(sa_full) - aligned_position(raw_start_to_event[raw_start][BASECALL])
+
+        # if they're not aligned, take the mean reference pos between the prev and next alignment
+        else:
+            last_aligned_pos = None
+            j = i
+            while j >= 0:
+                j_rs = event_idx_to_raw_start[j]
+                if BASECALL in raw_start_to_event[j_rs]:
+                    last_aligned_pos = aligned_position(raw_start_to_event[j_rs][BASECALL])
+                    break
+                j -= 1
+
+            next_aligned_pos = None
+            j = i
+            while j <= max_event_idx:
+                j_rs = event_idx_to_raw_start[j]
+                if BASECALL in raw_start_to_event[j_rs]:
+                    next_aligned_pos = aligned_position(raw_start_to_event[j_rs][BASECALL])
+                    break
+                j += 1
+
+            all_reference_pos = list(filter(lambda x: x is not None, [last_aligned_pos, next_aligned_pos]))
+            avg_reference_pos = int(np.mean(all_reference_pos))
+            difference = aligned_position(sa_full) - avg_reference_pos
+
+        sa_event_summary[raw_start] = {
+            SA_FULL: sa_full,
+            MEA: MEA in raw_start_to_event[raw_start],
+            EVENT_INDEX: raw_start_to_event_idx[raw_start],
+            SA_ALIGNMENT_DIFF: difference,
+            ABS_SA_ALIGNMENT_DIFF: abs(difference),
+            RAW_START: raw_start
+        }
+
+    # get all summary info
+    summaries = list(sa_event_summary.values())
+    summaries.sort(key=lambda x: x[RAW_START])
+
+    # separate based on mea and not mea
+    summaries__mea_event_idx = list(map(lambda x: x[EVENT_INDEX], list(filter(lambda x: x[MEA], summaries))))
+    summaries__mea_difference = list(map(lambda x: x[SA_ALIGNMENT_DIFF], list(filter(lambda x: x[MEA], summaries))))
+    summaries__no_mea_event_idx = list(map(lambda x: x[EVENT_INDEX], list(filter(lambda x: not x[MEA], summaries))))
+    summaries__no_mea_difference = list(map(lambda x: x[SA_ALIGNMENT_DIFF], list(filter(lambda x: not x[MEA], summaries))))
+
+    # plot it if appropriate
+    if generate_plot is not None and generate_plot:
+        plt.plot(summaries__mea_event_idx, summaries__mea_difference, color='blue', label='MEA')
+        plt.scatter(summaries__no_mea_event_idx, summaries__no_mea_difference, color='red', label='Not MEA', alpha=.5, s=10)
+        plt.xlabel("Event Index")
+        plt.ylabel("Reference Alignment Difference: (SignalAlignRefPos - CigarStringRefPos)")
+        plt.legend()
+
+        if type(generate_plot) == str:
+            plt.savefig(generate_plot)
+            plt.close()
+        else:
+            plt.show()
+
+    return summaries
+
+
+def main(args=None):
     """Plot event to reference labelled ONT nanopore reads """
     start = timer()
 
-    args = parse_args()
-    assert args.mea or args.sa_full or args.basecall, "--mea, --sa_full or --basecall must be set."
+    args = args if args is not None else parse_args()
 
     if args.dir:
-        for f5_path in list_dir(args.dir, ext="fast5"):
-            save_fig_path = None
-            cl_handle = CreateLabels(f5_path)
-            if args.output_dir:
-                save_fig_path = "{}.png".format(os.path.join(args.output_dir,
-                                                             os.path.splitext(os.path.basename(f5_path))[0]))
-            if args.mea:
-                for number in args.mea:
-                    cl_handle.add_mea_labels(number=int(number))
-            if args.sa_full:
-                for number in args.sa_full:
-                    cl_handle.add_signal_align_predictions(number=int(number))
-            if args.basecall:
-                for number in args.basecall:
-                    cl_handle.add_basecall_alignment_prediction(number=int(number))
-
-            print("Plotting {}".format(args.f5_path))
-            ps = PlotSignal(cl_handle.aligned_signal)
-            ps.plot_alignment(save_fig_path=save_fig_path, plot_alpha=args.plot_alpha)
-
+        f5_locations = list_dir(args.dir, ext="fast5")
     else:
+        f5_locations = [args.f5_path]
+
+
+    for f5_path in f5_locations:
         save_fig_path = None
-        cl_handle = CreateLabels(args.f5_path)
+        cl_handle = CreateLabels(f5_path)
         if args.output_dir:
             save_fig_path = "{}.png".format(os.path.join(args.output_dir,
-                                                         os.path.splitext(os.path.basename(args.f5_path))[0]))
+                                                         os.path.splitext(os.path.basename(f5_path))[0]))
+
+        mea_list = list()
         if args.mea:
             for number in args.mea:
-                cl_handle.add_mea_labels(number=int(number))
+                mea = cl_handle.add_mea_labels(number=int(number))
+                mea_list.append(mea)
+
+        sa_full_list = list()
         if args.sa_full:
             for number in args.sa_full:
-                cl_handle.add_signal_align_predictions(number=int(number), add_basecall=True)
+                sa_full = cl_handle.add_signal_align_predictions(number=int(number))
+                sa_full_list.append(sa_full)
 
+        basecall_list = list()
         if args.basecall:
             for number in args.basecall:
-                cl_handle.add_basecall_alignment_prediction(number=int(number))
+                matches, mismatches = cl_handle.add_basecall_alignment_prediction(number=int(number))
+                basecall = list()
+                basecall.extend(matches)
+                basecall.extend(mismatches)
+                basecall.sort(key=lambda x: x['raw_start'])
+                basecall_list.append(basecall)
+
+        max_analysis_index = min(map(lambda x: len(x), [mea_list, sa_full_list])) if args.basecall else []
+        for i in range(max_analysis_index):
+            print("Analyzing events for index {}".format(i))
+            analyze_event_skips(mea_list[i], sa_full_list[i], basecall_list[i])
+
         print("Plotting {}".format(args.f5_path))
         ps = PlotSignal(cl_handle.aligned_signal)
-        ps.plot_alignment(save_fig_path=save_fig_path, plot_alpha=False, plot_lines=False)
+        ps.plot_alignment(save_fig_path=save_fig_path, plot_alpha=args.plot_alpha)
 
     stop = timer()
     print("Running Time = {} seconds".format(stop - start), file=sys.stderr)

@@ -1328,6 +1328,9 @@ void getPosteriorProbsWithBanding(StateMachine *sM,
         //Condition true when we want to do an intermediate traceback.
         bool tracebackPoint = diagonal_getXay(diagonal) >= tracedBackTo + p->minDiagsBetweenTraceBack
                               && diagonal_getWidth(diagonal) <= p->diagonalExpansion * 2 + 1;
+        //TODO the intermediate traceback causes a set of poorly-aligned events to show up at the traceback points
+        // this should be investigated, but for now, this fixes it and probably causes higher memory usage
+        tracebackPoint = FALSE;
 
         // Traceback
         if (atEnd || tracebackPoint) {

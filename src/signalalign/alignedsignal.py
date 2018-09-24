@@ -21,9 +21,14 @@ from signalalign.fast5 import Fast5
 from signalalign.mea_algorithm import maximum_expected_accuracy_alignment, mea_slow, \
     mea_slower, create_random_prob_matrix, get_mea_params_from_events, match_events_with_signalalign, \
     create_label_from_events
-from signalalign.event_detection import time_to_index, index_to_time
+from signalalign.event_detection import add_raw_start_and_raw_length_to_events
 from itertools import islice
 
+#TODO see if these get used, and if not remove them.  otherwise, fix them
+def time_to_index(event_table, sampling_freq=0, start_time=0):
+    raise Exception("This function is deprecated; you should find a better way to assert raw_start and raw_length fields")
+def index_to_time(event_table, sampling_freq=0, start_time=0):
+    raise Exception("This function is deprecated; you should find a better way to assert start and length fields")
 
 class AlignedSignal(object):
     """Labeled nanopore signal data"""
@@ -89,7 +94,7 @@ class AlignedSignal(object):
         # check the labels are in the correct format
         assert min(label["raw_start"]) >= 0, "Raw start cannot be less than 0"
         assert 0 <= max(label["posterior_probability"]) <= 1, \
-            "posterior_probability must be between zero and one {}".format(row["posterior_probability"])
+            "posterior_probability must be between zero and one {}".format(max(label["posterior_probability"]))
         if label_type == 'guide':
             assert guide_name is not None, "If label_type is 'guide', you must pass in a guide_name"
         # make sure last label can actually index the signal correctly
@@ -187,7 +192,7 @@ class CreateLabels(Fast5):
             mea_alignment["reference_index"] += self.kmer_index
 
         self.aligned_signal.add_label(mea_alignment, name=name, label_type='label')
-        return True
+        return mea_alignment
 
     def add_signal_align_predictions(self, number=None, add_basecall=False):
         """Create prediction using probabilities from full output format from signalAlign
@@ -208,21 +213,13 @@ class CreateLabels(Fast5):
             basecall_events_path = self.get_signalalign_basecall_path()
             name = "full_signalalign"
         # cut out duplicates
-        # sa_events = np.unique(sa_events)
         if add_basecall:
             try:
                 events = self[basecall_events_path][()]
             except:
-                raise ValueError('Could not retrieve basecall_1D data from {}'.format(events_path))
+                raise ValueError('Could not retrieve basecall_1D data from events')
             self.add_basecall_alignment_prediction(my_events=events,
                                                    number=basecall_events_path[24])
-        # try:
-        #     check_numpy_table(events, req_fields=('raw_start', 'raw_length'))
-        #     # if events do not have raw_start or raw_lengths
-        # except KeyError:
-        #     events = time_to_index(events,
-        #                            sampling_freq=self.sample_rate,
-        #                            start_time=self.raw_attributes["start_time"])
         predictions = create_label_from_events(sa_events)
 
         # predictions = match_events_with_signalalign(sa_events=sa_events, event_detections=events)
@@ -232,7 +229,7 @@ class CreateLabels(Fast5):
         else:
             predictions["reference_index"] += self.kmer_index
         self.aligned_signal.add_label(predictions, name=name, label_type='prediction')
-        return True
+        return predictions
 
     def add_basecall_alignment_prediction(self, sam=None, number=None, add_mismatches=False, my_events=None):
         """Add the original basecalled event table and add matches and missmatches to 'prediction'
@@ -270,18 +267,7 @@ class CreateLabels(Fast5):
             check_numpy_table(events, req_fields=('raw_start', 'raw_length'))
         # if events do not have raw_start or raw_lengths
         except KeyError:
-            try:
-                events = time_to_index(events,
-                                       sampling_freq=self.sample_rate,
-                                       start_time=self.raw_attributes["start_time"])
-            # catch error for dumb rna data from ONT
-            except AssertionError:
-                events = index_to_time(events,
-                                       sampling_freq=self.sample_rate,
-                                       start_time=self.raw_attributes["start_time"])
-                events = time_to_index(events,
-                                       sampling_freq=self.sample_rate,
-                                       start_time=self.raw_attributes["start_time"])
+            events = add_raw_start_and_raw_length_to_events(events, self.sample_rate, self.raw_attributes["start_time"])
 
         matches, mismatches, raw_starts = match_cigar_with_basecall_guide(events=events, sam_string=sam,
                                                                           kmer_index=self.kmer_index)
@@ -298,7 +284,7 @@ class CreateLabels(Fast5):
             self.aligned_signal.add_label(mismatches, name=mismatches_name, label_type='prediction')
         self.aligned_signal.add_raw_starts(raw_starts)
 
-        return True
+        return matches, mismatches
 
     def add_basecall_alignment_guide(self, sam=None, event_table_path=None):
         """Add the original basecalled event table and add the 'guide' alignment labels to signal_label handle
@@ -379,12 +365,7 @@ def create_labels_from_guide_alignment(events, sam_string, rna=False, reference_
     :param one_ref_indexing: boolean zero or 1 based indexing for reference
     """
     # test if the required fields are in structured numpy array
-    try:
-        check_numpy_table(events, req_fields=('raw_start', 'model_state', 'p_model_state', 'raw_length', 'move'))
-    except IndexError:
-        assert basecall_events["start"].dtype is np.dtype('uint64'), "Event 'start' should be np.int32 type: {}" \
-            .format(basecall_events["start"].dtype)
-        events = time_to_index(events, sampling_freq=self.sample_rate, start_time=self.raw_attributes['start_time'])
+    check_numpy_table(events, req_fields=('raw_start', 'model_state', 'p_model_state', 'raw_length', 'move'))
 
     assert type(one_ref_indexing) is bool, "one_ref_indexing must be a boolean"
 
@@ -661,13 +642,7 @@ def match_cigar_with_basecall_guide(events, sam_string, kmer_index, rna=False, r
     :param kmer_index: index of the kmer to select for reference to event mapping
     :param one_ref_indexing: boolean zero or 1 based indexing for reference
     """
-    try:
-        check_numpy_table(events, req_fields=('raw_start', 'model_state', 'p_model_state', 'raw_length', 'move'))
-    except IndexError:
-        assert basecall_events["start"].dtype is np.dtype('uint64'), "Event 'start' should be np.int32 type: {}" \
-            .format(basecall_events["start"].dtype)
-        events = time_to_index(events, sampling_freq=self.sample_rate, start_time=self.raw_attributes['start_time'])
-
+    check_numpy_table(events, req_fields=('raw_start', 'model_state', 'p_model_state', 'raw_length', 'move'))
     assert type(one_ref_indexing) is bool, "one_ref_indexing must be a boolean"
 
     psam_h = initialize_aligned_segment_wrapper(sam_string, reference_path=reference_path)
