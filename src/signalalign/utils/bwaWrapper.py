@@ -8,6 +8,7 @@ import pysam
 import numpy as np
 
 from signalalign import _parseCigar
+from Bio import SeqIO
 
 
 class GuideAlignment(object):
@@ -240,6 +241,7 @@ def get_aligned_segment_from_alignment_file(alignment_location, read_name):
     # get reads from alignment file (sam or bam)
     n_aligned_segments = 0
     correct_segment = None
+    reference_name = None
     with closing(pysam.AlignmentFile(alignment_location, 'rb' if alignment_location.endswith("bam") else 'r')) as aln:
         for aligned_segment in aln.fetch():
             if aligned_segment.is_secondary or aligned_segment.is_unmapped \
@@ -249,7 +251,8 @@ def get_aligned_segment_from_alignment_file(alignment_location, read_name):
                 continue
             n_aligned_segments += 1
             correct_segment = aligned_segment
-        reference_name = aln.getrname(correct_segment.rname)
+        if correct_segment is not None:
+            reference_name = aln.getrname(correct_segment.rname)
 
     return correct_segment, n_aligned_segments, reference_name
 
@@ -267,14 +270,26 @@ def check_number_of_passing_reads(sam, fastq):
 
     total = 0
     passed = 0
+    not_primary = 0
+    av_phred_score_count = 0
 
     for record in SeqIO.parse(fastq, "fastq"):
         av_phred_score = np.mean(record.letter_annotations["phred_quality"])
         correct_segment, n_aligned_segments, reference_name = get_aligned_segment_from_alignment_file(sam, record.id)
-        if correct_segment is not None and n_aligned_segments == 1 and av_phred_score >= 7:
+        if correct_segment is None and n_aligned_segments != 1:
+            not_primary += 1
+            if av_phred_score < 7:
+                av_phred_score_count += 1
+        elif av_phred_score < 7:
+            av_phred_score_count += 1
+        else:
             passed += 1
+
         total += 1
 
-    print("total = {}\npassed = {}".format(total, passed))
+    print("total = {}\npassed = {}\nno_suitable_alignment = {}\nnum av_phred_score < 7 = {}".format(total,
+                                                                                                passed,
+                                                                                                not_primary,
+                                                                                                av_phred_score_count))
 
     return total, passed

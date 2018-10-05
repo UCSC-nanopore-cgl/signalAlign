@@ -96,8 +96,9 @@ def parse_args(args=None):
     return args
 
 
-def run_sa(fast5s, alignment_args):
-
+def get_all_event_summaries(fast5s, alignment_args, aln_dist_threshold=10, generate_plot=True, verbose=False):
+    start = timer()
+    all_event_summaries = dict()
     # argments required for this to work
     alignment_args['output_format'] = 'full'
     alignment_args['embed'] = True
@@ -107,10 +108,6 @@ def run_sa(fast5s, alignment_args):
     print("\n[validateSignalAlignment]: running signalAlign in preparation for validation", file=sys.stdout)
     multithread_signal_alignment(alignment_args, fast5s)
 
-
-def get_all_event_summaries(fast5s, aln_dist_threshold=10, generate_plot=True, verbose=False):
-    start = timer()
-    all_event_summaries = dict()
     print("\n[validateSignalAlignment]: performing validation", file=sys.stdout)
     for f5_path in fast5s:
         print("[validateSignalAlignment]: validating {}".format(f5_path), file=sys.stdout)
@@ -226,25 +223,23 @@ def main():
         sys.exit(1)
     print("[validateSignalAlignment] Found {} files".format(len(orig_fast5s)), file=sys.stdout)
     #
-    # alignment_args = create_signalAlignment_args(
-    #     # signal align args
-    #     destination=temp_signal_align,
-    #     stateMachineType=args.stateMachineType,
-    #     bwa_reference=args.ref,
-    #     forward_reference=args.ref,
-    #     in_templateHmm=args.in_T_Hmm,
-    #     in_complementHmm=args.in_C_Hmm,
-    #     in_templateHdp=args.templateHDP,
-    #     in_complementHdp=args.complementHDP,
-    #     threshold=args.threshold,
-    #     diagonal_expansion=args.diag_expansion,
-    #     constraint_trim=args.constraint_trim,
-    #     degenerate=getDegenerateEnum(args.degenerate),
-    #     perform_kmer_event_alignment=args.perform_kmer_event_alignment,
-    #     path_to_bin="/Users/andrewbailey/CLionProjects/nanopore-RNN/submodules/signalAlign/bin"
-    # )
-
-    get_all_event_summaries(orig_fast5s, aln_dist_threshold=args.aln_dist_threshold, verbose=args.verbose)
+    alignment_args = create_signalAlignment_args(
+        # signal align args
+        destination=temp_signal_align,
+        stateMachineType=args.stateMachineType,
+        bwa_reference=args.ref,
+        forward_reference=args.ref,
+        in_templateHmm=args.in_T_Hmm,
+        in_complementHmm=args.in_C_Hmm,
+        in_templateHdp=args.templateHDP,
+        in_complementHdp=args.complementHDP,
+        threshold=args.threshold,
+        diagonal_expansion=args.diag_expansion,
+        constraint_trim=args.constraint_trim,
+        degenerate=getDegenerateEnum(args.degenerate),
+        perform_kmer_event_alignment=args.perform_kmer_event_alignment,
+    )
+    get_all_event_summaries(orig_fast5s, alignment_args, aln_dist_threshold=args.aln_dist_threshold, verbose=args.verbose)
 
 
 if __name__ == "__main__":
