@@ -32,7 +32,7 @@ def create_signalAlignment_args(backward_reference=None, forward_reference=None,
                                 track_memory_usage=False, get_expectations=False, output_format='full', embed=False,
                                 event_table=False,
                                 check_for_temp_file_existance=True,
-                                path_to_bin='./', perform_kmer_event_alignment=None):
+                                path_to_bin='./', perform_kmer_event_alignment=None, filter_reads=False):
     """Create alignment arguments for SignalAlign. Parameters are explained in SignalAlignment"""
     alignment_args = {
         "backward_reference": backward_reference,
@@ -58,7 +58,8 @@ def create_signalAlignment_args(backward_reference=None, forward_reference=None,
         'event_table': event_table,
         'check_for_temp_file_existance': check_for_temp_file_existance,
         'path_to_bin': path_to_bin,
-        'perform_kmer_event_alignment': perform_kmer_event_alignment}
+        'perform_kmer_event_alignment': perform_kmer_event_alignment,
+        'filter_reads': filter_reads}
 
     return alignment_args
 
@@ -94,7 +95,8 @@ class SignalAlignment(object):
                  # True: always perform, False: never perform, None: perform if required
                  perform_kmer_event_alignment=None,
                  # parameter for nanopore reads
-                 enforce_supported_versions=True):
+                 enforce_supported_versions=True,
+                 filter_reads=False):
         self.in_fast5 = in_fast5  # fast5 file to align
         self.destination = destination  # place where the alignments go, should already exist
         self.stateMachineType = stateMachineType  # flag for signalMachine
@@ -123,6 +125,7 @@ class SignalAlignment(object):
         self.path_to_signalMachine = os.path.join(path_to_bin, "signalMachine")  # path to signalMachine
         self.perform_kmer_event_alignment = perform_kmer_event_alignment
         self.enforce_supported_versions = enforce_supported_versions
+        self.filter_reads = filter_reads  # filter reads out with average fastq quality scores less than 7
 
         assert os.path.exists(self.path_to_signalMachine), "Path to signalMachine does not exist"
         assert self.bwa_reference is not None or self.alignment_file is not None, \
@@ -165,12 +168,14 @@ class SignalAlignment(object):
         if self.twoD_chemistry:
             npRead = NanoporeRead2D(fast_five_file=self.in_fast5, event_table=self.event_table, initialize=True,
                                     path_to_bin=self.path_to_bin, enforce_supported_versions=self.enforce_supported_versions,
-                                    perform_kmer_event_alignment=self.perform_kmer_event_alignment)
+                                    perform_kmer_event_alignment=self.perform_kmer_event_alignment,
+                                    filter_reads=self.filter_reads)
         else:
             npRead = NanoporeRead(fast_five_file=self.in_fast5, event_table=self.event_table, initialize=True,
                                   path_to_bin=self.path_to_bin, alignment_file=self.alignment_file,
                                   model_file_location=self.in_templateHmm, enforce_supported_versions=self.enforce_supported_versions,
-                                  perform_kmer_event_alignment=self.perform_kmer_event_alignment)
+                                  perform_kmer_event_alignment=self.perform_kmer_event_alignment,
+                                  filter_reads=self.filter_reads)
         # sanity check
         if not npRead.initialize_success:
             self.failStop("[SignalAlignment.run] ERROR: NanoporeRead failed initialization: {}".format(self.in_fast5),
@@ -628,7 +633,7 @@ def multithread_signal_alignment(signal_align_arguments, fast5_locations, worker
     optional_arguments = {'backward_reference', 'alignment_file', 'bwa_reference', 'twoD_chemistry',
                           'target_regions', 'output_format', 'embed', 'event_table', 'check_for_temp_file_existance',
                           'track_memory_usage', 'get_expectations', 'path_to_bin', 'perform_kmer_event_alignment',
-                          'enforce_supported_versions'}
+                          'enforce_supported_versions', 'filter_reads'}
     missing_arguments = list(filter(lambda x: x not in signal_align_arguments.keys(), required_arguments))
     unexpected_arguments = list(filter(lambda x: x not in required_arguments and x not in optional_arguments,
                                        signal_align_arguments.keys()))

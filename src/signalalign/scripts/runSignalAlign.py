@@ -110,7 +110,8 @@ def parse_args():
     parser.add_argument('--allow_unsupported_nanopore_read_versions', action='store_false',
                         dest="enforce_supported_versions", default=True,
                         help="Will attempt to complete execution with unsupported nanopore read versions")
-
+    parser.add_argument('--filter_reads', action='store_true', default=False, dest='filter_reads',
+                        help="Will filter reads out if average fastq quality scores are below 7.")
     args = parser.parse_args()
     return args
 
@@ -223,7 +224,8 @@ def main(args):
         "track_memory_usage": False,
         "get_expectations": False,
         "perform_kmer_event_alignment": args.perform_kmer_event_alignment,
-        "enforce_supported_versions": args.enforce_supported_versions
+        "enforce_supported_versions": args.enforce_supported_versions,
+        "filter_reads": args.filter_reads
     }
 
     print("[runSignalAlign]:NOTICE: Got {} files to align".format(len(fast5s)), file=sys.stdout)

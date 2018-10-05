@@ -96,8 +96,7 @@ def parse_args(args=None):
     return args
 
 
-def get_all_event_summaries(fast5s, alignment_args, aln_dist_threshold=10, generate_plot=True, verbose=False):
-    start = timer()
+def run_sa(fast5s, alignment_args):
 
     # argments required for this to work
     alignment_args['output_format'] = 'full'
@@ -108,6 +107,9 @@ def get_all_event_summaries(fast5s, alignment_args, aln_dist_threshold=10, gener
     print("\n[validateSignalAlignment]: running signalAlign in preparation for validation", file=sys.stdout)
     multithread_signal_alignment(alignment_args, fast5s)
 
+
+def get_all_event_summaries(fast5s, aln_dist_threshold=10, generate_plot=True, verbose=False):
+    start = timer()
     all_event_summaries = dict()
     print("\n[validateSignalAlignment]: performing validation", file=sys.stdout)
     for f5_path in fast5s:
@@ -204,20 +206,17 @@ def main():
         sys.exit(1)
 
     # make directory to put temporary files and output location
-    output_location = args.out
+    output_location = os.path.abspath(args.out)
     if output_location is None:
         output_root = tempfile.TemporaryDirectory()
     else:
         if not os.path.isdir(output_location):
             os.mkdir(output_location)
         output_root = output_location
-    temp_root = FolderHandler()
-    temp_fast5_dir = temp_root.open_folder(os.path.join(output_root, "temp_fast5"))
     temp_signal_align_dir = os.path.join(output_root, "temp_signalAlign")
     if os.path.isdir(temp_signal_align_dir):
         shutil.rmtree(temp_signal_align_dir)
         assert not os.path.isdir(temp_signal_align_dir)
-    temp_signal_align = temp_root.open_folder(temp_signal_align_dir)
 
     # get input files
     input_glob = args.fast5_glob if args.fast5_glob is not None else os.path.join(args.files_dir, "*.fast5")
@@ -225,31 +224,27 @@ def main():
     if len(orig_fast5s) == 0:
         print("[validateSignalAlignment] Did not find any files matching {}".format(input_glob), file=sys.stderr)
         sys.exit(1)
-    fast5s = list()
-    for file in orig_fast5s:
-        dest = os.path.join(temp_fast5_dir, os.path.basename(file))
-        shutil.copy(file, dest)
-        fast5s.append(dest)
-    print("[validateSignalAlignment] Found {} files".format(len(fast5s)), file=sys.stdout)
+    print("[validateSignalAlignment] Found {} files".format(len(orig_fast5s)), file=sys.stdout)
+    #
+    # alignment_args = create_signalAlignment_args(
+    #     # signal align args
+    #     destination=temp_signal_align,
+    #     stateMachineType=args.stateMachineType,
+    #     bwa_reference=args.ref,
+    #     forward_reference=args.ref,
+    #     in_templateHmm=args.in_T_Hmm,
+    #     in_complementHmm=args.in_C_Hmm,
+    #     in_templateHdp=args.templateHDP,
+    #     in_complementHdp=args.complementHDP,
+    #     threshold=args.threshold,
+    #     diagonal_expansion=args.diag_expansion,
+    #     constraint_trim=args.constraint_trim,
+    #     degenerate=getDegenerateEnum(args.degenerate),
+    #     perform_kmer_event_alignment=args.perform_kmer_event_alignment,
+    #     path_to_bin="/Users/andrewbailey/CLionProjects/nanopore-RNN/submodules/signalAlign/bin"
+    # )
 
-    alignment_args = create_signalAlignment_args(
-        # signal align args
-        destination=temp_signal_align,
-        stateMachineType=args.stateMachineType,
-        bwa_reference=args.ref,
-        forward_reference=args.ref,
-        in_templateHmm=args.in_T_Hmm,
-        in_complementHmm=args.in_C_Hmm,
-        in_templateHdp=args.templateHDP,
-        in_complementHdp=args.complementHDP,
-        threshold=args.threshold,
-        diagonal_expansion=args.diag_expansion,
-        constraint_trim=args.constraint_trim,
-        degenerate=getDegenerateEnum(args.degenerate),
-        perform_kmer_event_alignment=args.perform_kmer_event_alignment,
-    )
-
-    get_all_event_summaries(fast5s, alignment_args, aln_dist_threshold=args.aln_dist_threshold, verbose=args.verbose)
+    get_all_event_summaries(orig_fast5s, aln_dist_threshold=args.aln_dist_threshold, verbose=args.verbose)
 
 
 if __name__ == "__main__":

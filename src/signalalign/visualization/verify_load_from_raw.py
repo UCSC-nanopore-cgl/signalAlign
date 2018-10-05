@@ -44,6 +44,10 @@ def parse_args():
                         dest='output_dir', required=False, type=str,
                         help="If set, will write out to output directory otherwise the graph is just shown")
 
+    parser.add_argument('--plot', action='store_true', dest='plot', default=False,
+                        help="Boolean option to plot individual read distribution")
+
+
     args = parser.parse_args()
     return args
 
@@ -97,7 +101,7 @@ def plot_deltas_as_distribution(deltas, save_fig_path=None, hist=False):
     panel1.grid(color='black', linestyle='-', linewidth=1)
     if hist:
         panel1.set_title("Delta Histogram")
-        panel1.hist(deltas, bins=len(set(deltas)), color='blue', edgecolor='black')
+        panel1.hist(deltas, bins=len(set(deltas)), color='blue', normed=True, edgecolor='black')
     else:
         panel1.set_title("Delta Density")
         sns.distplot(deltas, hist=False, kde=True,
@@ -113,6 +117,39 @@ def plot_deltas_as_distribution(deltas, save_fig_path=None, hist=False):
         pass
 
 
+def verify_load_from_raw(args, f5_locations):
+    means = []
+    percent_nonzeros = []
+
+    # loop through fast5s
+    for f5_path in f5_locations:
+        try:
+            # grab basecalled data
+            cl_handle = CreateLabels(f5_path)
+            og_matches, og_mismatches = cl_handle.add_basecall_alignment_prediction(number=int(args.basecall[0]))
+            new_matches, new_mismatches = cl_handle.add_basecall_alignment_prediction(number=int(args.basecall[1]))
+            # get and plot deltas
+            deltas = get_raw_start_delta(og_matches, new_matches)
+            mm_deltas = get_raw_start_delta(og_mismatches, new_mismatches)
+            all_deltas = np.append(deltas, mm_deltas)
+            if args.plot:
+                if max(all_deltas) != 0:
+                    plot_deltas_vs_raw_start(all_deltas, np.append(og_matches["raw_start"], og_mismatches['raw_start']))
+                    plot_deltas_as_distribution(all_deltas, hist=True)
+            percent_nonzero = np.count_nonzero(all_deltas)/len(all_deltas)
+            if percent_nonzero > 0.3:
+                print("Check read: {}, percent_nonzero = {}".format(f5_path, percent_nonzero))
+            percent_nonzeros.append(percent_nonzero)
+            means.append(np.mean(all_deltas))
+        except KeyError as err:
+            print("{}: {}".format(err, f5_path))
+            continue
+
+    if len(f5_locations) > 0:
+        plot_deltas_as_distribution(means, hist=True)
+        plot_deltas_as_distribution(percent_nonzeros, hist=True)
+
+
 def main(args=None):
     """Go through fast5 files and if there are two basecalled tables, compare and flag if different"""
     start = timer()
@@ -126,26 +163,8 @@ def main(args=None):
 
     assert len(args.basecall) == 2, "Must select two basecalled sections for comparison. " \
                                     "You selected {} basecalled tables".format(len(args.basecall))
-    # loop through fast5s
-    for f5_path in f5_locations:
-        try:
-            # grab basecalled data
-            cl_handle = CreateLabels(f5_path)
-            og_matches, og_mismatches = cl_handle.add_basecall_alignment_prediction(number=int(args.basecall[0]))
-            new_matches, new_mismatches = cl_handle.add_basecall_alignment_prediction(number=int(args.basecall[1]))
-            # get and plot deltas
-            deltas = get_raw_start_delta(og_matches, new_matches)
-            mm_deltas = get_raw_start_delta(og_mismatches, new_mismatches)
-            all_deltas = np.append(deltas, mm_deltas)
-            # if max(all_deltas) != 0:
-                # plot_deltas_vs_raw_start(all_deltas, np.append(og_matches["raw_start"], og_mismatches['raw_start']))
-                # plot_deltas_as_distribution(all_deltas, hist=True)
-            percent_nonzero = np.count_nonzero(all_deltas)/len(all_deltas)
-            if percent_nonzero > 0.3:
-                print("Check read {}".format(f5_path))
-        except KeyError as err:
-            print("{}: {}".format(err, f5_path))
-            continue
+
+    verify_load_from_raw(args, f5_locations)
 
     stop = timer()
     print("Running Time = {} seconds".format(stop - start), file=sys.stderr)

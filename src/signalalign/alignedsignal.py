@@ -30,6 +30,7 @@ def time_to_index(event_table, sampling_freq=0, start_time=0):
 def index_to_time(event_table, sampling_freq=0, start_time=0):
     raise Exception("This function is deprecated; you should find a better way to assert start and length fields")
 
+
 class AlignedSignal(object):
     """Labeled nanopore signal data"""
 
@@ -253,12 +254,7 @@ class CreateLabels(Fast5):
 
         else:
             if number is not None:
-                assert type(number) is int, "Number must be an integer"
-                events_path = self.__default_template_1d_basecall_events__.format(number)
-                try:
-                    events = self[events_path][()]
-                except:
-                    raise ValueError('Could not retrieve basecall_1D data from {}'.format(events_path))
+                events = self.get_basecalled_data_by_number(number)
                 matches_name = "matches_guide_alignment_{}".format(number)
                 mismatches_name = "mismatches_guide_alignment_{}".format(number)
             else:
@@ -285,6 +281,21 @@ class CreateLabels(Fast5):
         self.aligned_signal.add_raw_starts(raw_starts)
 
         return matches, mismatches
+
+    def get_basecalled_data_by_number(self, number):
+        """Get basecalled event data by the number"""
+        assert type(number) is int, "Number must be an integer"
+        events_path = self.__default_template_1d_basecall_events__.format(number)
+        try:
+            events = self[events_path][()]
+        except:
+            raise ValueError('Could not retrieve basecall_1D data from {}'.format(events_path))
+        try:
+            check_numpy_table(events, req_fields=('raw_start', 'raw_length'))
+        # if events do not have raw_start or raw_lengths
+        except KeyError:
+            events = add_raw_start_and_raw_length_to_events(events, self.sample_rate, self.raw_attributes["start_time"])
+        return events
 
     def add_basecall_alignment_guide(self, sam=None, event_table_path=None):
         """Add the original basecalled event table and add the 'guide' alignment labels to signal_label handle

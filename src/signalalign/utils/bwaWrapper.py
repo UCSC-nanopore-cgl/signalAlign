@@ -213,7 +213,6 @@ def getInfoFromCigarFile(cigar_file):
     assert False, "[generateGuideAlignment] No cigar line found in {}".format(cigar_file)
 
 
-
 def generateGuideAlignment(reference_fasta, query, temp_sam_path, target_regions=None):
     # type: (string, string, string, TargetRegions) -> GuideAlignment
     """Aligns the read sequnece with BWA to get the guide alignment,
@@ -243,7 +242,8 @@ def get_aligned_segment_from_alignment_file(alignment_location, read_name):
     correct_segment = None
     with closing(pysam.AlignmentFile(alignment_location, 'rb' if alignment_location.endswith("bam") else 'r')) as aln:
         for aligned_segment in aln.fetch():
-            if aligned_segment.is_secondary or aligned_segment.is_unmapped or aligned_segment.is_supplementary:
+            if aligned_segment.is_secondary or aligned_segment.is_unmapped \
+                    or aligned_segment.is_supplementary or aligned_segment.has_tag("SA"):
                 continue
             if read_name is not None and aligned_segment.qname != read_name and read_name not in aligned_segment.qname:
                 continue
@@ -252,3 +252,29 @@ def get_aligned_segment_from_alignment_file(alignment_location, read_name):
         reference_name = aln.getrname(correct_segment.rname)
 
     return correct_segment, n_aligned_segments, reference_name
+
+
+def check_number_of_passing_reads(sam, fastq):
+    """Calculate fraction of passing reads given original fastq and sam file
+
+    note: assumes phred-33 encoding
+
+    :param sam: sam/bam file containing alignment information
+    :param fastq: compiled fastq from nanopore reads
+    """
+    assert os.path.exists(fastq), "Fastq file does not exist: {}".format(fastq)
+    assert os.path.exists(sam), "Sam file does not exist: {}".format(sam)
+
+    total = 0
+    passed = 0
+
+    for record in SeqIO.parse(fastq, "fastq"):
+        av_phred_score = np.mean(record.letter_annotations["phred_quality"])
+        correct_segment, n_aligned_segments, reference_name = get_aligned_segment_from_alignment_file(sam, record.id)
+        if correct_segment is not None and n_aligned_segments == 1 and av_phred_score >= 7:
+            passed += 1
+        total += 1
+
+    print("total = {}\npassed = {}".format(total, passed))
+
+    return total, passed
