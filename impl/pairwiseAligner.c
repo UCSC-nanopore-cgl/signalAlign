@@ -1209,6 +1209,9 @@ void diagonalCalculationPosteriorMatchProbs(StateMachine *sM, int64_t xay, DpMat
     DpDiagonal *backDiagonal = dpMatrix_getDiagonal(backwardDpMatrix, xay);
     Diagonal diagonal = forwardDiagonal->diagonal;
     int64_t xmy = diagonal_getMinXmy(diagonal);
+    // DEBUGGING
+//    FILE *fH = fopen("/Users/andrewbailey/CLionProjects/nanopore-RNN/submodules/signalAlign/tests/minion_test_reads/delete_me_after_debugging/all_iterations.tsv", "a");
+    // DEBUGGING
 
     //Walk over the cells computing the posteriors
     while (xmy <= diagonal_getMaxXmy(diagonal)) {
@@ -1228,6 +1231,17 @@ void diagonalCalculationPosteriorMatchProbs(StateMachine *sM, int64_t xay, DpMat
                         double *backwardCells = path_getCell(pathBackwards);
                         double posteriorProbability = exp(
                                 (forwardCells[sM->matchState] + backwardCells[sM->matchState]) - totalProbability);
+
+                        // DEBUGGING
+//                        int64_t ref_index = 3560627+x;
+//                        int64_t event_index = y+64;
+//
+//                        fprintf(fH, "%"PRId64"\t%"PRId64"\t%f\t%f\t%f\t%f\t%f\n",
+//                                ref_index, event_index, forwardCells[sM->matchState], backwardCells[sM->matchState],
+//                                forwardCells[sM->matchState] + backwardCells[sM->matchState], totalProbability,
+//                                exp((forwardCells[sM->matchState] + backwardCells[sM->matchState]) - totalProbability));
+                        //  DEBUGGING
+
                         if (posteriorProbability >= p->threshold) {
                             if (posteriorProbability > 1.0) {
                                 posteriorProbability = 1.0;
@@ -1249,6 +1263,7 @@ void diagonalCalculationPosteriorMatchProbs(StateMachine *sM, int64_t xay, DpMat
         }
         xmy += 2;
     }
+//    fclose(fH);
     //st_uglyf("final length for alignedPairs: %lld\n", stList_length(alignedPairs));
 }
 
@@ -1330,7 +1345,7 @@ void getPosteriorProbsWithBanding(StateMachine *sM,
                               && diagonal_getWidth(diagonal) <= p->diagonalExpansion * 2 + 1;
         //TODO the intermediate traceback causes a set of poorly-aligned events to show up at the traceback points
         // this should be investigated, but for now, this fixes it and probably causes higher memory usage
-        tracebackPoint = FALSE;
+//        tracebackPoint = FALSE;
 
         // Traceback
         if (atEnd || tracebackPoint) {
@@ -1471,7 +1486,9 @@ stList *convertPairwiseForwardStrandAlignmentToAnchorPairs(struct PairwiseAlignm
 
         if (op->opType == PAIRWISE_MATCH) {
             for (int64_t l = trim; l < op->length - trim; l++) {
-                stList_append(alignedPairs, stIntTuple_construct2(j + l, k + l));
+                if (pA->end1 >= j + l + 6) {
+                    stList_append(alignedPairs, stIntTuple_construct2(j + l, k + l));
+                }
             }
         }
         if (op->opType != PAIRWISE_INDEL_Y) {
@@ -1853,9 +1870,11 @@ PairwiseAlignmentParameters *pairwiseAlignmentBandingParameters_construct() {
     PairwiseAlignmentParameters *p = st_malloc(sizeof(PairwiseAlignmentParameters));
     p->threshold = 0.01;
     p->minDiagsBetweenTraceBack = 1000;
-    p->traceBackDiagonals = 40;
+//    p->traceBackDiagonals = 40;
+    p->traceBackDiagonals = 100;
     p->diagonalExpansion = 20;
     p->constraintDiagonalTrim = 14;
+//    p->constraintDiagonalTrim = 14;
     p->anchorMatrixBiggerThanThis = 500 * 500;
     p->repeatMaskMatrixBiggerThanThis = 500 * 500;
     p->splitMatrixBiggerThanThis = (int64_t) 3000 * 3000;

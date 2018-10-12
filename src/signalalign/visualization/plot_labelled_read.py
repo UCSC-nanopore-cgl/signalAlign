@@ -70,6 +70,10 @@ def parse_args():
     parser.add_argument('--plot_alpha', action='store_true', default=False, dest="plot_alpha", required=False,
                         help="If set, will plot probability information as the alpha associated with each data point")
 
+    parser.add_argument('--trim', action='store', default=0, dest="trim", required=False, type=int,
+                        help="If set, will trim runs of matches")
+
+
     args = parser.parse_args()
     return args
 
@@ -143,7 +147,7 @@ class PlotSignal(object):
         color_selection = 0
         # plot signal alignments
         for i, alignment in enumerate(self.alignments):
-            handle, = panel1.plot(alignment[0], alignment[1], color=colors[color_selection], alpha=1)
+            handle, = panel1.plot(alignment[0], alignment[1]-(i*0.5), color=colors[color_selection], alpha=1)
             color_selection += 1
             handles.append(handle)
 
@@ -385,6 +389,8 @@ def main(args=None):
 
     args = args if args is not None else parse_args()
 
+    main_plot = True
+
     if args.dir:
         f5_locations = list_dir(args.dir, ext="fast5")
     else:
@@ -413,7 +419,7 @@ def main(args=None):
         if args.basecall:
             events_list = []
             for number in args.basecall:
-                matches, mismatches = cl_handle.add_basecall_alignment_prediction(number=int(number))
+                matches, mismatches = cl_handle.add_basecall_alignment_prediction(number=int(number), trim=args.trim)
                 basecall = list()
                 basecall.extend(matches)
                 basecall.extend(mismatches)
@@ -422,6 +428,8 @@ def main(args=None):
                 events = cl_handle.get_basecalled_data_by_number(int(number))
                 events_list.append(events)
             if len(events_list) > 1:
+                main_plot = False
+                print("Plotting {}".format(args.f5_path))
                 plot_basecalled_sequences(events_list[0], events2=events_list[1],
                                           signal=cl_handle.aligned_signal.scaled_signal)
 
@@ -429,10 +437,11 @@ def main(args=None):
         for i in range(max_analysis_index):
             print("Analyzing events for index {}".format(i))
             analyze_event_skips(mea_list[i], sa_full_list[i], basecall_list[i])
-        #
-        # print("Plotting {}".format(args.f5_path))
-        # ps = PlotSignal(cl_handle.aligned_signal)
-        # ps.plot_alignment(save_fig_path=save_fig_path, plot_alpha=args.plot_alpha)
+
+        if main_plot:
+            print("Plotting {}".format(args.f5_path))
+            ps = PlotSignal(cl_handle.aligned_signal)
+            ps.plot_alignment(save_fig_path=save_fig_path, plot_alpha=args.plot_alpha)
 
     stop = timer()
     print("Running Time = {} seconds".format(stop - start), file=sys.stderr)

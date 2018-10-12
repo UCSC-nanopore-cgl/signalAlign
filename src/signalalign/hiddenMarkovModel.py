@@ -107,14 +107,16 @@ class HmmModel(object):
 
     def set_default_transitions(self):
         MATCH_CONTINUE = np.exp(-0.23552123624314988)     # stride
-        MATCH_FROM_GAP_X = np.exp(-0.21880828092192281)   # 1 - skip'
-        MATCH_FROM_GAP_Y = np.exp(-0.013406326748077823)  # 1 - (skip + stay)
         GAP_OPEN_X = np.exp(-1.6269694202638481)          # skip
         GAP_OPEN_Y = np.exp(-4.3187242127300092)          # 1 - (skip + stride)
+
+        MATCH_FROM_GAP_X = np.exp(-0.21880828092192281)   # 1 - skip'
         GAP_EXTEND_X = np.exp(-1.6269694202638481)        # skip'
-        GAP_EXTEND_Y = np.exp(-4.3187242127239411)        # stay (1 - (skip + stay))
-        GAP_SWITCH_TO_X = 0.000000001
         GAP_SWITCH_TO_Y = 0.0
+
+        GAP_EXTEND_Y = np.exp(-4.3187242127239411)        # stay (1 - (skip + stay))
+        MATCH_FROM_GAP_Y = np.exp(-0.013406326748077823)  # 1 - (skip + stay)
+        GAP_SWITCH_TO_X = 0.000000001
         self.transitions = [
             MATCH_CONTINUE, GAP_OPEN_X, GAP_OPEN_Y,
             MATCH_FROM_GAP_X, GAP_EXTEND_X, GAP_SWITCH_TO_Y,

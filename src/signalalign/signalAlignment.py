@@ -470,7 +470,7 @@ class SignalAlignment(object):
                 print("[SignalAlignment.run] ERROR:  maximum expected alignment")
         npRead.close()
         # TODO add this back and fix errors
-        # self.temp_folder.remove_folder()
+        self.temp_folder.remove_folder()
         return True
 
     def write_nucleotide_read(self, nanopore_read, file_path):

@@ -547,7 +547,6 @@ int main(int argc, char *argv[]) {
             case 'm':
                 j = sscanf(optarg, "%" PRIi64 "", &constraintTrim);
                 assert (j == 1);
-                assert (constraintTrim >= 0);
                 constraintTrim = (int64_t)constraintTrim;
                 break;
             case 'f':
@@ -608,9 +607,11 @@ int main(int argc, char *argv[]) {
             st_errAbort("Need to have template and complement HDPs");
         }
         if (sMtype != threeStateHdp) {
-            fprintf(stderr, "[signalAlign] - Warning: this kind of stateMachine does not use the HDPs you gave\n");
+            sMtype = threeStateHdp;
+            fprintf(stderr, "[signalAlign] - Using threeStateHdp stateMachine since you pass in an HDP file\n");
+        } else {
+            fprintf(stderr, "[signalAlign] - using NanoporeHDPs\n");
         }
-        fprintf(stderr, "[signalAlign] - using NanoporeHDPs\n");
     }
 
     #pragma omp parallel sections

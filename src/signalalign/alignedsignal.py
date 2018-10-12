@@ -232,13 +232,14 @@ class CreateLabels(Fast5):
         self.aligned_signal.add_label(predictions, name=name, label_type='prediction')
         return predictions
 
-    def add_basecall_alignment_prediction(self, sam=None, number=None, add_mismatches=False, my_events=None):
+    def add_basecall_alignment_prediction(self, sam=None, number=None, add_mismatches=False, my_events=None, trim=None):
         """Add the original basecalled event table and add matches and missmatches to 'prediction'
             alignment labels to signal_label handle
         :param sam: correctly formatted SAM string
         :param number: integer representing which signal align predictions to plot
         :param add_mismatches: boolean option to add mismatches to labels
         :param my_events: if you want to pass the event table in directly
+        :param trim: trim both sides of continuous matches to show anchor pairs
         :return: True if the correct labels are added to the AlignedSignal internal class object
         """
         if not sam:
@@ -267,6 +268,9 @@ class CreateLabels(Fast5):
 
         matches, mismatches, raw_starts = match_cigar_with_basecall_guide(events=events, sam_string=sam,
                                                                           kmer_index=self.kmer_index)
+
+        if trim is not None:
+            matches = trim_matches(matches, trim=trim)
         # # rna reference positions are on 5' edge aka right side of kmer
         # if self.rna:
         #     matches["reference_index"] -= self.kmer_index
@@ -362,6 +366,60 @@ class CreateLabels(Fast5):
             lables["reference_index"] += self.kmer_index
 
         self.aligned_signal.add_label(lables, name='eventAlign', label_type='label')
+
+
+
+def trim_matches(matches, trim):
+    """Trim continuous matches by trim on both sides of the block of matches.
+
+    if trim = 2
+        10M -> 6M
+
+    :param matches:
+
+    """
+    # mask = np.ones(len(arr), dtype=bool)
+    # mask[[0,2,4]] = False
+    # result = arr[mask,...]
+
+    # deal with simple case
+    if trim == 0:
+        return matches
+    else:
+        mask = np.ones(len(matches), dtype=bool)
+        remove_indices = []
+        curr_ref_index = matches[0]["reference_index"]-1
+        # track where we are in match block
+        length = 0
+        for i, match in enumerate(matches):
+            if match["reference_index"] == curr_ref_index + 1:
+                length += 1
+                curr_ref_index = match["reference_index"]
+                continue
+
+            if length < 2*trim:
+                for x in range(i-length, i):
+                    remove_indices.append(x)
+            else:
+                for x in range(i-length, i-length+trim):
+                    remove_indices.append(x)
+                for x in range(i-trim, i):
+                    remove_indices.append(x)
+            length = 1
+            curr_ref_index = match["reference_index"]
+
+        if length < 2*trim:
+            for x in range(i-length+1, i+1):
+                remove_indices.append(x)
+        else:
+            for x in range(i-length+1, i-length+trim+1):
+                remove_indices.append(x)
+            for x in range(i-trim+1, i+1):
+                remove_indices.append(x)
+
+        mask[remove_indices] = False
+        matches = matches[mask]
+        return matches
 
 
 def create_labels_from_guide_alignment(events, sam_string, rna=False, reference_path=None, kmer_index=2,
