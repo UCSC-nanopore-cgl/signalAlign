@@ -32,7 +32,8 @@ def create_signalAlignment_args(backward_reference=None, forward_reference=None,
                                 track_memory_usage=False, get_expectations=False, output_format='full', embed=False,
                                 event_table=False,
                                 check_for_temp_file_existance=True,
-                                path_to_bin='./', perform_kmer_event_alignment=None, filter_reads=False):
+                                path_to_bin='./', perform_kmer_event_alignment=None, filter_reads=False,
+                                traceBackDiagonals=100):
     """Create alignment arguments for SignalAlign. Parameters are explained in SignalAlignment"""
     alignment_args = {
         "backward_reference": backward_reference,
@@ -59,7 +60,8 @@ def create_signalAlignment_args(backward_reference=None, forward_reference=None,
         'check_for_temp_file_existance': check_for_temp_file_existance,
         'path_to_bin': path_to_bin,
         'perform_kmer_event_alignment': perform_kmer_event_alignment,
-        'filter_reads': filter_reads}
+        'filter_reads': filter_reads,
+        'traceBackDiagonals': traceBackDiagonals}
 
     return alignment_args
 
@@ -96,7 +98,8 @@ class SignalAlignment(object):
                  perform_kmer_event_alignment=None,
                  # parameter for nanopore reads
                  enforce_supported_versions=True,
-                 filter_reads=False):
+                 filter_reads=False,
+                 traceBackDiagonals=100):
         self.in_fast5 = in_fast5  # fast5 file to align
         self.destination = destination  # place where the alignments go, should already exist
         self.stateMachineType = stateMachineType  # flag for signalMachine
@@ -126,7 +129,7 @@ class SignalAlignment(object):
         self.perform_kmer_event_alignment = perform_kmer_event_alignment
         self.enforce_supported_versions = enforce_supported_versions
         self.filter_reads = filter_reads  # filter reads out with average fastq quality scores less than 7
-
+        self.traceBackDiagonals = traceBackDiagonals  # number of traceback diagonals to caluclate before calculating
         assert os.path.exists(self.path_to_signalMachine), "Path to signalMachine does not exist"
         assert self.bwa_reference is not None or self.alignment_file is not None, \
             "either 'bwa_reference' or 'alignment_file' argument is needed to generate cigar strings"
@@ -380,7 +383,8 @@ class SignalAlignment(object):
             command = \
                 "{vA} {td} {degen}{sparse}{model} -q {npRead} " \
                 "{t_model}{c_model}{thresh}{expansion}{trim} {hdp}-L {readLabel} -p {cigarFile} " \
-                "-t {templateExpectations} -c {complementExpectations} -n {seq_name} {f_ref_fa} {b_ref_fa}" \
+                "-t {templateExpectations} -c {complementExpectations} -n {seq_name} {f_ref_fa} {b_ref_fa} " \
+                "-g {traceback}" \
                     .format(vA=self.path_to_signalMachine, model=stateMachineType_flag,
                             cigarFile=cigar_file_,
                             npRead=npRead_, readLabel=read_label, td=twoD_flag,
@@ -388,19 +392,19 @@ class SignalAlignment(object):
                             complementExpectations=complement_expectations_file_path, t_model=template_model_flag,
                             c_model=complement_model_flag, thresh=threshold_flag, expansion=diag_expansion_flag,
                             trim=trim_flag, degen=degenerate_flag, sparse=out_fmt, seq_name=reference_name,
-                            f_ref_fa=forward_ref_flag, b_ref_fa=backward_ref_flag)
+                            f_ref_fa=forward_ref_flag, b_ref_fa=backward_ref_flag, traceback=self.traceBackDiagonals)
         else:
             command = \
                 "{vA} {td} {degen}{sparse}{model} -q {npRead} " \
                 "{t_model}{c_model}{thresh}{expansion}{trim} -p {cigarFile} " \
-                "-u {posteriors} {hdp}-L {readLabel} -n {seq_name} {f_ref_fa} {b_ref_fa}" \
+                "-u {posteriors} {hdp}-L {readLabel} -n {seq_name} {f_ref_fa} {b_ref_fa} -g {traceback}" \
                     .format(vA=self.path_to_signalMachine, model=stateMachineType_flag, sparse=out_fmt,
                             cigarFile=cigar_file_,
                             readLabel=read_label, npRead=npRead_, td=twoD_flag,
                             t_model=template_model_flag, c_model=complement_model_flag,
                             posteriors=posteriors_file_path, thresh=threshold_flag, expansion=diag_expansion_flag,
                             trim=trim_flag, hdp=hdp_flags, degen=degenerate_flag, seq_name=reference_name,
-                            f_ref_fa=forward_ref_flag, b_ref_fa=backward_ref_flag)
+                            f_ref_fa=forward_ref_flag, b_ref_fa=backward_ref_flag, traceback=self.traceBackDiagonals)
 
         # run
         print("[SignalAlignment.run] running command: ", command, end="\n")
@@ -633,7 +637,7 @@ def multithread_signal_alignment(signal_align_arguments, fast5_locations, worker
     optional_arguments = {'backward_reference', 'alignment_file', 'bwa_reference', 'twoD_chemistry',
                           'target_regions', 'output_format', 'embed', 'event_table', 'check_for_temp_file_existance',
                           'track_memory_usage', 'get_expectations', 'path_to_bin', 'perform_kmer_event_alignment',
-                          'enforce_supported_versions', 'filter_reads'}
+                          'enforce_supported_versions', 'filter_reads', 'traceBackDiagonals'}
     missing_arguments = list(filter(lambda x: x not in signal_align_arguments.keys(), required_arguments))
     unexpected_arguments = list(filter(lambda x: x not in required_arguments and x not in optional_arguments,
                                        signal_align_arguments.keys()))

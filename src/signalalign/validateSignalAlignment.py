@@ -106,7 +106,7 @@ def get_all_event_summaries(fast5s, alignment_args, aln_dist_threshold=10, gener
 
     # run signal align
     print("\n[validateSignalAlignment]: running signalAlign in preparation for validation", file=sys.stdout)
-    multithread_signal_alignment(alignment_args, fast5s)
+    multithread_signal_alignment(alignment_args, fast5s, debug=True)
 
     print("\n[validateSignalAlignment]: performing validation", file=sys.stdout)
     for f5_path in fast5s:

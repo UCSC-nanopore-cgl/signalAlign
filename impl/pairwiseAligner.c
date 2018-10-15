@@ -1870,8 +1870,8 @@ PairwiseAlignmentParameters *pairwiseAlignmentBandingParameters_construct() {
     PairwiseAlignmentParameters *p = st_malloc(sizeof(PairwiseAlignmentParameters));
     p->threshold = 0.01;
     p->minDiagsBetweenTraceBack = 1000;
-//    p->traceBackDiagonals = 40;
-    p->traceBackDiagonals = 100;
+    p->traceBackDiagonals = 40;
+//    p->traceBackDiagonals = 100;
     p->diagonalExpansion = 20;
     p->constraintDiagonalTrim = 14;
 //    p->constraintDiagonalTrim = 14;

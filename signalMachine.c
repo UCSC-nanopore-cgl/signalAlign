@@ -35,7 +35,9 @@ void usage() {
     fprintf(stderr, "-c: Complement expectations (HMM transitions) output location\n");
     fprintf(stderr, "-x: Diagonal expansion, how much to expand the dynamic programming envelope\n");
     fprintf(stderr, "-D: Posterior probability threshold, keep aligned pairs with posterior prob >= this\n");
-    fprintf(stderr, "-m: Constranint trim, how much to trim the guide alignment anchors by\n\n");
+    fprintf(stderr, "-m: Constranint trim, how much to trim the guide alignment anchors by\n");
+    fprintf(stderr, "-g: traceBackDiagonals, how many backward diagonals to calculate during traceback\n\n");
+
 }
 
 void printPairwiseAlignmentSummary(struct PairwiseAlignment *pA) {
@@ -431,6 +433,7 @@ int main(int argc, char *argv[]) {
     int64_t diagExpansion = 50;
     double threshold = 0.01;
     int64_t constraintTrim = 14;
+    int64_t traceBackDiagonals = 40;
     int64_t degenerate;
     int64_t outFmt;
     bool twoD = FALSE;
@@ -474,11 +477,12 @@ int main(int argc, char *argv[]) {
                 {"forward_reference_path",  required_argument,  0,  'f'},
                 {"backward_reference_path", optional_argument,  0,  'b'},
                 {"sequence_name",           required_argument,  0,  'n'},
+                {"traceBackDiagonals",      optional_argument,  0,  'g'},
                 {0, 0, 0, 0} };
 
         int option_index = 0;
 
-        key = getopt_long(argc, argv, "h:d:e:s:o:a:T:C:L:q:f:b:p:u:v:w:t:c:x:D:m:n:",
+        key = getopt_long(argc, argv, "h:d:e:s:o:a:T:C:L:q:f:b:g:p:u:v:w:t:c:x:D:m:n:",
                           long_options, &option_index);
 
         if (key == -1) {
@@ -547,6 +551,7 @@ int main(int argc, char *argv[]) {
             case 'm':
                 j = sscanf(optarg, "%" PRIi64 "", &constraintTrim);
                 assert (j == 1);
+                assert (constraintTrim >= 0);
                 constraintTrim = (int64_t)constraintTrim;
                 break;
             case 'f':
@@ -557,6 +562,12 @@ int main(int argc, char *argv[]) {
                 break;
             case 'n':
                 sequence_name = stString_copy(optarg);
+                break;
+            case 'g':
+                j = sscanf(optarg, "%" PRIi64 "", &traceBackDiagonals);
+                assert (j == 1);
+                assert (traceBackDiagonals >= 0);
+                traceBackDiagonals = (int64_t)traceBackDiagonals;
                 break;
             default:
                 usage();
@@ -597,7 +608,7 @@ int main(int argc, char *argv[]) {
     p->threshold = threshold;
     p->constraintDiagonalTrim = constraintTrim;
     p->diagonalExpansion = diagExpansion;
-
+    p->traceBackDiagonals = traceBackDiagonals;
     // HDP routines //
     // load HDPs
     NanoporeHDP *nHdpT, *nHdpC;

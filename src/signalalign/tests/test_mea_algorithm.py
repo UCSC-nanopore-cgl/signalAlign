@@ -282,7 +282,10 @@ class MeaTest(unittest.TestCase):
                                                      in_templateHmm=template_hmm,
                                                      destination=temp_signal_align_dir,
                                                      forward_reference=ecoli_reference,
-                                                     path_to_bin=path_to_bin)
+                                                     path_to_bin=path_to_bin,
+                                                     constraint_trim=0,
+                                                     diagonal_expansion=0,
+                                                     embed=True)
 
         # get summaries
         all_event_summaries = get_all_event_summaries(fast5s, alignment_args, aln_dist_threshold=threshold,

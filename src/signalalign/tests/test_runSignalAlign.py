@@ -235,7 +235,7 @@ def main():
     testSuite.addTest(SignalAlignAlignmentTest('test_pUC_r9_reads_5mer'))
     testSuite.addTest(SignalAlignAlignmentTest('test_pUC_r9_reads_6mer'))
     testSuite.addTest(SignalAlignAlignmentTest('test_Ecoli1D_reads_5mer'))
-    # TODO add this back in after fixing RNA
+    # # TODO add this back in after fixing RNA
     # testSuite.addTest(SignalAlignAlignmentTest('test_RNA_edge_alignments_reads_5mer'))
     testSuite.addTest(SignalAlignAlignmentTest('test_signal_files_without_events'))
 
