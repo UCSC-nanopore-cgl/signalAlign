@@ -1,5 +1,5 @@
-rootPath = ./
-include ./include.mk
+rootPath = $(shell pwd)/
+include ${rootPath}/include.mk
 
 libSources = impl/*.c
 libHeaders = inc/*.h
@@ -11,7 +11,7 @@ signalAlignLib = ${basicLibs}
 test_directory = ${rootPath}/src/signalalign/tests/
 scrappie_build = ${rootPath}/scrappie/build
 
-htsLib = -L./htslib -lhts
+htsLib = -L./htslib -lhts -Wl,-rpath,${rootPath}htslib
 LIBS= -lz -lm
 
 HDF5?=install
@@ -82,7 +82,7 @@ sL :
 	cd sonLib && CFLAGS="${CFLAGS} -fPIC" make
 
 bD :
-	mkdir -v -p ${rootPath}bin
+	mkdir -v -p ${rootPath}/bin
 
 externals :
 	cd externalTools && make all
@@ -116,37 +116,37 @@ ${signalAlignBin}/kmerEventAlign : kmerEventAlign.c ${libPath}/signalAlignLib.a 
 
 nanoporeParams : estimateNanoporeParams.c ${libPath}/signalAlignLib.a ${signalAlignDependencies}
 	${cxx} ${cflags}  -I inc -I${libPath} -o ${signalAlignBin}/estimateNanoporeParams estimateNanoporeParams.c ${libPath}/signalAlignLib.a ${signalAlignLib}
-	cp ${rootPath}src/signalalign/scripts/nanoporeParamRunner.py ${signalAlignBin}/nanoporeParamRunner
+	cp ${rootPath}/src/signalalign/scripts/nanoporeParamRunner.py ${signalAlignBin}/nanoporeParamRunner
 	chmod +x ${signalAlignBin}/nanoporeParamRunner
 
 ${signalAlignBin}/buildHdpUtil : buildHdpUtil.c ${libPath}/signalAlignLib.a ${signalAlignDependencies}
 	${cxx} ${cflags}   -I inc -I${libPath} -o ${signalAlignBin}/buildHdpUtil buildHdpUtil.c ${libPath}/signalAlignLib.a ${signalAlignLib}
 
-${signalAlignBin}/runSignalAlign : ${rootPath}src/signalalign/scripts/runSignalAlign.py
-	cp ${rootPath}src/signalalign/scripts/runSignalAlign.py ${signalAlignBin}/runSignalAlign
+${signalAlignBin}/runSignalAlign : ${rootPath}/src/signalalign/scripts/runSignalAlign.py
+	cp ${rootPath}/src/signalalign/scripts/runSignalAlign.py ${signalAlignBin}/runSignalAlign
 	chmod +x ${signalAlignBin}/runSignalAlign
 
-${signalAlignBin}/trainModels : ${rootPath}src/signalalign/train/trainModels.py
-	cp ${rootPath}src/signalalign/train/trainModels.py ${signalAlignBin}/trainModels
+${signalAlignBin}/trainModels : ${rootPath}/src/signalalign/train/trainModels.py
+	cp ${rootPath}/src/signalalign/train/trainModels.py ${signalAlignBin}/trainModels
 	chmod +x ${signalAlignBin}/trainModels
 
 all_tests : .FORCE
 
 	chmod +x ${test_directory}/*
 
-${signalAlignBin}/zayante : ${rootPath}src/signalalign/scripts/zayante.py
-	cp ${rootPath}src/signalalign/scripts/zayante.py ${signalAlignBin}/zayante
+${signalAlignBin}/zayante : ${rootPath}/src/signalalign/scripts/zayante.py
+	cp ${rootPath}/src/signalalign/scripts/zayante.py ${signalAlignBin}/zayante
 	chmod +x ${signalAlignBin}/zayante
 
-${signalAlignBin}/empire : ${rootPath}src/signalalign/scripts/empire.py
-	cp ${rootPath}src/signalalign/scripts/empire.py ${signalAlignBin}/empire
+${signalAlignBin}/empire : ${rootPath}/src/signalalign/scripts/empire.py
+	cp ${rootPath}/src/signalalign/scripts/empire.py ${signalAlignBin}/empire
 	chmod +x ${signalAlignBin}/empire
 
-${signalAlignBin}/variantCallingLib.py : ${rootPath}src/signalalign/scripts/variantCallingLib.py
-	cp ${rootPath}src/signalalign/scripts/variantCallingLib.py ${signalAlignBin}/variantCallingLib.pyq
+${signalAlignBin}/variantCallingLib.py : ${rootPath}/src/signalalign/scripts/variantCallingLib.py
+	cp ${rootPath}/src/signalalign/scripts/variantCallingLib.py ${signalAlignBin}/variantCallingLib.pyq
 
-${signalAlignBin}/alignmentAnalysisLib.py : ${rootPath}src/signalalign/scripts/alignmentAnalysisLib.py
-	cp ${rootPath}src/signalalign/scripts/alignmentAnalysisLib.py ${signalAlignBin}/alignmentAnalysisLib.py
+${signalAlignBin}/alignmentAnalysisLib.py : ${rootPath}/src/signalalign/scripts/alignmentAnalysisLib.py
+	cp ${rootPath}/src/signalalign/scripts/alignmentAnalysisLib.py ${signalAlignBin}/alignmentAnalysisLib.py
 
 ${libPath}/signalAlignLib.a : ${libSources} ${libHeaders} ${stBarDependencies} ${rootPath}/lib/libhdf5.a
 	${cxx} ${cflags} -fPIC -Iinc/ -I${libPath}/ ${H5_INCLUDE} -I${htsLibRootPath} -I${htsLibPath}  ${htsLib} -c ${libSources} ${H5_LIB} ${LIBS}
