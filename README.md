@@ -6,7 +6,8 @@ Documentation is still being worked on, apologies for this.
 ### Cheat sheet/Quick Start
 
 ### Pre-installation
-1. `sudo apt-get update && sudo apt-get install zlib1g-dev g++ git`
+1. `sudo apt-get update`
+2. `sudo apt-get install wget git make g++ zlib1g-dev libbz2-dev liblzma-dev python3-dev python3-setuptools` 
 
 ### Getting BWA
 1. `git clone https://github.com/lh3/bwa.git`
@@ -15,7 +16,7 @@ Documentation is still being worked on, apologies for this.
 4. `export $PATH=$(pwd):$PATH`
 
 ### Installation:
-1. Clone this repo `https://github.com/UCSC-nanopore-cgl/signalAlign.git && cd signalAlign && git submodule update --init`
+1. Clone this repo `git clone --recursive https://github.com/UCSC-nanopore-cgl/signalAlign.git && cd signalAlign`
 3. Create a python3 virtual environment `virtualenv -p python3 venv && . venv/bin/activate`
 4. Compile the executables `make`
 5. Test the program `make test`
@@ -29,6 +30,7 @@ Nanopore sequencing is based on the principal of isolating a nanopore in a membr
     1. H5Py
     2. Numpy
     3. Pandas
+    3. Scipy
     4. Pysam
 * BWA-MEM (Li H. (2013), instructions can be found (https://github.com/lh3/bwa))
     * Needs to be in path
