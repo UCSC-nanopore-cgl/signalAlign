@@ -173,7 +173,7 @@ def load_from_raw(np_handle, alignment_file, model_file_location, path_to_bin=".
     if not os.path.isfile(str(alignment_file)) and nucleotide_sequence is None:
         nucleotide_sequence = np_handle.get_template_read(initalize_bypass=True)
         assert nucleotide_sequence, "alignment_file must be a real path a SAM/BAM alignment file, or " \
-                                    "nucleotide_sequence must be specified (retrieval attempted from fast5. " \
+                                    "nucleotide_sequence must be specified (retrieval attempted from fast5). " \
                                     "alignment_file: {}, nucleotide_sequence:{}".format(alignment_file, nucleotide_sequence)
 
     # check if file is open

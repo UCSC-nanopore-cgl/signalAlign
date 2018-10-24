@@ -22,7 +22,12 @@ from signalalign import parseFofn
 
 
 def signalAlignSourceDir():
-    return "/".join(os.path.abspath(__file__).split("/")[:-1])  # returns path without runSignalAlign
+    current_file = os.path.abspath(__file__)
+    # this is not a great solution, but it enables us to run this in an ide
+    scripts_path = "src/signalalign/scripts/runSignalAlign.py"
+    if current_file.endswith(scripts_path):
+        current_file = current_file.replace(scripts_path, 'runSignalAlign')
+    return "/".join(current_file.split("/")[:-1])  # returns path without runSignalAlign
 
 
 def resolvePath(p):
@@ -198,7 +203,7 @@ def main(args):
         shuffle(fast5s)
         fast5s = fast5s[:nb_files]
 
-    # return alignment_args
+    # get alignment_args
     alignment_args = {
         "destination": temp_dir_path,
         "stateMachineType": args.stateMachineType,
@@ -223,11 +228,13 @@ def main(args):
         "track_memory_usage": False,
         "get_expectations": False,
         "perform_kmer_event_alignment": args.perform_kmer_event_alignment,
-        "enforce_supported_versions": args.enforce_supported_versions
+        "enforce_supported_versions": args.enforce_supported_versions,
+        "path_to_bin": "./bin"
     }
 
     print("[runSignalAlign]:NOTICE: Got {} files to align".format(len(fast5s)), file=sys.stdout)
     # setup workers for multiprocessing
+    os.chdir(signalAlignSourceDir())
     multithread_signal_alignment(alignment_args, fast5s, args.nb_jobs, debug=args.DEBUG)
 
     print("\n#  signalAlign - finished alignments\n", file=sys.stderr)

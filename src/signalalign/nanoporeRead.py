@@ -84,7 +84,7 @@ class NanoporeRead(object):
 
         # initialize if appropriate
         if initialize:
-            self.Initialize()
+             self.Initialize()
 
     def open(self):
         if self.is_open: return True
