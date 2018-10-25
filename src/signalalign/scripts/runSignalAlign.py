@@ -12,6 +12,7 @@ from argparse import ArgumentParser
 from random import shuffle
 from multiprocessing import Process, current_process, Manager
 
+from signalalign.filter_reads import filter_reads
 from signalalign.signalAlignment import multithread_signal_alignment, create_signalAlignment_args
 from signalalign.utils.sequenceTools import processReferenceFasta
 from signalalign.utils.fileHandlers import FolderHandler
@@ -112,6 +113,9 @@ def parse_args():
                         help="Will attempt to complete execution with unsupported nanopore read versions")
     parser.add_argument('--filter_reads', action='store_true', default=False, dest='filter_reads',
                         help="Will filter reads out if average fastq quality scores are below 7.")
+    parser.add_argument('--path_to_bin', action='store', default='./', dest='path_to_bin',
+                        help="Path to bin to find signalMachine")
+
     args = parser.parse_args()
     return args
 
@@ -225,8 +229,14 @@ def main(args):
         "get_expectations": False,
         "perform_kmer_event_alignment": args.perform_kmer_event_alignment,
         "enforce_supported_versions": args.enforce_supported_versions,
-        "filter_reads": args.filter_reads
+        "filter_reads": args.filter_reads,
+        "path_to_bin": args.path_to_bin
     }
+    if args.filter_reads is not None and args.alignment_file:
+        n_reads = len(fast5s)
+        print("[runSignalAlign]:NOTICE: Filtering out low quality reads", file=sys.stdout)
+        fast5s = filter_reads(fast5s, args.alignment_file)
+        print("[runSignalAlign]:NOTICE: {} reads passed out of {} reads".format(len(fast5s), n_reads), file=sys.stdout)
 
     print("[runSignalAlign]:NOTICE: Got {} files to align".format(len(fast5s)), file=sys.stdout)
     # setup workers for multiprocessing

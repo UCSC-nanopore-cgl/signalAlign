@@ -657,4 +657,4 @@ def get_full_nucleotide_read_from_alignment(alignment_location, read_name, hardc
             # stop looking (assuming only one alignment per read in file)
             break
 
-    return sequence, qualities, hardclipped_start, hardclipped_end
+    return sequence, qualities, hardclipped_start, hardclipped_end, aligned_segment

@@ -140,6 +140,7 @@ def buildBwaIndex(reference, dest, output=None, log=None):
 def getGuideAlignmentFromAlignmentFile(alignment_location, read_name=None, target_regions=None):
     # get reads from alignment file (sam or bam)
     aligned_segment, n_aligned_segments, reference_name = get_aligned_segment_from_alignment_file(alignment_location, read_name)
+    assert aligned_segment is not None, "[generateGuideAlignment] Read {} has no passing alignment".format(read_name)
     query_name = aligned_segment.qname
     flag = aligned_segment.flag
     reference_pos = aligned_segment.pos + 1  # pysam gives the 0-based leftmost start

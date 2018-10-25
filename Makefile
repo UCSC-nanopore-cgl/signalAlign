@@ -33,7 +33,7 @@ all : sL bD hs python-utils ${libPath}/signalAlignLib.a ${signalAlignBin}/signal
 	  ${signalAlignBin}/signalMachine ${signalAlignBin}/runSignalAlign \
 	  ${signalAlignBin}/variantCallingLib.py ${signalAlignBin}/alignmentAnalysisLib.py \
 	  ${signalAlignBin}/buildHdpUtil ${signalAlignBin}/trainModels all_tests \
-	  externals nanoporeParams python_setup # ${scrappie_build}/scrappie \
+	  externals nanoporeParams python_setup ${signalAlignBin}/filterReads # ${scrappie_build}/scrappie \
 
 python-utils :
 	cd python_utils && python3 setup.py install
@@ -144,6 +144,11 @@ ${signalAlignBin}/empire : ${rootPath}src/signalalign/scripts/empire.py
 
 ${signalAlignBin}/variantCallingLib.py : ${rootPath}src/signalalign/scripts/variantCallingLib.py
 	cp ${rootPath}src/signalalign/scripts/variantCallingLib.py ${signalAlignBin}/variantCallingLib.pyq
+
+${signalAlignBin}/filterReads : ${rootPath}src/signalalign/filter_reads.py
+	cp ${rootPath}src/signalalign/filter_reads.py ${signalAlignBin}/filterReads
+	chmod +x ${signalAlignBin}/filterReads
+
 
 ${signalAlignBin}/alignmentAnalysisLib.py : ${rootPath}src/signalalign/scripts/alignmentAnalysisLib.py
 	cp ${rootPath}src/signalalign/scripts/alignmentAnalysisLib.py ${signalAlignBin}/alignmentAnalysisLib.py

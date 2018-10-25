@@ -185,7 +185,7 @@ def load_from_raw(np_handle, alignment_file, model_file_location, path_to_bin=".
     # get nucleotides and qualities
     if nucleotide_sequence is None:
         # get/build nucleotide sequence from alignment file (accounting for hardclipping)
-        nucleotide_sequence, nucleotide_qualities, _, _ = \
+        nucleotide_sequence, nucleotide_qualities, _, _, _ = \
             get_full_nucleotide_read_from_alignment(alignment_file, read_id)
         if nucleotide_sequence is None:
             print("[load_from_raw] nucleotides for {} not found in {}".format(read_id, alignment_file), file=sys.stderr)

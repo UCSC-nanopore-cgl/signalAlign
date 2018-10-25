@@ -9,6 +9,7 @@ import pysam
 import subprocess
 import h5py
 import glob
+import shutil
 from random import shuffle
 
 import signalalign.utils.multithread as multithread
@@ -130,7 +131,10 @@ class SignalAlignment(object):
         self.enforce_supported_versions = enforce_supported_versions
         self.filter_reads = filter_reads  # filter reads out with average fastq quality scores less than 7
         self.traceBackDiagonals = traceBackDiagonals  # number of traceback diagonals to caluclate before calculating
-        assert os.path.exists(self.path_to_signalMachine), "Path to signalMachine does not exist"
+        if shutil.which("signalMachine") is None:
+            assert os.path.exists(self.path_to_signalMachine), "Path to signalMachine does not exist"
+        else:
+            self.path_to_signalMachine = shutil.which("signalMachine")
         assert self.bwa_reference is not None or self.alignment_file is not None, \
             "either 'bwa_reference' or 'alignment_file' argument is needed to generate cigar strings"
 
@@ -637,7 +641,7 @@ def multithread_signal_alignment(signal_align_arguments, fast5_locations, worker
     optional_arguments = {'backward_reference', 'alignment_file', 'bwa_reference', 'twoD_chemistry',
                           'target_regions', 'output_format', 'embed', 'event_table', 'check_for_temp_file_existance',
                           'track_memory_usage', 'get_expectations', 'path_to_bin', 'perform_kmer_event_alignment',
-                          'enforce_supported_versions', 'filter_reads', 'traceBackDiagonals'}
+                          'enforce_supported_versions', 'filter_reads', ''}
     missing_arguments = list(filter(lambda x: x not in signal_align_arguments.keys(), required_arguments))
     unexpected_arguments = list(filter(lambda x: x not in required_arguments and x not in optional_arguments,
                                        signal_align_arguments.keys()))

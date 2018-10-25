@@ -86,6 +86,8 @@ def parse_args(args=None):
     # misc execution parameters
     parser.add_argument('--verbose', '-v', action='store_true', dest='verbose', required=False,
                         default=False, help="prints extra information")
+    parser.add_argument('--dont_run_sa', action='store_true', dest='dont_run_sa', required=False,
+                        default=False, help="Does not run signal align")
 
     args = parser.parse_args(args)
 
@@ -96,17 +98,19 @@ def parse_args(args=None):
     return args
 
 
-def get_all_event_summaries(fast5s, alignment_args, aln_dist_threshold=10, generate_plot=True, verbose=False):
+def get_all_event_summaries(fast5s, alignment_args, aln_dist_threshold=10, generate_plot=True, verbose=False,
+                            run_sa=True):
     start = timer()
-    all_event_summaries = dict()
-    # argments required for this to work
-    alignment_args['output_format'] = 'full'
-    alignment_args['embed'] = True
-    alignment_args['check_for_temp_file_existance'] = False
+    if run_sa:
+        all_event_summaries = dict()
+        # argments required for this to work
+        alignment_args['output_format'] = 'full'
+        alignment_args['embed'] = True
+        alignment_args['check_for_temp_file_existance'] = False
 
-    # run signal align
-    print("\n[validateSignalAlignment]: running signalAlign in preparation for validation", file=sys.stdout)
-    multithread_signal_alignment(alignment_args, fast5s, debug=True)
+        # run signal align
+        print("\n[validateSignalAlignment]: running signalAlign in preparation for validation", file=sys.stdout)
+        multithread_signal_alignment(alignment_args, fast5s, debug=True)
 
     print("\n[validateSignalAlignment]: performing validation", file=sys.stdout)
     for f5_path in fast5s:
@@ -238,8 +242,10 @@ def main():
         constraint_trim=args.constraint_trim,
         degenerate=getDegenerateEnum(args.degenerate),
         perform_kmer_event_alignment=args.perform_kmer_event_alignment,
+        alignment_file=args.alignment_file
     )
-    get_all_event_summaries(orig_fast5s, alignment_args, aln_dist_threshold=args.aln_dist_threshold, verbose=args.verbose)
+    get_all_event_summaries(orig_fast5s, alignment_args, aln_dist_threshold=args.aln_dist_threshold,
+                            verbose=args.verbose, run_sa=not args.dont_run_sa)
 
 
 if __name__ == "__main__":
