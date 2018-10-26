@@ -641,7 +641,7 @@ def multithread_signal_alignment(signal_align_arguments, fast5_locations, worker
     optional_arguments = {'backward_reference', 'alignment_file', 'bwa_reference', 'twoD_chemistry',
                           'target_regions', 'output_format', 'embed', 'event_table', 'check_for_temp_file_existance',
                           'track_memory_usage', 'get_expectations', 'path_to_bin', 'perform_kmer_event_alignment',
-                          'enforce_supported_versions', 'filter_reads', ''}
+                          'enforce_supported_versions', 'filter_reads', 'traceBackDiagonals'}
     missing_arguments = list(filter(lambda x: x not in signal_align_arguments.keys(), required_arguments))
     unexpected_arguments = list(filter(lambda x: x not in required_arguments and x not in optional_arguments,
                                        signal_align_arguments.keys()))
