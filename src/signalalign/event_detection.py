@@ -24,7 +24,7 @@ from shutil import which
 from contextlib import closing
 from collections import defaultdict
 from timeit import default_timer as timer
-from signalalign.utils.pyporeParsers import SpeedyStatSplit
+# from signalalign.utils.pyporeParsers import SpeedyStatSplit
 from signalalign.fast5 import Fast5
 from signalalign.utils.sequenceTools import get_full_nucleotide_read_from_alignment
 from signalalign.utils.filters import minknow_event_detect
