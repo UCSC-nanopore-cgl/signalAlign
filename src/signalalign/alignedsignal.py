@@ -106,17 +106,7 @@ class AlignedSignal(object):
 
         label1 = np.sort(label, order=['raw_start'], kind='mergesort')
 
-        # infer strand alignment of read
-        if label1[0]["reference_index"] >= label1[-1]["reference_index"]:
-            minus_strand = True
-        else:
-            minus_strand = False
-        if self.minus_strand is not None:
-            if label[0]["raw_start"] != label[-1]["raw_start"]:
-                assert self.minus_strand == minus_strand, "New label has different strand direction, check label"
-        else:
-            self.minus_strand = minus_strand
-
+        self.check_strand_mapping(label1)
         # set label with the specified name
         if label_type == 'label':
             self.label[name] = label
@@ -147,11 +137,28 @@ class AlignedSignal(object):
                 end = segment["raw_start"] + segment["raw_length"]
             yield signal[start:end], segment['kmer'], segment['posterior_probability'], segment['reference_index']
 
+    def check_strand_mapping(self, data):
+        """Check to see if alignment to reverse strand
+
+        :param data: numpy table with 'reference_index' field
+        """
+        check_numpy_table(data, req_fields=('reference_index', 'raw_start'))
+        # infer strand alignment of read
+        if data[0]["reference_index"] >= data[-1]["reference_index"]:
+            minus_strand = True
+        else:
+            minus_strand = False
+        if self.minus_strand is not None:
+            if data[0]["raw_start"] != data[-1]["raw_start"]:
+                assert self.minus_strand == minus_strand, "New label has different strand direction, check label"
+        else:
+            self.minus_strand = minus_strand
+
 
 class CreateLabels(Fast5):
     """Create an Aligned Signal object from a fast5 file with """
 
-    def __init__(self, fast5_path):
+    def __init__(self, fast5_path, kmer_index=2):
         """Initialize fast5 object and keep track of AlignedSignal object
         :param fast5_path: path to fast5 file
         :param reference: path to reference so we can run signalAlign
@@ -160,7 +167,7 @@ class CreateLabels(Fast5):
         self.fast5_path = fast5_path
         super(CreateLabels, self).__init__(fast5_path)
         self.aligned_signal = self._initialize()
-        self.kmer_index = 2
+        self.kmer_index = kmer_index
         self.rna = self.is_read_rna()
 
     def _initialize(self):
@@ -172,6 +179,17 @@ class CreateLabels(Fast5):
         aligned_signal.add_raw_signal(raw_signal)
         return aligned_signal
 
+    def fix_sa_reference_indexes(self, data):
+        """Fix reference indexes based on kmer length and kmer index"""
+        check_numpy_table(data, req_fields=('reference_index', 'raw_start', 'kmer'))
+        kmer_len = len(data[0]["kmer"])
+
+        if self.aligned_signal.minus_strand:
+            data["reference_index"] += ((kmer_len - 1) - self.kmer_index)
+        else:
+            data["reference_index"] += self.kmer_index
+        return data
+
     def add_mea_labels(self, number=None):
         """Gather mea_alignment labels information from fast5 file.
         :param number: integer representing which signal align predictions to plot
@@ -180,17 +198,17 @@ class CreateLabels(Fast5):
             assert type(number) is int, "Number must be an integer"
             path = self.__default_signalalign_events__.format(number)
             mea_alignment = self.get_signalalign_events(mea=True, override_path=path)
-            print("mea_alignment path: {}".format(path))
+            # print("mea_alignment path: {}".format(path))
 
             name = "mea_signalalign_{}".format(number)
         else:
             mea_alignment = self.get_signalalign_events(mea=True)
             name = "mea_signalalign"
         # rna reference positions are on 5' edge aka right side of kmer
-        if self.rna:
-            mea_alignment["reference_index"] -= self.kmer_index
-        else:
-            mea_alignment["reference_index"] += self.kmer_index
+        if self.aligned_signal.minus_strand is None:
+            self.aligned_signal.check_strand_mapping(mea_alignment)
+
+        mea_alignment = self.fix_sa_reference_indexes(mea_alignment)
 
         self.aligned_signal.add_label(mea_alignment, name=name, label_type='label')
         return mea_alignment
@@ -205,8 +223,8 @@ class CreateLabels(Fast5):
             path = self.__default_signalalign_events__.format(number)
             sa_events = self.get_signalalign_events(override_path=path)
             basecall_events_path = self.get_signalalign_basecall_path(override_path=path)
-            print("sa_events path: {}".format(path))
-            print("basecall_events_path: {}".format(basecall_events_path))
+            # print("sa_events path: {}".format(path))
+            # print("basecall_events_path: {}".format(basecall_events_path))
 
             name = "full_signalalign_{}".format(number)
         else:
@@ -223,12 +241,8 @@ class CreateLabels(Fast5):
                                                    number=basecall_events_path[24])
         predictions = create_label_from_events(sa_events)
 
-        # predictions = match_events_with_signalalign(sa_events=sa_events, event_detections=events)
-        # rna reference positions are on 5' edge aka right side of kmer
-        if self.rna:
-            predictions["reference_index"] -= self.kmer_index
-        else:
-            predictions["reference_index"] += self.kmer_index
+        predictions = self.fix_sa_reference_indexes(predictions)
+
         self.aligned_signal.add_label(predictions, name=name, label_type='prediction')
         return predictions
 
@@ -271,13 +285,6 @@ class CreateLabels(Fast5):
 
         if trim is not None:
             matches = trim_matches(matches, trim=trim)
-        # # rna reference positions are on 5' edge aka right side of kmer
-        # if self.rna:
-        #     matches["reference_index"] -= self.kmer_index
-        #     mismatches["reference_index"] -= self.kmer_index
-        # else:
-        #     mismatches["reference_index"] += self.kmer_index
-        #     matches["reference_index"] += self.kmer_index
 
         self.aligned_signal.add_label(matches, name=matches_name, label_type='prediction')
         if add_mismatches:
@@ -366,7 +373,6 @@ class CreateLabels(Fast5):
             lables["reference_index"] += self.kmer_index
 
         self.aligned_signal.add_label(lables, name='eventAlign', label_type='label')
-
 
 
 def trim_matches(matches, trim):
@@ -744,7 +750,7 @@ def match_cigar_with_basecall_guide(events, sam_string, kmer_index, rna=False, r
             matches_kmer.append(alignment.reference_base)
             matches_posterior_probability.append(probs[alignment.query_index])
             if psam_h.alignment_segment.is_reverse:
-                matches_reference_index.append(ref_start + ref_len - alignment.reference_index)
+                matches_reference_index.append(ref_start + ref_len - alignment.reference_index - 2)
             else:
                 matches_reference_index.append(ref_start + alignment.reference_index)
         else:
@@ -753,7 +759,7 @@ def match_cigar_with_basecall_guide(events, sam_string, kmer_index, rna=False, r
             mismatches_kmer.append(alignment.reference_base)
             mismatches_posterior_probability.append(probs[alignment.query_index])
             if psam_h.alignment_segment.is_reverse:
-                mismatches_reference_index.append(ref_start + ref_len - alignment.reference_index)
+                mismatches_reference_index.append(ref_start + ref_len - alignment.reference_index - 2)
             else:
                 mismatches_reference_index.append(ref_start + alignment.reference_index)
 

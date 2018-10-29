@@ -477,7 +477,6 @@ class SignalAlignment(object):
             else:
                 print("[SignalAlignment.run] ERROR:  maximum expected alignment")
         npRead.close()
-        # TODO add this back and fix errors
         self.temp_folder.remove_folder()
         return True
 

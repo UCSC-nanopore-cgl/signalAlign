@@ -13,7 +13,6 @@ import sys
 import os
 import colorsys
 import matplotlib.pyplot as plt
-# import matplotlib.pyplot as plt
 import matplotlib.patches as mplpatches
 from matplotlib.collections import LineCollection
 
@@ -398,7 +397,7 @@ def main(args=None):
 
     for f5_path in f5_locations:
         save_fig_path = None
-        cl_handle = CreateLabels(f5_path)
+        cl_handle = CreateLabels(f5_path, kmer_index=2)
         if args.output_dir:
             save_fig_path = "{}.png".format(os.path.join(args.output_dir,
                                                          os.path.splitext(os.path.basename(f5_path))[0]))
@@ -439,7 +438,7 @@ def main(args=None):
             analyze_event_skips(mea_list[i], sa_full_list[i], basecall_list[i])
 
         if main_plot:
-            print("Plotting {}".format(args.f5_path))
+            print("Plotting {}".format(f5_path))
             ps = PlotSignal(cl_handle.aligned_signal)
             ps.plot_alignment(save_fig_path=save_fig_path, plot_alpha=args.plot_alpha)
 
