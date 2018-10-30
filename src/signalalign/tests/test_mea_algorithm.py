@@ -284,6 +284,7 @@ class MeaTest(unittest.TestCase):
                                                      forward_reference=ecoli_reference,
                                                      path_to_bin=path_to_bin,
                                                      constraint_trim=0,
+                                                     traceBackDiagonals=100,
                                                      diagonal_expansion=0,
                                                      embed=True)
 
