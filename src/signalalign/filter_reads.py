@@ -46,7 +46,6 @@ def parse_args():
 
 def filter_reads(fast5s, alignment_file, quality_threshold=7):
     """Filter fast5 files based on a quality threhsold and if there is an alignment"""
-    passes = []
     # loop through fast5s
     fast5_dict = defaultdict()
     # loop through fast5s
@@ -57,7 +56,6 @@ def filter_reads(fast5s, alignment_file, quality_threshold=7):
         read_name = f5h.read_label
         fast5_dict[read_name] = fast5_path
     print("Created read_id to fast5_path mapping")
-    assert os.path.exists(fast5_path), "fast5 path does not exist: {}".format(fast5_path)
     # grab aligned segment
     with closing(pysam.AlignmentFile(alignment_file, 'rb' if alignment_file.endswith("bam") else 'r')) as aln:
         for aligned_segment in aln.fetch():
@@ -69,11 +67,10 @@ def filter_reads(fast5s, alignment_file, quality_threshold=7):
             # get data and sanity check
             if aligned_segment.query_qualities is not None:
                 if np.mean(aligned_segment.query_qualities) > quality_threshold:
-                    passes.append(fast5_path)
+                    yield fast5_path
             else:
-                passes.append(fast5_path)
+                yield fast5_path
 
-    return passes
 
 
 def main():

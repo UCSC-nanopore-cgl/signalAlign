@@ -109,18 +109,17 @@ def get_alignment_summary_info(fast5s, alignment_file, pass_threshold=7, gap_siz
                     reads_seen |= {read_name}
                     seen_counter += 1
                     mapped_reads["seen"][read_name] = 1
+                    print(fast5_path)
+                    cl_handle = CreateLabels(fast5_path, kmer_index=2)
+                    seq_start_time = cl_handle.raw_attributes['start_time']
+                    q_score_average = 0
+                    if aligned_segment.query_qualities is None:
+                        print("Alignment done with fasta instead of fastq so read qualities will not be reported")
+                    else:
+                        q_score_average = np.mean(aligned_segment.query_qualities)
 
-                print(fast5_path)
-                cl_handle = CreateLabels(fast5_path, kmer_index=2)
-                seq_start_time = cl_handle.raw_attributes['start_time']
-                q_score_average = 0
-                if aligned_segment.query_qualities is None:
-                    print("Alignment done with fasta instead of fastq so read qualities will not be reported")
-                else:
-                    q_score_average = np.mean(aligned_segment.query_qualities)
-
-                mapped_reads["q_score_average"][read_name] = q_score_average
-                mapped_reads["seq_start_time"][read_name] = seq_start_time
+                    mapped_reads["q_score_average"][read_name] = q_score_average
+                    mapped_reads["seq_start_time"][read_name] = seq_start_time
 
                 if aligned_segment.is_secondary or aligned_segment.is_unmapped \
                         or aligned_segment.is_supplementary or aligned_segment.has_tag("SA") \
@@ -203,7 +202,7 @@ def print_summary_information(summary_pd, pass_threshold=7):
         other_errors = failed_reads[failed_reads["other_errors"] > 0]
         print("Fraction of failed reads which had other errors: {}".format(len(other_errors)/len(failed_reads)))
 
-        other_errors = failed_reads[failed_reads["q_score_average"] > pass_threshold]
+        other_errors = failed_reads[failed_reads["q_score_average"] < pass_threshold]
         print("Fraction of failed reads which had q_score_average < {}: {}".format(pass_threshold, len(other_errors)/len(failed_reads)))
 
     else:
@@ -291,7 +290,7 @@ def main():
 
     if args.from_pickle is not None:
         print("Loading sequencing summary info from pickle")
-        summary_pd = pd.read_pickle(os.path.join(args.output_dir, "summary_info.pkl"))
+        summary_pd = pd.read_pickle(args.from_pickle)
     else:
         assert args.fast5_dir is not None, "Must select fast5_dir if not loading from pickle file"
         fast5s = list_dir(args.fast5_dir, ext='fast5')
