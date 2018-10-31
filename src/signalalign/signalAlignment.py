@@ -21,7 +21,7 @@ from signalalign.utils.fileHandlers import FolderHandler
 from signalalign.utils.sequenceTools import fastaWrite, samtools_faidx_fasta, processReferenceFasta
 from signalalign.mea_algorithm import mea_alignment_from_signal_align, match_events_with_signalalign, \
     add_events_to_signalalign, create_label_from_events
-from py3helpers.utils import merge_dicts, check_numpy_table
+from py3helpers.utils import merge_dicts, check_numpy_table, merge_lists
 
 
 def create_signalAlignment_args(backward_reference=None, forward_reference=None, destination=None,
@@ -421,12 +421,23 @@ class SignalAlignment(object):
                 mem_command.extend(command)
                 command = mem_command
 
-            output = subprocess.check_output(command, stderr=subprocess.STDOUT)
-            output = str(output).split("\\n")
-            for line in output:
-                print("[SignalAlignment.run]    {}: {}".format(read_label, line))
-                if line.startswith("DEBUG_MAX_MEM"):
-                    self.max_memory_usage_kb = int(line.split(":")[1])
+            # output = subprocess.check_output(command, stderr=subprocess.STDOUT)
+            proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+            output, errors = proc.communicate()
+            if not output:
+                errors = errors.decode().splitlines()
+                for line in errors:
+                    print(line)
+                self.failStop("[SignalAlignment.run] ERROR exception running signalAlign")
+                return False
+            else:
+                errors = errors.decode().splitlines()
+                output = output.decode().splitlines()
+                for line in merge_lists([errors, output]):
+                    print("[SignalAlignment.run]    {}: {}".format(read_label, line))
+                    if line.startswith("DEBUG_MAX_MEM"):
+                        self.max_memory_usage_kb = int(line.split(":")[1])
 
         except Exception as e:
             print("[SignalAlignment.run] exception ({}) running signalAlign: {}".format(type(e), e))
