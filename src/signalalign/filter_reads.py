@@ -12,6 +12,7 @@ import os
 import pysam
 import shutil
 import numpy as np
+from collections import defaultdict
 from contextlib import closing
 from argparse import ArgumentParser
 from signalalign.fast5 import Fast5
@@ -47,29 +48,30 @@ def filter_reads(fast5s, alignment_file, quality_threshold=7):
     """Filter fast5 files based on a quality threhsold and if there is an alignment"""
     passes = []
     # loop through fast5s
+    fast5_dict = defaultdict()
+    # loop through fast5s
     for fast5_path in fast5s:
         assert os.path.exists(fast5_path), "fast5 path does not exist: {}".format(fast5_path)
         f5h = NanoporeRead(fast5_path)
         f5h._initialize_metadata()
         read_name = f5h.read_label
-        correct_segment = None
-        # grab aligned segment
-        with closing(pysam.AlignmentFile(alignment_file, 'rb' if alignment_file.endswith("bam") else 'r')) as aln:
-            for aligned_segment in aln.fetch():
-                if aligned_segment.is_secondary or aligned_segment.is_unmapped \
-                        or aligned_segment.is_supplementary or aligned_segment.has_tag("SA"):
-                    continue
-                if aligned_segment.qname != read_name and read_name not in aligned_segment.qname:
-                    continue
-                # get data and sanity check
-                correct_segment = aligned_segment
-            # check if there is an alignment
-            if correct_segment is not None:
-                if correct_segment.query_qualities is not None:
-                    if np.mean(correct_segment.query_qualities) > quality_threshold:
-                        passes.append(fast5_path)
-                else:
+        fast5_dict[read_name] = fast5_path
+    print("Created read_id to fast5_path mapping")
+    assert os.path.exists(fast5_path), "fast5 path does not exist: {}".format(fast5_path)
+    # grab aligned segment
+    with closing(pysam.AlignmentFile(alignment_file, 'rb' if alignment_file.endswith("bam") else 'r')) as aln:
+        for aligned_segment in aln.fetch():
+            if aligned_segment.is_secondary or aligned_segment.is_unmapped \
+                    or aligned_segment.is_supplementary or aligned_segment.has_tag("SA"):
+                continue
+            read_name = aligned_segment.qname.split("_")[0]
+            fast5_path = fast5_dict[read_name]
+            # get data and sanity check
+            if aligned_segment.query_qualities is not None:
+                if np.mean(aligned_segment.query_qualities) > quality_threshold:
                     passes.append(fast5_path)
+            else:
+                passes.append(fast5_path)
 
     return passes
 

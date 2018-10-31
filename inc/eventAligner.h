@@ -33,6 +33,23 @@ typedef struct {
     basecalled_event *event;
 } basecalled_event_table;
 
+//join directory and file
+char* path_join_two_strings(char* directory, char* file_name);
+
+// check if file has correct extension
+bool check_file_ext(char* file_path, char* ext);
+
+// write fastqs from directory to outpath
+int write_fastqs_to_file(char* fast5_dir, char* output_path);
+
+// get a string dataset
+char *fast5_get_string(hid_t hdf5_file, char* path);
+
+// get fastq from fast5
+char *fast5_get_fastq(hid_t hdf5_file);
+
+// check if group exists
+bool hdf5_group_exists(hid_t hdf5_file, char* path);
 
 // open the file and return the hdf ID
 hid_t fast5_open(char* filename);

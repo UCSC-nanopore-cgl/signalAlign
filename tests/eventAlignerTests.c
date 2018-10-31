@@ -613,8 +613,9 @@ static void test_fast5_create_group(CuTest *testCase){
 
 }
 
-static void test_fast5_create_all_groups(CuTest *testCase){
-    char* path = stString_concat(HOME, "tests/minion_test_reads/RNA_edge_cases/DEAMERNANOPORE_20170922_FAH26525_MN16450_sequencing_run_MA_821_R94_NA12878_mRNA_09_22_17_67136_read_61_ch_151_strand.fast5");
+static void test_fast5_create_all_groups(CuTest *testCase) {
+    char *path = stString_concat(HOME,
+                                 "tests/minion_test_reads/RNA_edge_cases/DEAMERNANOPORE_20170922_FAH26525_MN16450_sequencing_run_MA_821_R94_NA12878_mRNA_09_22_17_67136_read_61_ch_151_strand.fast5");
     hid_t fast5_handle = fast5_open(path);
 
     herr_t status = fast5_create_all_groups(fast5_handle, "/Analyses/FakePath");
@@ -635,7 +636,90 @@ static void test_fast5_create_all_groups(CuTest *testCase){
 
 //    clean up
     fast5_close(fast5_handle);
+}
 
+static void test_fast5_get_string(CuTest *testCase){
+    char* path = stString_concat(HOME, "tests/minion_test_reads/embedded_files/miten_PC_20160820_FNFAD20259_MN17223_sequencing_run_AMS_158_R9_WGA_Ecoli_08_20_16_43623_ch103_read333_strand1.fast5");
+    hid_t fast5_handle = fast5_open(path);
+    char* fastq = fast5_get_string(fast5_handle, "Analyses/Basecall_1D_000/BaseCalled_template/Fastq");
+    char* fastq2 = fast5_get_string(fast5_handle, "Analyses/Basecall_1D_001/BaseCalled_template/Fastq");
+
+    CuAssertStrEquals(testCase, "@6e52", stString_getSubString(fastq, 0, 5));
+    CuAssertStrEquals(testCase, "@6e52", stString_getSubString(fastq2, 0, 5));
+
+//    clean up
+    fast5_close(fast5_handle);
+    free(fastq);
+    free(fastq2);
+}
+
+static void test_fast5_get_fastq(CuTest *testCase){
+    char* path = stString_concat(HOME, "tests/minion_test_reads/embedded_files/miten_PC_20160820_FNFAD20259_MN17223_sequencing_run_AMS_158_R9_WGA_Ecoli_08_20_16_43623_ch103_read333_strand1.fast5");
+    hid_t fast5_handle = fast5_open(path);
+    char* fastq = fast5_get_fastq(fast5_handle);
+
+    CuAssertStrEquals(testCase, "@6e52", stString_getSubString(fastq, 0, 5));
+//    clean up
+    fast5_close(fast5_handle);
+    free(fastq);
+    free(path);
+}
+
+
+static void test_hdf5_group_exists(CuTest *testCase){
+    char* path = stString_concat(HOME, "tests/minion_test_reads/embedded_files/miten_PC_20160820_FNFAD20259_MN17223_sequencing_run_AMS_158_R9_WGA_Ecoli_08_20_16_43623_ch103_read333_strand1.fast5");
+    hid_t fast5_handle = fast5_open(path);
+
+    bool test = hdf5_group_exists(fast5_handle, "/Analyses/Basecall_1D_000");
+    CuAssertTrue(testCase, test);
+    test = hdf5_group_exists(fast5_handle, "/Analyses/Basecall_1D_0");
+    CuAssertTrue(testCase, !test);
+
+    fast5_close(fast5_handle);
+}
+
+
+static void test_write_fastqs_to_file(CuTest *testCase){
+    char* dir = stString_concat(HOME, "tests/minion_test_reads/canonical_ecoli_R9/");
+    char* out_file = stString_concat(HOME, "tests/minion_test_reads/canonical_ecoli_R9/test.fastq");
+
+    int pass = write_fastqs_to_file(dir, out_file);
+    CuAssertTrue(testCase, pass == 0);
+    if (pass == 0){
+        CuAssertTrue(testCase, stFile_exists(out_file));
+        stFile_rmrf(out_file);
+    } else {
+        if (stFile_exists(out_file)){
+            stFile_rmrf(out_file);
+        }
+    }
+//    clean up
+    free(out_file);
+    free(dir);
+}
+
+static void test_check_file_ext(CuTest *testCase){
+    char* file_path = "asdfasdf.dfsdf";
+    char* file_path2 = "asd.fasdf.dfsdf";
+    bool test;
+
+    test = check_file_ext(file_path, "dfsdf");
+    CuAssertTrue(testCase, test);
+    test = check_file_ext(file_path2, "dfsdf");
+    CuAssertTrue(testCase, test);
+
+}
+
+static void test_path_join_two_strings(CuTest *testCase){
+    char* file_path = "asdf/asdf/asdf";
+    char* file_path2 = "/asdf/asdf/asdf/";
+    char* test;
+
+    test = path_join_two_strings(file_path, "dfsdf");
+    CuAssertStrEquals(testCase, test, "asdf/asdf/asdf/dfsdf");
+    test = path_join_two_strings(file_path2, "dfsdf");
+    CuAssertStrEquals(testCase, test, "/asdf/asdf/asdf/dfsdf");
+    free(test);
 }
 
 
@@ -672,6 +756,13 @@ CuSuite *eventAlignerTestSuite(void) {
     SUITE_ADD_TEST(suite, test_reverse_events);
     SUITE_ADD_TEST(suite, test_reverse_basecalled_events);
     SUITE_ADD_TEST(suite, test_build_kmer_list);
+
+    SUITE_ADD_TEST(suite, test_fast5_get_string);
+    SUITE_ADD_TEST(suite, test_hdf5_group_exists);
+    SUITE_ADD_TEST(suite, test_fast5_get_fastq);
+    SUITE_ADD_TEST(suite, test_check_file_ext);
+    SUITE_ADD_TEST(suite, test_path_join_two_strings);
+    SUITE_ADD_TEST(suite, test_write_fastqs_to_file);
 
     return suite;
 }

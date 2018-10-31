@@ -13,11 +13,13 @@ import pysam
 import shutil
 import numpy as np
 import pandas as pd
+import sys
 from contextlib import closing
 from collections import defaultdict, namedtuple
 from argparse import ArgumentParser
 import matplotlib.pyplot as plt
 import matplotlib.patches as mplpatches
+from timeit import default_timer as timer
 from signalalign.fast5 import Fast5
 from signalalign.nanoporeRead import NanoporeRead
 from signalalign.validateSignalAlignment import flag_large_gaps
@@ -31,11 +33,11 @@ def parse_args():
     parser = ArgumentParser(description=__doc__)
     # required arguments
     parser.add_argument('--alignment_file', '-a', action='store',
-                        dest='alignment_file', required=True, type=str, default=None,
+                        dest='alignment_file', required=False, type=str, default=None,
                         help="Sam/Bam file with all alignment data")
 
     parser.add_argument('--fast5_dir', '-d', action='store', default=None,
-                        dest='fast5_dir', required=True, type=str,
+                        dest='fast5_dir', required=False, type=str,
                         help="Directory of all fast5 files")
 
     parser.add_argument('--embedded', '-e', action='store_true', default=False,
@@ -51,7 +53,7 @@ def parse_args():
                         help="Directory to place plots and summary data")
 
     parser.add_argument('--max_reads', '-m', action='store', default=100,
-                        dest='max_reads', required=False,
+                        dest='max_reads', required=False, type=int,
                         help="Maximum number of reads to sample")
 
     parser.add_argument('--from_pickle', '-p', action='store',
@@ -69,7 +71,7 @@ def get_summary_info_table(read_ids):
                     "chimera_mapping", "soft_clipped_percentage",
                     "num_secondary_mappings",
                     "num_flagged_gaps", "avg_flagged_gap_size", 'pass',
-                    'other_errors']
+                    'other_errors', 'seen']
 
     d = pd.DataFrame(0.0, columns=column_names, index=row_names)
     return d
@@ -91,19 +93,23 @@ def get_alignment_summary_info(fast5s, alignment_file, pass_threshold=7, gap_siz
     mapped_reads = get_summary_info_table(list(fast5_dict.keys()))
     # grab aligned segment
     number = 0
-    counter = 0
-    reads_seen = []
+    seen_counter = 0
+    reads_seen = set()
+    print("first_len reads_seen: {}".format(len(reads_seen)), file=sys.stderr)
 
     with closing(pysam.AlignmentFile(alignment_file, 'rb' if alignment_file.endswith("bam") else 'r')) as aln:
         for aligned_segment in aln.fetch():
-            if counter > max_reads:
+            if seen_counter > max_reads:
                 break
             try:
+                print("reads_seen: {}".format(len(reads_seen)), file=sys.stderr)
                 read_name = aligned_segment.qname.split("_")[0]
                 fast5_path = fast5_dict[read_name]
                 if read_name not in reads_seen:
-                    reads_seen.append(read_name)
-                    counter += 1
+                    reads_seen |= {read_name}
+                    seen_counter += 1
+                    mapped_reads["seen"][read_name] = 1
+
                 print(fast5_path)
                 cl_handle = CreateLabels(fast5_path, kmer_index=2)
                 seq_start_time = cl_handle.raw_attributes['start_time']
@@ -117,7 +123,8 @@ def get_alignment_summary_info(fast5s, alignment_file, pass_threshold=7, gap_siz
                 mapped_reads["seq_start_time"][read_name] = seq_start_time
 
                 if aligned_segment.is_secondary or aligned_segment.is_unmapped \
-                        or aligned_segment.is_supplementary or aligned_segment.has_tag("SA"):
+                        or aligned_segment.is_supplementary or aligned_segment.has_tag("SA") \
+                        or q_score_average < pass_threshold:
 
                     if aligned_segment.is_secondary:
                         mapped_reads["num_secondary_mappings"][read_name] += 1
@@ -161,12 +168,12 @@ def get_alignment_summary_info(fast5s, alignment_file, pass_threshold=7, gap_siz
                     except KeyError:
                         mapped_reads["other_errors"][read_name] = 1
             except Exception as e:
-                print(e)
+                print(e, file=sys.stderr)
 
-        return mapped_reads
+        return mapped_reads[mapped_reads["seen"] == 1]
 
 
-def print_summary_information(summary_pd):
+def print_summary_information(summary_pd, pass_threshold=7):
     """Print out important summary stats"""
     passing_reads = summary_pd[summary_pd["pass"] == 1]
     if len(passing_reads) > 0:
@@ -184,7 +191,6 @@ def print_summary_information(summary_pd):
 
     failed_reads = summary_pd[summary_pd["pass"] == 0]
     if len(failed_reads) > 0:
-
         non_mapped_reads = failed_reads[failed_reads["no_mapping"] > 0]
         print("Fraction of failed reads which did not map to reference: {}".format(len(non_mapped_reads)/len(failed_reads)))
 
@@ -196,6 +202,9 @@ def print_summary_information(summary_pd):
 
         other_errors = failed_reads[failed_reads["other_errors"] > 0]
         print("Fraction of failed reads which had other errors: {}".format(len(other_errors)/len(failed_reads)))
+
+        other_errors = failed_reads[failed_reads["q_score_average"] > pass_threshold]
+        print("Fraction of failed reads which had q_score_average < {}: {}".format(pass_threshold, len(other_errors)/len(failed_reads)))
 
     else:
         print("None of the reads failed!")
@@ -212,7 +221,7 @@ def plot_summary_information(summary_pd, output_dir=None):
         output_file = None
     plot_accuracy_vs_qscore(summary_pd, save_fig_path=output_file)
     if output_dir:
-        output_file = os.path.join(output_dir, "accuracy_vs_qscore.jpg")
+        output_file = os.path.join(output_dir, "mapping_errors_vs_qscore.jpg")
     else:
         output_file = None
     plot_mapping_errors_vs_qscore(summary_pd, save_fig_path=output_file)
@@ -230,16 +239,19 @@ def plot_mapping_errors_vs_qscore(summary_pd, save_fig_path=None):
         multiple_mapping = q_scores[failed_reads["num_secondary_mappings"] != 0]
         bins = np.linspace(0, max(q_scores), num=30)
 
-        if len(unmapped_reads) > 0:
-            plt.hist(unmapped_reads, bins=bins, color='blue', label="unmapped_reads")
-        if len(chimera_reads) > 0:
-            plt.hist(q_scores, bins=bins, color='red', label='chimeric_reads')
-        if len(multiple_mapping) > 0:
-            plt.scatter(q_scores, bins=bins, color='green', label='multiple_mapping_locations')
+        plt.figure(figsize=(6, 8))
+        panel1 = plt.axes([0.1, 0.1, .9, .9])
 
-        plt.xlabel("Average Quality Score (phred)")
-        plt.ylabel("Basecalling Accuracy: Matches/ Alignment Length")
-        plt.legend()
+        if len(unmapped_reads) > 0:
+            panel1.hist(unmapped_reads, bins=bins, color='blue', label="unmapped_reads")
+        if len(chimera_reads) > 0:
+            panel1.hist(q_scores, bins=bins, color='red', label='chimeric_reads')
+        if len(multiple_mapping) > 0:
+            panel1.scatter(q_scores, bins=bins, color='green', label='multiple_mapping_locations')
+
+        panel1.set_xlabel("Average Quality Score (phred)")
+        panel1.set_ylabel("Basecalling Accuracy: Matches/ Alignment Length")
+        panel1.legend()
 
         if save_fig_path:
             plt.savefig(save_fig_path)
@@ -254,10 +266,13 @@ def plot_accuracy_vs_qscore(summary_pd, save_fig_path=None):
     accuracy = summary_pd['basecalled_accuracy']
     q_scores = summary_pd['q_score_average']
 
-    plt.scatter(q_scores, accuracy, color='blue', label='accuracy vs avg. quality score')
-    plt.xlabel("Average Quality Score (phred)")
-    plt.ylabel("Basecalling Accuracy: Matches/ Alignment Length")
-    plt.legend()
+    plt.figure(figsize=(6, 8))
+    panel1 = plt.axes([0.1, 0.1, .9, .9])
+
+    panel1.scatter(q_scores, accuracy, color='blue', label='accuracy vs avg. quality score')
+    panel1.set_xlabel("Average Quality Score (phred)")
+    panel1.set_ylabel("Basecalling Accuracy: Matches/ Alignment Length")
+    panel1.legend()
 
     if save_fig_path:
         plt.savefig(save_fig_path)
@@ -268,24 +283,30 @@ def plot_accuracy_vs_qscore(summary_pd, save_fig_path=None):
 
 
 def main():
-    args = parse_args()
+    start = timer()
 
-    fast5s = list_dir(args.fast5_dir, ext='fast5')
-    assert len(fast5s) > 0, "Check fast5_dir. No files with fast5 extension found: {}".format(args.fast5_dir)
+    args = parse_args()
+    pass_threshold = 7
     assert os.path.isdir(args.output_dir), "{} is not a directory".format(args.output_dir)
-    # Make output dir if it doesn't exist
+
     if args.from_pickle is not None:
         print("Loading sequencing summary info from pickle")
         summary_pd = pd.read_pickle(os.path.join(args.output_dir, "summary_info.pkl"))
     else:
+        assert args.fast5_dir is not None, "Must select fast5_dir if not loading from pickle file"
+        fast5s = list_dir(args.fast5_dir, ext='fast5')
+        assert len(fast5s) > 0, "Check fast5_dir. No files with fast5 extension found: {}".format(args.fast5_dir)
+
         print("Creating alignment summary info")
         summary_pd = get_alignment_summary_info(fast5s, args.alignment_file,
-                                                pass_threshold=7, max_reads=args.max_reads)
+                                                pass_threshold=pass_threshold, max_reads=args.max_reads)
         summary_pd.to_pickle(os.path.join(args.output_dir, "summary_info.pkl"))
 
     print("Printing summary stats and creating plots")
-    print_summary_information(summary_pd)
+    print_summary_information(summary_pd, pass_threshold=pass_threshold)
     plot_summary_information(summary_pd, output_dir=args.output_dir)
+    stop = timer()
+    print("Running Time = {} seconds".format(stop - start), file=sys.stderr)
 
 
 if __name__ == "__main__":

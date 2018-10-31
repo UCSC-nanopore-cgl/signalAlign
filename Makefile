@@ -33,7 +33,8 @@ all : sL bD hs python-utils ${libPath}/signalAlignLib.a ${signalAlignBin}/signal
 	  ${signalAlignBin}/signalMachine ${signalAlignBin}/runSignalAlign \
 	  ${signalAlignBin}/variantCallingLib.py ${signalAlignBin}/alignmentAnalysisLib.py \
 	  ${signalAlignBin}/buildHdpUtil ${signalAlignBin}/trainModels all_tests \
-	  externals nanoporeParams python_setup ${signalAlignBin}/filterReads # ${scrappie_build}/scrappie \
+	  externals nanoporeParams python_setup ${signalAlignBin}/filterReads ${signalAlignBin}/extract \
+	  # ${scrappie_build}/scrappie \
 
 python-utils :
 	cd python_utils && python3 setup.py install
@@ -113,6 +114,9 @@ ${signalAlignBin}/signalMachine : signalMachine.c ${libPath}/signalAlignLib.a ${
 
 ${signalAlignBin}/kmerEventAlign : kmerEventAlign.c ${libPath}/signalAlignLib.a ${signalAlignDependencies}
 	${cxx} ${cflags}  -I inc -I${libPath} -I${htsLibRootPath} -I${htsLibPath} ${H5_INCLUDE} -o ${signalAlignBin}/kmerEventAlign kmerEventAlign.c ${libPath}/signalAlignLib.a ${signalAlignLib}  ${htsLib} ${H5_LIB} ${LIBS}
+
+${signalAlignBin}/extract : extract.c ${libPath}/signalAlignLib.a ${signalAlignDependencies}
+	${cxx} ${cflags}  -I inc -I${libPath} -I${htsLibRootPath} -I${htsLibPath} -o ${signalAlignBin}/extract extract.c ${libPath}/signalAlignLib.a ${signalAlignLib}  ${htsLib} ${H5_LIB} ${LIBS}
 
 nanoporeParams : estimateNanoporeParams.c ${libPath}/signalAlignLib.a ${signalAlignDependencies}
 	${cxx} ${cflags}  -I inc -I${libPath} -o ${signalAlignBin}/estimateNanoporeParams estimateNanoporeParams.c ${libPath}/signalAlignLib.a ${signalAlignLib}
