@@ -217,7 +217,7 @@ static void test_fast5_set_basecall_event_table(CuTest *testCase){
 }
 
 static void test_alignment_to_base_event_map(CuTest *testCase){
-    char* templateModelFile = stString_concat(HOME, "/models/testModelR9p4_5mer_acegt_template.model");
+    char* templateModelFile = stString_concat(HOME, "models/testModelR9p4_5mer_acegt_template.model");
     StateMachine *sM = stateMachine3_loadFromFile(templateModelFile, threeState, emissions_kmer_getGapProb,
                                                   emissions_signal_strawManGetKmerEventMatchProbWithDescaling_MeanOnly,
                                                   stateMachine3_loadTransitionsFromFile, NULL);
@@ -639,26 +639,23 @@ static void test_fast5_create_all_groups(CuTest *testCase) {
 }
 
 static void test_fast5_get_string(CuTest *testCase){
-    char* path = stString_concat(HOME, "tests/minion_test_reads/embedded_files/miten_PC_20160820_FNFAD20259_MN17223_sequencing_run_AMS_158_R9_WGA_Ecoli_08_20_16_43623_ch103_read333_strand1.fast5");
+    char* path = stString_concat(HOME, "tests/minion_test_reads/embedded_files/LomanLabz_PC_20161025_FNFAB42699_MN17633_sequencing_run_20161025_E_coli_native_450bps_82361_ch92_read1108_strand.fast5");
     hid_t fast5_handle = fast5_open(path);
     char* fastq = fast5_get_string(fast5_handle, "Analyses/Basecall_1D_000/BaseCalled_template/Fastq");
-    char* fastq2 = fast5_get_string(fast5_handle, "Analyses/Basecall_1D_001/BaseCalled_template/Fastq");
 
-    CuAssertStrEquals(testCase, "@6e52", stString_getSubString(fastq, 0, 5));
-    CuAssertStrEquals(testCase, "@6e52", stString_getSubString(fastq2, 0, 5));
+    CuAssertStrEquals(testCase, "@5cc8", stString_getSubString(fastq, 0, 5));
 
 //    clean up
     fast5_close(fast5_handle);
     free(fastq);
-    free(fastq2);
 }
 
 static void test_fast5_get_fastq(CuTest *testCase){
-    char* path = stString_concat(HOME, "tests/minion_test_reads/embedded_files/miten_PC_20160820_FNFAD20259_MN17223_sequencing_run_AMS_158_R9_WGA_Ecoli_08_20_16_43623_ch103_read333_strand1.fast5");
+    char* path = stString_concat(HOME, "tests/minion_test_reads/embedded_files/LomanLabz_PC_20161025_FNFAB42699_MN17633_sequencing_run_20161025_E_coli_native_450bps_82361_ch92_read1108_strand.fast5");
     hid_t fast5_handle = fast5_open(path);
     char* fastq = fast5_get_fastq(fast5_handle);
 
-    CuAssertStrEquals(testCase, "@6e52", stString_getSubString(fastq, 0, 5));
+    CuAssertStrEquals(testCase, "@5cc8", stString_getSubString(fastq, 0, 5));
 //    clean up
     fast5_close(fast5_handle);
     free(fastq);
@@ -667,7 +664,7 @@ static void test_fast5_get_fastq(CuTest *testCase){
 
 
 static void test_hdf5_group_exists(CuTest *testCase){
-    char* path = stString_concat(HOME, "tests/minion_test_reads/embedded_files/miten_PC_20160820_FNFAD20259_MN17223_sequencing_run_AMS_158_R9_WGA_Ecoli_08_20_16_43623_ch103_read333_strand1.fast5");
+    char* path = stString_concat(HOME, "tests/minion_test_reads/embedded_files/LomanLabz_PC_20161025_FNFAB42699_MN17633_sequencing_run_20161025_E_coli_native_450bps_82361_ch92_read1108_strand.fast5");
     hid_t fast5_handle = fast5_open(path);
 
     bool test = hdf5_group_exists(fast5_handle, "/Analyses/Basecall_1D_000");

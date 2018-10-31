@@ -131,7 +131,7 @@ class SignalAlignmentTest(unittest.TestCase):
             final_args = merge_dicts([args, dict(in_fast5=os.path.join(new_dir, "LomanLabz_PC_20161025_FNFAB42699_MN17633_sequencing_run_20161025_E_coli_native_450bps_82361_ch6_read347_strand.fast5"))])
             handle = SignalAlignment(**final_args)
             handle.run()
-            self.assertEqual(len(os.listdir(working_folder.path)), 2)
+            self.assertEqual(len(os.listdir(working_folder.path)), 1)
             self.assertEqual(sorted(os.listdir(working_folder.path))[0], "9e4d14b1-8167-44ef-9fdb-5c29dd0763fd.sm.backward.tsv")
 
     def test_embed(self):
@@ -159,7 +159,7 @@ class SignalAlignmentTest(unittest.TestCase):
             sam = f5fh.get_signalalign_events(sam=True)
             self.assertEqual(mea[0]["raw_start"], 153)
             self.assertEqual(sam[0], "9")
-            self.assertEqual(len(os.listdir(working_folder.path)), 2)
+            self.assertEqual(len(os.listdir(working_folder.path)), 1)
             self.assertEqual(sorted(os.listdir(working_folder.path))[0], "9e4d14b1-8167-44ef-9fdb-5c29dd0763fd.sm.backward.tsv")
 
         # DNA WITH events
@@ -187,7 +187,7 @@ class SignalAlignmentTest(unittest.TestCase):
             sam = f5fh.get_signalalign_events(sam=True)
             self.assertEqual(mea[0]["raw_start"], 153)
             self.assertEqual(sam[0], "9")
-            self.assertEqual(len(os.listdir(working_folder.path)), 2)
+            self.assertEqual(len(os.listdir(working_folder.path)), 1)
             self.assertEqual(sorted(os.listdir(working_folder.path))[0], "9e4d14b1-8167-44ef-9fdb-5c29dd0763fd.sm.backward.tsv")
 
     def test_multithread_signal_alignment(self):

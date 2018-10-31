@@ -256,7 +256,7 @@ class MeaTest(unittest.TestCase):
         fast5_dir = os.path.join(MeaTest.HOME, "tests/minion_test_reads/1D")
         template_hmm = os.path.join(MeaTest.HOME, "models/testModelR9_acgt_template.model")
         path_to_bin = os.path.join(MeaTest.HOME, 'bin')
-        threshold = 10
+        threshold = 11
 
         # make directory to put temporary files and output location
         output_root = tempfile.TemporaryDirectory()

@@ -433,7 +433,7 @@ int main(int argc, char *argv[]) {
     int64_t diagExpansion = 50;
     double threshold = 0.01;
     int64_t constraintTrim = 14;
-    int64_t traceBackDiagonals = 40;
+    int64_t traceBackDiagonals = 50;
     int64_t degenerate;
     int64_t outFmt;
     bool twoD = FALSE;

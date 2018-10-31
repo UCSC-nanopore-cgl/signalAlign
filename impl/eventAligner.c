@@ -200,7 +200,9 @@ char *fast5_get_string(hid_t hdf5_file, char* path){
 
 hid_t fast5_open(char* filename)
     {
-    assert(stFile_exists(filename));
+    if (!stFile_exists(filename)){
+        st_errAbort("File does not exist: %s", filename);
+    }
     hid_t hdf5file = H5Fopen(filename, H5F_ACC_RDWR, H5P_DEFAULT);
     return hdf5file;
     }
