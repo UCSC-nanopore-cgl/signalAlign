@@ -5,7 +5,8 @@ import re
 import numpy as np
 from itertools import islice
 from signalalign.fast5 import Fast5
-from signalalign.event_detection import load_from_raw
+from signalalign.utils.sequenceTools import get_full_nucleotide_read_from_alignment
+from signalalign.event_detection import load_from_raw, load_from_raw2
 from py3helpers.utils import check_numpy_table
 from Bio import SeqIO
 try:
@@ -29,7 +30,7 @@ SUPPORTED_2D_VERSIONS = ("1.15.0", "1.19.0", "1.20.0", "1.22.2", "1.22.4", "1.23
 class NanoporeRead(object):
     def __init__(self, fast_five_file, twoD=False, event_table='', initialize=False, path_to_bin="./",
                  alignment_file=None, model_file_location=None, perform_kmer_event_alignment=None,
-                 enforce_supported_versions=True, filter_reads=False):
+                 enforce_supported_versions=True, filter_reads=False, aligned_segment=None):
         # load the fast5
         self.filename = fast_five_file  # fast5 file path
         self.fastFive = None  # fast5 object
@@ -73,6 +74,7 @@ class NanoporeRead(object):
         self.twoD = twoD  # 2D read flag, necessary right now, and the client should know
         # if set, unsupported versions will cause failure
         self.enforce_supported_versions = enforce_supported_versions
+        self.aligned_segment = aligned_segment # pysam aligned_segment object
 
         if type(self) == NanoporeRead:
             if twoD:
@@ -191,9 +193,7 @@ class NanoporeRead(object):
         if oned_root_address and self.rna and not self.has_valid_event_table_format(oned_root_address):
             self.logError("[NanoporeRead:_initialize] WARN invalid event table format for RNA read")
             if perform_kmer_event_aln_if_required:
-                oned_root_address = load_from_raw(self, self.alignment_file, self.model_file_location,
-                                                  self.path_to_bin)
-
+                oned_root_address = self.generate_new_event_table()
         # sanity check
         if not oned_root_address:
             self.logError("[NanoporeRead:_initialize] ERROR could not find 1D root address in {}"
@@ -264,8 +264,12 @@ class NanoporeRead(object):
         return True
 
     def generate_new_event_table(self):
-        oned_root_address = load_from_raw(self, self.alignment_file, self.model_file_location, self.path_to_bin,
-                                          analysis_identifier=self.event_table if self.event_table else None)
+        if self.aligned_segment is None:
+            nucleotide_sequence, nucleotide_qualities, _, _, self.aligned_segment = \
+                get_full_nucleotide_read_from_alignment(self.alignment_file, self.read_label)
+
+        oned_root_address = load_from_raw2(self, self.aligned_segment, self.model_file_location, self.path_to_bin,
+                                           analysis_identifier=self.event_table if self.event_table else None)
         if oned_root_address:
             self.logError(
                 "[NanoporeRead:generate_new_event_table] INFO generated event table at {}".format(oned_root_address))

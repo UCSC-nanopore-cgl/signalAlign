@@ -658,3 +658,41 @@ def get_full_nucleotide_read_from_alignment(alignment_location, read_name, hardc
             break
 
     return sequence, qualities, hardclipped_start, hardclipped_end, aligned_segment
+
+
+def get_full_nucleotide_read_from_aligned_segment(aligned_segment, read_name, hardclip_character=None):
+    sequence, qualities, hardclipped_start, hardclipped_end = None, None, 0, 0
+
+    # get data and sanity check
+    sequence = aligned_segment.query_sequence.upper()
+    qualities = aligned_segment.qual
+    cigar_tuples = aligned_segment.cigartuples
+    if cigar_tuples is None or len(cigar_tuples) == 0:
+        print("[get_full_nucleotide_read_from_alignment] no alignment found for {} in {}".format(
+            read_name, alignment_location), file=sys.stderr)
+
+    else:
+        # check for hard clipping
+        if cigar_tuples[0][0] == BAM_CHARD_CLIP:
+            hardclipped_start = cigar_tuples[0][1]
+            if hardclip_character is not None:
+                sequence = (hardclip_character * hardclipped_start) + sequence
+                if qualities is not None and len(qualities) != 0:
+                    qualities = ("!" * hardclipped_start) + qualities
+        if cigar_tuples[-1][0] == BAM_CHARD_CLIP:
+            hardclipped_end = cigar_tuples[-1][1]
+            if hardclip_character is not None:
+                sequence = sequence + (hardclip_character * hardclipped_end)
+                if qualities is not None and len(qualities) != 0:
+                    qualities = qualities + ("!" * hardclipped_end)
+
+        # check for reverse mapping
+        if aligned_segment.is_reverse:
+            sequence = reverse_complement(sequence, reverse=True, complement=True)
+            if qualities is not None and len(qualities) != 0:
+                qualities = ''.join(reversed(list(qualities)))
+            tmp = hardclipped_end
+            hardclipped_end = hardclipped_start
+            hardclipped_start = tmp
+
+    return sequence, qualities, hardclipped_start, hardclipped_end, aligned_segment

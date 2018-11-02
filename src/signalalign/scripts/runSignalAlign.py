@@ -235,7 +235,8 @@ def main(args):
     if args.filter_reads is not None and args.alignment_file:
         n_reads = len(fast5s)
         print("[runSignalAlign]:NOTICE: Filtering out low quality reads", file=sys.stdout)
-        fast5s = filter_reads(fast5s, args.alignment_file)
+        fast5s = filter_reads(fast5s, args.alignment_file, args.readdb)
+        fast5s = [x for x, y in fast5s]
         print("[runSignalAlign]:NOTICE: {} reads passed out of {} reads".format(len(fast5s), n_reads), file=sys.stdout)
 
     print("[runSignalAlign]:NOTICE: Got {} files to align".format(len(fast5s)), file=sys.stdout)

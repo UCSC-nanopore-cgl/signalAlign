@@ -32,6 +32,10 @@ def parse_args():
                         dest='fast5_dir', required=True, type=str,
                         help="Directory of all fast5 files")
 
+    parser.add_argument('--readdb', action='store', default=None,
+                        dest='readdb', required=True, type=str,
+                        help="Path to readdb file")
+
     parser.add_argument('--pass_output_dir', action='store', default=None,
                         dest='pass_output_dir', required=True, type=str,
                         help="Location where all pass reads will be moved")
@@ -44,33 +48,51 @@ def parse_args():
     return args
 
 
-def filter_reads(fast5s, alignment_file, quality_threshold=7):
-    """Filter fast5 files based on a quality threhsold and if there is an alignment"""
-    # loop through fast5s
-    fast5_dict = defaultdict()
-    # loop through fast5s
-    for fast5_path in fast5s:
-        assert os.path.exists(fast5_path), "fast5 path does not exist: {}".format(fast5_path)
-        f5h = NanoporeRead(fast5_path)
-        f5h._initialize_metadata()
-        read_name = f5h.read_label
-        fast5_dict[read_name] = fast5_path
-    print("Created read_id to fast5_path mapping")
-    # grab aligned segment
-    with closing(pysam.AlignmentFile(alignment_file, 'rb' if alignment_file.endswith("bam") else 'r')) as aln:
-        for aligned_segment in aln.fetch():
-            if aligned_segment.is_secondary or aligned_segment.is_unmapped \
-                    or aligned_segment.is_supplementary or aligned_segment.has_tag("SA"):
-                continue
-            read_name = aligned_segment.qname.split("_")[0]
-            fast5_path = fast5_dict[read_name]
-            # get data and sanity check
-            if aligned_segment.query_qualities is not None:
-                if np.mean(aligned_segment.query_qualities) > quality_threshold:
-                    yield fast5_path
-            else:
-                yield fast5_path
+def parse_readdb(readdb, directories):
+    """Parse readdb file
 
+    :param readdb: path to readdb file
+    :param directories: path to directories of where the reads are
+    """
+    assert readdb.endswith("readdb"), "readdb file must end with .readdb: {}".format(readdb)
+    with open(readdb, 'r') as fh:
+        for line in fh:
+            split_line = line.split()
+            for dir_path in directories:
+                full_path = os.path.join(dir_path, split_line[1])
+                if os.path.exists(full_path):
+                    yield split_line[0], full_path
+
+
+def filter_reads(alignment_file, readdb, read_dirs, quality_threshold=7):
+    """Filter fast5 files based on a quality threshold and if there is an alignment"""
+    assert alignment_file.endswith("bam"), "Alignment file must be in BAM format: {}".format(alignment_file)
+    # grab aligned segment
+    with closing(pysam.AlignmentFile(alignment_file, 'rb')) as bamfile:
+        name_indexed = pysam.IndexedReads(bamfile)
+        name_indexed.build()
+
+        for name, fast5 in parse_readdb(readdb, read_dirs):
+            try:
+                iterator = name_indexed.find(name)
+                for aligned_segment in iterator:
+                    if aligned_segment.is_secondary or aligned_segment.is_unmapped \
+                            or aligned_segment.is_supplementary or aligned_segment.has_tag("SA"):
+                        continue
+                    # get data and sanity check
+                    if aligned_segment.query_qualities is not None:
+                        if np.mean(aligned_segment.query_qualities) < quality_threshold:
+                            continue
+                    yield fast5, aligned_segment
+
+            except KeyError:
+                print("Found no alignments for {}".format(fast5))
+
+
+def filter_reads_to_string_wrapper(filter_reads_generator):
+    """Wrap filter reads in order to convert the aligned segment into a string so it can be pickled"""
+    for fast5, aligned_segment in filter_reads_generator:
+        yield fast5, aligned_segment.to_string()
 
 
 def main():
@@ -83,11 +105,11 @@ def main():
     if not os.path.isdir(args.pass_output_dir):
         os.mkdir(args.pass_output_dir)
 
-    best_files = filter_reads(fast5s, args.alignment_file, args.quality_threshold)
+    best_files = filter_reads(args.alignment_file, args.readdb, [args.fast5_dir], args.quality_threshold)
 
     # move passed files
     assert os.path.isdir(args.pass_output_dir), "pass_output_dir does not exist or get created: {}".format(args.pass_output_dir)
-    for path in best_files:
+    for path, _ in best_files:
         shutil.move(path, os.path.join(args.pass_output_dir, os.path.basename(path)))
 
 

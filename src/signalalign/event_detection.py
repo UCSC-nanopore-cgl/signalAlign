@@ -26,7 +26,7 @@ from collections import defaultdict
 from timeit import default_timer as timer
 # from signalalign.utils.pyporeParsers import SpeedyStatSplit
 from signalalign.fast5 import Fast5
-from signalalign.utils.sequenceTools import get_full_nucleotide_read_from_alignment
+from signalalign.utils.sequenceTools import get_full_nucleotide_read_from_alignment, reverse_complement
 from signalalign.utils.filters import minknow_event_detect
 from py3helpers.utils import check_numpy_table, list_dir, TimeStamp, change_np_field_type, merge_dicts
 from py3helpers.seq_tools import create_fastq_line, check_fastq_line, ReverseComplement, pairwise_alignment_accuracy
@@ -192,6 +192,83 @@ def load_from_raw(np_handle, alignment_file, model_file_location, path_to_bin=".
             return False
     else:
         nucleotide_qualities = None
+    if nucleotide_qualities is None:
+        nucleotide_qualities = "!" * len(nucleotide_sequence)
+
+    # we need to swap the orientation because alignments for RNA reads are 3'-5' for reasons that were good I swear
+    if np_handle.rna:
+        nucleotide_sequence = nucleotide_sequence[::-1].replace("T", "U")
+        nucleotide_qualities = nucleotide_qualities[::-1]
+
+    # get fastq (this is saved with the event table)
+    fastq = create_fastq_line(read_id, nucleotide_sequence, nucleotide_qualities)
+
+    # get temp location
+    tmp_root = np_handle.fastFive.get_analysis_new(EVENT_KMERALIGN_TMP)
+    tmp_dest = np_handle.fastFive.get_analysis_events_path_new(EVENT_KMERALIGN_TMP)
+    assert tmp_dest.startswith(tmp_root), "Invalid analysis path management"
+    file_name = np_handle.filename
+    np_handle.close()
+    tmp_directory = tempfile.mkdtemp()
+    # run the c code which does the required stuff
+    status = run_kmeralign_exe(file_name, nucleotide_sequence, model_file_location, tmp_dest, path_to_bin,
+                               write_failed_alignments=write_failed_alignments, tmp_directory=tmp_directory)
+    os.removedirs(tmp_directory)
+    # alignment succeeded, save it to the appropriate location
+    if status:
+        np_handle.open()
+        if analysis_identifier is None: analysis_identifier = Fast5.__default_basecall_1d_analysis__
+        # get attrs
+        keys = ["signalAlign version", "time_stamp"]
+        values = ["0.2.0", TimeStamp().posix_date()]
+        attributes = merge_dicts([dict(zip(keys, values)), np_handle.fastFive.raw_attributes])
+        # get events (and delete tmp location)
+        events = np_handle.fastFive.get_custom_analysis_events(EVENT_KMERALIGN_TMP)
+        np_handle.fastFive.delete(tmp_root, ignore=False)
+        # save events and fastq
+        saved_loc = save_event_table_and_fastq(np_handle.fastFive, events, fastq, attributes,
+                                               analysis_identifier=analysis_identifier)
+        return saved_loc
+
+    # alignment failed, remove offending location (if it exists) and report
+    else:
+        print("[load_from_raw] error performing kmeralign", file=sys.stderr)
+        np_handle.open()
+        np_handle.fastFive.delete(tmp_root, ignore=True)
+        return False
+
+
+def load_from_raw2(np_handle, aligned_segment, model_file_location, path_to_bin="./",
+                   analysis_identifier=None, write_failed_alignments=False):
+    """Load a nanopore read from raw signal and an alignment file. Need a model to create banded alignment.
+    :param np_handle: NanoporeRead class object
+    :param aligned_segment: pysam aligned_segment object
+    :param model_file_location: path to model file
+    :param path_to_bin: bath to signalAlign bin where executables are stored
+    :param analysis_identifier: identifier for storage of event table and fastq
+    :param write_failed_alignments: still write alignments that failed quality checks
+    :return: path to events in fast5 file or -1 if the task fails
+    """
+    assert os.path.isfile(model_file_location), \
+        "Model_file_location must be a real path to a SignalAlign HMM model file"
+    assert os.path.exists(path_to_bin), \
+        "path_to_bin must exist"
+    # check if file is open
+    if not np_handle.open():
+        return False
+    # grab read id
+    read_id = np_handle.read_label
+
+    # get nucleotides and qualities
+    nucleotide_sequence = aligned_segment.query_sequence.upper()
+    nucleotide_qualities = aligned_segment.query_qualities
+
+    # check for reverse mapping
+    if aligned_segment.is_reverse:
+        nucleotide_sequence = reverse_complement(nucleotide_sequence, reverse=True, complement=True)
+        if nucleotide_qualities is not None and len(nucleotide_qualities) != 0:
+            nucleotide_qualities = ''.join(reversed(list(nucleotide_qualities)))
+
     if nucleotide_qualities is None:
         nucleotide_qualities = "!" * len(nucleotide_sequence)
 

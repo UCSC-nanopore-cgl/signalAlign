@@ -12,6 +12,8 @@
 #include <eventAligner.h>
 #include "sonLib.h"
 #include "signalMachineUtils.h"
+#include "kseq.h"
+#include <zlib.h>
 
 #define RAW_ROOT "/Raw/Reads/"
 
@@ -19,6 +21,119 @@
 //#define DEBUG_FAST5_IO 1
 //#define DEBUG_PRINT_STATS 1
 
+
+int write_readdb_file1(char* fast5_dir, char* output_path){
+    assert(stFile_isDir(fast5_dir));
+    char* fast5_file;
+    char* fastq;
+    char* fast5_path;
+    fastq_entry *fastqEntry;
+    FILE *fH = fopen(output_path, "a");
+    hid_t f5_handle;
+    if (!check_file_ext(output_path, "readdb")){
+        st_errAbort("Output path must end with readdb: %s", output_path);
+    }
+    stList* fast5_files = stFile_getFileNamesInDirectory(fast5_dir);
+    for (int i = 0; i < stList_length(fast5_files); i++){
+        fast5_file = stList_get(fast5_files, i);
+        if (check_file_ext(fast5_file, "fast5")){
+            fast5_path = path_join_two_strings(fast5_dir, fast5_file);
+            f5_handle = fast5_open(fast5_path);
+            fastq = fast5_get_fastq(f5_handle);
+            if (stString_eq(fastq, "")){
+                printf("Fastq not found in: %s\n", fast5_path);
+            } else {
+                fastqEntry = parse_fastq_string(fastq);
+                fprintf(fH, "%s\t%s\n", fastqEntry->name, fast5_file);
+                fastq_entry_destruct(fastqEntry);
+            }
+        }
+    }
+    stList_destruct(fast5_files);
+    fclose(fH);
+    return 0;
+}
+
+int write_fastq_and_readdb_file1(char* fast5_dir, char* fastq_output_path, char* readdb_output_path){
+    assert(stFile_isDir(fast5_dir));
+    char* fast5_file;
+    char* fastq;
+    char* fast5_path;
+    fastq_entry *fastqEntry;
+    FILE *db_fH = fopen(readdb_output_path, "a");
+    FILE *fq_fH = fopen(fastq_output_path, "a");
+
+    hid_t f5_handle;
+    if (!check_file_ext(readdb_output_path, "readdb")){
+        st_errAbort("Output path must end with readdb: %s", readdb_output_path);
+    }
+    if (!check_file_ext(fastq_output_path, "fastq") && !check_file_ext(fastq_output_path, "fq")){
+        st_errAbort("Output path must end with fastq: %s", fastq_output_path);
+    }
+    stList* fast5_files = stFile_getFileNamesInDirectory(fast5_dir);
+    for (int i = 0; i < stList_length(fast5_files); i++){
+        fast5_file = stList_get(fast5_files, i);
+        if (check_file_ext(fast5_file, "fast5")){
+            fast5_path = path_join_two_strings(fast5_dir, fast5_file);
+            f5_handle = fast5_open(fast5_path);
+            fastq = fast5_get_fastq(f5_handle);
+            if (stString_eq(fastq, "")){
+                printf("Fastq not found in: %s\n", fast5_path);
+            } else {
+                fastqEntry = parse_fastq_string(fastq);
+                fprintf(db_fH, "%s\t%s\n", fastqEntry->name, fast5_file);
+                fprintf(fq_fH, "%s", fastq);
+                fastq_entry_destruct(fastqEntry);
+            }
+        }
+    }
+    stList_destruct(fast5_files);
+    fclose(db_fH);
+    fclose(fq_fH);
+    return 0;
+}
+
+//int write_readdb_file2(char* fast5_dir, char* fasta, char* output_path){
+//
+//}
+
+void fastq_entry_destruct(fastq_entry *fastq) {
+    free(fastq);
+}
+
+
+fastq_entry *parse_fastq_string(char* fastq_string){
+    fastq_entry *fastq = malloc(sizeof(fastq_entry));
+    char* name;
+    stList *all_fields = stString_splitByString(fastq_string, "\n");
+    name = stList_get(all_fields, 0);
+
+//    check header
+    if (name[0] != '@'){
+        st_errAbort("Fastq string does not start with @.\n");
+    }
+    if (!stString_eq(stList_get(all_fields, 2), "+")){
+        st_errAbort("Fastq string's third line is not +.\n");
+    }
+
+    stList *header = stString_split(name);
+
+    if (stList_length(header) > 1) {
+        name = stList_get(header, 0);
+        fastq->comment = stList_get(header, 1);
+    } else {
+        fastq->comment = "";
+    }
+    fastq->name = stString_getSubString(name, 1, (int64_t) strlen(name));
+
+//    fastq.comment = stList_get(all_fields, 0);
+    fastq->seq = stList_get(all_fields, 1);
+    fastq->qual = stList_get(all_fields, 3);
+    if (strlen(fastq->seq) != strlen(fastq->qual)){
+        st_errAbort("Fastq seq len and qual lengths do not match.\n");
+    }
+    return fastq;
+}
 
 int write_fastqs_to_file(char* fast5_dir, char* output_path){
 //    get fast5s

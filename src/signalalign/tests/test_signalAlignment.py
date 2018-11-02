@@ -22,8 +22,9 @@ from signalalign.signalAlignment import *
 from signalalign.fast5 import Fast5
 from signalalign.train.trainModels import HmmModel
 from signalalign import parseFofn
+from signalalign.filter_reads import filter_reads
 from signalalign.utils.fileHandlers import FolderHandler
-from py3helpers.utils import captured_output, merge_dicts
+from py3helpers.utils import captured_output, merge_dicts, list_dir
 
 
 class SignalAlignmentTest(unittest.TestCase):
@@ -41,10 +42,17 @@ class SignalAlignmentTest(unittest.TestCase):
             "miten_PC_20160820_FNFAD20259_MN17223_sequencing_run_AMS_158_R9_WGA_Ecoli_08_20_16_43623_ch101_read456_strand.fast5",
             "miten_PC_20160820_FNFAD20259_MN17223_sequencing_run_AMS_158_R9_WGA_Ecoli_08_20_16_43623_ch101_read544_strand1.fast5",
             "miten_PC_20160820_FNFAD20259_MN17223_sequencing_run_AMS_158_R9_WGA_Ecoli_08_20_16_43623_ch103_read333_strand1.fast5"]
-        cls.fast5_paths = [os.path.join(cls.fast5_dir, f) for f in os.listdir(cls.fast5_dir)
-                           if os.path.isfile(os.path.join(cls.fast5_dir, f))]
+        cls.fast5_paths = list_dir(cls.fast5_dir, ext="fast5")
         cls.template_hmm = os.path.join(cls.HOME, "models/testModelR9_acgt_template.model")
         cls.path_to_bin = os.path.join(cls.HOME, 'bin')
+        cls.tmp_directory = tempfile.mkdtemp()
+        cls.test_dir = os.path.join(cls.tmp_directory, "test")
+
+        dna_dir = os.path.join(cls.HOME, "tests/minion_test_reads/1D/")
+        # copy file to tmp directory
+        shutil.copytree(dna_dir, cls.test_dir)
+        cls.readdb = os.path.join(cls.HOME, "tests/minion_test_reads/oneD.fastq.index.readdb")
+        cls.bam = os.path.join(cls.HOME, "tests/minion_test_reads/oneD.bam")
 
     def test_create_signalAlignment_args(self):
         expected_args = {"backward_reference", "forward_reference", "destination", "stateMachineType", "in_templateHmm",
@@ -53,7 +61,7 @@ class SignalAlignmentTest(unittest.TestCase):
                          "bwa_reference",
                          'track_memory_usage', 'get_expectations', 'output_format', 'embed', 'event_table',
                          'check_for_temp_file_existance', 'path_to_bin', 'perform_kmer_event_alignment', 'filter_reads',
-                         'traceBackDiagonals'}
+                         'traceBackDiagonals', 'delete_tmp'}
         args = create_signalAlignment_args()
         self.assertSetEqual(set(args.keys()), expected_args)
 
@@ -207,6 +215,24 @@ class SignalAlignmentTest(unittest.TestCase):
                 output_files = multithread_signal_alignment(signal_align_arguments, fast5_files, 2,
                                                             forward_reference=self.ecoli_reference)
             self.assertEqual(len(output_files), len(fast5_files))
+            # round 2
+            working_folder = FolderHandler()
+            working_folder.open_folder(os.path.join(tempdir, "test_dir2"))
+            # create signalalign args
+            assert os.path.isfile(self.template_hmm)
+            signal_align_arguments = create_signalAlignment_args(bwa_reference=self.ecoli_reference,
+                                                                 in_templateHmm=self.template_hmm,
+                                                                 destination=working_folder.path,
+                                                                 forward_reference=self.ecoli_reference,
+                                                                 path_to_bin=self.path_to_bin)
+
+            filter_reads_generator = filter_reads(self.bam, self.readdb, [self.test_dir])
+            output_files = multithread_signal_alignment(signal_align_arguments, [], 2,
+                                                        forward_reference=self.ecoli_reference,
+                                                        filter_read_generator=filter_reads_generator,
+                                                        debug=True)
+            self.assertEqual(len(output_files), 3)
+
 
     def test_multithread_signal_alignment_samples(self):
         with tempfile.TemporaryDirectory() as tempdir:

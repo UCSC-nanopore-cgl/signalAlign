@@ -141,11 +141,6 @@ def getGuideAlignmentFromAlignmentFile(alignment_location, read_name=None, targe
     # get reads from alignment file (sam or bam)
     aligned_segment, n_aligned_segments, reference_name = get_aligned_segment_from_alignment_file(alignment_location, read_name)
     assert aligned_segment is not None, "[generateGuideAlignment] Read {} has no passing alignment".format(read_name)
-    query_name = aligned_segment.qname
-    flag = aligned_segment.flag
-    reference_pos = aligned_segment.pos + 1  # pysam gives the 0-based leftmost start
-    sam_cigar = aligned_segment.cigarstring
-
     # couldn't find anything
     if n_aligned_segments == 0:
         print("[generateGuideAlignment] Found no aligned segments" +
@@ -154,6 +149,35 @@ def getGuideAlignmentFromAlignmentFile(alignment_location, read_name=None, targe
 
     if n_aligned_segments > 1:
         print("[generateGuideAlignment] WARNING more than 1 mapping, taking the first one heuristically")
+
+    return getGuideAlignmentFromAlignedSegment(aligned_segment, target_regions=target_regions)
+
+
+def getInfoFromCigarFile(cigar_file):
+    with open(cigar_file, 'r') as cig:
+        for line in cig:
+            if not line.startswith("cigar:"): continue
+            parts = line.split()
+            assert len(parts) >= 11, "[generateGuideAlignment] Malformed cigar file {}".format(cigar_file)
+            strand = parts[8]
+            assert strand == '+' or strand == "-", "[generateGuideAlignment] Unexpected strand '{}' in cigar line {}".format(strand, line)
+            reference_name = parts[5]
+            return strand, reference_name
+    assert False, "[generateGuideAlignment] No cigar line found in {}".format(cigar_file)
+
+
+def getGuideAlignmentFromAlignedSegment(aligned_segment, target_regions=None):
+    """Generate a GuideAlignment from a pysam alignedSegment object
+
+    :param aligned_segment: an pysam AlignedSegment object
+    :param target_regions: target_regions
+    :return: GuideAlignment object
+    """
+    reference_name = aligned_segment.reference_name
+    query_name = aligned_segment.qname
+    flag = aligned_segment.flag
+    reference_pos = aligned_segment.pos + 1  # pysam gives the 0-based leftmost start
+    sam_cigar = aligned_segment.cigarstring
 
     # get strand
     strand = ""
@@ -200,19 +224,6 @@ def getGuideAlignmentFromAlignmentFile(alignment_location, read_name=None, targe
             pass
 
     return GuideAlignment(completeCigarString, strand, reference_name)
-
-
-def getInfoFromCigarFile(cigar_file):
-    with open(cigar_file, 'r') as cig:
-        for line in cig:
-            if not line.startswith("cigar:"): continue
-            parts = line.split()
-            assert len(parts) >= 11, "[generateGuideAlignment] Malformed cigar file {}".format(cigar_file)
-            strand = parts[8]
-            assert strand == '+' or strand == "-", "[generateGuideAlignment] Unexpected strand '{}' in cigar line {}".format(strand, line)
-            reference_name = parts[5]
-            return strand, reference_name
-    assert False, "[generateGuideAlignment] No cigar line found in {}".format(cigar_file)
 
 
 def generateGuideAlignment(reference_fasta, query, temp_sam_path, target_regions=None):

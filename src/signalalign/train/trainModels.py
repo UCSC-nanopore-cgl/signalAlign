@@ -662,6 +662,7 @@ class TrainSignalAlign(object):
             in_complementHdp=self.complement_hdp_model_path,
             diagonal_expansion=self.args.diagonal_expansion,
             constraint_trim=self.args.constraint_trim,
+            traceBackDiagonals=self.args.traceBackDiagonals,
             twoD_chemistry=self.two_d,
             get_expectations=get_expectations,
             path_to_bin=self.path_to_bin,
@@ -670,10 +671,11 @@ class TrainSignalAlign(object):
             track_memory_usage=self.args.signal_alignment_args.track_memory_usage,
             embed=self.args.signal_alignment_args.embed,
             event_table=self.args.signal_alignment_args.event_table,
-            output_format=output_format)
+            output_format=output_format,
+            filter_reads=self.args.filter_reads)
 
         self.samples = multithread_signal_alignment_samples(self.samples, alignment_args, self.job_count,
-                                                            trim=trim)
+                                                            trim=trim, debug=self.debug)
         return self.samples
 
 
