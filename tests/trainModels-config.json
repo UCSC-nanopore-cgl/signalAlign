@@ -69,5 +69,7 @@
   "two_d": false,
   "output_dir": "./",
   "constraint_trim": null,
-  "diagonal_expansion": null
+  "diagonal_expansion": null,
+  "traceBackDiagonals": 100,
+  "filter_reads": 7
 }

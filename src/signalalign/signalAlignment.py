@@ -442,19 +442,18 @@ class SignalAlignment(object):
             proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
             output, errors = proc.communicate()
-            if not output:
-                errors = errors.decode().splitlines()
-                for line in errors:
-                    print(line)
+            passed = errors.decode().find("SUCCESS")
+
+            errors = errors.decode().splitlines()
+            output = output.decode().splitlines()
+            for line in merge_lists([errors, output]):
+                print("[SignalAlignment.run]    {}: {}".format(read_label, line))
+                if line.startswith("DEBUG_MAX_MEM"):
+                    self.max_memory_usage_kb = int(line.split(":")[1])
+
+            if passed == -1:
                 self.failStop("[SignalAlignment.run] ERROR exception running signalAlign")
                 return False
-            else:
-                errors = errors.decode().splitlines()
-                output = output.decode().splitlines()
-                for line in merge_lists([errors, output]):
-                    print("[SignalAlignment.run]    {}: {}".format(read_label, line))
-                    if line.startswith("DEBUG_MAX_MEM"):
-                        self.max_memory_usage_kb = int(line.split(":")[1])
 
         except Exception as e:
             print("[SignalAlignment.run] exception ({}) running signalAlign: {}".format(type(e), e))
@@ -593,6 +592,7 @@ def signal_alignment_service2(args, service_name="signal_alignment"):
         if alignment.max_memory_usage_kb is not None:
             mem_usage = alignment.max_memory_usage_kb
         if not success:
+            print(success)
             error = True
 
     except Exception as e:
@@ -720,15 +720,22 @@ def multithread_signal_alignment(signal_align_arguments, fast5_locations, worker
                 success = alignment.run()
     else:
         if filter_read_generator:
-            total, failure, messages = multithread.run_service3(
-                    signal_alignment_service2, filter_reads_to_string_wrapper(filter_read_generator),
-                    signal_align_arguments, ['in_fast5', "cigar_string"], worker_count)
+            total, failure, messages = multithread.run_service2(
+                signal_alignment_service, filter_reads_to_string_wrapper(filter_read_generator),
+                signal_align_arguments, ['in_fast5', "cigar_string"], worker_count)
+
+            # total, failure, messages = multithread.run_service3(
+            #             signal_alignment_service2, filter_reads_to_string_wrapper(filter_read_generator),
+            #             signal_align_arguments, ['in_fast5', "cigar_string"], worker_count)
         else:
             print("[multithread_signal_alignment] running signal_alignment on {} fast5s with {} workers".format(
                 len(fast5_locations), worker_count))
+            total, failure, messages = multithread.run_service2(
+                signal_alignment_service, filter_reads_to_string_wrapper(filter_read_generator),
+                signal_align_arguments, ['in_fast5'], worker_count)
 
-            total, failure, messages = multithread.run_service3(
-                    signal_alignment_service2, fast5_locations, signal_align_arguments, ['in_fast5'], worker_count)
+            # total, failure, messages = multithread.run_service3(
+            #         signal_alignment_service2, fast5_locations, signal_align_arguments, ['in_fast5'], worker_count)
 
         # report memory usage
         memory_stats = list()
