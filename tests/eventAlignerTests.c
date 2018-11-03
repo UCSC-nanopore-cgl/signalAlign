@@ -12,8 +12,8 @@
 #include <zlib.h>
 
 
-//#define HOME "../" //this is based on where travis runs tests from
-#define HOME "/Users/andrewbailey/CLionProjects/nanopore-RNN/submodules/signalAlign/" //this is based on where travis runs tests from
+#define HOME "../" //this is based on where travis runs tests from
+//#define HOME "/Users/andrewbailey/CLionProjects/nanopore-RNN/submodules/signalAlign/" //this is based on where travis runs tests from
 
 #define EVENT_LOCATION "/Analyses/UnittestEvents"
 
