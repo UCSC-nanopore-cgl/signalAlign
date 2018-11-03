@@ -754,6 +754,7 @@ int main(int argc, char *argv[]) {
             sequence_destruct(cEventSequence);
             hmmContinuous_destruct(complementExpectations, sMtype);
         }
+        fprintf(stderr, "signalAlign - SUCCESS: finished alignment of query %s, exiting\n", readLabel);
         return 0;
     } else {
         // Alignment Procedure //
