@@ -255,7 +255,7 @@ def get_aligned_segment_from_alignment_file(alignment_location, read_name):
     correct_segment = None
     reference_name = None
     with closing(pysam.AlignmentFile(alignment_location, 'rb' if alignment_location.endswith("bam") else 'r')) as aln:
-        for aligned_segment in aln.fetch():
+        for aligned_segment in aln.fetch(until_eof=True):
             if aligned_segment.is_secondary or aligned_segment.is_unmapped \
                     or aligned_segment.is_supplementary or aligned_segment.has_tag("SA"):
                 continue

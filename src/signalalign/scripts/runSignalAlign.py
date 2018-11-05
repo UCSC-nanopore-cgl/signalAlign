@@ -115,6 +115,8 @@ def parse_args():
                         help="Will filter reads out if average fastq quality scores are below 7.")
     parser.add_argument('--path_to_bin', action='store', default='./', dest='path_to_bin',
                         help="Path to bin to find signalMachine")
+    parser.add_argument('--readdb', action='store', default=None, dest='readdb',
+                        help="Path readdb file for easy filtering")
 
     args = parser.parse_args()
     return args
@@ -232,16 +234,15 @@ def main(args):
         "filter_reads": args.filter_reads,
         "path_to_bin": args.path_to_bin
     }
-    if args.filter_reads is not None and args.alignment_file:
-        n_reads = len(fast5s)
+    filter_read_generator = None
+    if args.filter_reads is not None and args.alignment_file and args.readdb and args.files_dir:
         print("[runSignalAlign]:NOTICE: Filtering out low quality reads", file=sys.stdout)
-        fast5s = filter_reads(fast5s, args.alignment_file, args.readdb)
-        fast5s = [x for x, y in fast5s]
-        print("[runSignalAlign]:NOTICE: {} reads passed out of {} reads".format(len(fast5s), n_reads), file=sys.stdout)
+        filter_read_generator = filter_reads(args.alignment_file, args.readdb, [args.files_dir])
 
     print("[runSignalAlign]:NOTICE: Got {} files to align".format(len(fast5s)), file=sys.stdout)
     # setup workers for multiprocessing
-    multithread_signal_alignment(alignment_args, fast5s, args.nb_jobs, debug=args.DEBUG)
+    multithread_signal_alignment(alignment_args, fast5s, args.nb_jobs, debug=args.DEBUG,
+                                 filter_read_generator=filter_read_generator)
 
     print("\n#  signalAlign - finished alignments\n", file=sys.stderr)
     print("\n#  signalAlign - finished alignments\n", file=sys.stdout)

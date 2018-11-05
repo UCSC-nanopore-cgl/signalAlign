@@ -203,7 +203,7 @@ class SignalAlignAlignmentTest(unittest.TestCase):
             new_dir = os.path.join(tempdir, "new_dir")
             shutil.copytree(signal_file_reads, new_dir)
             ecoli_reference = os.path.join(SIGNALALIGN_ROOT, "tests/test_sequences/E.coli_K12.fasta")
-            signal_file_guide_alignment = os.path.join(SIGNALALIGN_ROOT, "tests/minion_test_reads/oneD_alignments.sam")
+            signal_file_guide_alignment = os.path.join(SIGNALALIGN_ROOT, "tests/minion_test_reads/oneD.bam")
             self.check_alignments(true_alignments=signal_file_true_alignments,
                                   reads=new_dir,
                                   reference=ecoli_reference,
@@ -211,7 +211,6 @@ class SignalAlignAlignmentTest(unittest.TestCase):
                                   contig_name="gi_ecoli",
                                   extra_args="-T=../models/testModelR9p4_5mer_acegt_template.model "
                                              "--alignment_file {}".format(signal_file_guide_alignment))
-
 
 
 def add_all_tests_to_Suite(test_suite, test_class):

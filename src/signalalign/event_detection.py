@@ -261,7 +261,7 @@ def load_from_raw2(np_handle, aligned_segment, model_file_location, path_to_bin=
 
     # get nucleotides and qualities
     nucleotide_sequence = aligned_segment.query_sequence.upper()
-    nucleotide_qualities = aligned_segment.query_qualities
+    nucleotide_qualities = aligned_segment.qual
 
     # check for reverse mapping
     if aligned_segment.is_reverse:

@@ -731,7 +731,7 @@ def multithread_signal_alignment(signal_align_arguments, fast5_locations, worker
             print("[multithread_signal_alignment] running signal_alignment on {} fast5s with {} workers".format(
                 len(fast5_locations), worker_count))
             total, failure, messages = multithread.run_service2(
-                signal_alignment_service, filter_reads_to_string_wrapper(filter_read_generator),
+                signal_alignment_service, fast5_locations,
                 signal_align_arguments, ['in_fast5'], worker_count)
 
             # total, failure, messages = multithread.run_service3(
