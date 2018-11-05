@@ -4,7 +4,8 @@
     "track_memory_usage": false,
     "threshold": 0.01,
     "event_table": false,
-    "embed": false
+    "embed": false,
+    "delete_tmp": false
   },
   "samples": [
     {

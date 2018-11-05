@@ -21,12 +21,20 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as mplpatches
 from timeit import default_timer as timer
 from signalalign.fast5 import Fast5
+from signalalign.filter_reads import parse_readdb
 from signalalign.nanoporeRead import NanoporeRead
 from signalalign.validateSignalAlignment import flag_large_gaps
 from signalalign.visualization.plot_labelled_read import analyze_event_skips, CreateLabels
 from signalalign.utils.sequenceTools import get_full_nucleotide_read_from_alignment
 from py3helpers.utils import list_dir
 from py3helpers.seq_tools import AlignmentSegmentWrapper
+
+COLUMN_NAMES = ["q_score_average", "seq_start_time",
+                "basecalled_accuracy", "no_mapping",
+                "chimera_mapping", "soft_clipped_percentage",
+                "num_secondary_mappings",
+                "num_flagged_gaps", "avg_flagged_gap_size", 'pass',
+                'other_errors', 'seen', "map_q"]
 
 
 def parse_args():
@@ -48,6 +56,10 @@ def parse_args():
                         dest='quality_threshold', required=False, type=float,
                         help="Minimum average base quality threshold. Default = 7")
 
+    parser.add_argument('--readdb', '-b', action='store',
+                        dest='readdb', required=False, type=str,
+                        help="Path to readdb file for easy mapping")
+
     parser.add_argument('--output_dir', '-o', action='store',
                         dest='output_dir', required=True,
                         help="Directory to place plots and summary data")
@@ -66,15 +78,107 @@ def parse_args():
 
 def get_summary_info_table(read_ids):
     row_names = read_ids
-    column_names = ["q_score_average", "seq_start_time",
-                    "basecalled_accuracy", "no_mapping",
-                    "chimera_mapping", "soft_clipped_percentage",
-                    "num_secondary_mappings",
-                    "num_flagged_gaps", "avg_flagged_gap_size", 'pass',
-                    'other_errors', 'seen']
-
-    d = pd.DataFrame(0.0, columns=column_names, index=row_names)
+    d = pd.DataFrame(0.0, columns=COLUMN_NAMES, index=row_names)
     return d
+
+
+def get_summary_info_row(read_id):
+    d = pd.DataFrame(0.0, columns=COLUMN_NAMES, index=[read_id])
+    return d
+
+
+def get_alignment_summary_info_withdb(alignment_file, readdb, read_dirs, pass_threshold=7,
+                                      gap_size=10, verbose=False, max_reads=100):
+    """Filter fast5 files based on a quality threhsold and if there is an alignment"""
+    assert alignment_file.endswith("bam"), "Alignment file must be in BAM format: {}".format(alignment_file)
+    # grab aligned segment
+    number = 0
+    seen_counter = 0
+
+    with closing(pysam.AlignmentFile(alignment_file, 'rb')) as bamfile:
+        name_indexed = pysam.IndexedReads(bamfile)
+        name_indexed.build()
+
+        for name, fast5 in parse_readdb(readdb, read_dirs):
+            try:
+                iterator = name_indexed.find(name)
+                # create ability to only grab x number of reads
+                if seen_counter >= max_reads:
+                    break
+                # need to start the data table with first row
+                if seen_counter == 0:
+                    pd_data = get_summary_info_row(name)
+                    big_table = pd_data
+                else:
+                    big_table.append(pd_data)
+                    pd_data = get_summary_info_row(name)
+
+                # start tracking data
+                pd_data["seen"] = 1
+                seen_counter += 1
+
+                cl_handle = CreateLabels(fast5, kmer_index=2)
+                seq_start_time = cl_handle.raw_attributes['start_time']
+
+                q_score_average = 0
+                if aligned_segment.query_qualities is None:
+                    print("Alignment done with fasta instead of fastq so read qualities will not be reported")
+                else:
+                    q_score_average = np.mean(aligned_segment.query_qualities)
+
+                pd_data["q_score_average"] = q_score_average
+                pd_data["seq_start_time"] = seq_start_time
+
+                for aligned_segment in iterator:
+                    if aligned_segment.is_secondary or aligned_segment.is_unmapped \
+                            or aligned_segment.is_supplementary or aligned_segment.has_tag("SA"):
+                        if aligned_segment.is_secondary:
+                            pd_data["num_secondary_mappings"] += 1
+                        if aligned_segment.is_unmapped:
+                            pd_data["no_mapping"] = 1
+                        if aligned_segment.is_supplementary or aligned_segment.has_tag("SA"):
+                            pd_data["chimera_mapping"] += 1
+                    else:
+                        pd_data["map_q"] = aligned_segment.mapq
+                        soft_clipped_percentage = \
+                            1 - float(len(aligned_segment.query_alignment_sequence)) / len(aligned_segment.query_sequence)
+                        pd_data["soft_clipped_percentage"] = soft_clipped_percentage
+
+                        handle = AlignmentSegmentWrapper(aligned_segment)
+                        handle.initialize()
+
+                        accuracy = handle.alignment_accuracy()
+                        pd_data["basecalled_accuracy"] = accuracy
+                        try:
+                            mea = cl_handle.add_mea_labels(number=int(number))
+                            sa_full = cl_handle.add_signal_align_predictions(number=int(number), add_basecall=True)
+                            all_basecall_data = []
+                            for name, basecall_data in cl_handle.aligned_signal.prediction.items():
+                                if "guide" in name:
+                                    all_basecall_data.extend(basecall_data)
+
+                            alignment_summary = analyze_event_skips(mea, sa_full, all_basecall_data, generate_plot=False)
+                            flagged_gaps_summary = flag_large_gaps(alignment_summary, gap_size, verbose=verbose)
+                            counter = 0
+                            total_distance = 0
+                            for gap in flagged_gaps_summary:
+                                if gap["mea_peak_distance"] > 10:
+                                    counter += 1
+                                    total_distance += gap["mea_peak_distance"]
+                            if counter > 0:
+                                pd_data["num_flagged_gaps"] = counter
+                                pd_data["avg_flagged_gap_size"] = float(total_distance) / counter
+
+                            if pd_data["q_score_average"] > pass_threshold:
+                                pd_data["pass"] = 1
+
+                        except KeyError:
+                            pd_data["other_errors"] = 1
+            except KeyError:
+                pd_data["other_errors"] = 1
+                print("Found no alignments for {}".format(fast5))
+
+        return big_table
 
 
 def get_alignment_summary_info(fast5s, alignment_file, pass_threshold=7, gap_size=10, verbose=False, max_reads=100):
@@ -98,7 +202,7 @@ def get_alignment_summary_info(fast5s, alignment_file, pass_threshold=7, gap_siz
     print("first_len reads_seen: {}".format(len(reads_seen)), file=sys.stderr)
 
     with closing(pysam.AlignmentFile(alignment_file, 'rb' if alignment_file.endswith("bam") else 'r')) as aln:
-        for aligned_segment in aln.fetch():
+        for aligned_segment in aln.fetch(until_eof=True):
             if seen_counter > max_reads:
                 break
             try:
@@ -132,6 +236,8 @@ def get_alignment_summary_info(fast5s, alignment_file, pass_threshold=7, gap_siz
                     if aligned_segment.is_supplementary or aligned_segment.has_tag("SA"):
                         mapped_reads["chimera_mapping"][read_name] += 1
                 else:
+                    mapped_reads["map_q"][read_name] = aligned_segment.mapq
+
                     soft_clipped_percentage = \
                         1 - float(len(aligned_segment.query_alignment_sequence)) / len(aligned_segment.query_sequence)
                     mapped_reads["soft_clipped_percentage"][read_name] = soft_clipped_percentage
@@ -295,10 +401,15 @@ def main():
         assert args.fast5_dir is not None, "Must select fast5_dir if not loading from pickle file"
         fast5s = list_dir(args.fast5_dir, ext='fast5')
         assert len(fast5s) > 0, "Check fast5_dir. No files with fast5 extension found: {}".format(args.fast5_dir)
-
         print("Creating alignment summary info")
-        summary_pd = get_alignment_summary_info(fast5s, args.alignment_file,
-                                                pass_threshold=pass_threshold, max_reads=args.max_reads)
+        if args.readdb:
+            summary_pd = get_alignment_summary_info_withdb(args.alignment_file, args.readdb, [args.fast5_dir],
+                                                           pass_threshold=pass_threshold, max_reads=args.max_reads)
+
+        else:
+            summary_pd = get_alignment_summary_info(fast5s, args.alignment_file,
+                                                    pass_threshold=pass_threshold, max_reads=args.max_reads)
+
         summary_pd.to_pickle(os.path.join(args.output_dir, "summary_info.pkl"))
 
     print("Printing summary stats and creating plots")
