@@ -201,7 +201,7 @@ class NanoporeRead(object):
             self.close()
             return False
 
-        print("[NanoporeRead._initialize] oned_root_address {}".format(oned_root_address), file=sys.stderr)
+        print("[NanoporeRead._initialize] oned_root_address {}".format(oned_root_address))
         # get basecall version
         if not any(x in self.fastFive[oned_root_address].attrs.keys() for x in VERSION_KEY):
             self.logError("[NanoporeRead:_initialize] ERROR %s missing version" % self.filename)

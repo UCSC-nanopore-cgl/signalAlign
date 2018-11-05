@@ -673,7 +673,7 @@ class TrainSignalAlign(object):
             event_table=self.args.signal_alignment_args.event_table,
             output_format=output_format,
             filter_reads=self.args.filter_reads,
-            delete_tmp=self.args.delete_tmp)
+            delete_tmp=self.args.signal_alignment_args.delete_tmp)
 
         self.samples = multithread_signal_alignment_samples(self.samples, alignment_args, self.job_count,
                                                             trim=trim, debug=self.debug)

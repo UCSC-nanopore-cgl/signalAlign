@@ -542,7 +542,7 @@ class SignalAlignment(object):
         self.temp_folder.remove_folder()
         if nanopore_read is not None:
             nanopore_read.close()
-        print(message, file=sys.stderr)
+        print(message, file=sys.stdout)
 
     @staticmethod
     def read_in_signal_align_tsv(tsv_path, file_type):
@@ -969,6 +969,7 @@ def multithread_signal_alignment_samples(samples, signal_align_arguments, worker
         else:
             list_of_fast5s = sample.getFiles()
         # correct signal align arguments
+        sample.process_reads()
         signal_align_arguments["alignment_file"] = sample.alignment_file
         signal_align_arguments["bwa_reference"] = sample.bwa_reference
         signal_align_arguments["backward_reference"] = sample.bw_fasta_path
