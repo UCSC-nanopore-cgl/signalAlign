@@ -77,6 +77,9 @@ def parse_args():
                         dest='debug', required=False,
                         help="Will stop multiprocess in order to debug underlying code")
 
+    parser.add_argument('--workers', action="store", default=1,
+                        dest='workers', required=False, type=int,
+                        help="Number of workers to process reads")
 
     args = parser.parse_args()
     return args
@@ -555,19 +558,11 @@ def main():
         fast5s = list_dir(args.fast5_dir, ext='fast5')
         assert len(fast5s) > 0, "Check fast5_dir. No files with fast5 extension found: {}".format(args.fast5_dir)
         print("Creating alignment summary info")
-        if args.readdb:
-            # summary_pd = get_alignment_summary_info_withdb(args.alignment_file, args.readdb, [args.fast5_dir],
-            #                                                pass_threshold=args.quality_threshold, max_reads=args.max_reads,
-            #                                                number=args.number)
-            get_summary_args = dict(number=args.number, pass_threshold=args.quality_threshold,
-                                  gap_size=10, verbose=False)
-            summary_pd = multiprocess_get_summary_info(args.alignment_file, args.readdb, [args.fast5_dir],
-                                                       get_summary_args, worker_count=1, debug=args.debug)
 
-        else:
-            summary_pd = get_alignment_summary_info(fast5s, args.alignment_file,
-                                                    pass_threshold=args.quality_threshold, max_reads=args.max_reads,
-                                                    number=args.number)
+        get_summary_args = dict(number=args.number, pass_threshold=args.quality_threshold,
+                                gap_size=10, verbose=False)
+        summary_pd = multiprocess_get_summary_info(args.alignment_file, args.readdb, [args.fast5_dir],
+                                                   get_summary_args, worker_count=args.workers, debug=args.debug)
 
         summary_pd.to_pickle(os.path.join(args.output_dir, "summary_info.pkl"))
 
