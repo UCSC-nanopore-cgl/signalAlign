@@ -539,7 +539,8 @@ class SignalAlignment(object):
         return self.temp_folder.add_file_path(path_to_add)
 
     def failStop(self, message, nanopore_read=None):
-        self.temp_folder.remove_folder()
+        if self.delete_tmp:
+            self.temp_folder.remove_folder()
         if nanopore_read is not None:
             nanopore_read.close()
         print(message, file=sys.stdout)
@@ -720,7 +721,7 @@ def multithread_signal_alignment(signal_align_arguments, fast5_locations, worker
                 success = alignment.run()
     else:
         if filter_read_generator:
-            total, failure, messages = multithread.run_service2(
+            total, failure, messages, output = multithread.run_service2(
                 signal_alignment_service, filter_reads_to_string_wrapper(filter_read_generator),
                 signal_align_arguments, ['in_fast5', "cigar_string"], worker_count)
 
@@ -730,7 +731,7 @@ def multithread_signal_alignment(signal_align_arguments, fast5_locations, worker
         else:
             print("[multithread_signal_alignment] running signal_alignment on {} fast5s with {} workers".format(
                 len(fast5_locations), worker_count))
-            total, failure, messages = multithread.run_service2(
+            total, failure, messages, output = multithread.run_service2(
                 signal_alignment_service, fast5_locations,
                 signal_align_arguments, ['in_fast5'], worker_count)
 
@@ -945,8 +946,7 @@ def trim_num_files_in_sample(sample, max_bases, twoD, verbose=True):
     return list_of_fast5s
 
 
-def multithread_signal_alignment_samples(samples, signal_align_arguments, worker_count, trim=None, debug=False,
-                                         filter_read_generator=None):
+def multithread_signal_alignment_samples(samples, signal_align_arguments, worker_count, trim=None, debug=False):
     """Multiprocess SignalAlignment for a list of fast5 files given a set of alignment arguments.
 
     :param samples: list of "process_sample" samples
@@ -954,7 +954,6 @@ def multithread_signal_alignment_samples(samples, signal_align_arguments, worker
     :param worker_count: number of workers
     :param trim: number of bases to analyze for each sample
     :param debug: option to stop program if error is found using signalAlign
-    :param filter_read_generator: option to pass in filter_read generator
     """
     original_destination = signal_align_arguments["destination"]
     names = [sample.name for sample in samples]

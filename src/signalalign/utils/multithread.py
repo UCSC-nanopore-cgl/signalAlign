@@ -124,7 +124,7 @@ def run_service(service, iterable, iterable_arguments, iterable_argument_name, w
         log_function("[run_service]\tMessages:\n[run_service]\t\t{}".format("\n[run_service]\t\t".join(messages)))
 
     # return relevant info
-    return total, failure, messages
+    return total, failure, messages, None
 
 
 def run_service2(service, iterable, iterable_arguments, iterable_argument_names, worker_count,
@@ -164,13 +164,23 @@ def run_service2(service, iterable, iterable_arguments, iterable_argument_names,
 
     # if example service model is used, metrics can be gathered in this way
     messages = []
+    output = []
     total = 0
     failure = 0
-    for f in iter(done_queue.get, 'STOP'):
-        if f.startswith(TOTAL_KEY): total += int(f.split(":")[1])
-        elif f.startswith(FAILURE_KEY): failure += int(f.split(":")[1])
-        else: messages.append(f)
-
+    no_stop = True
+    while no_stop:
+        f = done_queue.get()
+        if isinstance(f, str):
+            if f == "STOP":
+                no_stop = False
+            elif f.startswith(TOTAL_KEY):
+                total += int(f.split(":")[1])
+            elif f.startswith(FAILURE_KEY):
+                failure += int(f.split(":")[1])
+            else:
+                messages.append(f)
+        else:
+            output.append(f)
     # if we should be logging and if there is material to be logged
     if log_function is not None and (total + failure + len(messages)) > 0:
         log_function("[run_service] Summary {}:\n[run_service]\tTime: {}s\n[run_service]\tTotal: {}\n[run_service]\tFailure: {}"
@@ -178,7 +188,7 @@ def run_service2(service, iterable, iterable_arguments, iterable_argument_names,
         log_function("[run_service]\tMessages:\n[run_service]\t\t{}".format("\n[run_service]\t\t".join(messages)))
 
     # return relevant info
-    return total, failure, messages
+    return total, failure, messages, output
 
 
 def run_service3(service, iterable, iterable_arguments, iterable_argument_names, worker_count,

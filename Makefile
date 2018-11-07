@@ -134,7 +134,7 @@ ${signalAlignBin}/trainModels : ${rootPath}src/signalalign/train/trainModels.py
 	cp ${rootPath}src/signalalign/train/trainModels.py ${signalAlignBin}/trainModels
 	chmod +x ${signalAlignBin}/trainModels
 
-${signalAlignBin}/trainModels : ${rootPath}src/signalalign/visualization/sequencing_summary.py
+${signalAlignBin}/sequencing_summary : ${rootPath}src/signalalign/visualization/sequencing_summary.py
 	cp ${rootPath}src/signalalign/visualization/sequencing_summary.py ${signalAlignBin}/sequencing_summary
 	chmod +x ${signalAlignBin}/sequencing_summary
 

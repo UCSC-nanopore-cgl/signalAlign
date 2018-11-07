@@ -100,7 +100,7 @@ class CreateHdpTrainingData(object):
         self.complement = complement
         self.verbose = verbose
         self.master_assignment_table = \
-            make_master_assignment_table(sorted(merge_lists([sample.analysis_files for sample in self.samples])))
+            make_master_assignment_table(sorted([x for x in merge_lists([sample.analysis_files for sample in self.samples]) if x.endswith("assignments.tsv")]))
         self.k = len(self.master_assignment_table.iloc[0]['kmer'])
         self.n_assignments = len(self.master_assignment_table)
 
@@ -362,7 +362,7 @@ class TrainSignalAlign(object):
             build_alignment_path = hdp_data.write_hdp_training_file()
             num_alignments = hdp_data.n_assignments
 
-        verbose_flag = "--verbose " if self.debug is True else ""
+        verbose_flag = "--verbose "
         # create the output paths for the models
         template_hdp_location = os.path.join(self.working_path, "template." + self.args.hdp_args.hdp_type + ".nhdp")
         complement_hdp_location = None
