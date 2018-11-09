@@ -23,7 +23,7 @@ from signalalign.mea_algorithm import mea_alignment_from_signal_align, match_eve
     add_events_to_signalalign, create_label_from_events
 from signalalign.filter_reads import filter_reads_to_string_wrapper, filter_reads
 from py3helpers.utils import merge_dicts, check_numpy_table, merge_lists
-from py3helpers.seq_tools import sam_string_to_aligned_segment
+from py3helpers.seq_tools import sam_string_to_aligned_segment, Cigar
 
 
 def create_signalAlignment_args(backward_reference=None, forward_reference=None, destination=None,
@@ -202,6 +202,11 @@ class SignalAlignment(object):
                           npRead)
             return False
 
+        if npRead.rna and self.aligned_segment is None and self.alignment_file is None:
+            self.failStop("[SignalAlignment.run] ERROR: RNA reads must have alignment file. {}".format(self.in_fast5),
+                          npRead)
+
+
         # validate input models and get defaults if appropriate
         if self.in_templateHmm is None:
             self.in_templateHmm = defaultModelFromVersion(strand="template", version=npRead.version)
@@ -220,7 +225,6 @@ class SignalAlignment(object):
                 self.failStop("[SignalAlignment.run] ERROR Need to have complement HMM for 2D analysis", npRead)
                 return False
 
-
         # read label
         read_label = npRead.read_label  # use this to identify the read throughout
         self.read_label = read_label
@@ -228,20 +232,12 @@ class SignalAlignment(object):
         # nanopore read (event table, etc)
         npRead_ = self.addTempFilePath("temp_%s.npRead" % self.read_name)
         if not (self.check_for_temp_file_existance and os.path.isfile(npRead_)):
-            # TODO is this totally fucked for RNA because of 3'-5' mapping?
             fH = open(npRead_, "w")
             ok = npRead.Write(out_file=fH)
             fH.close()
             if not ok:
                 self.failStop("[SignalAlignment.run] File: %s did not pass initial checks" % self.read_name, npRead)
                 return False
-
-        # nucleotide read
-        read_fasta_ = self.addTempFilePath("temp_seq_%s.fa" % read_label)
-        ok = self.write_nucleotide_read(npRead, read_fasta_)
-        if not ok:
-            print("[SignalAlignment.run] Failed to write nucleotide read.  Continuing execution.")
-
         # alignment info
         cigar_file_ = self.addTempFilePath("temp_cigar_%s.txt" % read_label)
         temp_samfile_ = self.addTempFilePath("temp_sam_file_%s.sam" % read_label)
@@ -264,6 +260,12 @@ class SignalAlignment(object):
 
             # get from bwa
             if guide_alignment is None and self.bwa_reference is not None:
+                # nucleotide read
+                read_fasta_ = self.addTempFilePath("temp_seq_%s.fa" % read_label)
+                ok = self.write_nucleotide_read(npRead, read_fasta_)
+                if not ok:
+                    print("[SignalAlignment.run] Failed to write nucleotide read.  Continuing execution.")
+
                 guide_alignment = generateGuideAlignment(reference_fasta=self.bwa_reference,
                                                          query=read_fasta_,
                                                          temp_sam_path=temp_samfile_,
@@ -396,6 +398,12 @@ class SignalAlignment(object):
         else:
             twoD_flag = ""
 
+        # rna flag
+        if npRead.rna:
+            rna_flag = "--rna"
+        else:
+            rna_flag = ""
+
         # commands
         if self.get_expectations:
             template_expectations_file_path = os.path.join(self.destination, read_label + ".template.expectations.tsv")
@@ -405,7 +413,7 @@ class SignalAlignment(object):
                 "{vA} {td} {degen}{sparse}{model} -q {npRead} " \
                 "{t_model}{c_model}{thresh}{expansion}{trim} {hdp}-L {readLabel} -p {cigarFile} " \
                 "-t {templateExpectations} -c {complementExpectations} -n {seq_name} {f_ref_fa} {b_ref_fa} " \
-                "-g {traceback}" \
+                "-g {traceback} {rna}" \
                     .format(vA=self.path_to_signalMachine, model=stateMachineType_flag,
                             cigarFile=cigar_file_,
                             npRead=npRead_, readLabel=read_label, td=twoD_flag,
@@ -413,19 +421,21 @@ class SignalAlignment(object):
                             complementExpectations=complement_expectations_file_path, t_model=template_model_flag,
                             c_model=complement_model_flag, thresh=threshold_flag, expansion=diag_expansion_flag,
                             trim=trim_flag, degen=degenerate_flag, sparse=out_fmt, seq_name=reference_name,
-                            f_ref_fa=forward_ref_flag, b_ref_fa=backward_ref_flag, traceback=self.traceBackDiagonals)
+                            f_ref_fa=forward_ref_flag, b_ref_fa=backward_ref_flag, traceback=self.traceBackDiagonals,
+                            rna=rna_flag)
         else:
             command = \
                 "{vA} {td} {degen}{sparse}{model} -q {npRead} " \
                 "{t_model}{c_model}{thresh}{expansion}{trim} -p {cigarFile} " \
-                "-u {posteriors} {hdp}-L {readLabel} -n {seq_name} {f_ref_fa} {b_ref_fa} -g {traceback}" \
+                "-u {posteriors} {hdp}-L {readLabel} -n {seq_name} {f_ref_fa} {b_ref_fa} -g {traceback} {rna}" \
                     .format(vA=self.path_to_signalMachine, model=stateMachineType_flag, sparse=out_fmt,
                             cigarFile=cigar_file_,
                             readLabel=read_label, npRead=npRead_, td=twoD_flag,
                             t_model=template_model_flag, c_model=complement_model_flag,
                             posteriors=posteriors_file_path, thresh=threshold_flag, expansion=diag_expansion_flag,
                             trim=trim_flag, hdp=hdp_flags, degen=degenerate_flag, seq_name=reference_name,
-                            f_ref_fa=forward_ref_flag, b_ref_fa=backward_ref_flag, traceback=self.traceBackDiagonals)
+                            f_ref_fa=forward_ref_flag, b_ref_fa=backward_ref_flag, traceback=self.traceBackDiagonals,
+                            rna=rna_flag)
 
         # run
         print("[SignalAlignment.run] running command: ", command, end="\n")

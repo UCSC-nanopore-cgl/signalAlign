@@ -34,7 +34,8 @@ class EventDetectTests(unittest.TestCase):
                                 "tests/minion_test_reads/canonical_ecoli_R9/miten_PC_20160820_FNFAD20259_MN17223_mux_scan_AMS_158_R9_WGA_Ecoli_08_20_16_83098_ch138_read23_strand.fast5")
         rna_file = os.path.join(cls.HOME,
                                 "tests/minion_test_reads/RNA_edge_cases/DEAMERNANOPORE_20170922_FAH26525_MN16450_sequencing_run_MA_821_R94_NA12878_mRNA_09_22_17_67136_read_61_ch_151_strand.fast5")
-
+        rna_file2 = os.path.join(cls.HOME,
+                                 "tests/minion_test_reads/RNA_edge_cases/DEAMERNANOPORE_20170922_FAH26525_MN16450_sequencing_run_MA_821_R94_NA12878_mRNA_09_22_17_67136_read_36_ch_218_strand.fast5")
         # get file locations
         cls.tmp_dna_file = os.path.join(str(cls.tmp_directory), 'test_dna.fast5')
         cls.tmp_rna_file1 = os.path.join(str(cls.tmp_directory), 'test_rna1.fast5')
@@ -45,7 +46,7 @@ class EventDetectTests(unittest.TestCase):
         shutil.copy(dna_file, cls.tmp_dna_file)
         shutil.copy(rna_file, cls.tmp_rna_file1)
         shutil.copy(rna_file, cls.tmp_rna_file2)
-        shutil.copy(rna_file, cls.tmp_rna_file3)
+        shutil.copy(rna_file2, cls.tmp_rna_file3)
 
         # create handles
         cls.dna_handle = Fast5(cls.tmp_dna_file, 'r+')
@@ -111,7 +112,6 @@ class EventDetectTests(unittest.TestCase):
         for original_length, length in zip(original_lengths, lengths):
             self.assertAlmostEqual(original_length, length, places=places)
 
-
     def test_check_event_table_time(self):
         # """test check_event_table_time"""
         events = np.empty(3, dtype=[('start', float), ('length', float)])
@@ -123,20 +123,19 @@ class EventDetectTests(unittest.TestCase):
         events["length"] = [1, 1, 1]
         self.assertFalse(check_event_table_time(events))
 
-
     def test_load_from_raw(self):
         path_to_bin = os.path.join(self.HOME, "bin")
         self.rna_handle3.close()
         np_handle = NanoporeRead(os.path.abspath(self.tmp_rna_file3))
         np_handle._initialize_metadata()
-        alignment_file = os.path.join(self.HOME, "tests/minion_test_reads/RNA_edge_case.sam")
+        alignment_file = os.path.join(self.HOME, "tests/minion_test_reads/RNA_edge_cases/rna_reads.sam")
         saved_location = load_from_raw(np_handle, alignment_file, self.rna_model_file, path_to_bin)
         # close and reopen
         np_handle.close()
         np_handle = NanoporeRead(os.path.abspath(self.tmp_rna_file3))
         # get events and validate
         events = np.array(np_handle.fastFive["/Analyses/Basecall_1D_001/BaseCalled_template/Events"])
-        self.assertEqual(events[0]["raw_length"], 7)
+        self.assertEqual(events[0]["raw_length"], 11)
         self.assertTrue("/Analyses/Basecall_1D_001/BaseCalled_template/Fastq" in np_handle.fastFive)
         self.assertEqual(saved_location, "/Analyses/Basecall_1D_001")
 

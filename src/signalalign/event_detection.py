@@ -195,11 +195,6 @@ def load_from_raw(np_handle, alignment_file, model_file_location, path_to_bin=".
     if nucleotide_qualities is None:
         nucleotide_qualities = "!" * len(nucleotide_sequence)
 
-    # we need to swap the orientation because alignments for RNA reads are 3'-5' for reasons that were good I swear
-    if np_handle.rna:
-        nucleotide_sequence = nucleotide_sequence[::-1].replace("T", "U")
-        nucleotide_qualities = nucleotide_qualities[::-1]
-
     # get fastq (this is saved with the event table)
     fastq = create_fastq_line(read_id, nucleotide_sequence, nucleotide_qualities)
 
@@ -271,11 +266,6 @@ def load_from_raw2(np_handle, aligned_segment, model_file_location, path_to_bin=
 
     if nucleotide_qualities is None:
         nucleotide_qualities = "!" * len(nucleotide_sequence)
-
-    # we need to swap the orientation because alignments for RNA reads are 3'-5' for reasons that were good I swear
-    if np_handle.rna:
-        nucleotide_sequence = nucleotide_sequence[::-1].replace("T", "U")
-        nucleotide_qualities = nucleotide_qualities[::-1]
 
     # get fastq (this is saved with the event table)
     fastq = create_fastq_line(read_id, nucleotide_sequence, nucleotide_qualities)

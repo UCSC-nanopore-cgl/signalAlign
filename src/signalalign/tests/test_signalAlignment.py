@@ -15,6 +15,7 @@ import numpy as np
 import unittest
 import shutil
 import tempfile
+import pysam
 from shutil import copyfile
 from collections import defaultdict
 from scipy import sparse
@@ -25,6 +26,7 @@ from signalalign import parseFofn
 from signalalign.filter_reads import filter_reads
 from signalalign.utils.fileHandlers import FolderHandler
 from py3helpers.utils import captured_output, merge_dicts, list_dir
+from py3helpers.seq_tools import sam_string_to_aligned_segment, ReverseComplement
 
 
 class SignalAlignmentTest(unittest.TestCase):
@@ -53,6 +55,15 @@ class SignalAlignmentTest(unittest.TestCase):
         shutil.copytree(dna_dir, cls.test_dir)
         cls.readdb = os.path.join(cls.HOME, "tests/minion_test_reads/oneD.fastq.index.readdb")
         cls.bam = os.path.join(cls.HOME, "tests/minion_test_reads/oneD.bam")
+
+        cls.rna_bam = os.path.join(cls.HOME, "tests/minion_test_reads/RNA_edge_cases/rna_reads.bam")
+        cls.rna_readdb = os.path.join(cls.HOME, "tests/minion_test_reads/RNA_edge_cases/rna_reads.readdb")
+        cls.test_dir_rna = os.path.join(cls.tmp_directory, "test_rna")
+        cls.rna_reference = os.path.join(cls.HOME, "tests/test_sequences/fake_rna_ref.fa")
+
+        rna_dir = os.path.join(cls.HOME, "tests/minion_test_reads/RNA_edge_cases/")
+        # copy file to tmp directory
+        shutil.copytree(rna_dir, cls.test_dir_rna)
 
     def test_create_signalAlignment_args(self):
         expected_args = {"backward_reference", "forward_reference", "destination", "stateMachineType", "in_templateHmm",
@@ -233,7 +244,6 @@ class SignalAlignmentTest(unittest.TestCase):
                                                         debug=True)
             self.assertEqual(len(output_files), 3)
 
-
     def test_multithread_signal_alignment_samples(self):
         with tempfile.TemporaryDirectory() as tempdir:
             working_folder = FolderHandler()
@@ -286,6 +296,39 @@ class SignalAlignmentTest(unittest.TestCase):
             working_folder = FolderHandler()
             working_folder.open_folder(os.path.join(tempdir, "test_dir"))
             sample = SignalAlignSample(working_folder=working_folder, **test_args)
+
+    def test_rna_reads(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            template_model = os.path.join(self.HOME, "models/testModelR9p4_5mer_acgt_RNA.model")
+            args = create_signalAlignment_args(alignment_file=self.rna_bam, bwa_reference=self.rna_reference,
+                                               forward_reference=self.rna_reference, in_templateHmm=template_model,
+                                               path_to_bin=self.path_to_bin, destination=tempdir, embed=True,
+                                               delete_tmp=False)
+
+            in_rna_file = os.path.join(self.test_dir_rna, "DEAMERNANOPORE_20170922_FAH26525_MN16450_sequencing_run_MA_821_R94_NA12878_mRNA_09_22_17_67136_read_36_ch_218_strand.fast5")
+            final_args = merge_dicts([args, dict(in_fast5=in_rna_file)])
+            handle = SignalAlignment(**final_args)
+            handle.run()
+            fh = pysam.FastaFile(self.rna_reference)
+            f5fh = Fast5(in_rna_file)
+            sa_events = f5fh.get_signalalign_events()
+            for i, event in enumerate(sa_events):
+                kmer = fh.fetch(reference="rna_fake", start=event["reference_index"], end=event["reference_index"]+5)[::-1]
+                self.assertEqual(event["path_kmer"].decode(), kmer)
+                self.assertEqual(event["reference_kmer"].decode(), kmer)
+
+            in_rna_file = os.path.join(self.test_dir_rna, "DEAMERNANOPORE_20170922_FAH26525_MN16450_sequencing_run_MA_821_R94_NA12878_mRNA_09_22_17_67136_read_61_ch_151_strand.fast5")
+            final_args = merge_dicts([args, dict(in_fast5=in_rna_file)])
+            handle = SignalAlignment(**final_args)
+            handle.run()
+            rev_c = ReverseComplement()
+            f5fh = Fast5(in_rna_file)
+            sa_events = f5fh.get_signalalign_events()
+            for i, event in enumerate(sa_events):
+                kmer = fh.fetch(reference="rna_fake", start=event["reference_index"], end=event["reference_index"]+5)[::-1]
+                rev_kmer = rev_c.reverse_complement(kmer)
+                self.assertEqual(event["path_kmer"].decode(), rev_kmer)
+                self.assertEqual(event["reference_kmer"].decode(), kmer)
 
 
 if __name__ == '__main__':

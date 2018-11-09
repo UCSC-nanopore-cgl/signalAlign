@@ -36,7 +36,8 @@ void usage() {
     fprintf(stderr, "-x: Diagonal expansion, how much to expand the dynamic programming envelope\n");
     fprintf(stderr, "-D: Posterior probability threshold, keep aligned pairs with posterior prob >= this\n");
     fprintf(stderr, "-m: Constranint trim, how much to trim the guide alignment anchors by\n");
-    fprintf(stderr, "-g: traceBackDiagonals, how many backward diagonals to calculate during traceback\n\n");
+    fprintf(stderr, "-g: traceBackDiagonals, how many backward diagonals to calculate during traceback\n");
+    fprintf(stderr, "-r: boolean option if read is RNA\n\n");
 
 }
 
@@ -90,7 +91,7 @@ static inline int64_t adjustQueryPosition(int64_t unadjustedQueryPosition, int64
 void writePosteriorProbsFull(char *posteriorProbsFile, char *readLabel, StateMachine *sM,
                              NanoporeReadAdjustmentParameters npp, double *events, char *target, bool forward,
                              char *contig, int64_t eventSequenceOffset, int64_t referenceSequenceOffset,
-                             stList *alignedPairs, Strand strand) {
+                             stList *alignedPairs, Strand strand, bool rna) {
     // label for tsv output
     char *strandLabel = strand == template ? "t" : "c";
 
@@ -143,6 +144,9 @@ void writePosteriorProbsFull(char *posteriorProbsFile, char *readLabel, StateMac
 
         // make reference kmer
         char *refKmer = makeReferenceKmer(k_i, strand, forward);
+        if (rna){
+            refKmer = stString_reverseComplementString(refKmer);
+        }
 
         // write to file
         fprintf(fH, "%s\t%"PRId64"\t%s\t%s\t%s\t%"PRId64"\t%f\t%f\t%f\t%s\t%f\t%f\t%f\t%f\t%f\t%s\n",
@@ -275,11 +279,12 @@ void outputAlignment(
         int64_t referenceSequenceOffset,
         stList *alignedPairs, 
         double posteriorScore,
-        Strand strand) {
+        Strand strand,
+        bool rna) {
     switch (fmt) {
         case full:
             writePosteriorProbsFull(posteriorProbsFile, readLabel, sM, npp, events, target, forward, contig,
-                                    eventSequenceOffset, referenceSequenceOffset, alignedPairs, strand);
+                                    eventSequenceOffset, referenceSequenceOffset, alignedPairs, strand, rna);
             break;
         case variantCaller:
             writePosteriorProbsVC(posteriorProbsFile, readLabel, sM, target, forward, eventSequenceOffset,
@@ -437,6 +442,7 @@ int main(int argc, char *argv[]) {
     int64_t degenerate;
     int64_t outFmt;
     bool twoD = FALSE;
+    bool rna = FALSE;
     char *templateModelFile = NULL;
     char *complementModelFile = NULL;
     char *readLabel = NULL;
@@ -460,6 +466,7 @@ int main(int argc, char *argv[]) {
                 {"sm3Hdp",                  no_argument,        0,  'd'},
                 {"sparse_output",           no_argument,        0,  's'},
                 {"twoD",                    no_argument,        0,  'e'},
+                {"rna",                     no_argument,        0,  'r'},
                 {"degenerate",              required_argument,  0,  'o'},
                 {"templateModel",           required_argument,  0,  'T'},
                 {"complementModel",         required_argument,  0,  'C'},
@@ -482,7 +489,7 @@ int main(int argc, char *argv[]) {
 
         int option_index = 0;
 
-        key = getopt_long(argc, argv, "h:d:e:s:o:a:T:C:L:q:f:b:g:p:u:v:w:t:c:x:D:m:n:",
+        key = getopt_long(argc, argv, "h:d:e:s:r:o:a:T:C:L:q:f:b:g:p:u:v:w:t:c:x:D:m:n:",
                           long_options, &option_index);
 
         if (key == -1) {
@@ -499,6 +506,9 @@ int main(int argc, char *argv[]) {
                 break;
             case 'e':
                 twoD = TRUE;
+                break;
+            case 'r':
+                rna = TRUE;
                 break;
             case 'o':
                 j = sscanf(optarg, "%" PRIi64 "", &degenerate);
@@ -601,7 +611,6 @@ int main(int argc, char *argv[]) {
     struct PairwiseAlignment *pA;
     pA = cigarRead(fileHandleIn);
     fclose(fileHandleIn);
-
     // Alignment Parameters //
     // make the pairwise alignment parameters
     PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
@@ -642,7 +651,8 @@ int main(int argc, char *argv[]) {
 //                    forwardReference, backwardReference);
 //    }
     ReferenceSequence *R;
-    R = fastaHandler_ReferenceSequenceConstructFull(forward_reference_path, backward_reference_path, pA, sequence_name);
+    R = fastaHandler_ReferenceSequenceConstructFull(forward_reference_path, backward_reference_path, pA,
+            sequence_name, rna);
 
     // Nanopore Read //
     // load nanopore read
@@ -789,7 +799,7 @@ int main(int argc, char *argv[]) {
         if (posteriorProbsFile != NULL) {
             outputAlignment(outFmt, posteriorProbsFile, readLabel, sMt, npRead->templateParams, npRead->templateEvents,
                             R->getTemplateTargetSequence(R), forward, pA->contig1, tCoordinateShift, rCoordinateShift_t,
-                            templateAlignedPairs, templatePosteriorScore,template);
+                            templateAlignedPairs, templatePosteriorScore,template, rna);
         }
 
         stList *complementAlignedPairs;
@@ -825,7 +835,7 @@ int main(int argc, char *argv[]) {
                 outputAlignment(outFmt, posteriorProbsFile, readLabel, sMc, npRead->complementParams,
                                 npRead->complementEvents, R->getComplementTargetSequence(R), forward, pA->contig1,
                                 cCoordinateShift, rCoordinateShift_c, complementAlignedPairs, complementPosteriorScore,
-                                complement);
+                                complement, rna);
             }
 
         }

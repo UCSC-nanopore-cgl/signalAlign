@@ -152,8 +152,6 @@ class PlotSignal(object):
 
         # plot predictions (signal align outputs)
         for i, prediction in enumerate(self.predictions):
-            print(color_selection)
-            print(self.names[color_selection])
             rgba_colors = np.tile(np.array(colors[color_selection]), (len(prediction[0]), 1))
             if plot_alpha or "full_signalalign" in self.names[color_selection] or False:
                 rgba_colors = np.insert(rgba_colors, 3, prediction[3].tolist(), axis=1)
@@ -396,51 +394,54 @@ def main(args=None):
         f5_locations = [args.f5_path]
 
     for f5_path in f5_locations:
-        save_fig_path = None
-        cl_handle = CreateLabels(f5_path, kmer_index=2)
-        if args.output_dir:
-            save_fig_path = "{}.png".format(os.path.join(args.output_dir,
-                                                         os.path.splitext(os.path.basename(f5_path))[0]))
+        try:
+            save_fig_path = None
+            cl_handle = CreateLabels(f5_path, kmer_index=2)
+            if args.output_dir:
+                save_fig_path = "{}.png".format(os.path.join(args.output_dir,
+                                                             os.path.splitext(os.path.basename(f5_path))[0]))
 
-        mea_list = list()
-        if args.mea:
-            for number in args.mea:
-                mea = cl_handle.add_mea_labels(number=int(number))
-                mea_list.append(mea)
+            mea_list = list()
+            if args.mea:
+                for number in args.mea:
+                    mea = cl_handle.add_mea_labels(number=int(number))
+                    mea_list.append(mea)
 
-        sa_full_list = list()
-        if args.sa_full:
-            for number in args.sa_full:
-                sa_full = cl_handle.add_signal_align_predictions(number=int(number), add_basecall=True)
-                sa_full_list.append(sa_full)
+            sa_full_list = list()
+            if args.sa_full:
+                for number in args.sa_full:
+                    sa_full = cl_handle.add_signal_align_predictions(number=int(number), add_basecall=True)
+                    sa_full_list.append(sa_full)
 
-        basecall_list = list()
-        if args.basecall:
-            events_list = []
-            for number in args.basecall:
-                matches, mismatches = cl_handle.add_basecall_alignment_prediction(number=int(number), trim=args.trim)
-                basecall = list()
-                basecall.extend(matches)
-                basecall.extend(mismatches)
-                basecall.sort(key=lambda x: x['raw_start'])
-                basecall_list.append(basecall)
-                events = cl_handle.get_basecalled_data_by_number(int(number))
-                events_list.append(events)
-            if len(events_list) > 1:
-                main_plot = False
-                print("Plotting {}".format(args.f5_path))
-                plot_basecalled_sequences(events_list[0], events2=events_list[1],
-                                          signal=cl_handle.aligned_signal.scaled_signal)
+            basecall_list = list()
+            if args.basecall:
+                events_list = []
+                for number in args.basecall:
+                    matches, mismatches = cl_handle.add_basecall_alignment_prediction(number=int(number), trim=args.trim)
+                    basecall = list()
+                    basecall.extend(matches)
+                    basecall.extend(mismatches)
+                    basecall.sort(key=lambda x: x['raw_start'])
+                    basecall_list.append(basecall)
+                    events = cl_handle.get_basecalled_data_by_number(int(number))
+                    events_list.append(events)
+                if len(events_list) > 1:
+                    main_plot = False
+                    print("Plotting {}".format(args.f5_path))
+                    plot_basecalled_sequences(events_list[0], events2=events_list[1],
+                                              signal=cl_handle.aligned_signal.scaled_signal)
 
-        max_analysis_index = min(map(lambda x: len(x), [mea_list, sa_full_list])) if args.basecall else 0
-        for i in range(max_analysis_index):
-            print("Analyzing events for index {}".format(i))
-            analyze_event_skips(mea_list[i], sa_full_list[i], basecall_list[i])
+            max_analysis_index = min(map(lambda x: len(x), [mea_list, sa_full_list])) if args.basecall else 0
+            for i in range(max_analysis_index):
+                print("Analyzing events for index {}".format(i))
+                analyze_event_skips(mea_list[i], sa_full_list[i], basecall_list[i])
 
-        if main_plot:
-            print("Plotting {}".format(f5_path))
-            ps = PlotSignal(cl_handle.aligned_signal)
-            ps.plot_alignment(save_fig_path=save_fig_path, plot_alpha=args.plot_alpha)
+            if main_plot:
+                print("Plotting {}".format(f5_path))
+                ps = PlotSignal(cl_handle.aligned_signal)
+                ps.plot_alignment(save_fig_path=save_fig_path, plot_alpha=args.plot_alpha)
+        except KeyError as e:
+            print("FAILED: {}: {}".format(e, f5_path))
 
     stop = timer()
     print("Running Time = {} seconds".format(stop - start), file=sys.stderr)

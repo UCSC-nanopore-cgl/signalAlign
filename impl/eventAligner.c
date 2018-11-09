@@ -85,6 +85,7 @@ int write_fastq_and_readdb_file1(char* fast5_dir, char* fastq_output_path, char*
                 fprintf(fq_fH, "%s", fastq);
                 fastq_entry_destruct(fastqEntry);
             }
+            fast5_close(f5_handle);
         }
     }
     stList_destruct(fast5_files);
@@ -226,9 +227,9 @@ char *fast5_get_fastq(hid_t hdf5_file) {
         char* path = stString_concat(keep, "/BaseCalled_template/Fastq");
         free(keep);
         char* fastq = fast5_get_string(hdf5_file, path);
-//        if (stString_eq(fastq[strlen(fastq)-1], "\n")){
-//
-//        }
+        if (fastq[(size_t) strlen(fastq)-1] != '\n'){
+            fastq = stString_concat(fastq, "\n");
+        }
         free(path);
         return fastq;
     }

@@ -47,14 +47,18 @@ char *fastaHandler_getSubSequence(char *fastaReferencePath, int64_t start, int64
 ReferenceSequence *fastaHandler_ReferenceSequenceConstructFull(char *forward_fastaReferencePath,
                                                               char *backward_fastaReferencePath,
                                                               struct PairwiseAlignment *pA,
-                                                              const char *sequence_name) {
+                                                              const char *sequence_name,
+                                                              bool rna) {
     ReferenceSequence *R = st_malloc(sizeof(ReferenceSequence));
     char *backward_sequence = NULL;
+    if (rna) {
+        listReverse(pA->operationList);
+    }
 
     R->A = referenceSequence_copyPairwiseAlignment(pA);
 
     char *forward_sequence = fastaHandler_getSubSequence(forward_fastaReferencePath, R->A->start1, R->A->end1,
-                                                       R->A->strand1, sequence_name);
+                                                         R->A->strand1, sequence_name);
 
     if (forward_sequence == NULL) {
         st_errAbort("[signalMachine] ERROR: Unable to fetch reference sequence.  \n");
@@ -65,6 +69,21 @@ ReferenceSequence *fastaHandler_ReferenceSequenceConstructFull(char *forward_fas
                 backward_fastaReferencePath, R->A->start1, R->A->end1, R->A->strand1, sequence_name));
     } else {
         backward_sequence = signalUtils_stringReverse(stString_ComplementString(forward_sequence));
+    }
+    if (rna){
+        char *tmp = backward_sequence;
+//        printf("%s\n", tmp);
+        backward_sequence = stString_ReverseString(forward_sequence);
+        forward_sequence = stString_ReverseString(tmp);
+        int64_t tmp2 = R->A->start1;
+        R->A->start1 = R->A->end1;
+        R->A->end1 = tmp2;
+        pA->end1 = R->A->end1;
+        pA->start1 = R->A->start1;
+        pA->strand1 = !pA->strand1;
+        R->A->strand1 = !R->A->strand1;
+
+//        printf("%s\n", forward_sequence);
     }
 
     R->trimmedForwardSequence = forward_sequence;

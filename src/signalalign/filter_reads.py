@@ -89,6 +89,30 @@ def filter_reads(alignment_file, readdb, read_dirs, quality_threshold=7):
                 print("Found no alignments for {}".format(fast5))
 
 
+def make_readdb(alignment_file, read_dirs, readdb_out):
+    """Create a readdb generator from an alignment file"""
+    assert out_path.endswith("readdb"), "Readdb output file nees to end with readdb. {}".format(readdb_out)
+    assert alignment_file.endswith("bam"), "Alignment file must be in BAM format: {}".format(alignment_file)
+    # grab aligned segment
+    for read_dir in read_dirs:
+        fast5s = list_dir(read_dir, ext="fast5")
+        for fast5_path in fast5s:
+            assert os.path.exists(fast5_path), "fast5 path does not exist: {}".format(fast5_path)
+            f5h = NanoporeRead(fast5_path)
+            f5h._initialize_metadata()
+            read_name = f5h.read_label
+            fast5_dict[read_name] = fast5_path
+
+    with closing(pysam.AlignmentFile(alignment_file, 'rb' if alignment_file.endswith("bam") else 'r')) as aln:
+        for aligned_segment in aln.fetch():
+            try:
+                read_name = aligned_segment.qname.split("_")[0]
+                fast5_path = fast5_dict[read_name]
+                yield aligned_segment.qname, fast5_path
+            except KeyError:
+                print("{} not found in fast5s".format(read_name))
+
+
 def filter_reads_to_string_wrapper(filter_reads_generator):
     """Wrap filter reads in order to convert the aligned segment into a string so it can be pickled"""
     for fast5, aligned_segment in filter_reads_generator:

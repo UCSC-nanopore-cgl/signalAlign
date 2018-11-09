@@ -245,11 +245,12 @@ class NanoporeRead(object):
                 self.close()
                 return False
 
-
         self.template_read = self.fastq.split('\n')[1]
         if self.rna:
             # reverse and replace "U"
             self.template_read = self.template_read.replace("U", "T")[::-1]
+
+            template_read2 = self.sequence_from_events(self.fastFive[self.template_event_table_address])
 
         self.kmer_length = -1 if len(self.fastFive[self.template_event_table_address]) == 0 else \
             len(self.bytes_to_string(self.fastFive[self.template_event_table_address][0]['model_state']))
@@ -375,6 +376,8 @@ class NanoporeRead(object):
             # set and return the read (initialize will overwrite this if run)
             self.template_read = self.bytes_to_string(self.fastFive[self.fastq_sequence_address][()]).split('\n')[1]
             self.template_read_length = len(self.template_read)
+            if self.rna:
+                self.template_read = self.template_read.replace("U", "T")[::-1]
             return self.template_read
 
         return False

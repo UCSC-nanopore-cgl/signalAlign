@@ -34,7 +34,7 @@ def index_to_time(event_table, sampling_freq=0, start_time=0):
 class AlignedSignal(object):
     """Labeled nanopore signal data"""
 
-    def __init__(self, scaled_signal):
+    def __init__(self, scaled_signal, rna=False):
         """Initialize the scaled signal and label
 
         :param scaled_signal: scaled signal to pA
@@ -52,6 +52,7 @@ class AlignedSignal(object):
         self.guide = defaultdict(defaultdict)
         # place to store event starts
         self.raw_starts = None
+        self.rna = rna
 
     def add_raw_signal(self, signal):
         """Add raw signal to class
@@ -109,11 +110,11 @@ class AlignedSignal(object):
         self.check_strand_mapping(label1)
         # set label with the specified name
         if label_type == 'label':
-            self.label[name] = label
+            self.label[name] = label1
         elif label_type == 'prediction':
-            self.prediction[name] = label
+            self.prediction[name] = label1
         elif label_type == 'guide':
-            self.guide[guide_name][name] = label
+            self.guide[guide_name][name] = label1
 
     def generate_label_mapping(self, name, scaled=True):
         """Create a generator of the mapping between the signal and the label
@@ -148,6 +149,11 @@ class AlignedSignal(object):
             minus_strand = True
         else:
             minus_strand = False
+
+        # rna is read 3' - 5'
+        if self.rna:
+            minus_strand = not minus_strand
+
         if self.minus_strand is not None:
             if data[0]["raw_start"] != data[-1]["raw_start"]:
                 assert self.minus_strand == minus_strand, "New label has different strand direction, check label"
@@ -166,16 +172,16 @@ class CreateLabels(Fast5):
         """
         self.fast5_path = fast5_path
         super(CreateLabels, self).__init__(fast5_path)
-        self.aligned_signal = self._initialize()
         self.kmer_index = kmer_index
         self.rna = self.is_read_rna()
+        self.aligned_signal = self._initialize()
 
     def _initialize(self):
         """Initialize AlignedSignal class by adding the raw and scaled signal"""
         scaled_signal = self.get_read(raw=True, scale=True)
         raw_signal = self.get_read(raw=True, scale=False)
         # add raw signal information to AlignedSignal
-        aligned_signal = AlignedSignal(scaled_signal)
+        aligned_signal = AlignedSignal(scaled_signal, rna=self.rna)
         aligned_signal.add_raw_signal(raw_signal)
         return aligned_signal
 
@@ -192,8 +198,7 @@ class CreateLabels(Fast5):
 
     def add_mea_labels(self, number=None):
         """Gather mea_alignment labels information from fast5 file.
-        :param number: integer representing which signal align predictions to plot
-        """
+        :param number: integer representing which signal align predictions to plot"""
         if number is not None:
             assert type(number) is int, "Number must be an integer"
             path = self.__default_signalalign_events__.format(number)
@@ -216,8 +221,7 @@ class CreateLabels(Fast5):
     def add_signal_align_predictions(self, number=None, add_basecall=False):
         """Create prediction using probabilities from full output format from signalAlign
         :param number: integer representing which signal align predictions to plot
-        :param add_basecall: if set to true, will add basecalled event table
-        """
+        :param add_basecall: if set to true, will add basecalled event table"""
         if number is not None:
             assert type(number) is int, "Number must be an integer"
             path = self.__default_signalalign_events__.format(number)
@@ -225,12 +229,13 @@ class CreateLabels(Fast5):
             basecall_events_path = self.get_signalalign_basecall_path(override_path=path)
             # print("sa_events path: {}".format(path))
             # print("basecall_events_path: {}".format(basecall_events_path))
-
+            sam = self.get_signalalign_events(sam=True, override_path=path)
             name = "full_signalalign_{}".format(number)
         else:
             sa_events = self.get_signalalign_events()
             basecall_events_path = self.get_signalalign_basecall_path()
             name = "full_signalalign"
+            sam = None
         # cut out duplicates
         if add_basecall:
             try:
@@ -238,7 +243,8 @@ class CreateLabels(Fast5):
             except:
                 raise ValueError('Could not retrieve basecall_1D data from events')
             self.add_basecall_alignment_prediction(my_events=events,
-                                                   number=basecall_events_path[24])
+                                                   number=basecall_events_path[24],
+                                                   sam=sam)
         predictions = create_label_from_events(sa_events)
 
         predictions = self.fix_sa_reference_indexes(predictions)
@@ -280,7 +286,7 @@ class CreateLabels(Fast5):
         except KeyError:
             events = add_raw_start_and_raw_length_to_events(events, self.sample_rate, self.raw_attributes["start_time"])
 
-        matches, mismatches, raw_starts = match_cigar_with_basecall_guide(events=events, sam_string=sam,
+        matches, mismatches, raw_starts = match_cigar_with_basecall_guide(events=events, sam_string=sam, rna=self.rna,
                                                                           kmer_index=self.kmer_index)
 
         if trim is not None:
@@ -307,35 +313,6 @@ class CreateLabels(Fast5):
         except KeyError:
             events = add_raw_start_and_raw_length_to_events(events, self.sample_rate, self.raw_attributes["start_time"])
         return events
-
-    def add_basecall_alignment_guide(self, sam=None, event_table_path=None):
-        """Add the original basecalled event table and add the 'guide' alignment labels to signal_label handle
-        :param sam: correctly formatted SAM string
-        :param event_table_path: grab event table from direct path given
-        :return: True if the correct labels are added to the AlignedSignal internal class object
-        """
-        if not sam:
-            sam = self.get_signalalign_events(sam=True)
-
-        if event_table_path:
-            events = np.array(self[event_table_path])
-        else:
-            events = self.get_basecall_data()
-
-        try:
-            check_numpy_table(events, req_fields=('raw_start', 'raw_length'))
-        # if events do not have raw_start or raw_lengths
-        except KeyError:
-            events = time_to_index(events,
-                                   sampling_freq=self.sample_rate,
-                                   start_time=self.raw_attributes["start_time"])
-
-        cigar_labels = create_labels_from_guide_alignment(events=events, sam_string=sam,
-                                                          kmer_index=self.kmer_index)
-        for i, block in enumerate(cigar_labels):
-            self.aligned_signal.add_label(block, name="basecalled_alignment{}".format(i), label_type='guide',
-                                          guide_name="basecall")
-        return True
 
     def add_nanoraw_labels(self, reference):
         """Add nanoraw labels to signal_label handle"""
@@ -426,94 +403,6 @@ def trim_matches(matches, trim):
         mask[remove_indices] = False
         matches = matches[mask]
         return matches
-
-
-def create_labels_from_guide_alignment(events, sam_string, rna=False, reference_path=None, kmer_index=2,
-                                       one_ref_indexing=False):
-    """Create labeled signal from a guide alignment with only matches being reported
-
-    :param events: path to fast5 file
-    :param sam_string: sam alignment string
-    :param rna: if read is rna, reverse again
-    :param reference_path: if sam_string has MDZ field the reference sequence can be inferred, otherwise, it is needed
-    :param kmer_index: index of the kmer to select for reference to event mapping
-    :param one_ref_indexing: boolean zero or 1 based indexing for reference
-    """
-    # test if the required fields are in structured numpy array
-    check_numpy_table(events, req_fields=('raw_start', 'model_state', 'p_model_state', 'raw_length', 'move'))
-
-    assert type(one_ref_indexing) is bool, "one_ref_indexing must be a boolean"
-
-    psam_h = initialize_aligned_segment_wrapper(sam_string, reference_path=reference_path)
-
-    # create an indexed map of the events and their corresponding bases
-    bases, base_raw_starts, base_raw_lengths, probs = index_bases_from_events(events, kmer_index=kmer_index)
-
-    # check if string mapped to reverse strand
-    if psam_h.alignment_segment.is_reverse:
-        probs = probs[::-1]
-        base_raw_starts = base_raw_starts[::-1]
-        # rna reads go 3' to 5' so we dont need to reverse if it mapped to reverse strand
-        if not rna:
-            bases = ReverseComplement().reverse(''.join(bases))
-    # reverse if it mapped to forward strand and RNA
-    elif rna:
-        bases = ReverseComplement().reverse(''.join(bases))
-
-    # all 'matches' and 'mismatches'
-    matches_map = psam_h.seq_alignment.matches_map
-    # zero indexed reference start
-    ref_start = psam_h.alignment_segment.reference_start + one_ref_indexing
-    # set labels
-    raw_start = []
-    raw_length = []
-    reference_index = []
-    kmer = []
-    posterior_probability = []
-    cigar_labels = []
-    prev = matches_map[0].reference_index
-    for i, alignment in enumerate(matches_map):
-        if i == 0 or alignment.reference_index == prev + 1:
-            raw_start.append(base_raw_starts[alignment.query_index])
-            raw_length.append(base_raw_lengths[alignment.query_index])
-            reference_index.append(alignment.reference_index + ref_start)
-            kmer.append(alignment.reference_base)
-            posterior_probability.append(probs[alignment.query_index])
-        else:
-            # initialize labels
-            cigar_label = np.zeros(len(raw_start),
-                                   dtype=[('raw_start', int), ('raw_length', int), ('reference_index', int),
-                                          ('posterior_probability', float), ('kmer', 'S5')])
-            # assign labels
-            cigar_label['raw_start'] = raw_start
-            cigar_label['raw_length'] = raw_length
-            cigar_label['reference_index'] = reference_index
-            cigar_label['kmer'] = kmer
-            cigar_label['posterior_probability'] = posterior_probability
-            # add to other blocks
-            cigar_labels.append(cigar_label)
-            # reset trackers
-            raw_start = [base_raw_starts[alignment.query_index]]
-            raw_length = [base_raw_lengths[alignment.query_index]]
-            reference_index = [alignment.reference_index + ref_start]
-            kmer = [alignment.reference_base]
-            posterior_probability = [probs[alignment.query_index]]
-        # keep track of reference positions
-        prev = alignment.reference_index
-
-    # catch the last label
-    cigar_label = np.zeros(len(raw_start), dtype=[('raw_start', int), ('raw_length', int), ('reference_index', int),
-                                                  ('posterior_probability', float), ('kmer', 'S5')])
-    # assign labels
-    cigar_label['raw_start'] = raw_start
-    cigar_label['raw_length'] = raw_length
-    cigar_label['reference_index'] = reference_index
-    cigar_label['kmer'] = kmer
-    cigar_label['posterior_probability'] = posterior_probability
-    # add to other blocks
-    cigar_labels.append(cigar_label)
-
-    return cigar_labels
 
 
 def index_bases_from_events(events, kmer_index=2):
@@ -724,7 +613,12 @@ def match_cigar_with_basecall_guide(events, sam_string, kmer_index, rna=False, r
     psam_h = initialize_aligned_segment_wrapper(sam_string, reference_path=reference_path)
 
     # create an indexed map of the events and their corresponding bases
-    bases, base_raw_starts, base_raw_lengths, probs = index_bases_from_events(events, kmer_index=kmer_index)
+    _, base_raw_starts, base_raw_lengths, probs = index_bases_from_events(events, kmer_index=kmer_index)
+    if rna:
+        # events are 3'-5', swap to correct for alignment file
+        base_raw_starts = base_raw_starts[::-1]
+        base_raw_lengths = base_raw_lengths[::-1]
+        probs = probs[::-1]
     # all 'matches' and 'mismatches'
     matches_map = psam_h.seq_alignment.matches_map
     ref_len = len(psam_h.get_reference_sequence())
@@ -750,7 +644,7 @@ def match_cigar_with_basecall_guide(events, sam_string, kmer_index, rna=False, r
             matches_kmer.append(alignment.reference_base)
             matches_posterior_probability.append(probs[alignment.query_index])
             if psam_h.alignment_segment.is_reverse:
-                matches_reference_index.append(ref_start + ref_len - alignment.reference_index - 2)
+                matches_reference_index.append((ref_start + ref_len - 1) - alignment.reference_index)
             else:
                 matches_reference_index.append(ref_start + alignment.reference_index)
         else:
@@ -759,7 +653,7 @@ def match_cigar_with_basecall_guide(events, sam_string, kmer_index, rna=False, r
             mismatches_kmer.append(alignment.reference_base)
             mismatches_posterior_probability.append(probs[alignment.query_index])
             if psam_h.alignment_segment.is_reverse:
-                mismatches_reference_index.append(ref_start + ref_len - alignment.reference_index - 2)
+                mismatches_reference_index.append((ref_start + ref_len - 1) - alignment.reference_index)
             else:
                 mismatches_reference_index.append(ref_start + alignment.reference_index)
 
@@ -781,7 +675,8 @@ def match_cigar_with_basecall_guide(events, sam_string, kmer_index, rna=False, r
     mismatches['kmer'] = mismatches_kmer
     mismatches['posterior_probability'] = mismatches_posterior_probability
 
-    return matches, mismatches, events["raw_start"]
+    # trim extra event alignments
+    return matches[kmer_index:len(matches)-kmer_index], mismatches[kmer_index:len(matches)-kmer_index], events["raw_start"]
 
 
 def get_highest_single_digit_integer_from_string(in_string):

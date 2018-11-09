@@ -338,6 +338,7 @@ def create_summary_pd(sam_lines, fast5, name, number=0, pass_threshold=7, gap_si
                 print("ERROR {}: {}".format(fast5, e), file=sys.stderr)
     return pd_data
 
+
 def get_alignment_summary_info(fast5s, alignment_file, pass_threshold=7, gap_size=10, verbose=False,
                                max_reads=100, number=0):
     """Filter fast5 files based on a quality threhsold and if there is an alignment"""

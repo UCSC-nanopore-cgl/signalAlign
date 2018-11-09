@@ -34,7 +34,7 @@ all : sL bD hs python-utils ${libPath}/signalAlignLib.a ${signalAlignBin}/signal
 	  ${signalAlignBin}/variantCallingLib.py ${signalAlignBin}/alignmentAnalysisLib.py \
 	  ${signalAlignBin}/buildHdpUtil ${signalAlignBin}/trainModels all_tests \
 	  externals nanoporeParams python_setup ${signalAlignBin}/filterReads ${signalAlignBin}/extract \
-	  ${signalAlignBin}/sequencing_summary  # ${scrappie_build}/scrappie \
+	  ${signalAlignBin}/sequencing_summary  ${signalAlignBin}/plot_kmer_distributions # ${scrappie_build}/scrappie \
 
 python-utils :
 	cd python_utils && python3 setup.py install
@@ -137,6 +137,10 @@ ${signalAlignBin}/trainModels : ${rootPath}src/signalalign/train/trainModels.py
 ${signalAlignBin}/sequencing_summary : ${rootPath}src/signalalign/visualization/sequencing_summary.py
 	cp ${rootPath}src/signalalign/visualization/sequencing_summary.py ${signalAlignBin}/sequencing_summary
 	chmod +x ${signalAlignBin}/sequencing_summary
+
+${signalAlignBin}/plot_kmer_distributions : ${rootPath}src/signalalign/visualization/plot_kmer_distributions.py
+	cp ${rootPath}src/signalalign/visualization/plot_kmer_distributions.py ${signalAlignBin}/plot_kmer_distributions
+	chmod +x ${signalAlignBin}/plot_kmer_distributions
 
 
 all_tests : .FORCE
