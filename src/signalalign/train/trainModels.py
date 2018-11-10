@@ -183,10 +183,10 @@ class CreateHdpTrainingData(object):
                 kmer_assignments = kmer_assignments.sort_values(['prob'], ascending=0)
                 n = 0
                 for _, r in kmer_assignments.iterrows():
-                    yield make_alignment_line(strand=r['strand'], kmer=r['kmer'], event=r['level_mean'], prob=r['prob'])
                     n += 1
-                    if n >= max_assignments:
+                    if n > max_assignments:
                         break
+                    yield make_alignment_line(strand=r['strand'], kmer=r['kmer'], event=r['level_mean'], prob=r['prob'])
                 if n < max_assignments and verbose:
                     print("WARNING didn't find {max} requested assignments for {kmer} only found {found}"
                           "".format(max=max_assignments, kmer=k, found=n))
