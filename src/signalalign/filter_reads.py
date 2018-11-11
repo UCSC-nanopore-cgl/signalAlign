@@ -64,6 +64,22 @@ def parse_readdb(readdb, directories):
                     yield split_line[0], full_path
 
 
+def parse_seq_summary(seq_summary, directories):
+    """Parse seq_summary file
+
+    :param seq_summary: path to seq_summary file
+    :param directories: path to directories of where the reads are
+    """
+    assert readdb.endswith("tsv"), "seq_summary file must end with .tsv: {}".format(seq_summary)
+    with open(seq_summary, 'r') as fh:
+        for line in fh:
+            split_line = line.split()
+            for dir_path in directories:
+                full_path = os.path.join(dir_path, split_line[0])
+                if os.path.exists(full_path):
+                    yield split_line[1], full_path
+
+
 def filter_reads(alignment_file, readdb, read_dirs, quality_threshold=7):
     """Filter fast5 files based on a quality threshold and if there is an alignment"""
     assert alignment_file.endswith("bam"), "Alignment file must be in BAM format: {}".format(alignment_file)
@@ -71,8 +87,11 @@ def filter_reads(alignment_file, readdb, read_dirs, quality_threshold=7):
     with closing(pysam.AlignmentFile(alignment_file, 'rb')) as bamfile:
         name_indexed = pysam.IndexedReads(bamfile)
         name_indexed.build()
-
-        for name, fast5 in parse_readdb(readdb, read_dirs):
+        if readdb.endswith("readdb"):
+            file_generator = parse_readdb(readdb, read_dirs)
+        else:
+            file_generator = parse_seq_summary(readdb, read_dirs)
+        for name, fast5 in file_generator:
             try:
                 iterator = name_indexed.find(name)
                 for aligned_segment in iterator:
