@@ -22,7 +22,7 @@ from signalalign.utils.sequenceTools import fastaWrite, samtools_faidx_fasta, pr
 from signalalign.mea_algorithm import mea_alignment_from_signal_align, match_events_with_signalalign, \
     add_events_to_signalalign, create_label_from_events
 from signalalign.filter_reads import filter_reads_to_string_wrapper, filter_reads
-from py3helpers.utils import merge_dicts, check_numpy_table, merge_lists
+from py3helpers.utils import merge_dicts, check_numpy_table, merge_lists, list_dir_recursive, list_dir
 from py3helpers.seq_tools import sam_string_to_aligned_segment, Cigar
 
 
@@ -768,7 +768,7 @@ def multithread_signal_alignment(signal_align_arguments, fast5_locations, worker
 def create_sa_sample_args(fofns=[], fast5_dirs=[], positions_file=None, motifs=None, alignment_file=None,
                           bwa_reference=None, fw_reference=None, bw_reference=None, name=None,
                           number_of_kmer_assignments=10, probability_threshold=0.8, kmers_from_reference=False,
-                          quality_threshold=7):
+                          quality_threshold=7, recursive=False):
     """Create sample arguments for SignalAlignSample. Parameters are explained in SignalAlignmentSample"""
     sample_args = {
         "fofns": fofns,
@@ -783,7 +783,8 @@ def create_sa_sample_args(fofns=[], fast5_dirs=[], positions_file=None, motifs=N
         "probability_threshold": probability_threshold,
         "kmers_from_reference": kmers_from_reference,
         'alignment_file': alignment_file,
-        'quality_threshold': quality_threshold
+        'quality_threshold': quality_threshold,
+        'recursive': recursive
     }
     return sample_args
 
@@ -791,7 +792,7 @@ def create_sa_sample_args(fofns=[], fast5_dirs=[], positions_file=None, motifs=N
 class SignalAlignSample(object):
     def __init__(self, working_folder, fofns, fast5_dirs, positions_file, motifs, bwa_reference, fw_reference,
                  bw_reference, name, number_of_kmer_assignments, probability_threshold, kmers_from_reference,
-                 alignment_file, readdb=None, quality_threshold=7):
+                 alignment_file, readdb=None, quality_threshold=7, recursive=False):
         """Prepare sample for processing via signalAlign.
 
         :param working_folder: FolderHandler() object with a working directory already created
@@ -806,6 +807,7 @@ class SignalAlignSample(object):
         :param alignment_file: path to bam file to get alignments
         :param readdb: only one readdb file per sample allowed ( will only look in fast5_dirs)
         :param quality_threshold: read quailty threshold for passing reads
+        :param recursive: recursively search fast5 dirs for files
 
         ###### Sample specific HDP Training Parameters #######
         :param number_of_kmer_assignments: max number of assignments for each kmer
@@ -829,6 +831,7 @@ class SignalAlignSample(object):
         self.readdb = readdb
         self.quality_threshold = quality_threshold
         self.filter_read_generator = None
+        self.recursive = recursive
 
         assert self.name is not None, "Must specify a name for your sample. name: {}".format(self.name)
         assert isinstance(self.fast5_dirs, list), "fast5_dirs needs to be a list. fast5_dirs: {}".format(
@@ -849,8 +852,11 @@ class SignalAlignSample(object):
         # gather all files in fast5 directories
         for fast5_dir in self.fast5_dirs:
             assert os.path.isdir(fast5_dir), "Fast5 directory does not exist. dir: {}".format(fast5_dir)
-            self.files.extend(
-                [os.path.abspath(os.path.join(fast5_dir, x)) for x in os.listdir(fast5_dir) if x.endswith(".fast5")])
+            if self.recursive:
+                files = list_dir_recursive(fast5_dir, ext="fast5")
+            else:
+                files = list_dir(fast5_dir, ext="fast5")
+            self.files.extend(files)
         # gather files from fofn.txt files
         for fofn in self.fofns:
             self.files.extend(parseFofn(fofn))
@@ -885,7 +891,8 @@ class SignalAlignSample(object):
         """Creates a filter_read generator object"""
         if self.alignment_file and self.readdb and self.quality_threshold:
             self.filter_read_generator = filter_reads(self.alignment_file, self.readdb,
-                                                      self.fast5_dirs, quality_threshold=self.quality_threshold)
+                                                      self.fast5_dirs, quality_threshold=self.quality_threshold,
+                                                      recursive=self.recursive)
 
 
 # TODO use Fast5 object

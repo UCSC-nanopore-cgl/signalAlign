@@ -18,7 +18,7 @@ from argparse import ArgumentParser
 from signalalign.fast5 import Fast5
 from signalalign.nanoporeRead import NanoporeRead
 from signalalign.utils.sequenceTools import get_full_nucleotide_read_from_alignment
-from py3helpers.utils import list_dir
+from py3helpers.utils import list_dir, get_all_sub_directories
 
 
 def parse_args():
@@ -43,6 +43,10 @@ def parse_args():
     parser.add_argument('--quality_threshold', action='store', default=7,
                         dest='quality_threshold', required=False, type=float,
                         help="Minimum average base quality threshold. Default = 7")
+
+    parser.add_argument('--recursive', action='store_true', default=False,
+                        dest='recursive', required=False, type=float,
+                        help="Search directory recursively to find fast5 files")
 
     args = parser.parse_args()
     return args
@@ -70,7 +74,7 @@ def parse_seq_summary(seq_summary, directories):
     :param seq_summary: path to seq_summary file
     :param directories: path to directories of where the reads are
     """
-    assert readdb.endswith("tsv"), "seq_summary file must end with .tsv: {}".format(seq_summary)
+    assert seq_summary.endswith("tsv"), "seq_summary file must end with .tsv: {}".format(seq_summary)
     with open(seq_summary, 'r') as fh:
         for line in fh:
             split_line = line.split()
@@ -80,18 +84,39 @@ def parse_seq_summary(seq_summary, directories):
                     yield split_line[1], full_path
 
 
-def filter_reads(alignment_file, readdb, read_dirs, quality_threshold=7):
+def parse_read_name_map_file(read_map, directories, recursive=False):
+    """Parse either a seq summary file or a readdb file"""
+    if read_map.endswith("readdb"):
+        name_index = 0
+        path_index = 1
+    else:
+        name_index = 1
+        path_index = 0
+
+    with open(read_map, 'r') as fh:
+        for line in fh:
+            split_line = line.split()
+            for dir_path in directories:
+                if recursive:
+                    directories2 = get_all_sub_directories(dir_path)
+                    for dir_path2 in directories2:
+                        full_path = os.path.join(dir_path2, split_line[path_index])
+                        if os.path.exists(full_path):
+                            yield split_line[name_index], full_path
+                else:
+                    full_path = os.path.join(dir_path, split_line[path_index])
+                    if os.path.exists(full_path):
+                        yield split_line[name_index], full_path
+
+
+def filter_reads(alignment_file, readdb, read_dirs, quality_threshold=7, recursive=False):
     """Filter fast5 files based on a quality threshold and if there is an alignment"""
     assert alignment_file.endswith("bam"), "Alignment file must be in BAM format: {}".format(alignment_file)
     # grab aligned segment
     with closing(pysam.AlignmentFile(alignment_file, 'rb')) as bamfile:
         name_indexed = pysam.IndexedReads(bamfile)
         name_indexed.build()
-        if readdb.endswith("readdb"):
-            file_generator = parse_readdb(readdb, read_dirs)
-        else:
-            file_generator = parse_seq_summary(readdb, read_dirs)
-        for name, fast5 in file_generator:
+        for name, fast5 in parse_read_name_map_file(readdb, read_dirs, recursive=recursive):
             try:
                 iterator = name_indexed.find(name)
                 for aligned_segment in iterator:
@@ -148,7 +173,8 @@ def main():
     if not os.path.isdir(args.pass_output_dir):
         os.mkdir(args.pass_output_dir)
 
-    best_files = filter_reads(args.alignment_file, args.readdb, [args.fast5_dir], args.quality_threshold)
+    best_files = filter_reads(args.alignment_file, args.readdb, [args.fast5_dir], args.quality_threshold,
+                              recursive=args.recursive)
 
     # move passed files
     assert os.path.isdir(args.pass_output_dir), "pass_output_dir does not exist or get created: {}".format(args.pass_output_dir)

@@ -21,7 +21,8 @@
       "name": "canonical",
       "probability_threshold": 0.8,
       "number_of_kmer_assignments": 10,
-      "alignment_file": null
+      "alignment_file": null,
+      "recursive": false
     }
   ],
   "hdp_args": {

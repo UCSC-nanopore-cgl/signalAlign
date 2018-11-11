@@ -43,6 +43,10 @@ class FilterReadsTest(unittest.TestCase):
         self.assertEqual(len(first_dir), 3)
         first_dir = {x: y for x, y in filter_reads(self.bam, self.readdb, [self.test_dir], quality_threshold=12)}
         self.assertEqual(len(first_dir), 0)
+        first_dir = {x: y for x, y in filter_reads(self.bam, self.readdb, [os.path.split(self.test_dir)[0]],
+                                                   quality_threshold=7, recursive=True)}
+        self.assertEqual(len(first_dir), 3)
+
 
     def test_filter_reads_to_string_wrapper(self):
         a = filter_reads(self.bam, self.readdb, [self.test_dir], quality_threshold=7)
