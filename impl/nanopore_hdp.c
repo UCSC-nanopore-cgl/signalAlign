@@ -1163,6 +1163,18 @@ static NanoporeHDP *loadNanoporeHdpFromScratch(NanoporeHdpType nHdpType, const c
 
         return nHdp;
     }
+    if (nHdpType == singleLevelFixedM6A) {
+        if ((baseGamma == NULL_HYPERPARAMETER) || (leafGamma == NULL_HYPERPARAMETER)) {
+            st_errAbort("loadNanoporeHdpFromScratch: You need to provide a base gamma and leaf gamma "
+                        "for this NanoporeHdpType\n");
+        }
+
+        NanoporeHDP *nHdp = flat_hdp_model(METHYL_ADENOSINE_RNA, SYMBOL_NUMBER, kmerLength,
+                                           baseGamma, leafGamma,
+                                           samplingGridStart, samplingGridEnd, samplingGridLength, modelFile);
+
+        return nHdp;
+    }
     if (nHdpType == singleLevelFixed) {
         if ((baseGamma == NULL_HYPERPARAMETER) || (leafGamma == NULL_HYPERPARAMETER)) {
             st_errAbort("loadNanoporeHdpFromScratch: You need to provide a base gamma and leaf gamma "

@@ -566,7 +566,7 @@ class CustomAmbiguityPositions(object):
         return df
 
 
-def processReferenceFasta(fasta, work_folder, motifs=None, positions_file=None):
+def processReferenceFasta(fasta, work_folder, name, motifs=None, positions_file=None):
     """loops over all of the contigs in the reference file, writes the forward and backward sequences
     as flat files (no headers or anything) for signalMachine, returns a dict that has the sequence
     names as keys and the paths to the processed sequence as keys
@@ -592,8 +592,8 @@ def processReferenceFasta(fasta, work_folder, motifs=None, positions_file=None):
         positions = CustomAmbiguityPositions(positions_file)
 
     # process fasta
-    fw_fasta_path = work_folder.add_file_path("forward.{}".format(os.path.basename(fasta)))
-    bw_fasta_path = work_folder.add_file_path("backward.{}".format(os.path.basename(fasta)))
+    fw_fasta_path = work_folder.add_file_path("forward.{}.{}".format(name, os.path.basename(fasta)))
+    bw_fasta_path = work_folder.add_file_path("backward.{}.{}".format(name, os.path.basename(fasta)))
     print("[SignalAlignment.run] NOTICE: Creating forward and backward fasta files.")
     with open(bw_fasta_path, 'w') as bw_outfasta, open(fw_fasta_path, 'w') as fw_outfasta:
         for header, comment, sequence in read_fasta(fasta):

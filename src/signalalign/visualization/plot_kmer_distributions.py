@@ -8,7 +8,7 @@
 # History: 08/10/18 Created
 ########################################################################
 
-from signalalign.hiddenMarkovModel import HmmModel
+from signalalign.hiddenMarkovModel import HmmModel, parse_alignment_file
 from argparse import ArgumentParser
 
 
@@ -59,9 +59,12 @@ def main():
                                             savefig_dir=args.output_dir)
     else:
         assert args.all_kmers, "Must pick a single kmer to plot using --kmer or pass the flag --all_kmers"
+        alignment_data = None
+        if args.build_alignment_file:
+            alignment_data = parse_alignment_file(args.build_alignment_file)
         for kmer in model_handle.sorted_kmer_tuple:
             model_handle.plot_kmer_distribution(kmer,
-                                                alignment_file=args.build_alignment_file,
+                                                alignment_file_data=alignment_data,
                                                 savefig_dir=args.output_dir)
 
 

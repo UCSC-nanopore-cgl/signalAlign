@@ -14,7 +14,7 @@ from shutil import copyfile
 from subprocess import check_call
 
 from py3helpers.utils import create_dot_dict, merge_lists, all_string_permutations, save_json, load_json, \
-    count_lines_in_file
+    count_lines_in_file, merge_dicts
 
 from signalalign.signalAlignment import multithread_signal_alignment_samples, create_signalAlignment_args, \
     SignalAlignSample
@@ -213,7 +213,8 @@ def get_hdp_type(requested_type):
         "multisetPrior2": 11,
         "multisetPriorEcoli": 12,
         "singleLevelPriorEcoli": 13,
-        "singleLevelFixedCanonical": 14
+        "singleLevelFixedCanonical": 14,
+        "singleLevelFixedM6A": 15
     }
     assert (requested_type in list(hdp_types.keys())), "Requested HDP type is invalid, got {}".format(requested_type)
     return hdp_types[requested_type]
@@ -240,7 +241,8 @@ class TrainSignalAlign(object):
     HDP_TYPES_1D = [
         ("singleLevelPrior2", 10),
         ("multisetPrior2", 11),
-        ("singleLevelFixedCanonical", 14)
+        ("singleLevelFixedCanonical", 14),
+        ("singleLevelFixedM6A", 15),
     ]
 
     HDP_TYPES_ACEGT = [
@@ -255,6 +257,9 @@ class TrainSignalAlign(object):
     HDP_TYPES_ACEGIT = [
         ("multisetPriorEcoli", 12),
         ("singleLevelPriorEcoli", 13),
+    ]
+    HDP_TYPES_ACFGT = [
+        ("singleLevelFixedM6A", 15),
     ]
 
     def __init__(self, args):
@@ -300,7 +305,8 @@ class TrainSignalAlign(object):
 
     def _create_samples(self):
         """Create SignalAlignSample for each sample"""
-        return [SignalAlignSample(working_folder=self.working_folder, **s) for s in self.args.samples]
+        sa_args = [merge_dicts([s, {"quality_threshold": self.args.filter_reads}]) for s in self.args.samples]
+        return [SignalAlignSample(working_folder=self.working_folder, **s) for s in sa_args]
 
     def new_working_folder(self, append):
         """Create new working folder in order to keep track of each new run of analysis"""
@@ -384,7 +390,7 @@ class TrainSignalAlign(object):
                                               cHdpLoc=complement_hdp_location,
                                               buildAln=build_alignment_path,
                                               gibbs_samples=self.args.hdp_args.gibbs_samples,
-                                              burnIn=int(self.args.hdp_args.burnin_multiplier * num_alignments),
+                                              burnIn=min(30000000, int(self.args.hdp_args.burnin_multiplier * num_alignments)),
                                               thin=self.args.hdp_args.thinning,
                                               start=self.args.hdp_args.grid_start,
                                               end=self.args.hdp_args.grid_end,
@@ -614,6 +620,10 @@ class TrainSignalAlign(object):
             assert (self.args.hdp_args.hdp_type, self.int_hdp_type) in set(self.HDP_TYPES_ACGT), \
                 "HDP type is not compatible with alphabet=ACGT." \
                 "Hdp_type: {}, ACGT HDP types:  {}".format(self.args.hdp_type, self.HDP_TYPES_ACGT)
+        elif self.alphabet == "ACFGT":
+            assert (self.args.hdp_args.hdp_type, self.int_hdp_type) in set(self.HDP_TYPES_ACFGT), \
+                "HDP type is not compatible with alphabet=ACFGT." \
+                "Hdp_type: {}, ACFGT HDP types:  {}".format(self.args.hdp_type, self.HDP_TYPES_ACFGT)
         else:
             raise AssertionError("Cannot create a HDP with proved alphabet")
 
@@ -698,6 +708,7 @@ def main():
             exit(1)
         # run training
         config_args = create_dot_dict(load_json(args.config))
+        copyfile(args.config, os.path.join(config_args.output_dir, os.path.basename(args.config)))
         TrainSignalAlign(config_args).expectation_maximization_training()
     else:
         print("Error, try: `trainModels run --config path/to/config.json`")

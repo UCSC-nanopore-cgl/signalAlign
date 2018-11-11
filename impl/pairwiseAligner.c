@@ -270,6 +270,8 @@ char *sequence_getBaseOptions(DegenerateType type) {
         case canonicalVariants:
             return CANONICAL_NUCLEOTIDES;
         case adenosineMethylation:
+            return F_ADENOSINES;
+        case adenosineInosine:
             return ADENOSINES;
         default:
             return CANONICAL_NUCLEOTIDES;
@@ -284,8 +286,10 @@ int64_t sequence_nbBaseOptions(DegenerateType type) {
             return 3; // C, E, O
         case canonicalVariants:
             return 4; // A, C, G, T
-        case adenosineMethylation:
+        case adenosineInosine:
             return 2; // A, I
+        case adenosineMethylation:
+            return 5; // A, F
         default:
             return 4; // A, C, G, T
     }
@@ -391,6 +395,19 @@ Sequence *sequence_constructReferenceKmerSequence(int64_t length, void *elements
                                                     type);
     return self;
 }
+
+Sequence *sequence_constructReferenceKmerSequence2(int64_t length, void *elements,
+                                                  void *(*getFcn)(void *, int64_t),
+                                                  Sequence *(*sliceFcn)(Sequence *, int64_t, int64_t),
+                                                  DegenerateType dType, SequenceType type) {
+
+    Sequence *self = sequence_constructKmerSequence(length, elements, getFcn, sliceFcn,
+                                                    sequence_getBaseOptions(dType),
+                                                    sequence_nbBaseOptions(dType),
+                                                    type);
+    return self;
+}
+
 
 Sequence *sequence_deepCopyNucleotideSequence(const Sequence *toCopy) {
     char *elementsCopy = stString_copy(toCopy->elements);

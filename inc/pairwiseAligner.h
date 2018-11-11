@@ -33,6 +33,7 @@ extern const char *PAIRWISE_ALIGNMENT_EXCEPTION_ID;
 #define THREE_CYTOSINES "CEO"
 #define TWO_CYTOSINES "CE"
 #define ADENOSINES "AI"
+#define F_ADENOSINES "AF"
 #define CANONICAL_NUCLEOTIDES "ACGT"
 #define ALL_BASES "ACEGOT"
 
@@ -51,8 +52,9 @@ typedef enum {
 typedef enum {
     cytosineMethylation2 = 0,
     cytosineMethylation3 = 1,
-    adenosineMethylation = 2,
-    canonicalVariants = 3
+    adenosineInosine = 2,
+    canonicalVariants = 3,
+    adenosineMethylation = 5
 } DegenerateType;
 
 typedef struct _sequence Sequence;
@@ -85,6 +87,11 @@ Sequence *sequence_constructReferenceKmerSequence(int64_t length, void *elements
 Sequence *sequence_constructKmerSequence(int64_t length, void *elements, void *(*getFcn)(void *, int64_t),
                                          Sequence *(*sliceFcn)(Sequence *, int64_t, int64_t),
                                          char *nucleotideOptions, int64_t nbOptions, SequenceType type);
+
+Sequence *sequence_constructReferenceKmerSequence2(int64_t length, void *elements,
+                                                   void *(*getFcn)(void *, int64_t),
+                                                   Sequence *(*sliceFcn)(Sequence *, int64_t, int64_t),
+                                                   DegenerateType dType, SequenceType type);
 
 Sequence *sequence_deepCopyNucleotideSequence(const Sequence *toCopy);
 

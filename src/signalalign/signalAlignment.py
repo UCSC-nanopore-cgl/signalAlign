@@ -767,7 +767,8 @@ def multithread_signal_alignment(signal_align_arguments, fast5_locations, worker
 
 def create_sa_sample_args(fofns=[], fast5_dirs=[], positions_file=None, motifs=None, alignment_file=None,
                           bwa_reference=None, fw_reference=None, bw_reference=None, name=None,
-                          number_of_kmer_assignments=10, probability_threshold=0.8, kmers_from_reference=False):
+                          number_of_kmer_assignments=10, probability_threshold=0.8, kmers_from_reference=False,
+                          quality_threshold=7):
     """Create sample arguments for SignalAlignSample. Parameters are explained in SignalAlignmentSample"""
     sample_args = {
         "fofns": fofns,
@@ -781,7 +782,8 @@ def create_sa_sample_args(fofns=[], fast5_dirs=[], positions_file=None, motifs=N
         "number_of_kmer_assignments": number_of_kmer_assignments,
         "probability_threshold": probability_threshold,
         "kmers_from_reference": kmers_from_reference,
-        'alignment_file': alignment_file
+        'alignment_file': alignment_file,
+        'quality_threshold': quality_threshold
     }
     return sample_args
 
@@ -856,6 +858,12 @@ class SignalAlignSample(object):
                                     "{}, fofns: {}, fast5_dirs: {}".format(self.files, self.fofns, self.fast5_dirs)
 
     def getFiles(self):
+        """Get all files that pass or just all files"""
+        passing_files = []
+        if self.filter_read_generator is not None:
+            for fast5, _ in self.filter_read_generator:
+                passing_files.append(fast5)
+            self.files = passing_files
         return self.files
 
     def getReferences(self):
@@ -870,11 +878,12 @@ class SignalAlignSample(object):
             self.fw_fasta_path, self.bw_fasta_path = processReferenceFasta(fasta=self.bwa_reference,
                                                                            work_folder=self.working_folder,
                                                                            motifs=self.motifs,
-                                                                           positions_file=self.positions_file)
+                                                                           positions_file=self.positions_file,
+                                                                           name=self.name)
 
     def process_reads(self):
         """Creates a filter_read generator object"""
-        if self.alignment_file and self.readdb:
+        if self.alignment_file and self.readdb and self.quality_threshold:
             self.filter_read_generator = filter_reads(self.alignment_file, self.readdb,
                                                       self.fast5_dirs, quality_threshold=self.quality_threshold)
 
@@ -930,14 +939,16 @@ def trim_num_files_in_sample(sample, max_bases, twoD, verbose=True):
     :param twoD: boolean option to include twoD length
     :param verbose: boolean option to report trimming stats
     """
-    shuffle(sample.getFiles())
+    fast5_files = sample.getFiles()
+    assert len(fast5_files) > 0, "None of the Fast5 files passed. Turn off filtering if you want to continue"
+    shuffle(fast5_files)
     total_amount = 0
     file_count = 0
     get_seq_len_fcn = get_2d_length if twoD else get_1d_length
     # loop over files and add them to training list, break when we have enough bases to complete a batch
     # collect paths to fast5 files
     list_of_fast5s = []
-    for f in sample.getFiles():
+    for f in fast5_files:
         total_amount += get_seq_len_fcn(f)
         if total_amount >= max_bases:
             if len(list_of_fast5s) == 0:

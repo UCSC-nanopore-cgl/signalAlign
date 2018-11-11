@@ -19,6 +19,8 @@ from itertools import product
 from scipy.stats import norm, invgauss, entropy
 from scipy.spatial.distance import euclidean
 from sklearn.neighbors import KernelDensity
+from py3helpers.utils import all_string_permutations
+from py3helpers.seq_tools import is_non_canonical_iupac_base
 
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
@@ -283,7 +285,6 @@ class HmmModel(object):
         assert len(kmer) == kmer_length, "Kmer length does not match model kmer length"
 
         return self.sorted_kmer_tuple.index(kmer)
-
 
     def get_event_mean_gaussian_parameters(self, kmer):
         """Get the model's Normal distribution parameters to model the mean of a specific kmer
@@ -594,6 +595,7 @@ class HmmModel(object):
             # plot HDP predicted distribution
             kmer_id = self.get_kmer_index(kmer)
             x = self.linspace
+            panel1.set_xlim(min(x), max(x))
             hdp_y = self.all_posterior_pred[kmer_id]
             hdp_handle, = panel1.plot(x, hdp_y, '-')
             # compute entropy and hellinger distance
@@ -614,9 +616,9 @@ class HmmModel(object):
             legend_text2.extend(["HDP Model: \n  {}".format(hdp_model_name), "Kullback–Leibler divergence: {}".format(np.round(kl_distance, 4)),
                                 "Hellinger distance: {}".format(np.round(h_distance, 4))])
 
-        if alignment_file or alignment_file_data:
+        if alignment_file is not None or alignment_file_data is not None:
             # option to parse file or not
-            if alignment_file:
+            if alignment_file is not None:
                 data = parse_alignment_file(alignment_file)
             else:
                 data = alignment_file_data
@@ -723,6 +725,57 @@ class HmmModel(object):
 
         return hellinger_distances, kl_divergences, median_deltas
 
+    def write_new_model(self, out_path, alphabet, replacement_base):
+        """Write a correctly formatted new model file with a new alphabet.
+        :param out_path: path to output hmm
+        :param alphabet: new alphabet
+        :param replacement_base: base to replace new character
+
+        note: will retain same kmer size and assumes only one new character
+        """
+        # the model file has the format:
+        # line 0: stateNumber \t alphabetSize \t alphabet \t kmerLength
+        # line 1: match->match \t match->gapX \t match->gapY \t
+        #         gapX->match \t gapX->gapX \t gapX->gapY \t
+        #         gapY->match \t gapY->gapX \t gapY->gapY \n
+        # line 2: [level_mean] [level_sd] [noise_mean] [noise_sd] [noise_lambda ](.../kmer) \n
+        assert self.has_ont_model, "Shouldn't be writing down a Hmm that has no Model"
+        if not self.normalized:
+            self.normalize_transitions_expectations()
+
+        alphabet = "".join(sorted(alphabet.upper()))
+        for base in alphabet:
+            assert not is_non_canonical_iupac_base(base), \
+                "You cannot use IUPAC character to represent multiple bases. {}".format(base)
+
+        replacement_base = replacement_base.upper()
+        new_base = (set(alphabet) - set(self.alphabet)).pop()
+
+        alphabet_size = len(alphabet)
+        new_kmers = all_string_permutations(alphabet)
+        with open(out_path, 'w') as f:
+
+            # line 0
+            f.write("{stateNumber}\t{alphabetSize}\t{alphabet}\t{kmerLength}\n"
+                    "".format(stateNumber=self.state_number, alphabetSize=alphabet_size,
+                              alphabet=alphabet, kmerLength=self.kmer_length))
+            # line 1 transitions
+            for i in range(self.state_number * self.state_number):
+                f.write("{transition}\t".format(transition=str(self.transitions[i])))
+            # likelihood
+            f.write("{}\n".format(str(self.likelihood)))
+
+            # line 2 Event Model
+            for kmer in new_kmers:
+                generic_kmer = kmer.replace(new_base, replacement_base)
+                k = self.get_kmer_index(generic_kmer)
+                f.write("{level_mean}\t{level_sd}\t{noise_mean}\t{noise_sd}\t{noise_lambda}\t"
+                        "".format(level_mean=self.event_model["means"][k], level_sd=self.event_model["SDs"][k],
+                                  noise_mean=self.event_model["noise_means"][k], noise_sd=self.event_model["noise_SDs"][k],
+                                  noise_lambda=self.event_model["noise_lambdas"][k]))
+            f.write("\n")
+
+
 
 def hellinger2(p, q):
     return euclidean(np.sqrt(p), np.sqrt(q)) / _SQRT2
@@ -758,7 +811,7 @@ def main():
 
     rna_hmm_handle = HmmModel(rna_ont_model, rna_hdp_model, rna=True)
 
-    rna_hmm_handle.plot_kmer_distribution("GGACT", alignment_file=alignment_file, savefig_dir=savefig_dir)
+    # rna_hmm_handle.plot_kmer_distribution("GGACT", alignment_file=alignment_file, savefig_dir=savefig_dir)
 
     # ﻿ RRACH
     #     R= A/G

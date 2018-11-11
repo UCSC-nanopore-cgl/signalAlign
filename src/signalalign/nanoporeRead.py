@@ -236,10 +236,10 @@ class NanoporeRead(object):
             return False
 
         self.fastq = self.bytes_to_string(self.fastFive[self.fastq_sequence_address][()])
-        if self.filter_reads:
+        if self.filter_reads is not None:
             record = SeqIO.read(StringIO(self.fastq), "fastq")
             average_quality = np.mean(record.letter_annotations["phred_quality"])
-            if average_quality < 0.7:
+            if average_quality < self.filter_reads:
                 self.logError("[NanoporeRead:_initialize]ERROR {} Fastq quality is below minimum threshold "
                               "{} < 7".format(self.filename, average_quality))
                 self.close()
@@ -249,8 +249,6 @@ class NanoporeRead(object):
         if self.rna:
             # reverse and replace "U"
             self.template_read = self.template_read.replace("U", "T")[::-1]
-
-            template_read2 = self.sequence_from_events(self.fastFive[self.template_event_table_address])
 
         self.kmer_length = -1 if len(self.fastFive[self.template_event_table_address]) == 0 else \
             len(self.bytes_to_string(self.fastFive[self.template_event_table_address][0]['model_state']))
@@ -324,8 +322,6 @@ class NanoporeRead(object):
         assert len(self.template_strand_event_map) == len(self.template_read), \
             "Read and event map lengths do not match {} != {}".format(len(self.template_read),
                                                                       len(self.template_strand_event_map))
-        # if self.rna:
-        #     self.template_strand_event_map = self.template_strand_event_map[::-1]
 
         return True
 

@@ -233,7 +233,7 @@ def main(args):
         "get_expectations": False,
         "perform_kmer_event_alignment": args.perform_kmer_event_alignment,
         "enforce_supported_versions": args.enforce_supported_versions,
-        "filter_reads": args.filter_reads,
+        "filter_reads": 7 if args.filter_reads else None,
         "path_to_bin": args.path_to_bin,
         "delete_tmp": args.delete_tmp
     }
@@ -241,7 +241,7 @@ def main(args):
     if args.filter_reads is not None and args.alignment_file and args.readdb and args.files_dir:
         print("[runSignalAlign]:NOTICE: Filtering out low quality reads", file=sys.stdout)
         filter_read_generator = filter_reads(args.alignment_file, args.readdb,
-                                             [args.files_dir], quality_threshold=args.filter_reads)
+                                             [args.files_dir], quality_threshold=7)
 
     print("[runSignalAlign]:NOTICE: Got {} files to align".format(len(fast5s)), file=sys.stdout)
     # setup workers for multiprocessing
