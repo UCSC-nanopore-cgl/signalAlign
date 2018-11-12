@@ -45,8 +45,12 @@ def parse_args():
                         help="Minimum average base quality threshold. Default = 7")
 
     parser.add_argument('--recursive', action='store_true', default=False,
-                        dest='recursive', required=False, type=float,
+                        dest='recursive', required=False,
                         help="Search directory recursively to find fast5 files")
+
+    parser.add_argument('--trim', action='store', default=False,
+                        dest='trim', required=False, type=int,
+                        help="Only move as many files which contain a total of some number of bases set by trim. ")
 
     args = parser.parse_args()
     return args
@@ -109,10 +113,22 @@ def parse_read_name_map_file(read_map, directories, recursive=False):
                         yield split_line[name_index], full_path
 
 
-def filter_reads(alignment_file, readdb, read_dirs, quality_threshold=7, recursive=False):
-    """Filter fast5 files based on a quality threshold and if there is an alignment"""
+def filter_reads(alignment_file, readdb, read_dirs, quality_threshold=7, recursive=False, trim=False):
+    """Filter fast5 files based on a quality threshold and if there is an alignment
+    :param alignment_file: bam aligment file
+    :param readdb: readdb or sequence summary file
+    :param read_dirs: list of directories
+    :param quality_threshold: phred quality score min threshold for passing
+    :param recursive: search directories recursively for more fast5 dirs
+    :param trim: number of bases to analyze
+    """
     assert alignment_file.endswith("bam"), "Alignment file must be in BAM format: {}".format(alignment_file)
     # grab aligned segment
+    if trim:
+        assert isinstance(trim, str), "Trim needs to be an integer: {}".format(trim)
+    else:
+        trim = np.inf
+    n_bases = 0
     with closing(pysam.AlignmentFile(alignment_file, 'rb')) as bamfile:
         name_indexed = pysam.IndexedReads(bamfile)
         name_indexed.build()
@@ -127,6 +143,9 @@ def filter_reads(alignment_file, readdb, read_dirs, quality_threshold=7, recursi
                     if aligned_segment.query_qualities is not None:
                         if np.mean(aligned_segment.query_qualities) < quality_threshold:
                             continue
+                    if trim < n_bases:
+                        break
+                    n_bases += aligned_segment.query_length
                     yield fast5, aligned_segment
 
             except KeyError:
@@ -174,7 +193,7 @@ def main():
         os.mkdir(args.pass_output_dir)
 
     best_files = filter_reads(args.alignment_file, args.readdb, [args.fast5_dir], args.quality_threshold,
-                              recursive=args.recursive)
+                              recursive=args.recursive, trim=args.trim)
 
     # move passed files
     assert os.path.isdir(args.pass_output_dir), "pass_output_dir does not exist or get created: {}".format(args.pass_output_dir)

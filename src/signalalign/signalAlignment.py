@@ -887,12 +887,12 @@ class SignalAlignSample(object):
                                                                            positions_file=self.positions_file,
                                                                            name=self.name)
 
-    def process_reads(self):
+    def process_reads(self, trim=False):
         """Creates a filter_read generator object"""
         if self.alignment_file and self.readdb and self.quality_threshold:
             self.filter_read_generator = filter_reads(self.alignment_file, self.readdb,
                                                       self.fast5_dirs, quality_threshold=self.quality_threshold,
-                                                      recursive=self.recursive)
+                                                      recursive=self.recursive, trim=trim)
 
 
 # TODO use Fast5 object
@@ -989,14 +989,15 @@ def multithread_signal_alignment_samples(samples, signal_align_arguments, worker
                                           "".format(names)
     for sample in samples:
         # process sample
-        if trim:
-            assert type(trim) is int, "Trim must be an integer"
-            list_of_fast5s = trim_num_files_in_sample(sample, trim, signal_align_arguments["twoD_chemistry"],
-                                                      verbose=True)
-        else:
-            list_of_fast5s = sample.getFiles()
+        if not sample.filter_read_generator:
+            if trim:
+                assert type(trim) is int, "Trim must be an integer"
+                list_of_fast5s = trim_num_files_in_sample(sample, trim, signal_align_arguments["twoD_chemistry"],
+                                                          verbose=True)
+            else:
+                list_of_fast5s = sample.getFiles()
         # correct signal align arguments
-        sample.process_reads()
+        sample.process_reads(trim=trim)
         signal_align_arguments["alignment_file"] = sample.alignment_file
         signal_align_arguments["bwa_reference"] = sample.bwa_reference
         signal_align_arguments["backward_reference"] = sample.bw_fasta_path
