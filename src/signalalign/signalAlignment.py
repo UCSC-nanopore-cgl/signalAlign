@@ -889,7 +889,7 @@ class SignalAlignSample(object):
 
     def process_reads(self, trim=False):
         """Creates a filter_read generator object"""
-        if self.alignment_file and self.readdb and self.quality_threshold:
+        if self.alignment_file and self.readdb and self.quality_threshold is not None:
             self.filter_read_generator = filter_reads(self.alignment_file, self.readdb,
                                                       self.fast5_dirs, quality_threshold=self.quality_threshold,
                                                       recursive=self.recursive, trim=trim)
@@ -988,6 +988,7 @@ def multithread_signal_alignment_samples(samples, signal_align_arguments, worker
     assert len(names) == len(set(names)), "Cannot have same name for multiple samples: sample.name {}" \
                                           "".format(names)
     for sample in samples:
+        list_of_fast5s = []
         # process sample
         if not sample.filter_read_generator:
             if trim:

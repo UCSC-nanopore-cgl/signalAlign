@@ -48,6 +48,10 @@ def parse_args():
                         dest='recursive', required=False,
                         help="Search directory recursively to find fast5 files")
 
+    parser.add_argument('--copy_dir_structure', action='store_true', default=False,
+                        dest='copy_dir_structure', required=False,
+                        help="Step into directory and copy directory structure for output files")
+
     parser.add_argument('--trim', action='store', default=False,
                         dest='trim', required=False, type=int,
                         help="Only move as many files which contain a total of some number of bases set by trim. ")
@@ -125,7 +129,7 @@ def filter_reads(alignment_file, readdb, read_dirs, quality_threshold=7, recursi
     assert alignment_file.endswith("bam"), "Alignment file must be in BAM format: {}".format(alignment_file)
     # grab aligned segment
     if trim:
-        assert isinstance(trim, str), "Trim needs to be an integer: {}".format(trim)
+        assert isinstance(trim, int), "Trim needs to be an integer: {}".format(trim)
     else:
         trim = np.inf
     n_bases = 0
@@ -192,13 +196,25 @@ def main():
     if not os.path.isdir(args.pass_output_dir):
         os.mkdir(args.pass_output_dir)
 
-    best_files = filter_reads(args.alignment_file, args.readdb, [args.fast5_dir], args.quality_threshold,
-                              recursive=args.recursive, trim=args.trim)
+    if copy_dir_structure:
+        for sub_dir in get_all_sub_directories(args.fast5_dir):
+            # make dir if it doesnt exist
+            out_dir = os.path.join(args.pass_output_dir, os.path.basename(sub_dir))
+            if not os.path.isdir(out_dir):
+                os.mkdir(out_dir)
 
-    # move passed files
-    assert os.path.isdir(args.pass_output_dir), "pass_output_dir does not exist or get created: {}".format(args.pass_output_dir)
-    for path, _ in best_files:
-        shutil.move(path, os.path.join(args.pass_output_dir, os.path.basename(path)))
+            best_files = filter_reads(args.alignment_file, args.readdb, [sub_dir], args.quality_threshold, trim=args.trim)
+            assert os.path.isdir(out_dir), "out_dir does not exist or get created: {}".format(out_dir)
+            for path, _ in best_files:
+                shutil.move(path, os.path.join(out_dir, os.path.basename(path)))
+
+    else:
+        best_files = filter_reads(args.alignment_file, args.readdb, [args.fast5_dir], args.quality_threshold,
+                                  recursive=args.recursive, trim=args.trim)
+        # move passed files
+        assert os.path.isdir(args.pass_output_dir), "pass_output_dir does not exist or get created: {}".format(args.pass_output_dir)
+        for path, _ in best_files:
+            shutil.move(path, os.path.join(args.pass_output_dir, os.path.basename(path)))
 
 
 if __name__ == "__main__":
