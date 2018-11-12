@@ -305,7 +305,9 @@ class TrainSignalAlign(object):
 
     def _create_samples(self):
         """Create SignalAlignSample for each sample"""
-        sa_args = [merge_dicts([s, {"quality_threshold": self.args.filter_reads}]) for s in self.args.samples]
+        sa_args = [merge_dicts([s,
+                                {"quality_threshold": self.args.filter_reads, "workers": self.args.job_count}])
+                   for s in self.args.samples]
         return [SignalAlignSample(working_folder=self.working_folder, **s) for s in sa_args]
 
     def new_working_folder(self, append):

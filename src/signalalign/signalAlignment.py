@@ -21,7 +21,7 @@ from signalalign.utils.fileHandlers import FolderHandler
 from signalalign.utils.sequenceTools import fastaWrite, samtools_faidx_fasta, processReferenceFasta
 from signalalign.mea_algorithm import mea_alignment_from_signal_align, match_events_with_signalalign, \
     add_events_to_signalalign, create_label_from_events
-from signalalign.filter_reads import filter_reads_to_string_wrapper, filter_reads
+from signalalign.filter_reads import filter_reads_to_string_wrapper, filter_reads, multiprocess_filter_reads
 from py3helpers.utils import merge_dicts, check_numpy_table, merge_lists, list_dir_recursive, list_dir
 from py3helpers.seq_tools import sam_string_to_aligned_segment, Cigar
 
@@ -140,7 +140,7 @@ class SignalAlignment(object):
 
         self.aligned_segment = None
         if cigar_string:
-            self.aligned_segment = sam_string_to_aligned_segment(cigar_string) # pysam aligned segment
+            self.aligned_segment = sam_string_to_aligned_segment(cigar_string)  # pysam aligned segment
         if shutil.which("signalMachine") is None:
             assert os.path.exists(self.path_to_signalMachine), "Path to signalMachine does not exist"
         else:
@@ -205,7 +205,6 @@ class SignalAlignment(object):
         if npRead.rna and self.aligned_segment is None and self.alignment_file is None:
             self.failStop("[SignalAlignment.run] ERROR: RNA reads must have alignment file. {}".format(self.in_fast5),
                           npRead)
-
 
         # validate input models and get defaults if appropriate
         if self.in_templateHmm is None:
@@ -505,7 +504,8 @@ class SignalAlignment(object):
                 # write SAM alignment
                 if self.aligned_segment is None:
                     if self.alignment_file:
-                        self.aligned_segment, _, _ = get_aligned_segment_from_alignment_file(self.alignment_file, read_label)
+                        self.aligned_segment, _, _ = get_aligned_segment_from_alignment_file(self.alignment_file,
+                                                                                             read_label)
                     else:
                         self.aligned_segment, _, _ = get_aligned_segment_from_alignment_file(temp_samfile_, read_label)
 
@@ -660,7 +660,7 @@ def signal_alignment_service(work_queue, done_queue, service_name="signal_alignm
 
 
 def multithread_signal_alignment(signal_align_arguments, fast5_locations, worker_count=1, forward_reference=None,
-                                 debug=False, filter_read_generator=None):
+                                 debug=False, filter_reads_to_string_wrapper=None):
     """Multiprocess SignalAlignment for a list of fast5 files given a set of alignment arguments.
 
     :param signal_align_arguments: signalAlignment arguments besides 'in_fast5'
@@ -668,7 +668,7 @@ def multithread_signal_alignment(signal_align_arguments, fast5_locations, worker
     :param worker_count: number of workers
     :param forward_reference: path to forward reference for signalAlign alignment
     :param debug: option to iterate over each read so that the error messages are not suppressed
-    :param filter_read_generator: if you want to pass in the generator from filter_reads
+    :param filter_reads_to_string_wrapper: if you want to pass in the generator from filter_reads
     """
     # don't modify the signal_align_arguments
     signal_align_arguments = dict(**signal_align_arguments)
@@ -718,10 +718,10 @@ def multithread_signal_alignment(signal_align_arguments, fast5_locations, worker
     if debug:
         print("[multithread_signal_alignment] running signal_alignment on {} fast5s with 1 worker".format(
             len(fast5_locations)))
-        if filter_read_generator:
-            for in_fast5, aligned_segment in filter_read_generator:
+        if filter_reads_to_string_wrapper:
+            for in_fast5, cigar_string in filter_reads_to_string_wrapper:
                 f = merge_dicts([signal_align_arguments, {"in_fast5": in_fast5,
-                                                          "cigar_string": aligned_segment.to_string()}])
+                                                          "cigar_string": cigar_string}])
                 alignment = SignalAlignment(**f)
                 success = alignment.run()
         else:
@@ -730,9 +730,9 @@ def multithread_signal_alignment(signal_align_arguments, fast5_locations, worker
                 alignment = SignalAlignment(**f)
                 success = alignment.run()
     else:
-        if filter_read_generator:
+        if filter_reads_to_string_wrapper:
             total, failure, messages, output = multithread.run_service2(
-                signal_alignment_service, filter_reads_to_string_wrapper(filter_read_generator),
+                signal_alignment_service, filter_reads_to_string_wrapper,
                 signal_align_arguments, ['in_fast5', "cigar_string"], worker_count)
 
             # total, failure, messages = multithread.run_service3(
@@ -768,7 +768,7 @@ def multithread_signal_alignment(signal_align_arguments, fast5_locations, worker
 def create_sa_sample_args(fofns=[], fast5_dirs=[], positions_file=None, motifs=None, alignment_file=None,
                           bwa_reference=None, fw_reference=None, bw_reference=None, name=None,
                           number_of_kmer_assignments=10, probability_threshold=0.8, kmers_from_reference=False,
-                          quality_threshold=7, recursive=False):
+                          quality_threshold=7, recursive=False, workers=4):
     """Create sample arguments for SignalAlignSample. Parameters are explained in SignalAlignmentSample"""
     sample_args = {
         "fofns": fofns,
@@ -784,7 +784,8 @@ def create_sa_sample_args(fofns=[], fast5_dirs=[], positions_file=None, motifs=N
         "kmers_from_reference": kmers_from_reference,
         'alignment_file': alignment_file,
         'quality_threshold': quality_threshold,
-        'recursive': recursive
+        'recursive': recursive,
+        'workers': workers
     }
     return sample_args
 
@@ -792,7 +793,7 @@ def create_sa_sample_args(fofns=[], fast5_dirs=[], positions_file=None, motifs=N
 class SignalAlignSample(object):
     def __init__(self, working_folder, fofns, fast5_dirs, positions_file, motifs, bwa_reference, fw_reference,
                  bw_reference, name, number_of_kmer_assignments, probability_threshold, kmers_from_reference,
-                 alignment_file, readdb=None, quality_threshold=7, recursive=False):
+                 alignment_file, readdb=None, quality_threshold=7, recursive=False, workers=4):
         """Prepare sample for processing via signalAlign.
 
         :param working_folder: FolderHandler() object with a working directory already created
@@ -808,6 +809,7 @@ class SignalAlignSample(object):
         :param readdb: only one readdb file per sample allowed ( will only look in fast5_dirs)
         :param quality_threshold: read quailty threshold for passing reads
         :param recursive: recursively search fast5 dirs for files
+        :param workers: number of workers for multithreading
 
         ###### Sample specific HDP Training Parameters #######
         :param number_of_kmer_assignments: max number of assignments for each kmer
@@ -832,6 +834,7 @@ class SignalAlignSample(object):
         self.quality_threshold = quality_threshold
         self.filter_read_generator = None
         self.recursive = recursive
+        self.workers = workers
 
         assert self.name is not None, "Must specify a name for your sample. name: {}".format(self.name)
         assert isinstance(self.fast5_dirs, list), "fast5_dirs needs to be a list. fast5_dirs: {}".format(
@@ -890,9 +893,19 @@ class SignalAlignSample(object):
     def process_reads(self, trim=False):
         """Creates a filter_read generator object"""
         if self.alignment_file and self.readdb and self.quality_threshold is not None:
-            self.filter_read_generator = filter_reads(self.alignment_file, self.readdb,
-                                                      self.fast5_dirs, quality_threshold=self.quality_threshold,
-                                                      recursive=self.recursive, trim=trim)
+            if self.recursive:
+                assert len(self.fast5_dirs) == 1, "If recursive, should just look at "
+                self.filter_read_generator = \
+                    multiprocess_filter_reads(self.fast5_dirs[0], self.alignment_file, self.readdb, trim=trim,
+                                              quality_threshold=False, worker_count=self.workers, debug=False)
+
+            else:
+                self.filter_read_generator = \
+                    filter_reads_to_string_wrapper(filter_reads(self.alignment_file,
+                                                                self.readdb,
+                                                                self.fast5_dirs,
+                                                                quality_threshold=self.quality_threshold,
+                                                                trim=trim))
 
 
 # TODO use Fast5 object
@@ -1008,7 +1021,7 @@ def multithread_signal_alignment_samples(samples, signal_align_arguments, worker
             os.mkdir(signal_align_arguments["destination"])
         # run signal align
         output_files = multithread_signal_alignment(signal_align_arguments, list_of_fast5s, worker_count, debug=debug,
-                                                    filter_read_generator=sample.filter_read_generator)
+                                                    filter_reads_to_string_wrapper=sample.filter_read_generator)
         sample.analysis_files = output_files
 
     return samples

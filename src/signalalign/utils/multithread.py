@@ -96,7 +96,7 @@ def run_service(service, iterable, iterable_arguments, iterable_argument_name, w
         work_queue.put(args)
 
     # start workers
-
+    log_function("[run_service] Starting {} analyses with {} workers".format(service, worker_count))
     for w in range(worker_count):
         p = Process(target=service, args=(work_queue, done_queue), kwargs=service_arguments)
         p.start()

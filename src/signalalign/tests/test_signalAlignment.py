@@ -79,7 +79,7 @@ class SignalAlignmentTest(unittest.TestCase):
     def test_create_sa_sample_args(self):
         expected_args = {"fofns", "fast5_dirs", "positions_file", "motifs", "bwa_reference", "fw_reference",
                          "bw_reference", "name", "number_of_kmer_assignments", "probability_threshold",
-                         "kmers_from_reference", 'alignment_file'}
+                         "kmers_from_reference", 'alignment_file', "quality_threshold", "recursive", "workers"}
         args = create_sa_sample_args()
         self.assertSetEqual(set(args.keys()), expected_args)
 

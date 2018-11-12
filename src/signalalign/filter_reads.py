@@ -19,7 +19,7 @@ from signalalign.fast5 import Fast5
 from signalalign.utils import multithread
 from signalalign.nanoporeRead import NanoporeRead
 from signalalign.utils.sequenceTools import get_full_nucleotide_read_from_alignment
-from py3helpers.utils import list_dir, get_all_sub_directories, merge_dicts
+from py3helpers.utils import list_dir, get_all_sub_directories, merge_dicts, merge_lists
 
 
 def parse_args():
@@ -205,6 +205,53 @@ def filter_reads_to_string_wrapper(filter_reads_generator):
         yield fast5, aligned_segment.to_string()
 
 
+def filter_read_service2(work_queue, done_queue, service_name="filter_reads_service2"):
+    """
+    Service used by the multithread module in signal align to filter reads from a large number of directories
+    :param work_queue: arguments to be done
+    :param done_queue: errors and returns to be put
+    :param service_name: name of the service
+    """
+    # prep
+    total_handled = 0
+    failure_count = 0
+    mem_usages = list()
+
+    # catch overall exceptions
+    try:
+        for f in iter(work_queue.get, 'STOP'):
+            # catch exceptions on each element
+            try:
+                reads = filter_read_wrapper(**f)
+                done_queue.put(reads)
+            except Exception as e:
+                # get error and log it
+                message = "{}:{}".format(type(e), str(e))
+                error = "{} '{}' failed with: {}".format(service_name, multithread.current_process().name, message)
+                print("[{}] ".format(service_name) + error)
+                done_queue.put(error)
+                failure_count += 1
+
+            # increment total handling
+            total_handled += 1
+
+    except Exception as e:
+        # get error and log it
+        message = "{}:{}".format(type(e), str(e))
+        error = "{} '{}' critically failed with: {}".format(service_name, multithread.current_process().name, message)
+        print("[{}] ".format(service_name) + error)
+        done_queue.put(error)
+
+    finally:
+        # logging and final reporting
+        print("[%s] '%s' completed %d calls with %d failures"
+              % (service_name, multithread.current_process().name, total_handled, failure_count))
+        done_queue.put("{}:{}".format(multithread.TOTAL_KEY, total_handled))
+        done_queue.put("{}:{}".format(multithread.FAILURE_KEY, failure_count))
+        if len(mem_usages) > 0:
+            done_queue.put("{}:{}".format(multithread.MEM_USAGE_KEY, ",".join(map(str, mem_usages))))
+
+
 def filter_read_service(work_queue, done_queue, service_name="filter_reads"):
     """
     Service used by the multithread module in signal align to filter reads from a large number of directories
@@ -265,6 +312,20 @@ def filter_read_wrapper_for_making_dir(in_dir, out_dir, alignment_file, readdb, 
         shutil.move(path, os.path.join(out_dir, os.path.basename(path)))
 
 
+def filter_read_wrapper(in_dir, alignment_file, readdb, quality_threshold=7, trim=False):
+    """Helper function for multiprocessing all the different sub directories
+    :param in_dir: input directory to search for fast5s
+    :param out_dir: output directory to place passing fast5s
+    :param alignment_file: alignment file to look into
+    :param readdb: readdb or sequencing summary file
+    :param quality_threshold: q score threshold
+    :param trim: option to trim for x number of bases"""
+    best_files = [(fast5, cigar_string) for fast5, cigar_string in
+                  filter_reads_to_string_wrapper(filter_reads(alignment_file, readdb, [in_dir],
+                                                              quality_threshold, trim=trim))]
+    return best_files
+
+
 def create_new_directories_for_filter_reads(in_dir, out_dir):
     """Copy directory structure and return the input directory and output directory for each interal dir
     :param in_dir: top input directory to
@@ -278,8 +339,8 @@ def create_new_directories_for_filter_reads(in_dir, out_dir):
         yield sub_in_dir, sub_out_dir
 
 
-def multiprocess_filter_reads(in_dir, out_dir, alignment_file, readdb, trim=False,
-                              quality_threshold=False, worker_count=1, debug=False):
+def multiprocess_move_and_filter_reads(in_dir, out_dir, alignment_file, readdb, trim=False,
+                                       quality_threshold=False, worker_count=1, debug=False):
     """Multiprocess for filtering reads
     :param in_dir: input directory with subdirectories assumed to have fast5s in them
     :param out_dir: head output directory
@@ -302,11 +363,40 @@ def multiprocess_filter_reads(in_dir, out_dir, alignment_file, readdb, trim=Fals
                 shutil.move(path, os.path.join(sub_out_dir, os.path.basename(path)))
     else:
         filter_reads_args = {"readdb": readdb, "alignment_file": alignment_file,
-                            "quality_threshold": quality_threshold, "trim": trim}
+                             "quality_threshold": quality_threshold, "trim": trim}
         total, failure, messages, output = multithread.run_service2(
             filter_read_service, create_new_directories_for_filter_reads(in_dir, out_dir),
             filter_reads_args, ["in_dir", "out_dir"], worker_count)
     return True
+
+
+def multiprocess_filter_reads(in_dir, alignment_file, readdb, trim=False,
+                              quality_threshold=False, worker_count=1, debug=False):
+    """Multiprocess for filtering reads but dont move the files
+    :param in_dir: input directory with subdirectories assumed to have fast5s in them
+    :param alignment_file: bam file
+    :param readdb: readdb or sequence summary file
+    :param trim: option to trim for x number of bases
+    :param quality_threshold: quality threshold
+    :param worker_count: number of workers to use
+    :param debug: boolean option which will only use one process in order to fail if an error arises
+    :return: True
+    """
+    assert alignment_file.endswith("bam"), "Alignment file must be in BAM format: {}".format(alignment_file)
+    # grab aligned segment
+    if debug:
+        best_files = []
+        for sub_in_dir in get_all_sub_directories(in_dir):
+            best_files.extend(filter_reads(alignment_file, readdb, [sub_in_dir],
+                                           quality_threshold=quality_threshold, trim=trim))
+    else:
+        filter_reads_args = {"readdb": readdb, "alignment_file": alignment_file,
+                             "quality_threshold": quality_threshold, "trim": trim}
+        total, failure, messages, output = multithread.run_service2(
+            filter_read_service2, get_all_sub_directories(in_dir),
+            filter_reads_args, ["in_dir"], worker_count)
+        best_files = merge_lists(output)
+    return best_files
 
 
 def main():
@@ -317,8 +407,10 @@ def main():
         os.mkdir(args.pass_output_dir)
 
     if args.copy_dir_structure:
-        multiprocess_filter_reads(args.fast5_dir, args.pass_output_dir, alignment_file, args.readdb, trim=False,
-                                  quality_threshold=args.quality_threshold, worker_count=args.jobs, debug=args.debug)
+        multiprocess_move_and_filter_reads(args.fast5_dir, args.pass_output_dir, alignment_file, args.readdb,
+                                           trim=False,
+                                           quality_threshold=args.quality_threshold, worker_count=args.jobs,
+                                           debug=args.debug)
         # for sub_dir in get_all_sub_directories(args.fast5_dir):
         #     # make dir if it doesnt exist
         #     out_dir = os.path.join(args.pass_output_dir, os.path.basename(sub_dir))
@@ -334,7 +426,8 @@ def main():
         best_files = filter_reads(args.alignment_file, args.readdb, [args.fast5_dir], args.quality_threshold,
                                   recursive=args.recursive, trim=args.trim)
         # move passed files
-        assert os.path.isdir(args.pass_output_dir), "pass_output_dir does not exist or get created: {}".format(args.pass_output_dir)
+        assert os.path.isdir(args.pass_output_dir), "pass_output_dir does not exist or get created: {}".format(
+            args.pass_output_dir)
         for path, _ in best_files:
             shutil.move(path, os.path.join(args.pass_output_dir, os.path.basename(path)))
 

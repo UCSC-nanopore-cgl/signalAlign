@@ -12,7 +12,7 @@ from argparse import ArgumentParser
 from random import shuffle
 from multiprocessing import Process, current_process, Manager
 
-from signalalign.filter_reads import filter_reads
+from signalalign.filter_reads import filter_reads, filter_reads_to_string_wrapper
 from signalalign.signalAlignment import multithread_signal_alignment, create_signalAlignment_args
 from signalalign.utils.sequenceTools import processReferenceFasta
 from signalalign.utils.fileHandlers import FolderHandler
@@ -196,7 +196,8 @@ def main(args):
         args.forward_reference, args.backward_reference = processReferenceFasta(fasta=args.bwa_reference,
                                                                                 motifs=args.motifs,
                                                                                 work_folder=temp_folder,
-                                                                                positions_file=args.ambiguity_positions)
+                                                                                positions_file=args.ambiguity_positions,
+                                                                                name="")
 
     # list of read files
     if args.fofn is not None:
@@ -242,13 +243,14 @@ def main(args):
     filter_read_generator = None
     if args.filter_reads is not None and args.alignment_file and args.readdb and args.files_dir:
         print("[runSignalAlign]:NOTICE: Filtering out low quality reads", file=sys.stdout)
-        filter_read_generator = filter_reads(args.alignment_file, args.readdb,
-                                             [args.files_dir], quality_threshold=7, recursive=args.recursive)
+
+        filter_read_generator = filter_reads_to_string_wrapper(filter_reads(args.alignment_file, args.readdb,
+                                             [args.files_dir], quality_threshold=7, recursive=args.recursive))
 
     print("[runSignalAlign]:NOTICE: Got {} files to align".format(len(fast5s)), file=sys.stdout)
     # setup workers for multiprocessing
     multithread_signal_alignment(alignment_args, fast5s, args.nb_jobs, debug=args.DEBUG,
-                                 filter_read_generator=filter_read_generator)
+                                 filter_reads_to_string_wrapper=filter_read_generator)
 
     print("\n#  signalAlign - finished alignments\n", file=sys.stderr)
     print("\n#  signalAlign - finished alignments\n", file=sys.stdout)

@@ -59,26 +59,37 @@ class FilterReadsTest(unittest.TestCase):
             self.assertTrue(type(x) is str)
             self.assertTrue(type(y) is str)
 
-    def test_multiprocess_filter_reads(self):
+    def test_multiprocess_move_and_filter_reads(self):
         with tempfile.TemporaryDirectory() as tempdir:
-            multiprocess_filter_reads(self.tmp_directory, tempdir, self.bam, self.readdb, trim=False,
-                                      quality_threshold=False, worker_count=1, debug=True)
+            multiprocess_move_and_filter_reads(self.tmp_directory, tempdir, self.bam, self.readdb, trim=False,
+                                               quality_threshold=False, worker_count=1, debug=True)
             self.assertEqual(3, len(os.listdir(os.path.join(tempdir, "test"))))
             shutil.rmtree(self.test_dir)
             shutil.copytree(self.dna_dir, self.test_dir)
 
         with tempfile.TemporaryDirectory() as tempdir:
-            multiprocess_filter_reads(self.tmp_directory, tempdir, self.bam, self.readdb, trim=10,
-                                      quality_threshold=False, worker_count=1, debug=True)
+            multiprocess_move_and_filter_reads(self.tmp_directory, tempdir, self.bam, self.readdb, trim=10,
+                                               quality_threshold=False, worker_count=1, debug=True)
             self.assertEqual(1, len(os.listdir(os.path.join(tempdir, "test"))))
             shutil.rmtree(self.test_dir)
             shutil.copytree(self.dna_dir, self.test_dir)
         with tempfile.TemporaryDirectory() as tempdir:
-            multiprocess_filter_reads(self.tmp_directory, tempdir, self.bam, self.readdb, trim=False,
-                                      quality_threshold=False, worker_count=1, debug=False)
+            multiprocess_move_and_filter_reads(self.tmp_directory, tempdir, self.bam, self.readdb, trim=False,
+                                               quality_threshold=False, worker_count=1, debug=False)
             self.assertEqual(3, len(os.listdir(os.path.join(tempdir, "test"))))
             shutil.rmtree(self.test_dir)
             shutil.copytree(self.dna_dir, self.test_dir)
+
+    def test_multiprocess_filter_reads(self):
+        reads = multiprocess_filter_reads(self.tmp_directory, self.bam, self.readdb, trim=False,
+                                          quality_threshold=False, worker_count=1, debug=True)
+        self.assertEqual(len(reads), len(list_dir(self.test_dir, ext="fast5")))
+        counter = 0
+        for read, sam_str in multiprocess_filter_reads(self.tmp_directory, self.bam, self.readdb, trim=False,
+                                                       quality_threshold=False, worker_count=1, debug=False):
+            self.assertTrue(os.path.exists(read))
+            counter += 1
+        self.assertEqual(counter, len(list_dir(self.test_dir, ext="fast5")))
 
     @classmethod
     def tearDownClass(cls):
