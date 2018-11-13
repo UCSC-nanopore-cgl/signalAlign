@@ -23,7 +23,7 @@ from signalalign.signalAlignment import *
 from signalalign.fast5 import Fast5
 from signalalign.train.trainModels import HmmModel
 from signalalign import parseFofn
-from signalalign.filter_reads import filter_reads
+from signalalign.filter_reads import filter_reads, filter_reads_to_string_wrapper
 from signalalign.utils.fileHandlers import FolderHandler
 from py3helpers.utils import captured_output, merge_dicts, list_dir
 from py3helpers.seq_tools import sam_string_to_aligned_segment, ReverseComplement
@@ -237,10 +237,10 @@ class SignalAlignmentTest(unittest.TestCase):
                                                                  forward_reference=self.ecoli_reference,
                                                                  path_to_bin=self.path_to_bin)
 
-            filter_reads_generator = filter_reads(self.bam, self.readdb, [self.test_dir])
+            filter_reads_generator = filter_reads_to_string_wrapper(filter_reads(self.bam, self.readdb, [self.test_dir]))
             output_files = multithread_signal_alignment(signal_align_arguments, [], 2,
                                                         forward_reference=self.ecoli_reference,
-                                                        filter_read_generator=filter_reads_generator,
+                                                        filter_reads_to_string_wrapper=filter_reads_generator,
                                                         debug=True)
             self.assertEqual(len(output_files), 3)
 
