@@ -314,26 +314,25 @@ class CreateLabels(Fast5):
             events = add_raw_start_and_raw_length_to_events(events, self.sample_rate, self.raw_attributes["start_time"])
         return events
 
-    def add_nanoraw_labels(self, reference):
+    def add_tombo_labels(self, number=0):
         """Add nanoraw labels to signal_label handle"""
-        events, corr_start_rel_to_raw = self.get_corrected_events()
+        events, corr_start_rel_to_raw = self.get_corrected_events(number)
+        attributes = self.get_corrected_events_attr()
         events["start"] += corr_start_rel_to_raw
         sequence = ''.join([bytes.decode(x) for x in events['base']])
-        hit = get_minimap_alignment(reference, sequence, preset='map-ont')
         cigar_label = np.zeros(len(sequence), dtype=[('raw_start', int), ('raw_length', int), ('reference_index', int),
                                                      ('posterior_probability', float), ('kmer', 'S5')])
         # assign labels
         cigar_label['raw_start'] = events["start"]
         cigar_label['raw_length'] = events["length"]
-        if hit.strand:
-            reference_map = list(range(hit.r_st, hit.r_en))[::-1]
-        else:
-            reference_map = list(range(hit.r_st, hit.r_en))
+        reference_map = list(range(attributes["mapped_start"], attributes["mapped_end"]))
+        if attributes["mapped_strand"] != "+":
+            reference_map = reference_map[::-1]
         cigar_label['reference_index'] = reference_map
         cigar_label['kmer'] = events['base']
-        cigar_label['posterior_probability'] = [1 for _ in range(hit.r_st, hit.r_en)]
-        self.aligned_signal.add_label(cigar_label, name="nanoraw", label_type='label')
-        return True
+        cigar_label['posterior_probability'] = [1 for _ in range(len(reference_map))]
+        self.aligned_signal.add_label(cigar_label, name="tombo_{}".format(number), label_type='label')
+        return cigar_label
 
     def add_eventalign_labels(self):
         """Add eventalign labels"""

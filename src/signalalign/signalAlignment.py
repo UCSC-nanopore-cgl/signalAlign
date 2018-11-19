@@ -768,7 +768,7 @@ def multithread_signal_alignment(signal_align_arguments, fast5_locations, worker
 def create_sa_sample_args(fofns=[], fast5_dirs=[], positions_file=None, motifs=None, alignment_file=None,
                           bwa_reference=None, fw_reference=None, bw_reference=None, name=None,
                           number_of_kmer_assignments=10, probability_threshold=0.8, kmers_from_reference=False,
-                          quality_threshold=7, recursive=False, workers=4):
+                          quality_threshold=7, recursive=False, workers=4, assignments_dir=None):
     """Create sample arguments for SignalAlignSample. Parameters are explained in SignalAlignmentSample"""
     sample_args = {
         "fofns": fofns,
@@ -785,7 +785,8 @@ def create_sa_sample_args(fofns=[], fast5_dirs=[], positions_file=None, motifs=N
         'alignment_file': alignment_file,
         'quality_threshold': quality_threshold,
         'recursive': recursive,
-        'workers': workers
+        'workers': workers,
+        "assignments_dir": assignments_dir
     }
     return sample_args
 
@@ -793,7 +794,7 @@ def create_sa_sample_args(fofns=[], fast5_dirs=[], positions_file=None, motifs=N
 class SignalAlignSample(object):
     def __init__(self, working_folder, fofns, fast5_dirs, positions_file, motifs, bwa_reference, fw_reference,
                  bw_reference, name, number_of_kmer_assignments, probability_threshold, kmers_from_reference,
-                 alignment_file, readdb=None, quality_threshold=7, recursive=False, workers=4):
+                 alignment_file, readdb=None, quality_threshold=0, recursive=False, workers=4, assignments_dir=None):
         """Prepare sample for processing via signalAlign.
 
         :param working_folder: FolderHandler() object with a working directory already created
@@ -810,11 +811,13 @@ class SignalAlignSample(object):
         :param quality_threshold: read quailty threshold for passing reads
         :param recursive: recursively search fast5 dirs for files
         :param workers: number of workers for multithreading
+        :param assignments_dir: place where already built assignments were placed
 
         ###### Sample specific HDP Training Parameters #######
         :param number_of_kmer_assignments: max number of assignments for each kmer
         :param probability_threshold: minimum probability required to use for training
         :param kmers_from_reference: extract training kmers from reference sequence.
+
 
         """
         self.motifs = motifs
@@ -835,6 +838,7 @@ class SignalAlignSample(object):
         self.filter_read_generator = None
         self.recursive = recursive
         self.workers = workers
+        self.assignments_dir = assignments_dir
 
         assert self.name is not None, "Must specify a name for your sample. name: {}".format(self.name)
         assert isinstance(self.fast5_dirs, list), "fast5_dirs needs to be a list. fast5_dirs: {}".format(
@@ -848,7 +852,7 @@ class SignalAlignSample(object):
         self.files = []
         self._find_fast5_files()
         self.process_references()
-        self.process_reads()
+        # self.process_reads()
 
     def _find_fast5_files(self):
         """Get all fasta paths via fofn.txt files and fast5_dirs"""
@@ -869,6 +873,7 @@ class SignalAlignSample(object):
     def getFiles(self):
         """Get all files that pass or just all files"""
         passing_files = []
+        self.process_reads()
         if self.filter_read_generator is not None:
             for fast5, _ in self.filter_read_generator:
                 passing_files.append(fast5)
@@ -894,7 +899,7 @@ class SignalAlignSample(object):
         """Creates a filter_read generator object"""
         if self.alignment_file and self.readdb and self.quality_threshold is not None:
             if self.recursive:
-                assert len(self.fast5_dirs) == 1, "If recursive, should just look at "
+                assert len(self.fast5_dirs) == 1, "If recursive, should just look at only one directory"
                 self.filter_read_generator = \
                     multiprocess_filter_reads(self.fast5_dirs[0], self.alignment_file, self.readdb, trim=trim,
                                               quality_threshold=False, worker_count=self.workers, debug=False)
@@ -906,85 +911,6 @@ class SignalAlignSample(object):
                                                                 self.fast5_dirs,
                                                                 quality_threshold=self.quality_threshold,
                                                                 trim=trim))
-
-
-# TODO use Fast5 object
-def get_2d_length(fast5, verbose=False):
-    """Get 2d Read length. Searches only in one location
-
-   :param fast5: path to fast5 file
-   :param verbose: bool option to print update info
-    """
-    read = h5py.File(fast5, 'r')
-    twoD_read_sequence_address = "/Analyses/Basecall_2D_000/BaseCalled_2D/Fastq"
-    if not (twoD_read_sequence_address in read):
-        if verbose:
-            print("This read didn't have a 2D read", fast5, end='\n', file=sys.stderr)
-        read.close()
-        return 0
-    else:
-        read_length = len(read[twoD_read_sequence_address][()].split()[2])
-        if verbose:
-            print("read %s has %s bases" % (fast5, read_length))
-        read.close()
-        return read_length
-
-
-# TODO use Fast5 object
-def get_1d_length(fast5, verbose=False):
-    """Get 1D Read length. Searches only in one location
-
-    :param fast5: path to fast5 file
-    :param verbose: bool option to print update info
-    """
-    read = h5py.File(fast5, "r")
-    template_fastq_address = "/Analyses/Basecall_1D_000/BaseCalled_template/Fastq"
-    if not (template_fastq_address in read):
-        if verbose:
-            print("Read %s has not been basecalled" % fast5)
-        read.close()
-        return 0
-    else:
-        read_length = len(read[template_fastq_address][()].split()[2])
-        if verbose:
-            print("read %s has %s bases" % (fast5, read_length))
-        read.close()
-        return read_length
-
-
-def trim_num_files_in_sample(sample, max_bases, twoD, verbose=True):
-    """Trim the number of fast5 files based on sequence length
-    :param sample: "AbstractSamples" samples
-    :param max_bases: max number of nucelotides to analyze
-    :param twoD: boolean option to include twoD length
-    :param verbose: boolean option to report trimming stats
-    """
-    fast5_files = sample.getFiles()
-    assert len(fast5_files) > 0, "None of the Fast5 files passed. Turn off filtering if you want to continue"
-    shuffle(fast5_files)
-    total_amount = 0
-    file_count = 0
-    get_seq_len_fcn = get_2d_length if twoD else get_1d_length
-    # loop over files and add them to training list, break when we have enough bases to complete a batch
-    # collect paths to fast5 files
-    list_of_fast5s = []
-    for f in fast5_files:
-        total_amount += get_seq_len_fcn(f)
-        if total_amount >= max_bases:
-            if len(list_of_fast5s) == 0:
-                total_amount = 0
-                continue
-            else:
-                break
-        # yield f, sample.fw_fasta_path, sample.bw_fasta_path
-        list_of_fast5s.append(f)
-        # training_files.append((f, sample.fw_fasta_path, sample.bw_fasta_path))
-        file_count += 1
-        if verbose:
-            print("[Trim_Sample] Culled {file_count} training files, for {bases} from {sample}."
-                  .format(file_count=file_count, bases=total_amount, sample=sample.name, end="\n", file=sys.stderr))
-    assert len(list_of_fast5s) > 0, "All fast5 files have sequence lengths greater than max_bases: {}".format(max_bases)
-    return list_of_fast5s
 
 
 def multithread_signal_alignment_samples(samples, signal_align_arguments, worker_count, trim=None, debug=False):
@@ -1001,15 +927,6 @@ def multithread_signal_alignment_samples(samples, signal_align_arguments, worker
     assert len(names) == len(set(names)), "Cannot have same name for multiple samples: sample.name {}" \
                                           "".format(names)
     for sample in samples:
-        list_of_fast5s = []
-        # process sample
-        if not sample.filter_read_generator:
-            if trim:
-                assert type(trim) is int, "Trim must be an integer"
-                list_of_fast5s = trim_num_files_in_sample(sample, trim, signal_align_arguments["twoD_chemistry"],
-                                                          verbose=True)
-            else:
-                list_of_fast5s = sample.getFiles()
         # correct signal align arguments
         sample.process_reads(trim=trim)
         signal_align_arguments["alignment_file"] = sample.alignment_file
@@ -1020,7 +937,9 @@ def multithread_signal_alignment_samples(samples, signal_align_arguments, worker
         if not os.path.exists(signal_align_arguments["destination"]):
             os.mkdir(signal_align_arguments["destination"])
         # run signal align
-        output_files = multithread_signal_alignment(signal_align_arguments, list_of_fast5s, worker_count, debug=debug,
+        assert sample.filter_read_generator is not None, \
+            "Sample {} does not have a filter read generator.".format(sample.name)
+        output_files = multithread_signal_alignment(signal_align_arguments, [], worker_count, debug=debug,
                                                     filter_reads_to_string_wrapper=sample.filter_read_generator)
         sample.analysis_files = output_files
 

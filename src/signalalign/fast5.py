@@ -84,7 +84,7 @@ class Fast5(h5py.File):
     __default_basecall_alignment_summary__ = '/Summary/genome_mapping_{}/'  # under Alignment analysis
 
     #todo fix the form of these
-    __default_corrected_genome__ = '/Analyses/RawGenomeCorrected_000/BaseCalled_template'  # nanoraw
+    __default_corrected_genome__ = '/Analyses/RawGenomeCorrected_00{}/BaseCalled_template'  # nanoraw
     __default_signalalign_events__ = '/Analyses/SignalAlign_00{}'  # signalalign events
     __default_eventalign_events__ = '/Analyses/EventAlign_00{}'
     __default_template_1d_basecall_events__ = '/Analyses/Basecall_1D_00{}/BaseCalled_template/Events'
@@ -340,16 +340,27 @@ class Fast5(h5py.File):
         else:
             return self.get_reads(group, raw, read_numbers=[read_number], scale=scale).__next__()
 
-    def get_corrected_events(self):
+    def get_corrected_events(self, number=0):
         """Returns corrected events table along with the start relative to raw data"""
         try:
-            reads = self[self.__default_corrected_genome__]
+            reads = self[self.__default_corrected_genome__.format(number)]
             events = reads['Events']
             attributes = dict(events.attrs.items())
             corr_start_rel_to_raw = attributes['read_start_rel_to_raw']
         except KeyError:
-            raise KeyError('Read does not contain required fields: {}'.format(self.__default_corrected_genome__))
+            raise KeyError('Read does not contain required fields: {}'.format(self.__default_corrected_genome__.format(number)))
         return np.asarray(events), corr_start_rel_to_raw
+
+    def get_corrected_events_attr(self, number=0):
+        """Returns corrected events table along with the start relative to raw data"""
+        try:
+            reads = self[self.__default_corrected_genome__.format(number)]
+            alignment = reads['Alignment']
+            attributes = dict(alignment.attrs.items())
+        except KeyError:
+            raise KeyError('Read does not contain required fields: {}'.format(self.__default_corrected_genome__.format(number)))
+        return attributes
+
 
     #todo fix path creation
     def get_custom_analysis_events(self, name):

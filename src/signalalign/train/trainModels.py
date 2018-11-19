@@ -14,7 +14,7 @@ from shutil import copyfile
 from subprocess import check_call
 
 from py3helpers.utils import create_dot_dict, merge_lists, all_string_permutations, save_json, load_json, \
-    count_lines_in_file, merge_dicts
+    count_lines_in_file, merge_dicts, list_dir
 
 from signalalign.signalAlignment import multithread_signal_alignment_samples, create_signalAlignment_args, \
     SignalAlignSample
@@ -39,38 +39,81 @@ def parse_assignment_file(file_path):
     return data
 
 
-def make_alignment_line(strand, kmer, prob, event):
-    """Convert strand, kmer, probability and event to a correctly formatted alignment file line
-    :param strand: 't' or 'c' representing template or complement strand of read
-    :param kmer: nucleotide kmer
-    :param prob: probability of kmer coming from certain event
-    :param event: mean of the corresponding event
-    :return: correctly formatted alignment line
-    """
-    assert strand in ['c', 't'], "Strand must be either 'c' or 't'. strand: {}".format(strand)
-    assert isinstance(prob, float), "probability must be a float: prob {}".format(prob)
-    assert isinstance(kmer, str), "kmer must be a string: kmer {}".format(kmer)
-    assert isinstance(event, float), "event must be a float: event {}".format(event)
-    entry_line = "blank\t0\tblank\tblank\t{strand}\t0\t0.0\t0.0\t0.0\t{kmer}\t0.0\t0.0\t{prob}\t{event}\t0.0\n"
-    return entry_line.format(strand=strand, kmer=kmer, prob=prob, event=event)
-
-
-def make_master_assignment_table(list_of_assignment_paths):
+def make_master_assignment_table(list_of_assignment_paths, min_probability=0.0):
     """Create a master assignment table from a list of assignment paths
 
     :param list_of_assignment_paths: list of all paths to assignment.tsv files to concat
+    :param min_probability: minimum probabilty to keep
     :return: pandas DataFrame of all assignments
     """
     assignment_dfs = []
     for f in list_of_assignment_paths:
-        assignment_dfs.append(parse_assignment_file(f))
+        data = parse_assignment_file(f)
+        assignment_dfs.append(data.loc[data['prob'] >= min_probability])
     return pd.concat(assignment_dfs)
+
+
+def get_kmers(kmer_len, alphabet="ATGC", motifs=None, reference=None):
+    """Get all kmers from the reference sequence, all possible kmers from an alphabet and/or
+        all kmers that cover a modified nucelotide
+
+    :param kmer_len: length of kmer
+    :param alphabet: alphabet
+    :param motifs: if you want specific motifs to be looked at
+    :param reference: reference sequence to get kmers from
+    :return: set of desired kmers
+    """
+    kmers = set()
+    # if motifs is present, process for all motifs with modified base
+    if motifs is not None:
+        for motif in motifs:
+            kmers |= get_motif_kmers(motif, kmer_len, alphabet=alphabet)
+    # if we want to limit kmers which were seen in reference sequence
+    if reference is not None:
+        for _, _, sequence in read_fasta(reference):
+            kmers |= get_sequence_kmers(sequence, k=kmer_len, rev_comp=True)
+    else:
+        kmers |= {x for x in all_string_permutations(alphabet, length=kmer_len)}
+
+    return kmers
+
+
+def generate_buildAlignments(assignments_pd, kmer_list, max_assignments=10, strands=('t', 'c'), verbose=False):
+    """Convert assignments to alignment line format for HDP training.
+
+    Filter assignments on a minimum probability, read strand, and a max number of kmer assignments
+
+    :param assignments_pd: giant assignments pandas data table
+    :param verbose: option to print update statements
+    :param strands: 't' or 'c' representing template or complement strand of read
+    :param kmer_list: list of kmers to write to alignment file
+    :param max_assignments: max number of assignments to process for each kmer
+    :param min_probability: the minimum probability to use for assigning kmers
+    """
+    # loop through for each strand in the assignments
+    assert isinstance(strands, list) and len(strands) > 0, \
+        "strands must be a list and not be empty. strands: {}".format(strands)
+    final_output = []
+    for strand in strands:
+        by_strand = assignments_pd.loc[assignments_pd['strand'] == strand]
+
+        for k in kmer_list:
+            kmer_assignments = by_strand.loc[by_strand['kmer'] == k]
+            if kmer_assignments.empty and verbose:
+                print("missing kmer {}, continuing".format(k))
+                continue
+            kmer_assignments = kmer_assignments.sort_values(['prob'], ascending=0)[:max_assignments]
+            final_output.append(kmer_assignments)
+            if len(kmer_assignments) < max_assignments and verbose:
+                print("WARNING didn't find {max} requested assignments for {kmer} only found {found}"
+                      "".format(max=max_assignments, kmer=k, found=len(kmer_assignments)))
+    return pd.concat(final_output)
 
 
 class CreateHdpTrainingData(object):
     """Process the assignment files created from SignalAlign for the HDP distribution estimation"""
 
-    def __init__(self, samples, out_file_path, template=True, complement=False, verbose=True):
+    def __init__(self, samples, out_file_path, template=True, complement=False, verbose=True, alphabet="ATGC"):
         """
         Control how each kmer/event assignment is processed given a set of samples and the parameters associated with
         each sample
@@ -81,6 +124,7 @@ class CreateHdpTrainingData(object):
         :param complement: generate kmers for complement read strand: default: True
         :param min_probability: the minimum probability to use for assigning kmers
         :param verbose: option to print update statements
+        :param alphabet: alphabet of sequencing experiment
         """
         self.strands = []
         if template:
@@ -93,103 +137,67 @@ class CreateHdpTrainingData(object):
         for sample in samples:
             assert isinstance(sample, SignalAlignSample)
 
-        self.canonical = "ATGC"
+        self.alphabet = alphabet
         self.samples = samples
         self.out_file_path = out_file_path
         self.template = template
         self.complement = complement
         self.verbose = verbose
-        self.master_assignment_table = \
-            make_master_assignment_table(sorted([x for x in merge_lists([sample.analysis_files for sample in self.samples]) if x.endswith("assignments.tsv")]))
-        self.k = len(self.master_assignment_table.iloc[0]['kmer'])
-        self.n_assignments = len(self.master_assignment_table)
+        self.k = 0
+        self.n_assignments = 0
 
-    def generate_hdp_training_lines_wrapper(self, kmer_list, max_assignments=100, min_probability=0.8):
-        """Convert assignments to alignment line format for HDP training.
-
-        Filter assignments on a minimum probability, read strand, and a max number of kmer assignments
-
-        :param kmer_list: list of kmers to write to alignment file
-        :param max_assignments: max number of assignments to process for each kmer
-        :param min_probability: the minimum probability to use for assigning kmers
-        """
-        # loop through for each strand in the assignments
-        return self._generate_hdp_training_lines(self.master_assignment_table, kmer_list,
-                                                 max_assignments=max_assignments,
-                                                 strands=self.strands, min_probability=min_probability,
-                                                 verbose=self.verbose)
-
-    def write_hdp_training_file(self):
+    def write_hdp_training_file(self, verbose=False):
         """Write a hdp training file to a specified location"""
-        with open(self.out_file_path, 'w') as out_file:
-            for sample in self.samples:
-                # get kmers associated with each sample
-                kmers = self.get_sample_kmers(sample)
-                # write correctly formated output
-                for line in self.generate_hdp_training_lines_wrapper(kmers,
-                                                                     max_assignments=sample.number_of_kmer_assignments,
-                                                                     min_probability=sample.probability_threshold):
-                    out_file.write(line)
+        final_output = []
+        for sample in self.samples:
+            if len(sample.analysis_files) == 0:
+                assert sample.assignments_dir is not None, \
+                    "Received no assignments_dir or analysis files in sample {}".format(sample.name)
+                sample_assignment_table = make_master_assignment_table(list_dir(sample.assignments_dir,
+                                                                                ext="assignments.tsv"),
+                                                                       min_probability=sample.probability_threshold)
+            else:
+                if sample.assignments_dir is not None:
+                    print("[CreateHdpTrainingData] WARNING: Using sample analysis files when "
+                          "assignments_dir is also set: {}".format(sample.name))
+                sample_assignment_table = \
+                    make_master_assignment_table([x for x in sample.analysis_files if x.endswith("assignments.tsv")],
+                                                 min_probability=sample.probability_threshold)
+
+            self.set_kmer_len(len(sample_assignment_table.iloc[0]['kmer']))
+            # get kmers associated with each sample
+            kmers = self.get_sample_kmers(sample)
+            # write correctly formated output
+            final_output.append(generate_buildAlignments(sample_assignment_table, kmers,
+                                                         max_assignments=sample.number_of_kmer_assignments,
+                                                         strands=self.strands, verbose=verbose))
+        master_assignment_table = pd.concat(final_output)
+        self.n_assignments = len(master_assignment_table)
+        master_assignment_table.to_csv(self.out_file_path, sep='\t', header=False, index=False)
         return self.out_file_path
 
-    def get_sample_kmers(self, sample):
+    def set_kmer_len(self, k):
+        """Set the kmer length of the samples"""
+        if self.k == 0:
+            self.k = k
+        else:
+            assert self.k == k, "self.k was already set and does not match new k. self.k {} != k {}".format(self.k, k)
+
+    def get_sample_kmers(self, sample, kmer_len=None):
         """Get all kmers from a sample, either from the reference sequence, all possible kmers from an alphabet or
             all kmers that cover a modified nucelotide
 
         :param sample: AbstractSamples object
         :return: set of desired kmers
         """
-        kmers = set()
-        # if motifs is present, process for all motifs with modified base
-        if sample.motifs:
-            for motif in sample.motifs:
-                kmers |= get_motif_kmers(motif, self.k, alphabet=self.canonical)
-        # if we want to limit kmers which were seen in reference sequence
+        reference = None
+        if self.k == 0:
+            assert kmer_len is not None, "Kmer length was not set. Must set kmer length in order to get sample kmers"
+            self.set_kmer_len(kmer_len)
         if sample.kmers_from_reference:
-            for _, _, sequence in read_fasta(sample.bwa_reference):
-                kmers |= get_sequence_kmers(sequence, k=self.k, rev_comp=True)
-        else:
-            kmers |= {x for x in all_string_permutations(self.canonical, length=self.k)}
+            reference = sample.bwa_reference
 
-        return kmers
-
-    @staticmethod
-    def _generate_hdp_training_lines(assignments, kmer_list, max_assignments=10,
-                                     strands=('t', 'c'), min_probability=0.8, verbose=False):
-        """Convert assignments to alignment line format for HDP training.
-
-        Filter assignments on a minimum probability, read strand, and a max number of kmer assignments
-
-        :param assignments: pandas array of assignments to search
-        :param template: generate kmers for template read strand: default: True
-        :param complement: generate kmers for complement read strand: default: True
-        :param verbose: option to print update statements
-        :param kmer_list: list of kmers to write to alignment file
-        :param max_assignments: max number of assignments to process for each kmer
-        :param min_probability: the minimum probability to use for assigning kmers
-        """
-        # loop through for each strand in the assignments
-        assert isinstance(strands, list) and len(strands) > 0, "strands must be a list and not be empty. strands: {}" \
-                                                               "".format(strands)
-        for strand in strands:
-            by_strand = assignments.loc[(assignments['strand'] == strand)
-                                        & (assignments['prob'] >= min_probability)]
-
-            for k in kmer_list:
-                kmer_assignments = by_strand.loc[by_strand['kmer'] == k]
-                if kmer_assignments.empty and verbose:
-                    print("missing kmer {}, continuing".format(k))
-                    continue
-                kmer_assignments = kmer_assignments.sort_values(['prob'], ascending=0)
-                n = 0
-                for _, r in kmer_assignments.iterrows():
-                    n += 1
-                    if n > max_assignments:
-                        break
-                    yield make_alignment_line(strand=r['strand'], kmer=r['kmer'], event=r['level_mean'], prob=r['prob'])
-                if n < max_assignments and verbose:
-                    print("WARNING didn't find {max} requested assignments for {kmer} only found {found}"
-                          "".format(max=max_assignments, kmer=k, found=n))
+        return get_kmers(self.k, alphabet=self.alphabet, motifs=sample.motifs, reference=reference)
 
 
 def get_hdp_type(requested_type):
@@ -365,9 +373,10 @@ class TrainSignalAlign(object):
             hdp_data = CreateHdpTrainingData(self.samples, os.path.join(self.working_path, "buildAlignment.tsv"),
                                              template=template,
                                              complement=complement,
-                                             verbose=self.debug)
+                                             verbose=self.debug,
+                                             alphabet=self.template_model.alphabet)
             # write an hdp training file to path
-            build_alignment_path = hdp_data.write_hdp_training_file()
+            build_alignment_path = hdp_data.write_hdp_training_file(verbose=True)
             num_alignments = hdp_data.n_assignments
 
         verbose_flag = "--verbose "
@@ -519,7 +528,7 @@ class TrainSignalAlign(object):
             if self.args.training.hdp_emissions:
                 print("[trainModels] Training HDP emission distributions.")
                 if not self.args.hdp_args.built_alignments:
-                    self.run_signal_align()
+                    self.run_signal_align(check_samples=True)
                 self.train_hdp()
         else:
             raise AssertionError("Must set one of the following to True. "
@@ -663,7 +672,7 @@ class TrainSignalAlign(object):
 
         return self.args
 
-    def run_signal_align(self, output_format="assignments", get_expectations=False, trim=False):
+    def run_signal_align(self, output_format="assignments", get_expectations=False, trim=False, check_samples=True):
         """Run signal align with specified arguments"""
         alignment_args = create_signalAlignment_args(
             destination=self.working_path,
@@ -687,9 +696,39 @@ class TrainSignalAlign(object):
             filter_reads=self.args.filter_reads,
             delete_tmp=self.args.signal_alignment_args.delete_tmp)
 
-        self.samples = multithread_signal_alignment_samples(self.samples, alignment_args, self.job_count,
-                                                            trim=trim, debug=self.debug)
+        dont_run_sa_samples = []
+        run_sa_samples = []
+        ran_sa_samples = []
+        if check_samples:
+            for sample in self.samples:
+                if sample.assignments_dir is not None:
+                    dont_run_sa_samples.append(sample)
+                else:
+                    run_sa_samples.append(sample)
+            if len(run_sa_samples) > 0:
+                ran_sa_samples = multithread_signal_alignment_samples(run_sa_samples, alignment_args, self.job_count,
+                                                                      trim=trim, debug=self.debug)
+            self.samples = merge_lists([ran_sa_samples, dont_run_sa_samples])
+        else:
+            self.samples = multithread_signal_alignment_samples(self.samples, alignment_args, self.job_count,
+                                                                trim=trim, debug=self.debug)
         return self.samples
+
+
+def make_alignment_line(strand, kmer, prob, event):
+    """Convert strand, kmer, probability and event to a correctly formatted alignment file line
+    :param strand: 't' or 'c' representing template or complement strand of read
+    :param kmer: nucleotide kmer
+    :param prob: probability of kmer coming from certain event
+    :param event: mean of the corresponding event
+    :return: correctly formatted alignment line
+    """
+    assert strand in ['c', 't'], "Strand must be either 'c' or 't'. strand: {}".format(strand)
+    assert isinstance(prob, float), "probability must be a float: prob {}".format(prob)
+    assert isinstance(kmer, str), "kmer must be a string: kmer {}".format(kmer)
+    assert isinstance(event, float), "event must be a float: event {}".format(event)
+    entry_line = "blank\t0\tblank\tblank\t{strand}\t0\t0.0\t0.0\t0.0\t{kmer}\t0.0\t0.0\t{prob}\t{event}\t0.0\n"
+    return entry_line.format(strand=strand, kmer=kmer, prob=prob, event=event)
 
 
 def main():

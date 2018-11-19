@@ -58,6 +58,10 @@ def parse_args():
                         dest='mea', required=False,
                         help="Option to plot the maximum expected accuracy alignment from signalalign")
 
+    parser.add_argument('--tombo', nargs='+',
+                        dest='tombo', required=False,
+                        help="Option to plot the alignment from Tombo (RawGenomeCorrected)")
+
     parser.add_argument('--sa_full', nargs='+',
                         dest='sa_full', required=False,
                         help="Option to plot all of the posterior probabilities from the signalalign output")
@@ -412,6 +416,12 @@ def main(args=None):
                 for number in args.sa_full:
                     sa_full = cl_handle.add_signal_align_predictions(number=int(number), add_basecall=True)
                     sa_full_list.append(sa_full)
+
+            tombo_full_list = list()
+            if args.tombo:
+                for number in args.tombo:
+                    tombo_full = cl_handle.add_tombo_labels(number=int(number))
+                    tombo_full_list.append(tombo_full)
 
             basecall_list = list()
             if args.basecall:

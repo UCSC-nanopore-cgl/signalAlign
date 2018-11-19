@@ -111,7 +111,7 @@ def parse_args():
     parser.add_argument('--allow_unsupported_nanopore_read_versions', action='store_false',
                         dest="enforce_supported_versions", default=True,
                         help="Will attempt to complete execution with unsupported nanopore read versions")
-    parser.add_argument('--filter_reads', action='store_true', default=False, dest='filter_reads',
+    parser.add_argument('--filter_reads', action='store_true', default=None, dest='filter_reads',
                         help="Will filter reads out if average fastq quality scores are below 7.")
     parser.add_argument('--path_to_bin', action='store', default='./', dest='path_to_bin',
                         help="Path to bin to find signalMachine")

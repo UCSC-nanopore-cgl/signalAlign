@@ -328,6 +328,8 @@ class CreateLabelsTest(unittest.TestCase):
         self.assertSequenceEqual(probs, [1, 1, 1, 1, 1, 1, 1, 1])
         self.assertSequenceEqual(base_raw_starts, [0, 0, 0, 0, 0, 1, 2, 3])
 
+    # def test_get_corrected_events_dna(self):
+    #     pass
 
     @classmethod
     def tearDownClass(cls):
