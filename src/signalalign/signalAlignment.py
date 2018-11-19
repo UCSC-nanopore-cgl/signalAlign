@@ -848,9 +848,9 @@ class SignalAlignSample(object):
                                                             "fofns: {}, fast5_dirs: {}".format(self.fofns,
                                                                                                self.fast5_dirs)
         # container for analysis files
-        self.analysis_files = None
+        self.analysis_files = []
         self.files = []
-        self._find_fast5_files()
+        # self._find_fast5_files()
         self.process_references()
         # self.process_reads()
 
@@ -902,7 +902,8 @@ class SignalAlignSample(object):
                 assert len(self.fast5_dirs) == 1, "If recursive, should just look at only one directory"
                 self.filter_read_generator = \
                     multiprocess_filter_reads(self.fast5_dirs[0], self.alignment_file, self.readdb, trim=trim,
-                                              quality_threshold=False, worker_count=self.workers, debug=False)
+                                              quality_threshold=self.quality_threshold,
+                                              worker_count=self.workers, debug=False)
 
             else:
                 self.filter_read_generator = \

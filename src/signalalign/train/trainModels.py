@@ -150,6 +150,7 @@ class CreateHdpTrainingData(object):
         """Write a hdp training file to a specified location"""
         final_output = []
         for sample in self.samples:
+            print("Filtering and gathering {} assignment.tsv files".format(sample.name))
             if len(sample.analysis_files) == 0:
                 assert sample.assignments_dir is not None, \
                     "Received no assignments_dir or analysis files in sample {}".format(sample.name)
