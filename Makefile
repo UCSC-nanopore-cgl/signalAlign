@@ -11,24 +11,27 @@ signalAlignLib = ${basicLibs}
 test_directory = ${rootPath}/src/signalalign/tests/
 scrappie_build = ${rootPath}/scrappie/build
 
-htsLib = -L./htslib -lhts -Wl,-rpath,${rootPath}htslib
+htsLib = -lhts
 LIBS= -lz -lm
+H5_LIB=
+H5_INCLUDE=
+LIBS += -lhdf5
 
-HDF5?=install
-# Default to automatically installing hdf5
-ifeq ($(HDF5), install)
-    H5_LIB=./lib/libhdf5.a
-    H5_INCLUDE=-I./include
-    LIBS += -ldl
-else
-    # Use system-wide hdf5
-    H5_LIB=
-    H5_INCLUDE=
-    LIBS += -lhdf5
-endif
+#HDF5?=install
+## Default to automatically installing hdf5
+#ifeq ($(HDF5), install)
+#    H5_LIB=./lib/libhdf5.a
+#    H5_INCLUDE=-I./include
+#    LIBS += -ldl
+#else
+#    # Use system-wide hdf5
+#    H5_LIB=
+#    H5_INCLUDE=
+#    LIBS += -lhdf5
+#endif
 
 
-all : sL bD hs python-utils ${libPath}/signalAlignLib.a ${signalAlignBin}/signalAlignLibTests \
+all : sL bD python-utils ${libPath}/signalAlignLib.a ${signalAlignBin}/signalAlignLibTests \
 	  ${signalAlignBin}/compareDistributions ${signalAlignBin}/kmerEventAlign \
 	  ${signalAlignBin}/signalMachine ${signalAlignBin}/runSignalAlign \
 	  ${signalAlignBin}/variantCallingLib.py ${signalAlignBin}/alignmentAnalysisLib.py \
@@ -39,10 +42,10 @@ python-utils :
 	cd python_utils && python3 setup.py install
 
 
-${rootPath}/lib/libhdf5.a:
-	if [ ! -e hdf5-1.10.2.tar.gz ]; then wget https://support.hdfgroup.org/ftp/HDF5/releases/hdf5-1.10/hdf5-1.10.2/src/hdf5-1.10.2.tar.gz; fi
-	tar -xzf hdf5-1.10.2.tar.gz || exit 255
-	cd hdf5-1.10.2 && ./configure --enable-threadsafe --disable-hl --prefix=`pwd`/.. && make && make install
+#${rootPath}/lib/libhdf5.a:
+#	if [ ! -e hdf5-1.10.2.tar.gz ]; then wget https://support.hdfgroup.org/ftp/HDF5/releases/hdf5-1.10/hdf5-1.10.2/src/hdf5-1.10.2.tar.gz; fi
+#	tar -xzf hdf5-1.10.2.tar.gz || exit 255
+#	cd hdf5-1.10.2 && ./configure --enable-threadsafe --disable-hl --prefix=`pwd`/.. && make && make install
 
 
 ${scrappie_build}/scrappie :
@@ -54,7 +57,7 @@ ${scrappie_build}/scrappie :
 	cmake .. && \
 	make
 
-core : sL bD ${libPath}/signalAlignLib.a ${signalAlignBin}/signalAlignLibTests ${signalAlignBin}/signalMachine
+core : sL bD ${signalAlignBin}/signalAlignLibTests ${signalAlignBin}/signalMachine
 
 install: all pip_install
 
@@ -105,14 +108,14 @@ test :
 ${signalAlignBin}/compareDistributions : compareDistributions.c ${libPath}/signalAlignLib.a ${signalAlignDependencies}
 	${cxx} ${cflags}  -I inc -I${libPath} -o ${signalAlignBin}/compareDistributions compareDistributions.c ${libPath}/signalAlignLib.a ${signalAlignLib}
 
-${signalAlignBin}/signalAlignLibTests : ${libTests} tests/*.h ${libPath}/signalAlignLib.a ${signalAlignDependencies} ${rootPath}/lib/libhdf5.a .FORCE
-	${cxx} ${cflags}  -I inc -I${libPath} ${H5_INCLUDE} -I${htsLibRootPath} -I${htsLibPath} -Wno-error -o ${signalAlignBin}/signalAlignLibTests ${libTests} ${libPath}/signalAlignLib.a ${signalAlignLib} ${H5_LIB} ${LIBS} ${htsLib}
+${signalAlignBin}/signalAlignLibTests : ${libTests} tests/*.h ${libPath}/signalAlignLib.a ${signalAlignDependencies} .FORCE
+	${cxx} ${cflags}  -I inc -I${libPath} ${H5_INCLUDE} -Wno-error -o ${signalAlignBin}/signalAlignLibTests ${libTests} ${libPath}/signalAlignLib.a ${signalAlignLib} ${H5_LIB} ${LIBS} ${htsLib}
 
 ${signalAlignBin}/signalMachine : signalMachine.c ${libPath}/signalAlignLib.a ${signalAlignDependencies}
-	${cxx} ${cflags}  -I inc -I${libPath} -I${htsLibRootPath} -I${htsLibPath} -o ${signalAlignBin}/signalMachine signalMachine.c ${libPath}/signalAlignLib.a ${signalAlignLib}  ${htsLib}
+	${cxx} ${cflags}  -I inc -I${libPath}  -o ${signalAlignBin}/signalMachine signalMachine.c ${libPath}/signalAlignLib.a ${signalAlignLib}  ${htsLib}
 
 ${signalAlignBin}/kmerEventAlign : kmerEventAlign.c ${libPath}/signalAlignLib.a ${signalAlignDependencies}
-	${cxx} ${cflags}  -I inc -I${libPath} -I${htsLibRootPath} -I${htsLibPath} ${H5_INCLUDE} -o ${signalAlignBin}/kmerEventAlign kmerEventAlign.c ${libPath}/signalAlignLib.a ${signalAlignLib}  ${htsLib} ${H5_LIB} ${LIBS}
+	${cxx} ${cflags}  -I inc -I${libPath}  ${H5_INCLUDE} -o ${signalAlignBin}/kmerEventAlign kmerEventAlign.c ${libPath}/signalAlignLib.a ${signalAlignLib}  ${htsLib} ${H5_LIB} ${LIBS}
 
 nanoporeParams : estimateNanoporeParams.c ${libPath}/signalAlignLib.a ${signalAlignDependencies}
 	${cxx} ${cflags}  -I inc -I${libPath} -o ${signalAlignBin}/estimateNanoporeParams estimateNanoporeParams.c ${libPath}/signalAlignLib.a ${signalAlignLib}
@@ -148,8 +151,8 @@ ${signalAlignBin}/variantCallingLib.py : ${rootPath}/src/signalalign/scripts/var
 ${signalAlignBin}/alignmentAnalysisLib.py : ${rootPath}/src/signalalign/scripts/alignmentAnalysisLib.py
 	cp ${rootPath}/src/signalalign/scripts/alignmentAnalysisLib.py ${signalAlignBin}/alignmentAnalysisLib.py
 
-${libPath}/signalAlignLib.a : ${libSources} ${libHeaders} ${stBarDependencies} ${rootPath}/lib/libhdf5.a
-	${cxx} ${cflags} -fPIC -Iinc/ -I${libPath}/ ${H5_INCLUDE} -I${htsLibRootPath} -I${htsLibPath}  ${htsLib} -c ${libSources} ${H5_LIB} ${LIBS}
+${libPath}/signalAlignLib.a : ${libSources} ${libHeaders} ${stBarDependencies}
+	${cxx} ${cflags} -fPIC -Iinc/ -I${libPath}/ ${H5_INCLUDE}  ${htsLib} -c ${libSources} ${H5_LIB} ${LIBS}
 	ar rc signalAlignLib.a *.o
 	ranlib signalAlignLib.a
 	rm *.o

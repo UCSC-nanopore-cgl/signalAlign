@@ -52,18 +52,17 @@ install:
   fi
 - bash miniconda.sh -b -p $HOME/miniconda
 - export PATH="$HOME/miniconda/bin:$PATH"
+- export C_INCLUDE_PATH="$HOME/miniconda/envs/signalalign/include:$C_INCLUDE_PATH"
+- export LD_LIBRARY_PATH="$HOME/miniconda/envs/signalalign/lib:$LD_LIBRARY_PATH"
+- export LIBRARY_PATH="$HOME/miniconda/envs/signalalign/lib:$LIBRARY_PATH"
+
 - hash -r
 - conda config --set always_yes yes --set changeps1 no
 - conda update -q conda
 # Useful for debugging any issues with conda
 - conda info -a
-- conda install pytest
-- conda install numpy
-- conda install hdf5
-- conda install scipy
-- conda config --add channels bioconda
-- conda install samtools
-#- conda env create -f requirements35.yml
+- conda env create -f requirements.yml
+- source activate signalalign
 #- source activate nanotensor3.5
 #- pip install google-compute-engine
 - make
@@ -86,7 +85,6 @@ before_script: # configure a headless display to test plot generation
 
 script:
 - export PATH=$PATH:$PWD/bin
-- export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$PWD/htslib
 - make test
 #- cd src/signalalign/tests
 #- python *

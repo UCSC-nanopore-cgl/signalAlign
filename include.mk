@@ -7,7 +7,7 @@ binPath=${sonLibRootPath}/bin
 libPath=${sonLibPath}
 
 htsLibRootPath = ${rootPath}/htslib
-htsLibPath=${htsLibRootPath}/htslib
+#htsLibPath=${htsLibRootPath}/htslib
 
 
 include  ${sonLibRootPath}/include.mk
