@@ -25,36 +25,25 @@ git:
 before_install:
 - git submodule update --init
 - sudo apt-get update -qq
-- sudo apt-get install libhdf5-serial-dev
-- sudo apt-get install zlib1g-dev
-- sudo apt-get install libbz2-dev
-- sudo apt-get install liblzma-dev
-- sudo apt-get install autotools-dev
-- sudo apt-get install autoconf libopenblas-dev libhdf5-serial-dev cmake make libcunit1-dev
+#- sudo apt-get install libhdf5-serial-dev zlib1g-dev libbz2-dev liblzma-dev autotools-dev autoconf libopenblas-dev libhdf5-serial-dev cmake make libcunit1-dev
+- sudo apt-get install bwa
 - pip install google-compute-engine
-#- pip install tensorflow
-- git clone https://github.com/lh3/bwa.git
-- cd bwa
-- make
-- export PATH=$PATH:$PWD
-- cd ..
+#- git clone https://github.com/lh3/bwa.git
+#- cd bwa
+#- make
+#- export PATH=$PATH:$PWD
+#- cd ..
 
 # sudo apt-get install libbz2-dev
 
 install:
 - sudo apt-get update
-# We do this conditionally because it saves us some downloading if the
-# version is the same.
-- if [[ "$TRAVIS_PYTHON_VERSION" == "2.7" ]]; then
-    wget https://repo.continuum.io/miniconda/Miniconda2-latest-Linux-x86_64.sh -O miniconda.sh;
-  else
-    wget https://repo.continuum.io/miniconda/Miniconda3-4.5.4-Linux-x86_64.sh -O miniconda.sh;
-  fi
-- bash miniconda.sh -b -p $HOME/miniconda
-- export PATH="$HOME/miniconda/bin:$PATH"
-- export C_INCLUDE_PATH="$HOME/miniconda/envs/signalalign/include:$C_INCLUDE_PATH"
-- export LD_LIBRARY_PATH="$HOME/miniconda/envs/signalalign/lib:$LD_LIBRARY_PATH"
-- export LIBRARY_PATH="$HOME/miniconda/envs/signalalign/lib:$LIBRARY_PATH"
+- wget https://repo.anaconda.com/archive/Anaconda3-5.3.0-Linux-x86_64.sh -O anaconda.sh;
+- bash anaconda.sh -b -p $HOME/anaconda3
+- export PATH="$HOME/anaconda3/bin:$PATH"
+- export C_INCLUDE_PATH="$HOME/anaconda3/envs/signalalign/include:$C_INCLUDE_PATH"
+- export LD_LIBRARY_PATH="$HOME/anaconda3/envs/signalalign/lib:$LD_LIBRARY_PATH"
+- export LIBRARY_PATH="$HOME/anaconda3/envs/signalalign/lib:$LIBRARY_PATH"
 
 - hash -r
 - conda config --set always_yes yes --set changeps1 no
