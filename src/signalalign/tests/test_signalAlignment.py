@@ -45,6 +45,9 @@ class SignalAlignmentTest(unittest.TestCase):
             "miten_PC_20160820_FNFAD20259_MN17223_sequencing_run_AMS_158_R9_WGA_Ecoli_08_20_16_43623_ch101_read544_strand1.fast5",
             "miten_PC_20160820_FNFAD20259_MN17223_sequencing_run_AMS_158_R9_WGA_Ecoli_08_20_16_43623_ch103_read333_strand1.fast5"]
         cls.fast5_paths = list_dir(cls.fast5_dir, ext="fast5")
+        cls.fast5_bam = os.path.join(cls.HOME, "tests/minion_test_reads/canonical_ecoli_R9/canonical_ecoli.bam")
+        cls.fast5_readdb = os.path.join(cls.HOME, "tests/minion_test_reads/canonical_ecoli_R9/canonical_ecoli.readdb")
+
         cls.template_hmm = os.path.join(cls.HOME, "models/testModelR9_acgt_template.model")
         cls.path_to_bin = os.path.join(cls.HOME, 'bin')
         cls.tmp_directory = tempfile.mkdtemp()
@@ -79,7 +82,8 @@ class SignalAlignmentTest(unittest.TestCase):
     def test_create_sa_sample_args(self):
         expected_args = {"fofns", "fast5_dirs", "positions_file", "motifs", "bwa_reference", "fw_reference",
                          "bw_reference", "name", "number_of_kmer_assignments", "probability_threshold",
-                         "kmers_from_reference", 'alignment_file', "quality_threshold", "recursive", "workers"}
+                         "kmers_from_reference", 'alignment_file', "quality_threshold", "recursive",
+                         "workers", "assignments_dir", "readdb"}
         args = create_sa_sample_args()
         self.assertSetEqual(set(args.keys()), expected_args)
 
@@ -97,39 +101,6 @@ class SignalAlignmentTest(unittest.TestCase):
                     print("Something else", file=fofn_file)
             self.assertRaises(AssertionError, parseFofn, test_out)
             self.assertRaises(AssertionError, parseFofn, "fake_file")
-
-    # TODO use new reads to test
-    def test_get_2d_length(self):
-        lengths = [397, 9896, 7983, 11457]
-        for i, fast5path in enumerate(sorted(self.fast5_paths)):
-            self.assertEqual(lengths[i], (get_2d_length(fast5path)))
-
-    # TODO use new reads to test
-    def test_get_1d_length(self):
-        lengths = [388, 9616, 9868, 10614]
-        print(self.fast5_paths)
-        for i, fast5path in enumerate(sorted(self.fast5_paths)):
-            self.assertEqual(lengths[i], (get_1d_length(fast5path)))
-
-    def test_trim_num_files_in_sample(self):
-        with tempfile.TemporaryDirectory() as tempdir:
-            working_folder = FolderHandler()
-            working_folder.open_folder(os.path.join(tempdir, "test_dir"))
-            test_args = create_sa_sample_args(fast5_dirs=[self.fast5_dir], name="some_name",
-                                              fw_reference=self.ecoli_reference)
-            sample = SignalAlignSample(working_folder=working_folder, **test_args)
-            n_bases = 10000
-            fast5_files = trim_num_files_in_sample(sample, n_bases, False, verbose=False)
-            bases = 0
-            for fast5_file in fast5_files:
-                bases += get_1d_length(fast5_file)
-            self.assertLessEqual(bases, n_bases)
-            fast5_files = trim_num_files_in_sample(sample, n_bases, True, verbose=False)
-            bases = 0
-            for fast5_file in fast5_files:
-                bases += get_2d_length(fast5_file)
-            self.assertLessEqual(bases, n_bases)
-            self.assertRaises(AssertionError, trim_num_files_in_sample, sample, 1, False, verbose=False)
 
     def test_signal_file_and_alignment(self):
         signal_file_reads = os.path.join(self.HOME, "tests/minion_test_reads/no_event_data_1D_ecoli")
@@ -247,7 +218,7 @@ class SignalAlignmentTest(unittest.TestCase):
     def test_multithread_signal_alignment_samples(self):
         with tempfile.TemporaryDirectory() as tempdir:
             working_folder = FolderHandler()
-            test_fast5 = os.path.join(tempdir, "test.fast5")
+            test_fast5 = os.path.join(tempdir, "miten_PC_20160820_FNFAD20259_MN17223_mux_scan_AMS_158_R9_WGA_Ecoli_08_20_16_83098_ch138_read23_strand.fast5")
             num_files = 1
             copyfile(self.fast5_paths[0], test_fast5)
             working_folder.open_folder(os.path.join(tempdir, "test_dir"))
@@ -259,12 +230,14 @@ class SignalAlignmentTest(unittest.TestCase):
             samples = []
             options = create_sa_sample_args(fast5_dirs=[tempdir], name="some_name",
                                             fw_reference=self.ecoli_reference,
-                                            bwa_reference=self.ecoli_reference)
+                                            bwa_reference=self.ecoli_reference,
+                                            readdb=self.fast5_readdb,
+                                            alignment_file=self.fast5_bam)
             samples.append(SignalAlignSample(working_folder=working_folder, **options))
             options["name"] = "some_name2"
             samples.append(SignalAlignSample(working_folder=working_folder, **options))
-            with captured_output() as (out, err):
-                samples = multithread_signal_alignment_samples(samples, signal_align_arguments, 2)
+            # with captured_output() as (out, err):
+            samples = multithread_signal_alignment_samples(samples, signal_align_arguments, 2)
             self.assertSetEqual(set([sample.name for sample in samples]), {'some_name', 'some_name2'})
             for sample in samples:
                 if sample.name == "some_name":
