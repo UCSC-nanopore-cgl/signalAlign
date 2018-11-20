@@ -22,9 +22,13 @@ from sklearn.neighbors import KernelDensity
 from py3helpers.utils import all_string_permutations
 from py3helpers.seq_tools import is_non_canonical_iupac_base
 
+import matplotlib as mpl
+if os.environ.get('DISPLAY', '') == '':
+    print('no display found. Using non-interactive Agg backend')
+    mpl.use('Agg')
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
-# from signalalign.train.trainModels import parse_alignment_file
+from signalalign.train.trainModels import parse_assignment_file
 
 # Globals
 NORM_DIST_PARAMS = 2
@@ -619,7 +623,7 @@ class HmmModel(object):
         if alignment_file is not None or alignment_file_data is not None:
             # option to parse file or not
             if alignment_file is not None:
-                data = parse_alignment_file(alignment_file)
+                data = parse_assignment_file(alignment_file)
             else:
                 data = alignment_file_data
 
@@ -629,20 +633,23 @@ class HmmModel(object):
             x = np.asarray(kmer_data).reshape(len(kmer_data), 1)
             x_plot = self.linspace[:, np.newaxis]
             # get estimate for data
-            kde = KernelDensity(kernel="gaussian", bandwidth=0.5).fit(x)
-            # estimate across the linspace
-            log_dens = kde.score_samples(x_plot)
-            kde_handle, = panel1.plot(x_plot[:, 0], np.exp(log_dens), '-')
-            raw_data_handle, = panel1.plot(x[:, 0], -0.005 - 0.01 * np.random.random(x.shape[0]), '+k')
-            # add to legend
-            handles1.extend([kde_handle, raw_data_handle])
-            legend_text1.extend(["Gaussian KDE Estimate", "Event Means: {} points".format(len(kmer_data))])
-            txt_handle7, = panel1.plot([], [], ' ')
-            if alignment_file:
-                alignment_file_name = os.path.basename(alignment_file)
-                handles2.append(txt_handle7)
-                legend_text2.append("RAW event data file: \n  {}".format(alignment_file_name))
+            if len(kmer_data) > 0:
 
+                kde = KernelDensity(kernel="gaussian", bandwidth=0.5).fit(x)
+                # estimate across the linspace
+                log_dens = kde.score_samples(x_plot)
+                kde_handle, = panel1.plot(x_plot[:, 0], np.exp(log_dens), '-')
+                raw_data_handle, = panel1.plot(x[:, 0], -0.005 - 0.01 * np.random.random(x.shape[0]), '+k')
+                # add to legend
+                handles1.extend([kde_handle, raw_data_handle])
+                legend_text1.extend(["Gaussian KDE Estimate", "Event Means: {} points".format(len(kmer_data))])
+                txt_handle7, = panel1.plot([], [], ' ')
+                if alignment_file:
+                    alignment_file_name = os.path.basename(alignment_file)
+                    handles2.append(txt_handle7)
+                    legend_text2.append("RAW event data file: \n  {}".format(alignment_file_name))
+            else:
+                print("{} not found in alignment file".format(kmer))
         # create legend
         first_legend = panel1.legend(handles1, legend_text1, fancybox=True, shadow=True,
                                      loc='lower left', bbox_to_anchor=(1, .8))
@@ -776,7 +783,6 @@ class HmmModel(object):
             f.write("\n")
 
 
-
 def hellinger2(p, q):
     return euclidean(np.sqrt(p), np.sqrt(q)) / _SQRT2
 
@@ -789,7 +795,7 @@ def parse_alignment_file(file_path):
     """
     assert os.path.exists(file_path), "File path does not exist: {}".format(file_path)
     data = pd.read_table(file_path,
-                         usecols=(4, 9, 13, 12),
+                         usecols=(4, 9, 12, 13),
                          names=["strand", "kmer", "prob", "level_mean"],
                          dtype={"kmer": np.str, "strand": np.str, "level_mean": np.float64, "prob": np.float64},
                          header=None)

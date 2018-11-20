@@ -1,78 +1,38 @@
 python:
-  - 3.5
+- 3.5
 notifications: # set notification options
   slack:
     rooms:
-      - ucsc-cgl:Edwfgt7MJEVZV9Lib3igueTF
+    - ucsc-cgl:Edwfgt7MJEVZV9Lib3igueTF
     on_success: change
     on_failure: always
   email: false
 
-  # email:
-  #   recipients:
-  #     - andbaile@ucsc.edu
-  #	-rsafavi@ucsc.edu
-    # change is when the repo status goes from pass to fail or vice versa
-    # on_failure: always
-
-#branches:
-#  except:
-#    - train_rna2
-#    - train_rna
 git:
   submodules: false
 
 before_install:
 - git submodule update --init
 - sudo apt-get update -qq
-- sudo apt-get install libhdf5-serial-dev zlib1g-dev libbz2-dev liblzma-dev autotools-dev autoconf libopenblas-dev libhdf5-serial-dev cmake make libcunit1-dev
-- pip install google-compute-engine
-#- pip install tensorflow
-- git clone https://github.com/lh3/bwa.git
-- cd bwa
-- make
-- export PATH=$PATH:$PWD
-- cd ..
-
-# sudo apt-get install libbz2-dev
+- sudo apt-get install autotools-dev autoconf cmake make
 
 install:
 - sudo apt-get update
-# We do this conditionally because it saves us some downloading if the
-# version is the same.
-- if [[ "$TRAVIS_PYTHON_VERSION" == "2.7" ]]; then
-    wget https://repo.continuum.io/miniconda/Miniconda2-latest-Linux-x86_64.sh -O miniconda.sh;
-  else
-    wget https://repo.continuum.io/miniconda/Miniconda3-4.5.4-Linux-x86_64.sh -O miniconda.sh;
-  fi
-- bash miniconda.sh -b -p $HOME/miniconda
-- export PATH="$HOME/miniconda/bin:$PATH"
+- wget https://repo.anaconda.com/archive/Anaconda3-5.3.0-Linux-x86_64.sh -O anaconda.sh
+- bash anaconda.sh -b -p $HOME/anaconda3
+- export PATH="$HOME/anaconda3/bin:$PATH"
+- export C_INCLUDE_PATH="$HOME/anaconda3/envs/signalalign/include:$C_INCLUDE_PATH"
+- export LD_LIBRARY_PATH="$HOME/anaconda3/envs/signalalign/lib:$LD_LIBRARY_PATH"
+- export LIBRARY_PATH="$HOME/anaconda3/envs/signalalign/lib:$LIBRARY_PATH"
+
 - hash -r
 - conda config --set always_yes yes --set changeps1 no
 - conda update -q conda
 # Useful for debugging any issues with conda
 - conda info -a
-- conda install pytest
-- conda install numpy
-- conda install hdf5
-- conda install scipy
-- conda config --add channels bioconda
-- conda install samtools
-#- conda env create -f requirements35.yml
-#- source activate nanotensor3.5
-#- pip install google-compute-engine
+- conda env create -f requirements.yml
+- source activate signalalign
 - make
-#- cd nanonet
-#- python setup.py install
-#- cd ../signalAlign
-#- make
-#- python setup.py install
-#- pip install marginAlign
-#- cd marginAlign
-#- export BOTO_CONFIG=/dev/null
-#- pip install -U numpy
-#- pip install -U h5py
-#- cd nanotensor
 
 before_script: # configure a headless display to test plot generation
 - "export DISPLAY=:99.0"
@@ -81,21 +41,5 @@ before_script: # configure a headless display to test plot generation
 
 script:
 - export PATH=$PATH:$PWD/bin
-- export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$PWD/htslib
 - make test
-#- cd src/signalalign/tests
-#- python *
-#- gcov-4.9 bin/signalMachine.c
 
-#- cd bin
-#- coverage run -m pytest
-# - coverage run --source nanotensor -a nanotensor/tests/data_preparation_test.py
-# - bash <(curl -s https://codecov.io/bash) -cF python
-# after_script: # here's a build step block
-# - echo "We can put normal shell commands here"
-# - echo "more shell commands here"
-
-#after_success:
-#  - bash <(curl -s https://codecov.io/bash)
-#
-#  - codecov -t abf16a83-0e8f-4834-b033-3d8c7b4b7e63
