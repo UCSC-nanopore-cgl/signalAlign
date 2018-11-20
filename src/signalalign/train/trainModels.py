@@ -18,25 +18,10 @@ from py3helpers.utils import create_dot_dict, merge_lists, all_string_permutatio
 
 from signalalign.signalAlignment import multithread_signal_alignment_samples, create_signalAlignment_args, \
     SignalAlignSample
-from signalalign.hiddenMarkovModel import HmmModel
+from signalalign.hiddenMarkovModel import HmmModel, parse_assignment_file
 from signalalign.utils.fileHandlers import FolderHandler
 from signalalign.utils.parsers import read_fasta
 from signalalign.utils.sequenceTools import get_motif_kmers, get_sequence_kmers
-
-
-def parse_assignment_file(file_path):
-    """Parse the .assignments.tsv output file from signalAlign:
-
-    :param file_path: path to assignments file
-    :return: panda DataFrame with column names "kmer", "strand", "level_mean", "prob"
-    """
-    data = pd.read_table(file_path,
-                         usecols=(0, 1, 2, 3),
-                         names=["kmer", "strand", "level_mean", "prob"],
-                         dtype={"kmer": np.str, "strand": np.str, "level_mean": np.float64, "prob": np.float64},
-                         header=None
-                         )
-    return data
 
 
 def make_master_assignment_table(list_of_assignment_paths, min_probability=0.0):

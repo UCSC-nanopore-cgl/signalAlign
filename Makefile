@@ -96,18 +96,18 @@ ${signalAlignBin}/signalAlignLibTests : ${libTests} tests/*.h ${libPath}/signalA
 	${cxx} ${cflags}  -I inc -I${libPath} -Wno-error -o ${signalAlignBin}/signalAlignLibTests ${libTests} ${libPath}/signalAlignLib.a ${signalAlignLib} ${LIBS}
 
 ${signalAlignBin}/signalMachine : signalMachine.c ${libPath}/signalAlignLib.a ${signalAlignDependencies}
-	${cxx} ${cflags}  -I inc -I${libPath}  -o ${signalAlignBin}/signalMachine signalMachine.c ${libPath}/signalAlignLib.a ${signalAlignLib}
+	${cxx} ${cflags}  -I inc -I${libPath}  -o ${signalAlignBin}/signalMachine signalMachine.c ${libPath}/signalAlignLib.a ${signalAlignLib} ${LIBS}
 
 ${signalAlignBin}/kmerEventAlign : kmerEventAlign.c ${libPath}/signalAlignLib.a ${signalAlignDependencies}
 	${cxx} ${cflags}  -I inc -I${libPath}  -o ${signalAlignBin}/kmerEventAlign kmerEventAlign.c ${libPath}/signalAlignLib.a ${signalAlignLib}   ${LIBS}
 
 nanoporeParams : estimateNanoporeParams.c ${libPath}/signalAlignLib.a ${signalAlignDependencies}
-	${cxx} ${cflags}  -I inc -I${libPath} -o ${signalAlignBin}/estimateNanoporeParams estimateNanoporeParams.c ${libPath}/signalAlignLib.a ${signalAlignLib}
+	${cxx} ${cflags}  -I inc -I${libPath} -o ${signalAlignBin}/estimateNanoporeParams estimateNanoporeParams.c ${libPath}/signalAlignLib.a ${signalAlignLib} ${LIBS}
 	cp ${rootPath}/src/signalalign/scripts/nanoporeParamRunner.py ${signalAlignBin}/nanoporeParamRunner
 	chmod +x ${signalAlignBin}/nanoporeParamRunner
 
 ${signalAlignBin}/buildHdpUtil : buildHdpUtil.c ${libPath}/signalAlignLib.a ${signalAlignDependencies}
-	${cxx} ${cflags}   -I inc -I${libPath} -o ${signalAlignBin}/buildHdpUtil buildHdpUtil.c ${libPath}/signalAlignLib.a ${signalAlignLib}
+	${cxx} ${cflags}   -I inc -I${libPath} -o ${signalAlignBin}/buildHdpUtil buildHdpUtil.c ${libPath}/signalAlignLib.a ${signalAlignLib} ${LIBS}
 
 ${signalAlignBin}/runSignalAlign : ${rootPath}/src/signalalign/scripts/runSignalAlign.py
 	cp ${rootPath}/src/signalalign/scripts/runSignalAlign.py ${signalAlignBin}/runSignalAlign

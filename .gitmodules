@@ -1,9 +1,6 @@
 [submodule "serviceCourse"]
 	path = serviceCourse
 	url = https://github.com/ArtRand/serviceCourse.git
-[submodule "htslib"]
-	path = htslib
-	url = https://github.com/samtools/htslib.git
 [submodule "sonLib"]
 	path = sonLib
 	url = https://github.com/UCSC-nanopore-cgl/sonLib.git

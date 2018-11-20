@@ -28,12 +28,26 @@ if os.environ.get('DISPLAY', '') == '':
     mpl.use('Agg')
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
-from signalalign.train.trainModels import parse_assignment_file
 
 # Globals
 NORM_DIST_PARAMS = 2
 NB_MODEL_PARAMS = 5
 _SQRT2 = np.sqrt(2)
+
+
+def parse_assignment_file(file_path):
+    """Parse the .assignments.tsv output file from signalAlign:
+
+    :param file_path: path to assignments file
+    :return: panda DataFrame with column names "kmer", "strand", "level_mean", "prob"
+    """
+    data = pd.read_table(file_path,
+                         usecols=(0, 1, 2, 3),
+                         names=["kmer", "strand", "level_mean", "prob"],
+                         dtype={"kmer": np.str, "strand": np.str, "level_mean": np.float64, "prob": np.float64},
+                         header=None
+                         )
+    return data
 
 
 class HmmModel(object):
