@@ -3,43 +3,26 @@ project(signalAlign)
 
 set(CMAKE_C_STANDARD 99)
 
-#if(APPLE)
-#    set(CMAKE_SHARED_LIBRARY_CREATE_C_FLAGS "${CMAKE_SHARED_LIBRARY_CREATE_C_FLAGS} -undefined dynamic_lookup")
-#endif(APPLE)
-
-
 add_custom_target(build_signalAlign
         COMMAND make
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
-add_custom_target(build_nanoporeParams
-        COMMAND make
-        COMMAND make nanoporeParams
-        COMMAND pip install -r requirements.txt
-        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
-
-add_custom_target(nanotensor_reqs
-        COMMAND pip install -r requirements.txt
-        COMMAND sudo python setup.py install
-        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
-
 link_directories(/usr/local/lib)
-link_directories(${CMAKE_SOURCE_DIR}/inc)
-link_directories(${CMAKE_SOURCE_DIR}/sonLib/C/inc/)
-link_directories(${CMAKE_SOURCE_DIR}/sonLib/C/impl/)
-link_directories(/usr/local/lib)
-link_directories(${CMAKE_SOURCE_DIR}/sonLib/externalTools/cutest/)
-link_directories(${CMAKE_SOURCE_DIR}/sonLib/externalTools/quicktree_1.1/include)
-link_directories(/usr/include/)
 
 include_directories(${CMAKE_SOURCE_DIR}/inc)
 include_directories(${CMAKE_SOURCE_DIR}/sonLib/C/inc/)
-include_directories(${CMAKE_SOURCE_DIR}/sonLib/C/impl/)
-include_directories(/usr/local/lib)
 include_directories(${CMAKE_SOURCE_DIR}/sonLib/externalTools/cutest/)
 include_directories(${CMAKE_SOURCE_DIR}/sonLib/externalTools/quicktree_1.1/include)
-include_directories(/usr/include/)
+include_directories(/usr/local/include)
+include_directories(/usr/include)
+
 include_directories(/System/Library/Frameworks/Python.framework/Headers)
+
+set(SA_LIBRARY -lz -lm -lhts -lhdf5
+        ${CMAKE_CURRENT_SOURCE_DIR}/sonLib/lib/sonLib.a
+        ${CMAKE_CURRENT_SOURCE_DIR}/sonLib/lib/signalAlignLib.a
+        ${CMAKE_CURRENT_SOURCE_DIR}/sonLib/lib/cuTest.a
+        -lz -ldl -lpthread )
 
 set(SOURCE_FILES
         impl/stateMachine.c
@@ -78,40 +61,24 @@ set(SIGNALMACHINE_TEST tests/allTests.c
 
 set(SIGNAL_MACHINE signalMachine.c)
 set(DEBUGGING debugging.c)
-set(EVENTDETECT eventdetection/filters.c)
+#set(EVENTDETECT eventdetection/filters.c)
 set(EVENTALIGNERTESTS tests/eventAlignerTests.c)
+set(EXTRACT extract.c)
 
 
-add_executable(filters ${EVENTDETECT})
+#add_executable(filters ${EVENTDETECT})
 
 add_executable(signalMachine ${SOURCE_FILES} ${SIGNAL_MACHINE})
-target_link_libraries(signalMachine -lz -lm -lhts -lhdf5
-        ${CMAKE_CURRENT_SOURCE_DIR}/sonLib/lib/sonLib.a
-        ${CMAKE_CURRENT_SOURCE_DIR}/sonLib/lib/signalAlignLib.a
-        ${CMAKE_CURRENT_SOURCE_DIR}/sonLib/lib/cuTest.a
-        -lz -ldl -lpthread
-        )
+target_link_libraries(signalMachine ${SA_LIBRARY})
 
-include_directories(${CMAKE_SOURCE_DIR}/include)
 add_executable(kmerEventAlign ${SOURCE_FILES} kmerEventAlign.c)
-target_link_libraries(kmerEventAlign -lz -lm -lhts -lhdf5
-        ${CMAKE_CURRENT_SOURCE_DIR}/sonLib/lib/sonLib.a
-        ${CMAKE_CURRENT_SOURCE_DIR}/sonLib/lib/signalAlignLib.a
-        ${CMAKE_CURRENT_SOURCE_DIR}/sonLib/lib/cuTest.a
-        -lz -ldl -lpthread
-        )
+target_link_libraries(kmerEventAlign ${SA_LIBRARY})
 
 add_executable(eventAlignerTests ${SOURCE_FILES} ${EVENTALIGNERTESTS})
-target_link_libraries(eventAlignerTests -lz -lm -lhts -lhdf5
-        ${CMAKE_CURRENT_SOURCE_DIR}/sonLib/lib/sonLib.a
-        ${CMAKE_CURRENT_SOURCE_DIR}/sonLib/lib/signalAlignLib.a
-        ${CMAKE_CURRENT_SOURCE_DIR}/sonLib/lib/cuTest.a
-        -lz -ldl -lpthread
-        )
+target_link_libraries(eventAlignerTests ${SA_LIBRARY})
+
 add_executable(signalAlignLibTests ${SOURCE_FILES} ${SIGNALMACHINE_TEST})
-target_link_libraries(signalAlignLibTests  -lz -lm -lhts -lhdf5
-        ${CMAKE_CURRENT_SOURCE_DIR}/sonLib/lib/sonLib.a
-        ${CMAKE_CURRENT_SOURCE_DIR}/sonLib/lib/signalAlignLib.a
-        ${CMAKE_CURRENT_SOURCE_DIR}/sonLib/lib/cuTest.a
-        -lz -ldl -lpthread
-        )
+target_link_libraries(signalAlignLibTests  ${SA_LIBRARY})
+
+add_executable(extract ${SOURCE_FILES} ${EXTRACT})
+target_link_libraries(extract ${SA_LIBRARY})
