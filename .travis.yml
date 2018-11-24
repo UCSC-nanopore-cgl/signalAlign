@@ -51,7 +51,7 @@ install:
   fi
 
 - source activate signalalign
-- which gcc
+- gcc --version
 - make
 
 before_script: # configure a headless display to test plot generation
