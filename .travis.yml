@@ -18,19 +18,22 @@ git:
 before_install:
 - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
   brew update;
+  wget https://repo.anaconda.com/archive/Anaconda2-5.3.1-MacOSX-x86_64.sh;
+  bash anaconda.sh -b -p $HOME/anaconda3;
 
   else
+
     git submodule update --init;
     sudo apt-get update -qq;
     sudo apt-get install autotools-dev autoconf cmake make;
     sudo apt-get update
+    wget https://repo.anaconda.com/archive/Anaconda3-5.3.0-Linux-x86_64.sh -O anaconda.sh;
+    bash anaconda.sh -b -p $HOME/anaconda3;
 
   fi
 
 
 install:
-- wget https://repo.anaconda.com/archive/Anaconda3-5.3.0-Linux-x86_64.sh -O anaconda.sh
-- bash anaconda.sh -b -p $HOME/anaconda3
 - export PATH="$HOME/anaconda3/bin:$PATH"
 - export C_INCLUDE_PATH="$HOME/anaconda3/envs/signalalign/include:$C_INCLUDE_PATH"
 - export LD_LIBRARY_PATH="$HOME/anaconda3/envs/signalalign/lib:$LD_LIBRARY_PATH"
@@ -41,7 +44,12 @@ install:
 - conda update -q conda
 # Useful for debugging any issues with conda
 - conda info -a
-- conda env create -f requirements.yml python=3.6
+- if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
+  conda env create -f requirements2.yml python=3.6;
+  else
+  conda env create -f requirements.yml python=3.6;
+  fi
+
 - source activate signalalign
 - make
 
