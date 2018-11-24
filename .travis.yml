@@ -18,7 +18,7 @@ git:
 before_install:
 - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
   brew update;
-  wget https://repo.anaconda.com/archive/Anaconda2-5.3.1-MacOSX-x86_64.sh;
+  wget https://repo.anaconda.com/archive/Anaconda2-5.3.1-MacOSX-x86_64.sh -O anaconda.sh;
   bash anaconda.sh -b -p $HOME/anaconda3;
 
   else
@@ -26,7 +26,7 @@ before_install:
     git submodule update --init;
     sudo apt-get update -qq;
     sudo apt-get install autotools-dev autoconf cmake make;
-    sudo apt-get update
+    sudo apt-get update;
     wget https://repo.anaconda.com/archive/Anaconda3-5.3.0-Linux-x86_64.sh -O anaconda.sh;
     bash anaconda.sh -b -p $HOME/anaconda3;
 
