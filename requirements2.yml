@@ -53,5 +53,4 @@ dependencies:
 - numpy=1.15.4
 - wheel=0.32.3=py36_0
 - openmp=2018.0.3
-prefix: /Users/andrewbailey/anaconda3/envs/signalalign
 
