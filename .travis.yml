@@ -30,7 +30,7 @@ install:
 - conda update -q conda
 # Useful for debugging any issues with conda
 - conda info -a
-- conda env create -f requirements.yml python=3.6
+- conda env create -f requirements2.yml python=3.6
 - source activate signalalign
 - make
 

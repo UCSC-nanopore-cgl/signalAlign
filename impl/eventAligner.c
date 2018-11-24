@@ -59,6 +59,7 @@ int write_fastq_and_readdb_file1(char* fast5_dir, char* fastq_output_path, char*
     char* fast5_file;
     char* fastq;
     char* fast5_path;
+    char* read_id;
     fastq_entry *fastqEntry;
     FILE *db_fH = fopen(readdb_output_path, "a");
     FILE *fq_fH = fopen(fastq_output_path, "a");
@@ -78,6 +79,8 @@ int write_fastq_and_readdb_file1(char* fast5_dir, char* fastq_output_path, char*
             f5_handle = fast5_open(fast5_path);
             fastq = fast5_get_fastq(f5_handle);
             if (stString_eq(fastq, "")){
+                read_id = fast5_get_read_id(f5_handle);
+                fprintf(db_fH, "%s\t%s\n", read_id, fast5_file);
                 printf("Fastq not found in: %s\n", fast5_path);
             } else {
                 fastqEntry = parse_fastq_string(fastq);

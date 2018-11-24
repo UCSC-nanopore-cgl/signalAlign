@@ -64,11 +64,17 @@ set(SOURCE_FILES
         inc/scrappie_stdlib.h
         inc/scrappie_structures.h
         inc/sse_mathfun.h
-        inc/signalMachine.h
+        inc/signalMachine.h)
+
+set(SIGNALMACHINE_TEST tests/allTests.c
         tests/eventAlignerTests.c
         tests/fastaHandlerTests.c
-        tests)
-
+        tests/hdpTests.c
+        tests/nanoporeHdpTests.c
+        tests/randomSequences.c
+        tests/signalPairwiseAlignerTest.c
+        tests/stateMachineTests.c
+        tests/variableOrderPairwiseAlignerTests.c)
 
 set(SIGNAL_MACHINE signalMachine.c)
 set(DEBUGGING debugging.c)
@@ -78,49 +84,34 @@ set(EVENTALIGNERTESTS tests/eventAlignerTests.c)
 
 add_executable(filters ${EVENTDETECT})
 
-add_custom_command(
-        OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/sonLib/lib/sonLib.a ${CMAKE_CURRENT_SOURCE_DIR}/htslib/libhts.a
-        COMMAND make
-        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/
-)
-
-add_custom_target(
-        signalAlign
-        DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/sonLib/lib/sonLib.a
-        ${CMAKE_CURRENT_SOURCE_DIR}/sonLib/lib/signalAlignLib.a
-        ${CMAKE_CURRENT_SOURCE_DIR}/sonLib/lib/cuTest.a
-        ${CMAKE_CURRENT_SOURCE_DIR}/htslib/libhts.a)
-
 add_executable(signalMachine ${SOURCE_FILES} ${SIGNAL_MACHINE})
-target_link_libraries(signalMachine -lz -lm -L${CMAKE_CURRENT_SOURCE_DIR}/htslib hts
+target_link_libraries(signalMachine -lz -lm -lhts -lhdf5
         ${CMAKE_CURRENT_SOURCE_DIR}/sonLib/lib/sonLib.a
         ${CMAKE_CURRENT_SOURCE_DIR}/sonLib/lib/signalAlignLib.a
         ${CMAKE_CURRENT_SOURCE_DIR}/sonLib/lib/cuTest.a
-        ${CMAKE_CURRENT_SOURCE_DIR}/htslib/libhts.a
-        ${CMAKE_CURRENT_SOURCE_DIR}/lib/libhdf5.a
         -lz -ldl -lpthread
         )
-add_dependencies(signalMachine signalAlign)
 
 include_directories(${CMAKE_SOURCE_DIR}/include)
 add_executable(kmerEventAlign ${SOURCE_FILES} kmerEventAlign.c)
-target_link_libraries(kmerEventAlign -lz -lm -L${CMAKE_CURRENT_SOURCE_DIR}/htslib hts
+target_link_libraries(kmerEventAlign -lz -lm -lhts -lhdf5
         ${CMAKE_CURRENT_SOURCE_DIR}/sonLib/lib/sonLib.a
         ${CMAKE_CURRENT_SOURCE_DIR}/sonLib/lib/signalAlignLib.a
         ${CMAKE_CURRENT_SOURCE_DIR}/sonLib/lib/cuTest.a
-        ${CMAKE_CURRENT_SOURCE_DIR}/htslib/libhts.a
-        ${CMAKE_CURRENT_SOURCE_DIR}/lib/libhdf5.a
         -lz -ldl -lpthread
         )
-add_dependencies(kmerEventAlign signalAlign)
 
 add_executable(eventAlignerTests ${SOURCE_FILES} ${EVENTALIGNERTESTS})
-target_link_libraries(eventAlignerTests -lz -lm -L${CMAKE_CURRENT_SOURCE_DIR}/htslib hts
+target_link_libraries(eventAlignerTests -lz -lm -lhts -lhdf5
         ${CMAKE_CURRENT_SOURCE_DIR}/sonLib/lib/sonLib.a
         ${CMAKE_CURRENT_SOURCE_DIR}/sonLib/lib/signalAlignLib.a
         ${CMAKE_CURRENT_SOURCE_DIR}/sonLib/lib/cuTest.a
-        ${CMAKE_CURRENT_SOURCE_DIR}/htslib/libhts.a
-        ${CMAKE_CURRENT_SOURCE_DIR}/lib/libhdf5.a
         -lz -ldl -lpthread
         )
-add_dependencies(eventAlignerTests signalAlign)
+add_executable(signalAlignLibTests ${SOURCE_FILES} ${SIGNALMACHINE_TEST})
+target_link_libraries(signalAlignLibTests  -lz -lm -lhts -lhdf5
+        ${CMAKE_CURRENT_SOURCE_DIR}/sonLib/lib/sonLib.a
+        ${CMAKE_CURRENT_SOURCE_DIR}/sonLib/lib/signalAlignLib.a
+        ${CMAKE_CURRENT_SOURCE_DIR}/sonLib/lib/cuTest.a
+        -lz -ldl -lpthread
+        )

@@ -1,20 +1,25 @@
 ## SignalAlign Manual
 
-**UPDATED for R9 refactor**
-Updated 12/19/16 - Working to integrate new matrichor base caller, and multi-contig reference sequences
-
 ### Introduction
 SignalAlign is a hidden Markov model (HMM) software package for aligning the ionic current signal from the Oxford Nanopore Technologies (ONT) MinION to a reference sequence and inferring properties of the reference sequence.
 
-### Installation
-1. Recursively clone this repo `git clone --recursive https://github.com/ArtRand/signalAlign.git`
-2. Make a virtual environment in the directory `virtualenv venv`
-3. Activate it `. venv/bin/activate`
-4. Pip install the requirements `pip install -r requirements.txt`
-5. run `make`
-6. Test the installation by running `make test`
-7. All of the programs can be found in the `/bin/` directory
-8. If python can't find the modules in the repo, add the directory to the PYTHONPATH like so: `export PYTHONPATH="$PYTHONPATH:$(pwd)"`
+### Installation:
+1. Recursively clone this repo `git clone --recursive -b update_manual https://github.com/UCSC-nanopore-cgl/signalAlign.git`
+2. Set required environment variables. Use path to local anaconda or miniconda. `$HOME/anaconda3` is just a common install location for anaconda.  
+   `export PATH="$HOME/anaconda3/bin:$PATH"`  
+   `export C_INCLUDE_PATH="$HOME/anaconda3/envs/signalalign/include:$C_INCLUDE_PATH"`  
+   `export LD_LIBRARY_PATH="$HOME/anaconda3/envs/signalalign/lib:$LD_LIBRARY_PATH"`  
+   `export LIBRARY_PATH="$HOME/anaconda3/envs/signalalign/lib:$LIBRARY_PATH"`  
+3. Create conda environment   
+`conda env create -f requirements.yml python=3.6`
+4. Activate conda environment  
+`source activate signalalign`
+5. Make project  
+`make`
+6. Add bin to path  
+`export PATH=$PATH:$PWD/bin`
+7. Test install   
+`make test`
 
 ### Quick Start
 1. Install
