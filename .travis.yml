@@ -8,6 +8,10 @@ notifications: # set notification options
     on_failure: always
   email: false
 
+os:
+- linux
+- osx
+
 git:
   submodules: false
 
@@ -23,14 +27,14 @@ install:
 - export PATH="$HOME/anaconda3/bin:$PATH"
 - export C_INCLUDE_PATH="$HOME/anaconda3/envs/signalalign/include:$C_INCLUDE_PATH"
 - export LD_LIBRARY_PATH="$HOME/anaconda3/envs/signalalign/lib:$LD_LIBRARY_PATH"
-- export LIBRARY_PATH="$HOME/anaconda3/envs/signalalign/lib:$LIBRARY_PATH"
+- export LIBRARY_PATH="$LIBRARY_PATH:$HOME/anaconda3/envs/signalalign/lib"
 
 - hash -r
 - conda config --set always_yes yes --set changeps1 no
 - conda update -q conda
 # Useful for debugging any issues with conda
 - conda info -a
-- conda env create -f requirements2.yml python=3.6
+- conda env create -f requirements.yml python=3.6
 - source activate signalalign
 - make
 
