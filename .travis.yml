@@ -20,6 +20,11 @@ before_install:
 - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
   brew update;
   brew install gcc@5 autoconf automake libtool make;
+  gcc --version;
+  ls -la /usr/local/bin | grep gcc-5;
+  ln -s /usr/local/bin/gcc-5 /usr/local/bin/gcc;
+  gcc --version;
+
   wget https://repo.anaconda.com/archive/Anaconda2-5.3.1-MacOSX-x86_64.sh -O anaconda.sh;
 
   else
