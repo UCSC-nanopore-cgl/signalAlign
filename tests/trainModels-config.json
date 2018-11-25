@@ -12,7 +12,6 @@
       "positions_file": null,
       "fast5_dirs": ["./tests/minion_test_reads/one_R9_canonical_ecoli"],
       "bwa_reference": "./tests/test_sequences/E.coli_K12.fasta",
-      "fofns": [],
       "readdb": null,
       "fw_reference": null,
       "bw_reference": null,
@@ -47,8 +46,6 @@
     "gibbs_samples": 1000,
     "burnin_multiplier": 32,
     "hdp_type": "singleLevelFixedCanonical",
-    "threshold": 0.0,
-    "number_of_assignments": 100,
     "built_alignments": null
   },
   "transitions_args": {
