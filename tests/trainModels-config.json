@@ -12,6 +12,7 @@
       "positions_file": null,
       "fast5_dirs": ["./tests/minion_test_reads/one_R9_canonical_ecoli"],
       "bwa_reference": "./tests/test_sequences/E.coli_K12.fasta",
+      "fofns": [],
       "readdb": null,
       "fw_reference": null,
       "bw_reference": null,
