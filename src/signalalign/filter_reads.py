@@ -283,7 +283,7 @@ def filter_read_wrapper_for_making_dir(in_dir, out_dir, alignment_file, readdb, 
     :param quality_threshold: q score threshold
     :param trim: option to trim for x number of bases"""
     best_files = filter_reads(alignment_file, readdb, [in_dir], quality_threshold, trim=trim)
-    assert os.path.isdir(out_dir), "sub_out_dir does not exist or get created: {}".format(sub_out_dir)
+    assert os.path.isdir(out_dir), "out_dir does not exist or get created: {}".format(out_dir)
     for path, _ in best_files:
         shutil.move(path, os.path.join(out_dir, os.path.basename(path)))
 
@@ -316,7 +316,7 @@ def create_new_directories_for_filter_reads(in_dir, out_dir):
 
 
 def multiprocess_move_and_filter_reads(in_dir, out_dir, alignment_file, readdb, trim=False,
-                                       quality_threshold=False, worker_count=1, debug=False):
+                                       quality_threshold=7, worker_count=1, debug=False):
     """Multiprocess for filtering reads
     :param in_dir: input directory with subdirectories assumed to have fast5s in them
     :param out_dir: head output directory
@@ -347,7 +347,7 @@ def multiprocess_move_and_filter_reads(in_dir, out_dir, alignment_file, readdb, 
 
 
 def multiprocess_filter_reads(in_dir, alignment_file, readdb, trim=False,
-                              quality_threshold=False, worker_count=1, debug=False):
+                              quality_threshold=7, worker_count=1, debug=False):
     """Multiprocess for filtering reads but dont move the files
     :param in_dir: input directory with subdirectories assumed to have fast5s in them
     :param alignment_file: bam file
@@ -383,7 +383,7 @@ def main():
         os.mkdir(args.pass_output_dir)
 
     if args.copy_dir_structure:
-        multiprocess_move_and_filter_reads(args.fast5_dir, args.pass_output_dir, alignment_file, args.readdb,
+        multiprocess_move_and_filter_reads(args.fast5_dir, args.pass_output_dir, args.alignment_file, args.readdb,
                                            trim=False,
                                            quality_threshold=args.quality_threshold, worker_count=args.jobs,
                                            debug=args.debug)

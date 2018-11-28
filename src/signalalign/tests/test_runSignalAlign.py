@@ -86,7 +86,7 @@ class SignalAlignAlignmentTest(unittest.TestCase):
         # prep command
         run_signal_align = os.path.join(BIN_PATH, "runSignalAlign")
         # removed: --debug
-        alignment_command = "{runsignalalign} -d={reads} --bwa_reference={ref} -smt=threeState -o={testDir} " \
+        alignment_command = "{runsignalalign} run2 -d={reads} --bwa_reference={ref} -smt=threeState -o={testDir} " \
                             "".format(runsignalalign=run_signal_align, reads=reads, ref=reference,
                                       testDir="./signalAlign_unittest/")
         if extra_args is not None:

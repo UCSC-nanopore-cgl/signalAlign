@@ -12,6 +12,7 @@ TOTAL_KEY = "total"
 FAILURE_KEY = "failure"
 MEM_USAGE_KEY = "mem_usage"
 
+
 # here is an example of a class which will "perform work".  this could also just be a function that is invoked
 # instead of an object that's created and then had a function run
 class ExampleWork(object):

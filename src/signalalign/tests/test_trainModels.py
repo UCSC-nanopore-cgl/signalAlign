@@ -67,7 +67,8 @@ class TrainSignalAlignTest(unittest.TestCase):
             "multisetPrior2": 11,
             "multisetPriorEcoli": 12,
             "singleLevelPriorEcoli": 13,
-            "singleLevelFixedCanonical": 14
+            "singleLevelFixedCanonical": 14,
+            "singleLevelFixedM6A": 15
         }
         cls.test_hdp_training_data = os.path.join(cls.HOME, "tests/test_hdp/test_hdp_alignment.txt")
         cls.one_file_dir = os.path.join(cls.HOME, "tests/minion_test_reads/one_R9_canonical_ecoli")

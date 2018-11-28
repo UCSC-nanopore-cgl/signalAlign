@@ -1,16 +1,7 @@
 #!/usr/bin/env python3
 
 from __future__ import print_function
-import os
-import sys
-import csv
-import numpy as np
-import pysam
-import subprocess
-import h5py
-import glob
 import shutil
-from random import shuffle
 
 import signalalign.utils.multithread as multithread
 from signalalign import defaultModelFromVersion, parseFofn
@@ -19,11 +10,12 @@ from signalalign.event_detection import add_raw_start_and_raw_length_to_events
 from signalalign.utils.bwaWrapper import *
 from signalalign.utils.fileHandlers import FolderHandler
 from signalalign.utils.sequenceTools import fastaWrite, samtools_faidx_fasta, processReferenceFasta
-from signalalign.mea_algorithm import mea_alignment_from_signal_align, match_events_with_signalalign, \
+from signalalign.mea_algorithm import mea_alignment_from_signal_align, \
     add_events_to_signalalign, create_label_from_events
+from signalalign.motif import getDegenerateEnum
 from signalalign.filter_reads import filter_reads_to_string_wrapper, filter_reads, multiprocess_filter_reads
 from py3helpers.utils import merge_dicts, check_numpy_table, merge_lists, list_dir_recursive, list_dir
-from py3helpers.seq_tools import sam_string_to_aligned_segment, Cigar
+from py3helpers.seq_tools import sam_string_to_aligned_segment
 
 
 def create_signalAlignment_args(backward_reference=None, forward_reference=None, destination=None,
@@ -441,11 +433,11 @@ class SignalAlignment(object):
         try:
             command = command.split()
 
-            if self.track_memory_usage:
-                mem_command = ['/usr/bin/time', '-f', '\\nDEBUG_MAX_MEM:%M\\n']
-                print("[SignalAlignment.run] Prepending command to track mem usage: {}".format(mem_command))
-                mem_command.extend(command)
-                command = mem_command
+            # if self.track_memory_usage:
+            #     mem_command = ['/usr/bin/time', '-f', '\\nDEBUG_MAX_MEM:%M\\n']
+            #     print("[SignalAlignment.run] Prepending command to track mem usage: {}".format(mem_command))
+            #     mem_command.extend(command)
+            #     command = mem_command
 
             # output = subprocess.check_output(command, stderr=subprocess.STDOUT)
             proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -517,7 +509,7 @@ class SignalAlignment(object):
         npRead.close()
         if self.delete_tmp:
             self.temp_folder.remove_folder()
-        return True
+        return posteriors_file_path
 
     def write_nucleotide_read(self, nanopore_read, file_path):
         try:
@@ -718,17 +710,21 @@ def multithread_signal_alignment(signal_align_arguments, fast5_locations, worker
     if debug:
         print("[multithread_signal_alignment] running signal_alignment on {} fast5s with 1 worker".format(
             len(fast5_locations)))
+        output = []
         if filter_reads_to_string_wrapper:
             for in_fast5, cigar_string in filter_reads_to_string_wrapper:
                 f = merge_dicts([signal_align_arguments, {"in_fast5": in_fast5,
                                                           "cigar_string": cigar_string}])
                 alignment = SignalAlignment(**f)
                 success = alignment.run()
+                output.append(success)
         else:
             for in_fast5 in fast5_locations:
                 f = merge_dicts([signal_align_arguments, {"in_fast5": in_fast5}])
                 alignment = SignalAlignment(**f)
                 success = alignment.run()
+                output.append(success)
+
     else:
         if filter_reads_to_string_wrapper:
             total, failure, messages, output = multithread.run_service2(
@@ -761,8 +757,7 @@ def multithread_signal_alignment(signal_align_arguments, fast5_locations, worker
 
     # fin
     print("[multithread_signal_alignment] fin")
-    return [x for x in glob.glob(os.path.join(signal_align_arguments["destination"], "*.tsv")) if
-            os.stat(x).st_size != 0]
+    return [str(x) for x in output if os.path.exists(str(x)) and os.stat(str(x)).st_size != 0]
 
 
 def create_sa_sample_args(fofns=[], fast5_dirs=[], positions_file=None, motifs=None, alignment_file=None,
@@ -795,7 +790,8 @@ def create_sa_sample_args(fofns=[], fast5_dirs=[], positions_file=None, motifs=N
 class SignalAlignSample(object):
     def __init__(self, working_folder, fofns, fast5_dirs, positions_file, motifs, bwa_reference, fw_reference,
                  bw_reference, name, number_of_kmer_assignments, probability_threshold, kmers_from_reference,
-                 alignment_file, readdb=None, quality_threshold=0, recursive=False, workers=4, assignments_dir=None):
+                 alignment_file, readdb=None, quality_threshold=0, recursive=False, workers=4, assignments_dir=None,
+                 degenerate=None):
         """Prepare sample for processing via signalAlign.
 
         :param working_folder: FolderHandler() object with a working directory already created
@@ -840,6 +836,7 @@ class SignalAlignSample(object):
         self.recursive = recursive
         self.workers = workers
         self.assignments_dir = assignments_dir
+        self.degenerate =  getDegenerateEnum(degenerate)
 
         assert self.name is not None, "Must specify a name for your sample. name: {}".format(self.name)
         assert isinstance(self.fast5_dirs, list), "fast5_dirs needs to be a list. fast5_dirs: {}".format(
@@ -940,7 +937,8 @@ def multithread_signal_alignment_samples(samples, signal_align_arguments, worker
             os.mkdir(signal_align_arguments["destination"])
         # run signal align
         assert sample.filter_read_generator is not None, \
-            "Sample {} does not have a filter read generator.".format(sample.name)
+            "Sample {} does not have a filter read generator. " \
+            "Must pass in alignment_file and readdb and quality_threshold".format(sample.name)
         output_files = multithread_signal_alignment(signal_align_arguments, [], worker_count, debug=debug,
                                                     filter_reads_to_string_wrapper=sample.filter_read_generator)
         sample.analysis_files = output_files

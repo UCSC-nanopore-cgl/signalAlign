@@ -26,6 +26,7 @@ import matplotlib as mpl
 if os.environ.get('DISPLAY', '') == '':
     print('no display found. Using non-interactive Agg backend')
     mpl.use('Agg')
+mpl.use("TkAgg")
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 
@@ -291,18 +292,6 @@ class HmmModel(object):
         assert index < self.num_kmers, \
             "The kmer index is out of bounds given the alphabet and kmer length. {} > {}".format(index, self.num_kmers)
         return self.sorted_kmer_tuple[index]
-
-    def get_kmer_index2(self, kmer):
-        """Get the model index for a given kmer
-
-        ex: get_kmer_index(AAAAA) = 0
-        :param kmer: nucleotide sequence
-        """
-        assert set(kmer).issubset(set(alphabet)) is True, "Nucleotide not found in model alphabet: kmer={}, " \
-                                                          "alphabet={}".format(kmer, alphabet)
-        assert len(kmer) == kmer_length, "Kmer length does not match model kmer length"
-
-        return self.sorted_kmer_tuple.index(kmer)
 
     def get_event_mean_gaussian_parameters(self, kmer):
         """Get the model's Normal distribution parameters to model the mean of a specific kmer
@@ -589,7 +578,8 @@ class HmmModel(object):
         panel1.set_xlabel('pA')
         panel1.set_ylabel('Density')
         panel1.grid(color='black', linestyle='-', linewidth=1, alpha=0.5)
-        panel1.xaxis.set_major_locator(ticker.MultipleLocator(3))
+        panel1.xaxis.set_major_locator(ticker.AutoLocator())
+        panel1.xaxis.set_minor_locator(ticker.AutoMinorLocator())
         min_x = normal_mean-(5*normal_sd)
         max_x = normal_mean+(5*normal_sd)
         panel1.set_xlim(min_x, max_x)

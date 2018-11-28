@@ -9,24 +9,17 @@
 ########################################################################
 
 
-import sys
-import os
-import numpy as np
 import unittest
-import shutil
 import tempfile
-import pysam
 from shutil import copyfile
-from collections import defaultdict
-from scipy import sparse
+from subprocess import call
 from signalalign.signalAlignment import *
 from signalalign.fast5 import Fast5
-from signalalign.train.trainModels import HmmModel
 from signalalign import parseFofn
 from signalalign.filter_reads import filter_reads, filter_reads_to_string_wrapper
 from signalalign.utils.fileHandlers import FolderHandler
-from py3helpers.utils import captured_output, merge_dicts, list_dir
-from py3helpers.seq_tools import sam_string_to_aligned_segment, ReverseComplement
+from py3helpers.utils import captured_output, merge_dicts, list_dir, create_dot_dict, load_json, save_json
+from py3helpers.seq_tools import ReverseComplement
 
 
 class SignalAlignmentTest(unittest.TestCase):
@@ -67,6 +60,9 @@ class SignalAlignmentTest(unittest.TestCase):
         rna_dir = os.path.join(cls.HOME, "tests/minion_test_reads/RNA_edge_cases/")
         # copy file to tmp directory
         shutil.copytree(rna_dir, cls.test_dir_rna)
+        # used to test runSignalAlign with config file
+        cls.config_file = os.path.join(cls.HOME, "tests/runSignalAlign-config.json")
+        cls.default_args = create_dot_dict(load_json(cls.config_file))
 
     def test_create_signalAlignment_args(self):
         expected_args = {"backward_reference", "forward_reference", "destination", "stateMachineType", "in_templateHmm",
@@ -302,6 +298,34 @@ class SignalAlignmentTest(unittest.TestCase):
                 rev_kmer = rev_c.reverse_complement(kmer)
                 self.assertEqual(event["path_kmer"].decode(), rev_kmer)
                 self.assertEqual(event["reference_kmer"].decode(), kmer)
+
+    def test_runSa_with_config(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+
+            r9_complement_model_file_acgt = os.path.join(self.HOME, "models/testModelR9_5mer_acgt_complement.model")
+            r9_template_model_file_acgt = os.path.join(self.HOME, "models/testModelR9_5mer_acgt_template.model")
+            self.default_args.path_to_bin = self.path_to_bin
+            self.default_args.output_dir = self.path_to_bin
+            one_file_dir = os.path.join(self.HOME, "tests/minion_test_reads/one_R9_canonical_ecoli")
+            ecoli_bam = os.path.join(self.HOME, "tests/minion_test_reads/canonical_ecoli_R9/canonical_ecoli.bam")
+            ecoli_readdb = os.path.join(self.HOME, "tests/minion_test_reads/canonical_ecoli_R9/canonical_ecoli.readdb")
+
+            self.default_args.samples[0].fast5_dirs = [one_file_dir]
+            self.default_args.samples[0].bwa_reference = self.ecoli_reference
+            self.default_args.samples[0].alignment_file = ecoli_bam
+            self.default_args.samples[0].readdb = ecoli_readdb
+            self.default_args.complement_hmm_model = r9_complement_model_file_acgt
+            self.default_args.template_hmm_model = r9_template_model_file_acgt
+
+            tmp_json_path = os.path.join(tempdir, "test.json")
+            save_json(self.default_args, tmp_json_path)
+            run_signal_align = os.path.join(self.path_to_bin, "runSignalAlign")
+            alignment_command = "{runsignalalign} run --config {config} " \
+                                "".format(runsignalalign=run_signal_align, config=tmp_json_path)
+
+            # run signalAlign
+            result = call(alignment_command, shell=True, bufsize=-1)
+
 
 
 if __name__ == '__main__':

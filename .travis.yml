@@ -22,6 +22,9 @@ before_install:
   brew install gcc@5 automake make open-mpi;
   gcc --version;
   ln -s /usr/local/bin/gcc-5 /usr/local/bin/gcc;
+  alias gcc='gcc-5';
+  alias g++='g++-5';
+
   gcc --version;
   wget https://repo.anaconda.com/archive/Anaconda2-5.3.1-MacOSX-x86_64.sh -O anaconda.sh;
 
@@ -55,6 +58,7 @@ install:
 
 - source activate signalalign
 - alias gcc='gcc-5'
+- alias g++='g++-5'
 - gcc --version
 - make
 

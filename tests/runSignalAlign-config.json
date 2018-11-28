@@ -1,0 +1,43 @@
+{
+  "signal_alignment_args": {
+    "target_regions": null,
+    "track_memory_usage": false,
+    "threshold": 0.01,
+    "event_table": false,
+    "embed": false,
+    "delete_tmp": false,
+    "output_format": "full"
+  },
+  "samples": [
+    {
+      "positions_file": null,
+      "fast5_dirs": ["./tests/minion_test_reads/one_R9_canonical_ecoli"],
+      "bwa_reference": "./tests/test_sequences/E.coli_K12.fasta",
+      "fofns": [],
+      "readdb": null,
+      "fw_reference": null,
+      "bw_reference": null,
+      "kmers_from_reference": false,
+      "motifs": null,
+      "name": "canonical",
+      "probability_threshold": 0.8,
+      "number_of_kmer_assignments": 10,
+      "alignment_file": null,
+      "recursive": false,
+      "assignments_dir": null
+    }
+  ],
+  "path_to_bin": "./bin",
+  "complement_hdp_model": null,
+  "template_hdp_model": null,
+  "complement_hmm_model": "./models/testModelR9_5mer_acgt_complement.model",
+  "template_hmm_model": "./models/testModelR9_5mer_acgt_template.model",
+  "job_count": 2,
+  "debug": false,
+  "two_d": false,
+  "output_dir": "./",
+  "constraint_trim": 3,
+  "diagonal_expansion": 5,
+  "traceBackDiagonals": 100,
+  "filter_reads": 0
+}

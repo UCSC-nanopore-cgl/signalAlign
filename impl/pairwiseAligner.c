@@ -289,7 +289,7 @@ int64_t sequence_nbBaseOptions(DegenerateType type) {
         case adenosineInosine:
             return 2; // A, I
         case adenosineMethylation:
-            return 5; // A, F
+            return 2; // A, F
         default:
             return 4; // A, C, G, T
     }
