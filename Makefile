@@ -11,7 +11,7 @@ signalAlignLib = ${basicLibs}
 test_directory = ${rootPath}/src/signalalign/tests/
 scrappie_build = ${rootPath}/scrappie/build
 
-LIBS= -lz -lm -lhts -lhdf5 -lgomp
+LIBS= -lz -lm -lhts -lhdf5 -lgomp -fopenmp
 
 all : sL bD python-utils ${libPath}/signalAlignLib.a ${signalAlignBin}/signalAlignLibTests \
 	  ${signalAlignBin}/compareDistributions ${signalAlignBin}/kmerEventAlign \

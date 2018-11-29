@@ -194,7 +194,7 @@ def getDegenerateEnum(degenerate_key):
     ok   = enum.check(degenerate_key)
     if not ok:
         raise RuntimeError("[getDegenerateEnum]Degenerate key %s not allowed, options are"
-                           "%s " % (degenerate_key, list(enum.keys())))
+                           "%s " % (degenerate_key, list(enum.degenerate_type.keys())))
     else:
         return enum.get(degenerate_key)
 

@@ -24,7 +24,8 @@
       "number_of_kmer_assignments": 10,
       "alignment_file": null,
       "recursive": false,
-      "assignments_dir": null
+      "assignments_dir": null,
+      "degenerate": "variant"
     }
   ],
   "path_to_bin": "./bin",

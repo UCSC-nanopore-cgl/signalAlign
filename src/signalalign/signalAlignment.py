@@ -763,7 +763,8 @@ def multithread_signal_alignment(signal_align_arguments, fast5_locations, worker
 def create_sa_sample_args(fofns=[], fast5_dirs=[], positions_file=None, motifs=None, alignment_file=None,
                           bwa_reference=None, fw_reference=None, bw_reference=None, name=None,
                           number_of_kmer_assignments=10, probability_threshold=0.8, kmers_from_reference=False,
-                          quality_threshold=7, recursive=False, workers=4, assignments_dir=None, readdb=None):
+                          quality_threshold=7, recursive=False, workers=4, assignments_dir=None, readdb=None,
+                          degenerate="variant"):
     """Create sample arguments for SignalAlignSample. Parameters are explained in SignalAlignmentSample"""
     sample_args = {
         "fofns": fofns,
@@ -782,7 +783,8 @@ def create_sa_sample_args(fofns=[], fast5_dirs=[], positions_file=None, motifs=N
         'recursive': recursive,
         'workers': workers,
         "assignments_dir": assignments_dir,
-        "readdb": readdb
+        "readdb": readdb,
+        "degenerate": degenerate
     }
     return sample_args
 
@@ -791,7 +793,7 @@ class SignalAlignSample(object):
     def __init__(self, working_folder, fofns, fast5_dirs, positions_file, motifs, bwa_reference, fw_reference,
                  bw_reference, name, number_of_kmer_assignments, probability_threshold, kmers_from_reference,
                  alignment_file, readdb=None, quality_threshold=0, recursive=False, workers=4, assignments_dir=None,
-                 degenerate=None):
+                 degenerate="variant"):
         """Prepare sample for processing via signalAlign.
 
         :param working_folder: FolderHandler() object with a working directory already created
@@ -836,7 +838,9 @@ class SignalAlignSample(object):
         self.recursive = recursive
         self.workers = workers
         self.assignments_dir = assignments_dir
-        self.degenerate =  getDegenerateEnum(degenerate)
+        if degenerate is None:
+            degenerate = "variant"
+        self.degenerate = getDegenerateEnum(degenerate)
 
         assert self.name is not None, "Must specify a name for your sample. name: {}".format(self.name)
         assert isinstance(self.fast5_dirs, list), "fast5_dirs needs to be a list. fast5_dirs: {}".format(
