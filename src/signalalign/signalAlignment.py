@@ -509,7 +509,10 @@ class SignalAlignment(object):
         npRead.close()
         if self.delete_tmp:
             self.temp_folder.remove_folder()
-        return posteriors_file_path
+        if self.get_expectations:
+            return template_expectations_file_path, complement_expectations_file_path
+        else:
+            return posteriors_file_path, ""
 
     def write_nucleotide_read(self, nanopore_read, file_path):
         try:
@@ -620,6 +623,10 @@ def signal_alignment_service(work_queue, done_queue, service_name="signal_alignm
             try:
                 alignment = SignalAlignment(**f)
                 success = alignment.run()
+                if success:
+                    done_queue.put(success)
+                else:
+                    done_queue.put("{}".format(multithread.FAILURE_KEY))
                 if alignment.max_memory_usage_kb is not None:
                     mem_usages.append(alignment.max_memory_usage_kb)
                 if not success: failure_count += 1
@@ -717,14 +724,15 @@ def multithread_signal_alignment(signal_align_arguments, fast5_locations, worker
                                                           "cigar_string": cigar_string}])
                 alignment = SignalAlignment(**f)
                 success = alignment.run()
-                output.append(success)
+                if success:
+                    output.extend(success)
         else:
             for in_fast5 in fast5_locations:
                 f = merge_dicts([signal_align_arguments, {"in_fast5": in_fast5}])
                 alignment = SignalAlignment(**f)
                 success = alignment.run()
-                output.append(success)
-
+                if success:
+                    output.extend(success)
     else:
         if filter_reads_to_string_wrapper:
             total, failure, messages, output = multithread.run_service2(
@@ -754,7 +762,7 @@ def multithread_signal_alignment(signal_align_arguments, fast5_locations, worker
             print("[multithread_signal_alignment] memory avg: %3f Gb" % (kb_to_gb(np.mean(memory_stats))))
             print("[multithread_signal_alignment] memory std: %3f Gb" % (kb_to_gb(np.std(memory_stats))))
             print("[multithread_signal_alignment] memory max: %3f Gb" % (kb_to_gb(max(memory_stats))))
-
+        output = [i for sub in output for i in sub]
     # fin
     print("[multithread_signal_alignment] fin")
     return [str(x) for x in output if os.path.exists(str(x)) and os.stat(str(x)).st_size != 0]

@@ -1331,7 +1331,6 @@ void getPosteriorProbsWithBanding(StateMachine *sM,
     if (diagonalNumber == 0) { //Deal with trivial case
         return;
     }
-    // TODO band construction is where the error starts
     //Primitives for the forward matrix recursion
     Band *band = band_construct(anchorPairs, sX->length, sY->length, p->diagonalExpansion);
 
@@ -1360,7 +1359,6 @@ void getPosteriorProbsWithBanding(StateMachine *sM,
         //Condition true when we want to do an intermediate traceback.
         bool tracebackPoint = diagonal_getXay(diagonal) >= tracedBackTo + p->minDiagsBetweenTraceBack
                               && diagonal_getWidth(diagonal) <= p->diagonalExpansion * 2 + 1;
-        //TODO the intermediate traceback causes a set of poorly-aligned events to show up at the traceback points
         // this should be investigated, but for now, this fixes it and probably causes higher memory usage
 //        tracebackPoint = FALSE;
 
@@ -1407,8 +1405,10 @@ void getPosteriorProbsWithBanding(StateMachine *sM,
                                 forwardDpMatrix, backwardDpMatrix, sX, sY
                         );
                         if (totalPosteriorCalculationsThisTraceback != 1) {
-                            assert(totalProbability + 1.0 > newTotalProbability);
-                            assert(newTotalProbability + 1.0 > newTotalProbability);
+                            if (totalProbability != LOG_ZERO){
+                                assert(totalProbability + 1.0 > newTotalProbability);
+                                assert(newTotalProbability + 1.0 > newTotalProbability);
+                            }
                         }
                         totalProbability = newTotalProbability;
                     }

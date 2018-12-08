@@ -19,7 +19,7 @@ all : sL bD python-utils ${libPath}/signalAlignLib.a ${signalAlignBin}/signalAli
 	  ${signalAlignBin}/variantCallingLib.py ${signalAlignBin}/alignmentAnalysisLib.py \
 	  ${signalAlignBin}/buildHdpUtil ${signalAlignBin}/trainModels all_tests \
 	  externals python_setup ${signalAlignBin}/filterReads ${signalAlignBin}/extract \
-	  ${signalAlignBin}/sequencing_summary  ${signalAlignBin}/plot_kmer_distributions
+	  ${signalAlignBin}/sequencing_summary ${signalAlignBin}/plot_kmer_distributions
 
 python-utils :
 	cd python_utils && python3 setup.py install

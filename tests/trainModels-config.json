@@ -28,7 +28,7 @@
   ],
   "hdp_args": {
     "grid_start": 30.0,
-    "grid_end": 90.0,
+    "grid_end": 180.0,
     "grid_length": 1200,
 
     "base_alpha": 1.0,
