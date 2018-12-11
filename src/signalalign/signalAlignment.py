@@ -623,10 +623,8 @@ def signal_alignment_service(work_queue, done_queue, service_name="signal_alignm
             try:
                 alignment = SignalAlignment(**f)
                 success = alignment.run()
-                if success:
-                    done_queue.put(success)
-                else:
-                    done_queue.put("{}".format(multithread.FAILURE_KEY))
+                assert success, "SignalAlign returned False"
+                done_queue.put(success)
                 if alignment.max_memory_usage_kb is not None:
                     mem_usages.append(alignment.max_memory_usage_kb)
                 if not success: failure_count += 1
@@ -940,6 +938,7 @@ def multithread_signal_alignment_samples(samples, signal_align_arguments, worker
     for sample in samples:
         # correct signal align arguments
         sample.process_reads(trim=trim)
+        signal_align_arguments["degenerate"] = sample.degenerate
         signal_align_arguments["alignment_file"] = sample.alignment_file
         signal_align_arguments["bwa_reference"] = sample.bwa_reference
         signal_align_arguments["backward_reference"] = sample.bw_fasta_path

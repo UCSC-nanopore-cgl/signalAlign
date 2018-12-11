@@ -20,7 +20,7 @@ void usage() {
     fprintf(stderr, "--sm3Hdp, -d: Flag, enable HMM-HDP model\n");
     fprintf(stderr, "--twoD, -e: Flag, use 2D workflow (enables complement alignment)\n");
     fprintf(stderr, "-s: Output format, 0=full, 1=variantCaller, 2=assignments\n");
-    fprintf(stderr, "-o: Degernate, 0=C/E, 1=C/E/O, 2=A/I, 3=A/C/G/T\n");
+    fprintf(stderr, "-o: Degernate, 0=C/E, 1=C/E/O, 2=A/I, 3=A/C/G/T\n, 5=A/F");
     fprintf(stderr, "-T: Template HMM model\n");
     fprintf(stderr, "-C: Complement HMM model\n");
     fprintf(stderr, "-L: Read (output) label\n");
@@ -162,10 +162,16 @@ void writePosteriorProbsFull(char *posteriorProbsFile, char *readLabel, StateMac
 
 void writePosteriorProbsVC(char *posteriorProbsFile, char *readLabel, StateMachine *sM, char *target, bool forward,
                            int64_t eventSequenceOffset, int64_t referenceSequenceOffset, stList *alignedPairs,
-                           Strand strand, double posteriorScore) {
+                           Strand strand, double posteriorScore, bool rna) {
     // label for tsv output
     char *strandLabel = strand == template ? "t" : "c";
+    if (rna){
+        forward = !forward;
+    }
     char *forwardLabel = forward ? "forward" : "backward";
+    if (rna){
+        forward = !forward;
+    }
 
     // open the file for output
     FILE *fH = fopen(posteriorProbsFile, "a");
@@ -288,7 +294,7 @@ void outputAlignment(
             break;
         case variantCaller:
             writePosteriorProbsVC(posteriorProbsFile, readLabel, sM, target, forward, eventSequenceOffset,
-                                  referenceSequenceOffset, alignedPairs, strand, posteriorScore);
+                                  referenceSequenceOffset, alignedPairs, strand, posteriorScore, rna);
             break;
         case assignments:
             writeAssignments(posteriorProbsFile, sM, events, eventSequenceOffset, npp, alignedPairs, strand);
@@ -646,17 +652,17 @@ int main(int argc, char *argv[]) {
         }
     }
 
-//    if ((forwardReference == NULL) || (backwardReference == NULL)) {
-//        st_errAbort("[signalAlign] - ERROR: did not get reference files %s %s\n",
-//                    forwardReference, backwardReference);
-//    }
-    ReferenceSequence *R;
-    R = fastaHandler_ReferenceSequenceConstructFull(forward_reference_path, backward_reference_path, pA,
-            sequence_name, rna);
-
     // Nanopore Read //
     // load nanopore read
     NanoporeRead *npRead = nanopore_loadNanoporeReadFromFile(npReadFile);
+    if (rna){
+        int64_t tmp = pA->start2;
+        pA->start2 = npRead->templateReadLength - pA->end2;
+        pA->end2 = npRead->templateReadLength - tmp;
+    }
+    ReferenceSequence *R;
+    R = fastaHandler_ReferenceSequenceConstructFull(forward_reference_path, backward_reference_path, pA,
+                                                    sequence_name, rna);
 
     // constrain the event sequence to the positions given by the guide alignment
     Sequence *tEventSequence = makeEventSequenceFromPairwiseAlignment(npRead->templateEvents,
