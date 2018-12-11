@@ -25,16 +25,12 @@ Make sure you are using gcc and not clang. Check out .travis.yml for specific Ma
 ### Recommened Workflow
 1. Install
 2. Extract fastq's and generate a readdb file with mapping between read_id and fast5 file. Note: A sequencing summary file can be passed in as a `readdb` file. 
-3. Generate BAM file, preferably with MD field. We have a filtering steps which removes secondary and supplementary reads as well as reads with a mean phred quality score of less than 7. NOTE: Use minimap2 for RNA mapping so output format is correct. 
-4. If you are interested in specific regions of the genome or some other read mapping based information I would recommend filtering your BAM.
-5. To speed up computation, I would recommend using `filterReads` to move fast5 files into another directory so the program does not have to loop through all of the failed reads. 
-6. runSignalAlign
+3. Generate BAM file, preferably with MD field. We have a filtering steps which removes secondary and supplementary reads as well as reads with a mean phred quality score of less than 7. NOTE: Use minimap2 for RNA mapping so BAM format is correct. 
+4. If you are interested in specific regions of the genome or some other read mapping based information I would recommend filtering your BAM to specified regions.
+5. To speed up computation, I would also recommend using `filterReads` to move fast5 files into another directory so the program does not have to loop through all of the failed reads. 
+6. A config file is setup in tests/ to run from the signalAlign home directory
 ```bash
-./runSignalAlign -d /path/to/minionReads/ -r /path/to/reference.fasta -o /path/to/output/ &> log_file.txt
-```
-4. If you want to try the test _E. coli_ files run:
-```bash
-./runSignalAlign -d ../tests/minion_test_reads/ecoli/ -r ../tests/test_sequences/E.coli_K12.fasta -o ../tests/ &> log_file.txt
+runSignalAlign run --config tests/runSignalAlign-config.json &> log_file.txt
 ```
 
 ### Description of programs
@@ -71,6 +67,10 @@ If you have several sub_directories of fast5 data, then use the recursive flag a
 
 
 ### runSignalAlign-update
+Both command line and config file options are available. The config file is almost identical to the trainModels config.  
+*  `runSignalAlign run --config config.json` if you want to use a config file  
+* `runSignalAlign -d /path/to/minionReads/ -r /path/to/reference.fasta -o /path/to/output/ --in_tempalte_hmm /path/to/model &> log_file.txt` For command line usage
+
 #### Input
 _Required_
 * A directory of MinION reads, `-d`, (*.fast5) that have been basecalled. Currently, the following versions of Metrichor basecalled files are supported: 1.15.0, 1.19.0, 1.20.0, 1.22.2, 1.22.4. If you have a more recent or unsupported version open an issue and I'll modify the program (or feel free to implement it yourself and issue a pull request!). 
@@ -95,7 +95,7 @@ _Optional_
 * `--in_complement_hmm`, `-C` complement HMM parameters file 
 * `--template_hdp`, `-tH` template HDP model file
 * `--complement_hdp`, `-cH` complement HDP model file 
-* `--degenerate`, `-x` nucleotide options for degenerate or _ambiguous_ positions. `variant` = {A,C,G,T} `cytosine2` = {CE} `cytosine3` = {CEO} `adenosine` = {AI}. **n.b.** E = 5-methylcytosine, O = 5-hydroxymethylcytosine, I = 6-methyladenine
+* `--degenerate`, `-x` nucleotide options for degenerate or _ambiguous_ positions. `m6a` = {AF}, `variant` = {A,C,G,T} `cytosine2` = {CE} `cytosine3` = {CEO} `adenosine` = {AI}. **n.b.** E = 5-methylcytosine, O = 5-hydroxymethylcytosine, F = 6-methyladenine, I = Inosine
 * `--stateMachineType`, `-smt` HMM to use. Options: `threeState` and `threeStateHdp`. Default: `threeState`.
 * `--file_of_files`, `-fofn` a file containing the absolute path to files to align with, one file path per line
 * `--threshold`, `-t`. Minimum posterior match probability threshold (matches below this threshold will not be tabulated). Default: 0.01.
