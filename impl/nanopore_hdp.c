@@ -1094,7 +1094,7 @@ NanoporeHDP* deserialize_nhdp(const char* filepath) {
     free(line);
     
     line = stFile_getLineFromFile(in);
-    char* alphabet = (char*) malloc(sizeof(char) * alphabet_size);
+    char* alphabet = (char*) malloc(sizeof(char) * alphabet_size+1);
     sscanf(line, "%s", alphabet);
     free(line);
     

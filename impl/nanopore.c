@@ -665,16 +665,18 @@ void nanopore_descaleNanoporeRead(NanoporeRead *npRead) {
 
 void nanopore_nanoporeReadDestruct(NanoporeRead *npRead) {
     free(npRead->twoDread);
-    free(npRead->templateEventMap);
-    free(npRead->templateEvents);
-    free(npRead->complementEventMap);
-    free(npRead->complementEvents);
     free(npRead->complementRead);
     free(npRead->templateRead);
+    free(npRead->templateEventMap);
+    free(npRead->templateEvents);
     free(npRead->templateStrandEventMap);
+    free(npRead->complementEventMap);
+    free(npRead->complementEvents);
     free(npRead->complementStrandEventMap);
     free(npRead->templateModelState);
     free(npRead->complementModelState);
+    free(npRead->templatePModel);
+    free(npRead->complementPModel);
     free(npRead);
 }
 

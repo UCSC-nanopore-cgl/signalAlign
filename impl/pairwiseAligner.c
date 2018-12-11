@@ -377,8 +377,8 @@ Sequence *sequence_constructKmerSequence(int64_t length, void *elements,
         st_errAbort("sequence_constructKmerSequence: can only make reference sequence from kmer sequence\n");
     }
     Sequence *self = sequence_construct2(length, elements, getFcn, sliceFcn, type);
-    char *degenerateBases = (char *)st_malloc(sizeof(char) * nbOptions + 1);
-    memcpy(degenerateBases, nucleotideOptions, sizeof(char) * nbOptions + 1);
+    char *degenerateBases = (char *)st_malloc(sizeof(char) * (nbOptions + 1));
+    memcpy(degenerateBases, nucleotideOptions, sizeof(char) * (nbOptions + 1));
     self->sliceFcn = sliceFcn;
     self->degenerateBases = degenerateBases;
     self->nbDegenerateBases = nbOptions;
@@ -623,7 +623,7 @@ HDCell *hdCell_construct(void *nucleotideSequence, int64_t stateNumber, int64_t 
                          int64_t kmerLength) {
     char *kmer_i;
     if (nucleotideSequence != NULL) {
-        kmer_i = (char *)st_malloc((kmerLength) * sizeof(char));
+        kmer_i = (char *)st_malloc((kmerLength+1) * sizeof(char));
         for (int64_t x = 0; x < kmerLength; x++) {
             kmer_i[x] = *((char *)nucleotideSequence + x);
         }
@@ -659,9 +659,9 @@ HDCell *hdCell_construct(void *nucleotideSequence, int64_t stateNumber, int64_t 
         Path *path = path_construct(onePathKmer, stateNumber, kmerLength);
         cell->paths[0] = path;
     }
-
     cell->init = TRUE;
     free(kmer_i);
+    stList_destruct(degeneratePositions);
 
     return cell;
 }
