@@ -217,7 +217,7 @@ def getGuideAlignmentFromAlignedSegment(aligned_segment, target_regions=None):
         target_regions = target_regions if type(target_regions) == TargetRegions else TargetRegions(target_regions)
         keep = target_regions.check_aligned_region(reference_start, reference_end)
         if keep is False:
-            print("[generateGuideAlignment] Read does not map witin the target regions, passing "
+            print("[generateGuideAlignment] Read does not map within the target regions, passing "
                   "on signal-level alignment", file=sys.stderr)
             return None
         else:

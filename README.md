@@ -4,11 +4,12 @@
 
 ### Cheat sheet/Quick Start
 
-### Pre-installation on `toil-box` (if you're using `cgcloud`)
-1. `sudo apt-get update && sudo apt-get install zlib1g-dev g++ git`
+### Pre-installation
+1. `sudo apt-get update`
+2. `sudo apt-get install wget git make g++ zlib1g-dev libbz2-dev liblzma-dev python3-dev python3-setuptools` 
 
 ### Installation:
-1. Recursively clone this repo `git clone --recursive -b update_manual https://github.com/UCSC-nanopore-cgl/signalAlign.git`
+1. Recursively clone this repo `git clone --recursive https://github.com/UCSC-nanopore-cgl/signalAlign.git`
 2. Set required environment variables. Use path to local anaconda or miniconda. `$HOME/anaconda3` is just a common install location for anaconda.  
    `export PATH="$HOME/anaconda3/bin:$PATH"`  
    `export C_INCLUDE_PATH="$HOME/anaconda3/envs/signalalign/include:$C_INCLUDE_PATH"`  

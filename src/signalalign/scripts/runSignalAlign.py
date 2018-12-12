@@ -19,7 +19,19 @@ from signalalign import parseFofn
 
 
 def signalAlignSourceDir():
-    return "/".join(os.path.abspath(__file__).split("/")[:-1])  # returns path without runSignalAlign
+    current_file = os.path.abspath(__file__)
+    # this is not a great solution, but it enables us to run this in an ide
+    scripts_path = "src/signalalign/scripts/runSignalAlign.py"
+    bin_path = "bin/runSignalAlign"
+    if current_file.endswith(scripts_path):
+        current_file = current_file.replace(scripts_path, '')
+    elif current_file.endswith(bin_path):
+        current_file = current_file.replace(bin_path, '')
+    else:
+        print("[runSignalAlign] unexpected script location: {}".format(current_file))
+
+    # returns signalAlign root directory or current directory
+    return current_file if os.path.isdir(current_file) else "/".join(current_file.split("/")[:-1])
 
 
 def resolvePath(p):
