@@ -1,5 +1,5 @@
-rootPath = $(shell pwd)/
-include ${rootPath}/include.mk
+rootPath = ./
+include ./include.mk
 
 libSources = impl/*.c
 libHeaders = inc/*.h
@@ -68,7 +68,7 @@ sL :
 	cd sonLib && CFLAGS="${CFLAGS} -fPIC" make
 
 bD :
-	mkdir -v -p ${rootPath}/bin
+	mkdir -v -p ${rootPath}bin
 
 externals :
 	cd externalTools && make all
@@ -111,12 +111,12 @@ ${signalAlignBin}/extract : extract.c ${libPath}/signalAlignLib.a ${signalAlignD
 ${signalAlignBin}/buildHdpUtil : buildHdpUtil.c ${libPath}/signalAlignLib.a ${signalAlignDependencies}
 	${cxx} ${cflags}   -I inc -I${libPath} -o ${signalAlignBin}/buildHdpUtil buildHdpUtil.c ${libPath}/signalAlignLib.a ${signalAlignLib} ${LIBS}
 
-${signalAlignBin}/runSignalAlign : ${rootPath}/src/signalalign/scripts/runSignalAlign.py
-	cp ${rootPath}/src/signalalign/scripts/runSignalAlign.py ${signalAlignBin}/runSignalAlign
+${signalAlignBin}/runSignalAlign : ${rootPath}src/signalalign/scripts/runSignalAlign.py
+	cp ${rootPath}src/signalalign/scripts/runSignalAlign.py ${signalAlignBin}/runSignalAlign
 	chmod +x ${signalAlignBin}/runSignalAlign
 
-${signalAlignBin}/trainModels : ${rootPath}/src/signalalign/train/trainModels.py
-	cp ${rootPath}/src/signalalign/train/trainModels.py ${signalAlignBin}/trainModels
+${signalAlignBin}/trainModels : ${rootPath}src/signalalign/train/trainModels.py
+	cp ${rootPath}src/signalalign/train/trainModels.py ${signalAlignBin}/trainModels
 	chmod +x ${signalAlignBin}/trainModels
 
 ${signalAlignBin}/sequencing_summary : ${rootPath}src/signalalign/visualization/sequencing_summary.py
@@ -132,16 +132,16 @@ all_tests : .FORCE
 
 	chmod +x ${test_directory}/*
 
-${signalAlignBin}/zayante : ${rootPath}/src/signalalign/scripts/zayante.py
-	cp ${rootPath}/src/signalalign/scripts/zayante.py ${signalAlignBin}/zayante
+${signalAlignBin}/zayante : ${rootPath}src/signalalign/scripts/zayante.py
+	cp ${rootPath}src/signalalign/scripts/zayante.py ${signalAlignBin}/zayante
 	chmod +x ${signalAlignBin}/zayante
 
-${signalAlignBin}/empire : ${rootPath}/src/signalalign/scripts/empire.py
-	cp ${rootPath}/src/signalalign/scripts/empire.py ${signalAlignBin}/empire
+${signalAlignBin}/empire : ${rootPath}src/signalalign/scripts/empire.py
+	cp ${rootPath}src/signalalign/scripts/empire.py ${signalAlignBin}/empire
 	chmod +x ${signalAlignBin}/empire
 
-${signalAlignBin}/variantCallingLib.py : ${rootPath}/src/signalalign/scripts/variantCallingLib.py
-	cp ${rootPath}/src/signalalign/scripts/variantCallingLib.py ${signalAlignBin}/variantCallingLib.pyq
+${signalAlignBin}/variantCallingLib.py : ${rootPath}src/signalalign/scripts/variantCallingLib.py
+	cp ${rootPath}src/signalalign/scripts/variantCallingLib.py ${signalAlignBin}/variantCallingLib.pyq
 
 ${signalAlignBin}/filterReads : ${rootPath}src/signalalign/filter_reads.py
 	cp ${rootPath}src/signalalign/filter_reads.py ${signalAlignBin}/filterReads

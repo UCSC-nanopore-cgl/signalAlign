@@ -9,6 +9,7 @@ from signalalign.utils.sequenceTools import get_full_nucleotide_read_from_alignm
 from signalalign.event_detection import load_from_raw, load_from_raw2
 from py3helpers.utils import check_numpy_table
 from Bio import SeqIO
+
 try:
     from StringIO import StringIO
 except ImportError:
@@ -74,7 +75,7 @@ class NanoporeRead(object):
         self.twoD = twoD  # 2D read flag, necessary right now, and the client should know
         # if set, unsupported versions will cause failure
         self.enforce_supported_versions = enforce_supported_versions
-        self.aligned_segment = aligned_segment # pysam aligned_segment object
+        self.aligned_segment = aligned_segment  # pysam aligned_segment object
 
         if type(self) == NanoporeRead:
             if twoD:
@@ -92,7 +93,7 @@ class NanoporeRead(object):
 
         # initialize if appropriate
         if initialize:
-             self.Initialize()
+            self.Initialize()
 
     def open(self):
         if self.is_open: return True
