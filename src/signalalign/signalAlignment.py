@@ -556,7 +556,7 @@ class SignalAlignment(object):
         assert file_type in ("full", "assignments", "variantCaller")
         with open(tsv_path, 'r') as tsvin:
             if file_type == "full":
-                dtype = [('contig', 'S10'), ('reference_index', int),
+                dtype = [('contig', 'S100'), ('reference_index', int),
                          ('reference_kmer', 'S5'), ('read_file', 'S57'),
                          ('strand', 'S1'), ('event_index', int),
                          ('event_mean', float), ('event_noise', float),
@@ -571,7 +571,7 @@ class SignalAlignment(object):
             else:
                 dtype = [('event_index', int), ('reference_position', int),
                          ('base', 'S6'), ('posterior_probability', float), ('strand', 'S1'),
-                         ('forward_mapped', int), ('read_file', 'S57')]
+                         ('forward_mapped', "S8"), ('read_file', 'S57'), ('posterior_score', float), ('contig', 'S100')]
 
             event_table = np.loadtxt(tsvin, dtype=dtype)
 
