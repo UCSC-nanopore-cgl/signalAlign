@@ -34,7 +34,6 @@ CuSuite *stBaseAlignerRunAllTests(void) {
     CuSuiteAddSuite(suite, stateMachineAlignmentTestSuite());
     CuSuiteAddSuite(suite, fastaHandlerTestSuite());
     CuSuiteAddSuite(suite, eventAlignerTestSuite());
-
     // coming soon..
     //CuSuiteAddSuite(suite, multipleAlignerTestSuite());
     //CuSuiteAddSuite(suite, pairwiseAlignmentLongTestSuite());

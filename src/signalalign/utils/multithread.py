@@ -1,12 +1,17 @@
 #!/usr/bin/env python
 from __future__ import print_function
 from multiprocessing import Manager, Process, current_process
+from pathos.multiprocessing import ProcessingPool as Pool
+from pathos.pools import _ProcessPool
+from timeit import default_timer as timer
+
 import random
 import time
 
 TOTAL_KEY = "total"
 FAILURE_KEY = "failure"
 MEM_USAGE_KEY = "mem_usage"
+
 
 # here is an example of a class which will "perform work".  this could also just be a function that is invoked
 # instead of an object that's created and then had a function run
@@ -92,6 +97,7 @@ def run_service(service, iterable, iterable_arguments, iterable_argument_name, w
         work_queue.put(args)
 
     # start workers
+    log_function("[run_service] Starting {} analyses with {} workers".format(service, worker_count))
     for w in range(worker_count):
         p = Process(target=service, args=(work_queue, done_queue), kwargs=service_arguments)
         p.start()
@@ -119,7 +125,114 @@ def run_service(service, iterable, iterable_arguments, iterable_argument_name, w
         log_function("[run_service]\tMessages:\n[run_service]\t\t{}".format("\n[run_service]\t\t".join(messages)))
 
     # return relevant info
+    return total, failure, messages, None
+
+
+def run_service2(service, iterable, iterable_arguments, iterable_argument_names, worker_count,
+                 service_arguments={}, log_function=print):
+
+    start = time.time()
+    args = list(iterable_arguments.keys())
+    args.extend(iterable_argument_names)
+    if log_function is not None:
+        log_function("[run_service] running service {} with {} workers".format(service, worker_count))
+
+    # setup workers for multiprocessing
+    work_queue = Manager().Queue()
+    done_queue = Manager().Queue()
+
+    # add everything to work queue
+    jobs = []
+    for x in iterable:
+        if type(x) is not tuple:
+            x = [x]
+        args = dict(dict(zip(iterable_argument_names, x)),
+                    **iterable_arguments)
+        work_queue.put(args)
+
+
+    # start workers
+    for w in range(worker_count):
+        p = Process(target=service, args=(work_queue, done_queue), kwargs=service_arguments)
+        p.start()
+        jobs.append(p)
+        work_queue.put('STOP')
+
+    # wait for threads to finish, then stop the done queue
+    for p in jobs:
+        p.join()
+    done_queue.put('STOP')
+
+    # if example service model is used, metrics can be gathered in this way
+    messages = []
+    output = []
+    total = 0
+    failure = 0
+    no_stop = True
+    while no_stop:
+        f = done_queue.get()
+        if isinstance(f, str):
+            if f == "STOP":
+                no_stop = False
+            elif f.startswith(TOTAL_KEY):
+                total += int(f.split(":")[1])
+            elif f.startswith(FAILURE_KEY):
+                failure += int(f.split(":")[1])
+            else:
+                messages.append(f)
+        else:
+            output.append(f)
+    # if we should be logging and if there is material to be logged
+    if log_function is not None and (total + failure + len(messages)) > 0:
+        log_function("[run_service] Summary {}:\n[run_service]\tTime: {}s\n[run_service]\tTotal: {}\n[run_service]\tFailure: {}"
+                     .format(service, int(time.time() - start), total, failure))
+        log_function("[run_service]\tMessages:\n[run_service]\t\t{}".format("\n[run_service]\t\t".join(messages)))
+
+    # return relevant info
+    return total, failure, messages, output
+
+
+def run_service3(service, iterable, iterable_arguments, iterable_argument_names, worker_count,
+                 log_function=print):
+
+    start = timer()
+    args = list(iterable_arguments.keys())
+    args.extend(iterable_argument_names)
+    if log_function is not None:
+        log_function("[run_service] running service {} with {} workers".format(service, worker_count))
+
+    # add everything to work queue
+    all_args = []
+    for x in iterable:
+        if type(x) is not tuple:
+            x = [x]
+        args = dict(dict(zip(iterable_argument_names, x)),
+                    **iterable_arguments)
+        all_args.append(args)
+
+    pool = Pool(worker_count)
+    results = pool.amap(service, all_args)
+    final_results = results.get()
+    # if example service model is used, metrics can be gathered in this way
+    messages = []
+    total = len(final_results)
+    failure = 0
+    for error, mem_usage in final_results:
+        if error is not False:
+            failure += 1
+            if type(error) is str:
+                messages.append(error)
+
+    # if we should be logging and if there is material to be logged
+    if log_function is not None and (total + failure + len(messages)) > 0:
+        log_function("[run_service] Summary {}:\n[run_service]\tTime: {}s\n[run_service]\tTotal: {}\n[run_service]\tFailure: {}"
+                     .format(service, int(timer() - start), total, failure))
+        log_function("[run_service]\tMessages:\n[run_service]\t\t{}".format("\n[run_service]\t\t".join(messages)))
+
+    # return relevant info
     return total, failure, messages
+
+
 
 # example of how to run service
 def main():

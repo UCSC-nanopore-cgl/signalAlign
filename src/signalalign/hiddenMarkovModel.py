@@ -19,15 +19,36 @@ from itertools import product
 from scipy.stats import norm, invgauss, entropy
 from scipy.spatial.distance import euclidean
 from sklearn.neighbors import KernelDensity
+from py3helpers.utils import all_string_permutations
+from py3helpers.seq_tools import is_non_canonical_iupac_base
 
+import matplotlib as mpl
+if os.environ.get('DISPLAY', '') == '':
+    print('no display found. Using non-interactive Agg backend')
+    mpl.use('Agg')
+mpl.use("TkAgg")
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
-# from signalalign.train.trainModels import parse_alignment_file
 
 # Globals
 NORM_DIST_PARAMS = 2
 NB_MODEL_PARAMS = 5
 _SQRT2 = np.sqrt(2)
+
+
+def parse_assignment_file(file_path):
+    """Parse the .assignments.tsv output file from signalAlign:
+
+    :param file_path: path to assignments file
+    :return: panda DataFrame with column names "kmer", "strand", "level_mean", "prob"
+    """
+    data = pd.read_table(file_path,
+                         usecols=(0, 1, 2, 3),
+                         names=["kmer", "strand", "level_mean", "prob"],
+                         dtype={"kmer": np.str, "strand": np.str, "level_mean": np.float64, "prob": np.float64},
+                         header=None
+                         )
+    return data
 
 
 class HmmModel(object):
@@ -107,14 +128,16 @@ class HmmModel(object):
 
     def set_default_transitions(self):
         MATCH_CONTINUE = np.exp(-0.23552123624314988)     # stride
-        MATCH_FROM_GAP_X = np.exp(-0.21880828092192281)   # 1 - skip'
-        MATCH_FROM_GAP_Y = np.exp(-0.013406326748077823)  # 1 - (skip + stay)
         GAP_OPEN_X = np.exp(-1.6269694202638481)          # skip
         GAP_OPEN_Y = np.exp(-4.3187242127300092)          # 1 - (skip + stride)
+
+        MATCH_FROM_GAP_X = np.exp(-0.21880828092192281)   # 1 - skip'
         GAP_EXTEND_X = np.exp(-1.6269694202638481)        # skip'
-        GAP_EXTEND_Y = np.exp(-4.3187242127239411)        # stay (1 - (skip + stay))
-        GAP_SWITCH_TO_X = 0.000000001
         GAP_SWITCH_TO_Y = 0.0
+
+        GAP_EXTEND_Y = np.exp(-4.3187242127239411)        # stay (1 - (skip + stay))
+        MATCH_FROM_GAP_Y = np.exp(-0.013406326748077823)  # 1 - (skip + stay)
+        GAP_SWITCH_TO_X = 0.000000001
         self.transitions = [
             MATCH_CONTINUE, GAP_OPEN_X, GAP_OPEN_Y,
             MATCH_FROM_GAP_X, GAP_EXTEND_X, GAP_SWITCH_TO_Y,
@@ -269,19 +292,6 @@ class HmmModel(object):
         assert index < self.num_kmers, \
             "The kmer index is out of bounds given the alphabet and kmer length. {} > {}".format(index, self.num_kmers)
         return self.sorted_kmer_tuple[index]
-
-    def get_kmer_index2(self, kmer):
-        """Get the model index for a given kmer
-
-        ex: get_kmer_index(AAAAA) = 0
-        :param kmer: nucleotide sequence
-        """
-        assert set(kmer).issubset(set(alphabet)) is True, "Nucleotide not found in model alphabet: kmer={}, " \
-                                                          "alphabet={}".format(kmer, alphabet)
-        assert len(kmer) == kmer_length, "Kmer length does not match model kmer length"
-
-        return self.sorted_kmer_tuple.index(kmer)
-
 
     def get_event_mean_gaussian_parameters(self, kmer):
         """Get the model's Normal distribution parameters to model the mean of a specific kmer
@@ -568,7 +578,8 @@ class HmmModel(object):
         panel1.set_xlabel('pA')
         panel1.set_ylabel('Density')
         panel1.grid(color='black', linestyle='-', linewidth=1, alpha=0.5)
-        panel1.xaxis.set_major_locator(ticker.MultipleLocator(3))
+        panel1.xaxis.set_major_locator(ticker.AutoLocator())
+        panel1.xaxis.set_minor_locator(ticker.AutoMinorLocator())
         min_x = normal_mean-(5*normal_sd)
         max_x = normal_mean+(5*normal_sd)
         panel1.set_xlim(min_x, max_x)
@@ -592,6 +603,7 @@ class HmmModel(object):
             # plot HDP predicted distribution
             kmer_id = self.get_kmer_index(kmer)
             x = self.linspace
+            panel1.set_xlim(min(x), max(x))
             hdp_y = self.all_posterior_pred[kmer_id]
             hdp_handle, = panel1.plot(x, hdp_y, '-')
             # compute entropy and hellinger distance
@@ -612,10 +624,10 @@ class HmmModel(object):
             legend_text2.extend(["HDP Model: \n  {}".format(hdp_model_name), "Kullback–Leibler divergence: {}".format(np.round(kl_distance, 4)),
                                 "Hellinger distance: {}".format(np.round(h_distance, 4))])
 
-        if alignment_file or alignment_file_data:
+        if alignment_file is not None or alignment_file_data is not None:
             # option to parse file or not
-            if alignment_file:
-                data = parse_alignment_file(alignment_file)
+            if alignment_file is not None:
+                data = parse_assignment_file(alignment_file)
             else:
                 data = alignment_file_data
 
@@ -625,20 +637,23 @@ class HmmModel(object):
             x = np.asarray(kmer_data).reshape(len(kmer_data), 1)
             x_plot = self.linspace[:, np.newaxis]
             # get estimate for data
-            kde = KernelDensity(kernel="gaussian", bandwidth=0.5).fit(x)
-            # estimate across the linspace
-            log_dens = kde.score_samples(x_plot)
-            kde_handle, = panel1.plot(x_plot[:, 0], np.exp(log_dens), '-')
-            raw_data_handle, = panel1.plot(x[:, 0], -0.005 - 0.01 * np.random.random(x.shape[0]), '+k')
-            # add to legend
-            handles1.extend([kde_handle, raw_data_handle])
-            legend_text1.extend(["Gaussian KDE Estimate", "Event Means: {} points".format(len(kmer_data))])
-            txt_handle7, = panel1.plot([], [], ' ')
-            if alignment_file:
-                alignment_file_name = os.path.basename(alignment_file)
-                handles2.append(txt_handle7)
-                legend_text2.append("RAW event data file: \n  {}".format(alignment_file_name))
+            if len(kmer_data) > 0:
 
+                kde = KernelDensity(kernel="gaussian", bandwidth=0.5).fit(x)
+                # estimate across the linspace
+                log_dens = kde.score_samples(x_plot)
+                kde_handle, = panel1.plot(x_plot[:, 0], np.exp(log_dens), '-')
+                raw_data_handle, = panel1.plot(x[:, 0], -0.005 - 0.01 * np.random.random(x.shape[0]), '+k')
+                # add to legend
+                handles1.extend([kde_handle, raw_data_handle])
+                legend_text1.extend(["Gaussian KDE Estimate", "Event Means: {} points".format(len(kmer_data))])
+                txt_handle7, = panel1.plot([], [], ' ')
+                if alignment_file:
+                    alignment_file_name = os.path.basename(alignment_file)
+                    handles2.append(txt_handle7)
+                    legend_text2.append("RAW event data file: \n  {}".format(alignment_file_name))
+            else:
+                print("{} not found in alignment file".format(kmer))
         # create legend
         first_legend = panel1.legend(handles1, legend_text1, fancybox=True, shadow=True,
                                      loc='lower left', bbox_to_anchor=(1, .8))
@@ -721,6 +736,56 @@ class HmmModel(object):
 
         return hellinger_distances, kl_divergences, median_deltas
 
+    def write_new_model(self, out_path, alphabet, replacement_base):
+        """Write a correctly formatted new model file with a new alphabet.
+        :param out_path: path to output hmm
+        :param alphabet: new alphabet
+        :param replacement_base: base to replace new character
+
+        note: will retain same kmer size and assumes only one new character
+        """
+        # the model file has the format:
+        # line 0: stateNumber \t alphabetSize \t alphabet \t kmerLength
+        # line 1: match->match \t match->gapX \t match->gapY \t
+        #         gapX->match \t gapX->gapX \t gapX->gapY \t
+        #         gapY->match \t gapY->gapX \t gapY->gapY \n
+        # line 2: [level_mean] [level_sd] [noise_mean] [noise_sd] [noise_lambda ](.../kmer) \n
+        assert self.has_ont_model, "Shouldn't be writing down a Hmm that has no Model"
+        if not self.normalized:
+            self.normalize_transitions_expectations()
+
+        alphabet = "".join(sorted(alphabet.upper()))
+        for base in alphabet:
+            assert not is_non_canonical_iupac_base(base), \
+                "You cannot use IUPAC character to represent multiple bases. {}".format(base)
+
+        replacement_base = replacement_base.upper()
+        new_base = (set(alphabet) - set(self.alphabet)).pop()
+
+        alphabet_size = len(alphabet)
+        new_kmers = all_string_permutations(alphabet)
+        with open(out_path, 'w') as f:
+
+            # line 0
+            f.write("{stateNumber}\t{alphabetSize}\t{alphabet}\t{kmerLength}\n"
+                    "".format(stateNumber=self.state_number, alphabetSize=alphabet_size,
+                              alphabet=alphabet, kmerLength=self.kmer_length))
+            # line 1 transitions
+            for i in range(self.state_number * self.state_number):
+                f.write("{transition}\t".format(transition=str(self.transitions[i])))
+            # likelihood
+            f.write("{}\n".format(str(self.likelihood)))
+
+            # line 2 Event Model
+            for kmer in new_kmers:
+                generic_kmer = kmer.replace(new_base, replacement_base)
+                k = self.get_kmer_index(generic_kmer)
+                f.write("{level_mean}\t{level_sd}\t{noise_mean}\t{noise_sd}\t{noise_lambda}\t"
+                        "".format(level_mean=self.event_model["means"][k], level_sd=self.event_model["SDs"][k],
+                                  noise_mean=self.event_model["noise_means"][k], noise_sd=self.event_model["noise_SDs"][k],
+                                  noise_lambda=self.event_model["noise_lambdas"][k]))
+            f.write("\n")
+
 
 def hellinger2(p, q):
     return euclidean(np.sqrt(p), np.sqrt(q)) / _SQRT2
@@ -734,7 +799,7 @@ def parse_alignment_file(file_path):
     """
     assert os.path.exists(file_path), "File path does not exist: {}".format(file_path)
     data = pd.read_table(file_path,
-                         usecols=(4, 9, 13, 12),
+                         usecols=(4, 9, 12, 13),
                          names=["strand", "kmer", "prob", "level_mean"],
                          dtype={"kmer": np.str, "strand": np.str, "level_mean": np.float64, "prob": np.float64},
                          header=None)
@@ -756,7 +821,7 @@ def main():
 
     rna_hmm_handle = HmmModel(rna_ont_model, rna_hdp_model, rna=True)
 
-    rna_hmm_handle.plot_kmer_distribution("GGACT", alignment_file=alignment_file, savefig_dir=savefig_dir)
+    # rna_hmm_handle.plot_kmer_distribution("GGACT", alignment_file=alignment_file, savefig_dir=savefig_dir)
 
     # ﻿ RRACH
     #     R= A/G

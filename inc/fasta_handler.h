@@ -21,7 +21,8 @@ char *fastaHandler_getSubSequence(char *fastaReferencePath, int64_t start, int64
 ReferenceSequence *fastaHandler_ReferenceSequenceConstructFull(char *forward_fastaReferencePath,
                                                              char *backward_fastaReferencePath,
                                                              struct PairwiseAlignment *pA,
-                                                             const char *sequence_name);
+                                                             const char *sequence_name,
+                                                             bool rna);
 
 
 #endif //NANOPORE_RNN_FASTA_HANDLER_H

@@ -534,7 +534,7 @@ stList *nanopore_remapAnchorPairsWithOffset(stList *unmappedPairs, int64_t *even
 
     for (int64_t i = 0; i < stList_length(unmappedPairs); i++) {
         stIntTuple *pair = stList_get(unmappedPairs, i);
-
+//        printf("%" PRId64 " %" PRId64 "\n", stIntTuple_get(pair, 0), eventMap[stIntTuple_get(pair, 1)] - eventMap[mapOffset]);
         stList_append(mappedPairs,
                       stIntTuple_construct2(stIntTuple_get(pair, 0), eventMap[stIntTuple_get(pair, 1)] -
                               eventMap[mapOffset]));
@@ -665,16 +665,18 @@ void nanopore_descaleNanoporeRead(NanoporeRead *npRead) {
 
 void nanopore_nanoporeReadDestruct(NanoporeRead *npRead) {
     free(npRead->twoDread);
-    free(npRead->templateEventMap);
-    free(npRead->templateEvents);
-    free(npRead->complementEventMap);
-    free(npRead->complementEvents);
     free(npRead->complementRead);
     free(npRead->templateRead);
+    free(npRead->templateEventMap);
+    free(npRead->templateEvents);
     free(npRead->templateStrandEventMap);
+    free(npRead->complementEventMap);
+    free(npRead->complementEvents);
     free(npRead->complementStrandEventMap);
     free(npRead->templateModelState);
     free(npRead->complementModelState);
+    free(npRead->templatePModel);
+    free(npRead->complementPModel);
     free(npRead);
 }
 

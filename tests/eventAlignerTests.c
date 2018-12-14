@@ -8,8 +8,12 @@
 #include <eventAligner.h>
 #include "CuTest.h"
 #include "signalMachine.h"
+#include "kseq.h"
+#include <zlib.h>
+
 
 #define HOME "../" //this is based on where travis runs tests from
+//#define HOME "/Users/andrewbailey/CLionProjects/nanopore-RNN/submodules/signalAlign/" //this is based on where travis runs tests from
 
 #define EVENT_LOCATION "/Analyses/UnittestEvents"
 
@@ -217,7 +221,7 @@ static void test_fast5_set_basecall_event_table(CuTest *testCase){
 }
 
 static void test_alignment_to_base_event_map(CuTest *testCase){
-    char* templateModelFile = stString_concat(HOME, "/models/testModelR9p4_5mer_acegt_template.model");
+    char* templateModelFile = stString_concat(HOME, "models/testModelR9p4_5mer_acegt_template.model");
     StateMachine *sM = stateMachine3_loadFromFile(templateModelFile, threeState, emissions_kmer_getGapProb,
                                                   emissions_signal_strawManGetKmerEventMatchProbWithDescaling_MeanOnly,
                                                   stateMachine3_loadTransitionsFromFile, NULL);
@@ -613,8 +617,9 @@ static void test_fast5_create_group(CuTest *testCase){
 
 }
 
-static void test_fast5_create_all_groups(CuTest *testCase){
-    char* path = stString_concat(HOME, "tests/minion_test_reads/RNA_edge_cases/DEAMERNANOPORE_20170922_FAH26525_MN16450_sequencing_run_MA_821_R94_NA12878_mRNA_09_22_17_67136_read_61_ch_151_strand.fast5");
+static void test_fast5_create_all_groups(CuTest *testCase) {
+    char *path = stString_concat(HOME,
+                                 "tests/minion_test_reads/RNA_edge_cases/DEAMERNANOPORE_20170922_FAH26525_MN16450_sequencing_run_MA_821_R94_NA12878_mRNA_09_22_17_67136_read_61_ch_151_strand.fast5");
     hid_t fast5_handle = fast5_open(path);
 
     herr_t status = fast5_create_all_groups(fast5_handle, "/Analyses/FakePath");
@@ -635,8 +640,146 @@ static void test_fast5_create_all_groups(CuTest *testCase){
 
 //    clean up
     fast5_close(fast5_handle);
+}
+
+static void test_fast5_get_string(CuTest *testCase){
+    char* path = stString_concat(HOME, "tests/minion_test_reads/embedded_files/LomanLabz_PC_20161025_FNFAB42699_MN17633_sequencing_run_20161025_E_coli_native_450bps_82361_ch92_read1108_strand.fast5");
+    hid_t fast5_handle = fast5_open(path);
+    char* fastq = fast5_get_string(fast5_handle, "Analyses/Basecall_1D_000/BaseCalled_template/Fastq");
+
+    CuAssertStrEquals(testCase, "@5cc8", stString_getSubString(fastq, 0, 5));
+
+//    clean up
+    fast5_close(fast5_handle);
+    free(fastq);
+}
+
+static void test_fast5_get_fastq(CuTest *testCase){
+    char* path = stString_concat(HOME, "tests/minion_test_reads/embedded_files/LomanLabz_PC_20161025_FNFAB42699_MN17633_sequencing_run_20161025_E_coli_native_450bps_82361_ch92_read1108_strand.fast5");
+    hid_t fast5_handle = fast5_open(path);
+    char* fastq = fast5_get_fastq(fast5_handle);
+
+    CuAssertStrEquals(testCase, "@5cc8", stString_getSubString(fastq, 0, 5));
+//    clean up
+    fast5_close(fast5_handle);
+    free(fastq);
+    free(path);
+}
+
+static void test_hdf5_group_exists(CuTest *testCase){
+    char* path = stString_concat(HOME, "tests/minion_test_reads/embedded_files/LomanLabz_PC_20161025_FNFAB42699_MN17633_sequencing_run_20161025_E_coli_native_450bps_82361_ch92_read1108_strand.fast5");
+    hid_t fast5_handle = fast5_open(path);
+
+    bool test = hdf5_group_exists(fast5_handle, "/Analyses/Basecall_1D_000");
+    CuAssertTrue(testCase, test);
+    test = hdf5_group_exists(fast5_handle, "/Analyses/Basecall_1D_0");
+    CuAssertTrue(testCase, !test);
+
+    fast5_close(fast5_handle);
+}
+
+static void test_write_fastqs_to_file(CuTest *testCase){
+    char* dir = stString_concat(HOME, "tests/minion_test_reads/canonical_ecoli_R9/");
+    char* out_file = stString_concat(HOME, "tests/minion_test_reads/canonical_ecoli_R9/test.fastq");
+
+    int pass = write_fastqs_to_file(dir, out_file);
+    CuAssertTrue(testCase, pass == 0);
+    if (pass == 0){
+        CuAssertTrue(testCase, stFile_exists(out_file));
+        stFile_rmrf(out_file);
+    } else {
+        if (stFile_exists(out_file)){
+            stFile_rmrf(out_file);
+        }
+    }
+//    clean up
+    free(out_file);
+    free(dir);
+}
+
+static void test_check_file_ext(CuTest *testCase){
+    char* file_path = "asdfasdf.dfsdf";
+    char* file_path2 = "asd.fasdf.dfsdf";
+    bool test;
+
+    test = check_file_ext(file_path, "dfsdf");
+    CuAssertTrue(testCase, test);
+    test = check_file_ext(file_path2, "dfsdf");
+    CuAssertTrue(testCase, test);
 
 }
+
+static void test_path_join_two_strings(CuTest *testCase){
+    char* file_path = "asdf/asdf/asdf";
+    char* file_path2 = "/asdf/asdf/asdf/";
+    char* test;
+
+    test = path_join_two_strings(file_path, "dfsdf");
+    CuAssertStrEquals(testCase, test, "asdf/asdf/asdf/dfsdf");
+    test = path_join_two_strings(file_path2, "dfsdf");
+    CuAssertStrEquals(testCase, test, "/asdf/asdf/asdf/dfsdf");
+    free(test);
+}
+
+static void test_parse_fastq_string(CuTest *testCase){
+    char* path = stString_concat(HOME, "tests/minion_test_reads/embedded_files/LomanLabz_PC_20161025_FNFAB42699_MN17633_sequencing_run_20161025_E_coli_native_450bps_82361_ch92_read1108_strand.fast5");
+    hid_t fast5_handle = fast5_open(path);
+    char* fastq_str = fast5_get_fastq(fast5_handle);
+    fastq_entry *fastq_data = parse_fastq_string(fastq_str);
+    CuAssertStrEquals(testCase, "5cc8", stString_getSubString(fastq_data->name, 0, 4));
+    fast5_close(fast5_handle);
+    free(fastq_str);
+//    free(fastq_data);
+    fastq_entry_destruct(fastq_data);
+
+}
+
+static void test_write_readdb_file1(CuTest *testCase){
+    char* dir = stString_concat(HOME, "tests/minion_test_reads/canonical_ecoli_R9/");
+    char* out_file = stString_concat(HOME, "tests/minion_test_reads/canonical_ecoli_R9/test.readdb");
+    int pass = write_readdb_file1(dir, out_file);
+    CuAssertTrue(testCase, pass == 0);
+    if (pass == 0){
+        CuAssertTrue(testCase, stFile_exists(out_file));
+        stFile_rmrf(out_file);
+    } else {
+        if (stFile_exists(out_file)){
+            stFile_rmrf(out_file);
+        }
+    }
+//    clean up
+    free(out_file);
+    free(dir);
+
+}
+
+
+static void test_write_fastq_and_readdb_file1(CuTest *testCase){
+    char* dir = stString_concat(HOME, "tests/minion_test_reads/canonical_ecoli_R9/");
+    char* out_file = stString_concat(HOME, "tests/minion_test_reads/canonical_ecoli_R9/test.readdb");
+    char* out_file2 = stString_concat(HOME, "tests/minion_test_reads/canonical_ecoli_R9/test.fastq");
+
+    int pass = write_fastq_and_readdb_file1(dir, out_file2, out_file);
+    CuAssertTrue(testCase, pass == 0);
+    if (pass == 0){
+        CuAssertTrue(testCase, stFile_exists(out_file));
+        CuAssertTrue(testCase, stFile_exists(out_file2));
+        stFile_rmrf(out_file);
+        stFile_rmrf(out_file2);
+    } else {
+        if (stFile_exists(out_file)){
+            stFile_rmrf(out_file);
+        }
+        if (stFile_exists(out_file2)){
+            stFile_rmrf(out_file2);
+        }
+    }
+//    clean up
+    free(out_file);
+    free(out_file2);
+    free(dir);
+}
+
 
 
 CuSuite *eventAlignerTestSuite(void) {
@@ -673,6 +816,16 @@ CuSuite *eventAlignerTestSuite(void) {
     SUITE_ADD_TEST(suite, test_reverse_basecalled_events);
     SUITE_ADD_TEST(suite, test_build_kmer_list);
 
+    SUITE_ADD_TEST(suite, test_fast5_get_string);
+    SUITE_ADD_TEST(suite, test_hdf5_group_exists);
+    SUITE_ADD_TEST(suite, test_fast5_get_fastq);
+    SUITE_ADD_TEST(suite, test_check_file_ext);
+    SUITE_ADD_TEST(suite, test_path_join_two_strings);
+    SUITE_ADD_TEST(suite, test_write_fastqs_to_file);
+    SUITE_ADD_TEST(suite, test_parse_fastq_string);
+    SUITE_ADD_TEST(suite, test_write_readdb_file1);
+    SUITE_ADD_TEST(suite, test_write_fastq_and_readdb_file1);
+
     return suite;
 }
 
@@ -689,4 +842,29 @@ CuSuite *eventAlignerTestSuite(void) {
 //    CuStringDelete(output);
 //    int good = suite->failCount > 0;
 //    return good;
+//}
+//
+//KSEQ_INIT(gzFile, gzread)
+//
+//int main(int argc, char *argv[])
+//{
+//    gzFile fp;
+//    kseq_t *seq;
+//    int l;
+//    if (argc == 1) {
+//        fprintf(stderr, "Usage: %s <in.seq>\n", argv[0]);
+//        return 1;
+//    }
+//    fp = gzopen(argv[1], "r"); // STEP 2: open the file handler
+//    seq = kseq_init(fp); // STEP 3: initialize seq
+//    while ((l = kseq_read(seq)) >= 0) { // STEP 4: read sequence
+//        printf("name: %s\n", seq->name.s);
+//        if (seq->comment.l) printf("comment: %s\n", seq->comment.s);
+//        printf("seq: %s\n", seq->seq.s);
+//        if (seq->qual.l) printf("qual: %s\n", seq->qual.s);
+//    }
+//    printf("return value: %d\n", l);
+//    kseq_destroy(seq); // STEP 5: destroy seq
+//    gzclose(fp); // STEP 6: close the file handler
+//    return 0;
 //}

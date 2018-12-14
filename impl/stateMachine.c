@@ -124,7 +124,7 @@ int64_t emissions_discrete_getKmerIndexFromKmer(void *kmer) {
 
 int64_t emissions_discrete_getKmerIndexFromPtr(void *kmer) {
     // make temp kmer meant to work with getKmer
-    char *kmer_i = malloc((KMER_LENGTH) * sizeof(char));
+    char *kmer_i = malloc((KMER_LENGTH+1) * sizeof(char));
     for (int64_t x = 0; x < KMER_LENGTH; x++) {
         kmer_i[x] = *((char *)kmer+x);
     }
@@ -473,7 +473,7 @@ double emissions_signal_getHdpKmerDensity(StateMachine *sM, void *x_i, void *e_j
     }
 
     // make temp x_i
-    char *kmer_i = malloc((self->model.kmerLength) * sizeof(char));
+    char *kmer_i = malloc((self->model.kmerLength+1) * sizeof(char));
     for (int64_t x = 0; x < self->model.kmerLength; x++) {
         kmer_i[x] = *((char *) x_i + x);
     }

@@ -20,7 +20,7 @@ void usage() {
     fprintf(stderr, "--sm3Hdp, -d: Flag, enable HMM-HDP model\n");
     fprintf(stderr, "--twoD, -e: Flag, use 2D workflow (enables complement alignment)\n");
     fprintf(stderr, "-s: Output format, 0=full, 1=variantCaller, 2=assignments\n");
-    fprintf(stderr, "-o: Degernate, 0=C/E, 1=C/E/O, 2=A/I, 3=A/C/G/T\n");
+    fprintf(stderr, "-o: Degernate, 0=C/E, 1=C/E/O, 2=A/I, 3=A/C/G/T\n, 5=A/F");
     fprintf(stderr, "-T: Template HMM model\n");
     fprintf(stderr, "-C: Complement HMM model\n");
     fprintf(stderr, "-L: Read (output) label\n");
@@ -35,7 +35,10 @@ void usage() {
     fprintf(stderr, "-c: Complement expectations (HMM transitions) output location\n");
     fprintf(stderr, "-x: Diagonal expansion, how much to expand the dynamic programming envelope\n");
     fprintf(stderr, "-D: Posterior probability threshold, keep aligned pairs with posterior prob >= this\n");
-    fprintf(stderr, "-m: Constranint trim, how much to trim the guide alignment anchors by\n\n");
+    fprintf(stderr, "-m: Constranint trim, how much to trim the guide alignment anchors by\n");
+    fprintf(stderr, "-g: traceBackDiagonals, how many backward diagonals to calculate during traceback\n");
+    fprintf(stderr, "-r: boolean option if read is RNA\n\n");
+
 }
 
 void printPairwiseAlignmentSummary(struct PairwiseAlignment *pA) {
@@ -88,7 +91,7 @@ static inline int64_t adjustQueryPosition(int64_t unadjustedQueryPosition, int64
 void writePosteriorProbsFull(char *posteriorProbsFile, char *readLabel, StateMachine *sM,
                              NanoporeReadAdjustmentParameters npp, double *events, char *target, bool forward,
                              char *contig, int64_t eventSequenceOffset, int64_t referenceSequenceOffset,
-                             stList *alignedPairs, Strand strand) {
+                             stList *alignedPairs, Strand strand, bool rna) {
     // label for tsv output
     char *strandLabel = strand == template ? "t" : "c";
 
@@ -141,6 +144,9 @@ void writePosteriorProbsFull(char *posteriorProbsFile, char *readLabel, StateMac
 
         // make reference kmer
         char *refKmer = makeReferenceKmer(k_i, strand, forward);
+        if (rna){
+            refKmer = stString_reverseComplementString(refKmer);
+        }
 
         // write to file
         fprintf(fH, "%s\t%"PRId64"\t%s\t%s\t%s\t%"PRId64"\t%f\t%f\t%f\t%s\t%f\t%f\t%f\t%f\t%f\t%s\n",
@@ -156,10 +162,16 @@ void writePosteriorProbsFull(char *posteriorProbsFile, char *readLabel, StateMac
 
 void writePosteriorProbsVC(char *posteriorProbsFile, char *readLabel, StateMachine *sM, char *target, bool forward,
                            int64_t eventSequenceOffset, int64_t referenceSequenceOffset, stList *alignedPairs,
-                           Strand strand, double posteriorScore) {
+                           Strand strand, double posteriorScore, bool rna) {
     // label for tsv output
     char *strandLabel = strand == template ? "t" : "c";
+    if (rna){
+        forward = !forward;
+    }
     char *forwardLabel = forward ? "forward" : "backward";
+    if (rna){
+        forward = !forward;
+    }
 
     // open the file for output
     FILE *fH = fopen(posteriorProbsFile, "a");
@@ -273,15 +285,16 @@ void outputAlignment(
         int64_t referenceSequenceOffset,
         stList *alignedPairs, 
         double posteriorScore,
-        Strand strand) {
+        Strand strand,
+        bool rna) {
     switch (fmt) {
         case full:
             writePosteriorProbsFull(posteriorProbsFile, readLabel, sM, npp, events, target, forward, contig,
-                                    eventSequenceOffset, referenceSequenceOffset, alignedPairs, strand);
+                                    eventSequenceOffset, referenceSequenceOffset, alignedPairs, strand, rna);
             break;
         case variantCaller:
             writePosteriorProbsVC(posteriorProbsFile, readLabel, sM, target, forward, eventSequenceOffset,
-                                  referenceSequenceOffset, alignedPairs, strand, posteriorScore);
+                                  referenceSequenceOffset, alignedPairs, strand, posteriorScore, rna);
             break;
         case assignments:
             writeAssignments(posteriorProbsFile, sM, events, eventSequenceOffset, npp, alignedPairs, strand);
@@ -431,9 +444,11 @@ int main(int argc, char *argv[]) {
     int64_t diagExpansion = 50;
     double threshold = 0.01;
     int64_t constraintTrim = 14;
+    int64_t traceBackDiagonals = 50;
     int64_t degenerate;
     int64_t outFmt;
     bool twoD = FALSE;
+    bool rna = FALSE;
     char *templateModelFile = NULL;
     char *complementModelFile = NULL;
     char *readLabel = NULL;
@@ -457,6 +472,7 @@ int main(int argc, char *argv[]) {
                 {"sm3Hdp",                  no_argument,        0,  'd'},
                 {"sparse_output",           no_argument,        0,  's'},
                 {"twoD",                    no_argument,        0,  'e'},
+                {"rna",                     no_argument,        0,  'r'},
                 {"degenerate",              required_argument,  0,  'o'},
                 {"templateModel",           required_argument,  0,  'T'},
                 {"complementModel",         required_argument,  0,  'C'},
@@ -474,11 +490,12 @@ int main(int argc, char *argv[]) {
                 {"forward_reference_path",  required_argument,  0,  'f'},
                 {"backward_reference_path", optional_argument,  0,  'b'},
                 {"sequence_name",           required_argument,  0,  'n'},
+                {"traceBackDiagonals",      optional_argument,  0,  'g'},
                 {0, 0, 0, 0} };
 
         int option_index = 0;
 
-        key = getopt_long(argc, argv, "h:d:e:s:o:a:T:C:L:q:f:b:p:u:v:w:t:c:x:D:m:n:",
+        key = getopt_long(argc, argv, "h:d:e:s:r:o:a:T:C:L:q:f:b:g:p:u:v:w:t:c:x:D:m:n:",
                           long_options, &option_index);
 
         if (key == -1) {
@@ -495,6 +512,9 @@ int main(int argc, char *argv[]) {
                 break;
             case 'e':
                 twoD = TRUE;
+                break;
+            case 'r':
+                rna = TRUE;
                 break;
             case 'o':
                 j = sscanf(optarg, "%" PRIi64 "", &degenerate);
@@ -559,6 +579,12 @@ int main(int argc, char *argv[]) {
             case 'n':
                 sequence_name = stString_copy(optarg);
                 break;
+            case 'g':
+                j = sscanf(optarg, "%" PRIi64 "", &traceBackDiagonals);
+                assert (j == 1);
+                assert (traceBackDiagonals >= 0);
+                traceBackDiagonals = (int64_t)traceBackDiagonals;
+                break;
             default:
                 usage();
                 return 1;
@@ -591,14 +617,13 @@ int main(int argc, char *argv[]) {
     struct PairwiseAlignment *pA;
     pA = cigarRead(fileHandleIn);
     fclose(fileHandleIn);
-
     // Alignment Parameters //
     // make the pairwise alignment parameters
     PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
     p->threshold = threshold;
     p->constraintDiagonalTrim = constraintTrim;
     p->diagonalExpansion = diagExpansion;
-
+    p->traceBackDiagonals = traceBackDiagonals;
     // HDP routines //
     // load HDPs
     NanoporeHDP *nHdpT, *nHdpC;
@@ -608,9 +633,11 @@ int main(int argc, char *argv[]) {
             st_errAbort("Need to have template and complement HDPs");
         }
         if (sMtype != threeStateHdp) {
-            fprintf(stderr, "[signalAlign] - Warning: this kind of stateMachine does not use the HDPs you gave\n");
+            sMtype = threeStateHdp;
+            fprintf(stderr, "[signalAlign] - Using threeStateHdp stateMachine since you pass in an HDP file\n");
+        } else {
+            fprintf(stderr, "[signalAlign] - using NanoporeHDPs\n");
         }
-        fprintf(stderr, "[signalAlign] - using NanoporeHDPs\n");
     }
 
     #pragma omp parallel sections
@@ -625,16 +652,17 @@ int main(int argc, char *argv[]) {
         }
     }
 
-//    if ((forwardReference == NULL) || (backwardReference == NULL)) {
-//        st_errAbort("[signalAlign] - ERROR: did not get reference files %s %s\n",
-//                    forwardReference, backwardReference);
-//    }
-    ReferenceSequence *R;
-    R = fastaHandler_ReferenceSequenceConstructFull(forward_reference_path, backward_reference_path, pA, sequence_name);
-
     // Nanopore Read //
     // load nanopore read
     NanoporeRead *npRead = nanopore_loadNanoporeReadFromFile(npReadFile);
+    if (rna){
+        int64_t tmp = pA->start2;
+        pA->start2 = npRead->templateReadLength - pA->end2;
+        pA->end2 = npRead->templateReadLength - tmp;
+    }
+    ReferenceSequence *R;
+    R = fastaHandler_ReferenceSequenceConstructFull(forward_reference_path, backward_reference_path, pA,
+                                                    sequence_name, rna);
 
     // constrain the event sequence to the positions given by the guide alignment
     Sequence *tEventSequence = makeEventSequenceFromPairwiseAlignment(npRead->templateEvents,
@@ -742,6 +770,7 @@ int main(int argc, char *argv[]) {
             sequence_destruct(cEventSequence);
             hmmContinuous_destruct(complementExpectations, sMtype);
         }
+        fprintf(stderr, "signalAlign - SUCCESS: finished alignment of query %s, exiting\n", readLabel);
         return 0;
     } else {
         // Alignment Procedure //
@@ -776,7 +805,7 @@ int main(int argc, char *argv[]) {
         if (posteriorProbsFile != NULL) {
             outputAlignment(outFmt, posteriorProbsFile, readLabel, sMt, npRead->templateParams, npRead->templateEvents,
                             R->getTemplateTargetSequence(R), forward, pA->contig1, tCoordinateShift, rCoordinateShift_t,
-                            templateAlignedPairs, templatePosteriorScore,template);
+                            templateAlignedPairs, templatePosteriorScore,template, rna);
         }
 
         stList *complementAlignedPairs;
@@ -812,7 +841,7 @@ int main(int argc, char *argv[]) {
                 outputAlignment(outFmt, posteriorProbsFile, readLabel, sMc, npRead->complementParams,
                                 npRead->complementEvents, R->getComplementTargetSequence(R), forward, pA->contig1,
                                 cCoordinateShift, rCoordinateShift_c, complementAlignedPairs, complementPosteriorScore,
-                                complement);
+                                complement, rna);
             }
 
         }

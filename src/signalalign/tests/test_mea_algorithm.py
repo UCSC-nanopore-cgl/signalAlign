@@ -256,7 +256,7 @@ class MeaTest(unittest.TestCase):
         fast5_dir = os.path.join(MeaTest.HOME, "tests/minion_test_reads/1D")
         template_hmm = os.path.join(MeaTest.HOME, "models/testModelR9_acgt_template.model")
         path_to_bin = os.path.join(MeaTest.HOME, 'bin')
-        threshold = 10
+        threshold = 11
 
         # make directory to put temporary files and output location
         output_root = tempfile.TemporaryDirectory()
@@ -282,7 +282,11 @@ class MeaTest(unittest.TestCase):
                                                      in_templateHmm=template_hmm,
                                                      destination=temp_signal_align_dir,
                                                      forward_reference=ecoli_reference,
-                                                     path_to_bin=path_to_bin)
+                                                     path_to_bin=path_to_bin,
+                                                     constraint_trim=0,
+                                                     traceBackDiagonals=100,
+                                                     diagonal_expansion=0,
+                                                     embed=True)
 
         # get summaries
         all_event_summaries = get_all_event_summaries(fast5s, alignment_args, aln_dist_threshold=threshold,

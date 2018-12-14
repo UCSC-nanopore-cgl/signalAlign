@@ -8,6 +8,7 @@ import pysam
 import numpy as np
 
 from signalalign import _parseCigar
+from Bio import SeqIO
 
 
 class GuideAlignment(object):
@@ -139,11 +140,7 @@ def buildBwaIndex(reference, dest, output=None, log=None):
 def getGuideAlignmentFromAlignmentFile(alignment_location, read_name=None, target_regions=None):
     # get reads from alignment file (sam or bam)
     aligned_segment, n_aligned_segments, reference_name = get_aligned_segment_from_alignment_file(alignment_location, read_name)
-    query_name = aligned_segment.qname
-    flag = aligned_segment.flag
-    reference_pos = aligned_segment.pos + 1  # pysam gives the 0-based leftmost start
-    sam_cigar = aligned_segment.cigarstring
-
+    assert aligned_segment is not None, "[generateGuideAlignment] Read {} has no passing alignment".format(read_name)
     # couldn't find anything
     if n_aligned_segments == 0:
         print("[generateGuideAlignment] Found no aligned segments" +
@@ -152,6 +149,35 @@ def getGuideAlignmentFromAlignmentFile(alignment_location, read_name=None, targe
 
     if n_aligned_segments > 1:
         print("[generateGuideAlignment] WARNING more than 1 mapping, taking the first one heuristically")
+
+    return getGuideAlignmentFromAlignedSegment(aligned_segment, target_regions=target_regions)
+
+
+def getInfoFromCigarFile(cigar_file):
+    with open(cigar_file, 'r') as cig:
+        for line in cig:
+            if not line.startswith("cigar:"): continue
+            parts = line.split()
+            assert len(parts) >= 11, "[generateGuideAlignment] Malformed cigar file {}".format(cigar_file)
+            strand = parts[8]
+            assert strand == '+' or strand == "-", "[generateGuideAlignment] Unexpected strand '{}' in cigar line {}".format(strand, line)
+            reference_name = parts[5]
+            return strand, reference_name
+    assert False, "[generateGuideAlignment] No cigar line found in {}".format(cigar_file)
+
+
+def getGuideAlignmentFromAlignedSegment(aligned_segment, target_regions=None):
+    """Generate a GuideAlignment from a pysam alignedSegment object
+
+    :param aligned_segment: an pysam AlignedSegment object
+    :param target_regions: target_regions
+    :return: GuideAlignment object
+    """
+    reference_name = aligned_segment.reference_name
+    query_name = aligned_segment.qname
+    flag = aligned_segment.flag
+    reference_pos = aligned_segment.pos + 1  # pysam gives the 0-based leftmost start
+    sam_cigar = aligned_segment.cigarstring
 
     # get strand
     strand = ""
@@ -200,20 +226,6 @@ def getGuideAlignmentFromAlignmentFile(alignment_location, read_name=None, targe
     return GuideAlignment(completeCigarString, strand, reference_name)
 
 
-def getInfoFromCigarFile(cigar_file):
-    with open(cigar_file, 'r') as cig:
-        for line in cig:
-            if not line.startswith("cigar:"): continue
-            parts = line.split()
-            assert len(parts) >= 11, "[generateGuideAlignment] Malformed cigar file {}".format(cigar_file)
-            strand = parts[8]
-            assert strand == '+' or strand == "-", "[generateGuideAlignment] Unexpected strand '{}' in cigar line {}".format(strand, line)
-            reference_name = parts[5]
-            return strand, reference_name
-    assert False, "[generateGuideAlignment] No cigar line found in {}".format(cigar_file)
-
-
-
 def generateGuideAlignment(reference_fasta, query, temp_sam_path, target_regions=None):
     # type: (string, string, string, TargetRegions) -> GuideAlignment
     """Aligns the read sequnece with BWA to get the guide alignment,
@@ -241,14 +253,55 @@ def get_aligned_segment_from_alignment_file(alignment_location, read_name):
     # get reads from alignment file (sam or bam)
     n_aligned_segments = 0
     correct_segment = None
+    reference_name = None
     with closing(pysam.AlignmentFile(alignment_location, 'rb' if alignment_location.endswith("bam") else 'r')) as aln:
-        for aligned_segment in aln.fetch():
-            if aligned_segment.is_secondary or aligned_segment.is_unmapped or aligned_segment.is_supplementary:
+        for aligned_segment in aln.fetch(until_eof=True):
+            if aligned_segment.is_secondary or aligned_segment.is_unmapped \
+                    or aligned_segment.is_supplementary or aligned_segment.has_tag("SA"):
                 continue
             if read_name is not None and aligned_segment.qname != read_name and read_name not in aligned_segment.qname:
                 continue
             n_aligned_segments += 1
             correct_segment = aligned_segment
-        reference_name = aln.getrname(correct_segment.rname)
+        if correct_segment is not None:
+            reference_name = aln.getrname(correct_segment.rname)
 
     return correct_segment, n_aligned_segments, reference_name
+
+
+def check_number_of_passing_reads(sam, fastq):
+    """Calculate fraction of passing reads given original fastq and sam file
+
+    note: assumes phred-33 encoding
+
+    :param sam: sam/bam file containing alignment information
+    :param fastq: compiled fastq from nanopore reads
+    """
+    assert os.path.exists(fastq), "Fastq file does not exist: {}".format(fastq)
+    assert os.path.exists(sam), "Sam file does not exist: {}".format(sam)
+
+    total = 0
+    passed = 0
+    not_primary = 0
+    av_phred_score_count = 0
+
+    for record in SeqIO.parse(fastq, "fastq"):
+        av_phred_score = np.mean(record.letter_annotations["phred_quality"])
+        correct_segment, n_aligned_segments, reference_name = get_aligned_segment_from_alignment_file(sam, record.id)
+        if correct_segment is None and n_aligned_segments != 1:
+            not_primary += 1
+            if av_phred_score < 7:
+                av_phred_score_count += 1
+        elif av_phred_score < 7:
+            av_phred_score_count += 1
+        else:
+            passed += 1
+
+        total += 1
+
+    print("total = {}\npassed = {}\nno_suitable_alignment = {}\nnum av_phred_score < 7 = {}".format(total,
+                                                                                                passed,
+                                                                                                not_primary,
+                                                                                                av_phred_score_count))
+
+    return total, passed

@@ -4,7 +4,8 @@
     "track_memory_usage": false,
     "threshold": 0.01,
     "event_table": false,
-    "embed": false
+    "embed": false,
+    "delete_tmp": false
   },
   "samples": [
     {
@@ -12,6 +13,7 @@
       "fast5_dirs": ["./tests/minion_test_reads/one_R9_canonical_ecoli"],
       "bwa_reference": "./tests/test_sequences/E.coli_K12.fasta",
       "fofns": [],
+      "readdb": null,
       "fw_reference": null,
       "bw_reference": null,
       "kmers_from_reference": false,
@@ -19,12 +21,14 @@
       "name": "canonical",
       "probability_threshold": 0.8,
       "number_of_kmer_assignments": 10,
-      "alignment_file": null
+      "alignment_file": null,
+      "recursive": false,
+      "assignments_dir": null
     }
   ],
   "hdp_args": {
     "grid_start": 30.0,
-    "grid_end": 90.0,
+    "grid_end": 180.0,
     "grid_length": 1200,
 
     "base_alpha": 1.0,
@@ -43,8 +47,6 @@
     "gibbs_samples": 1000,
     "burnin_multiplier": 32,
     "hdp_type": "singleLevelFixedCanonical",
-    "threshold": 0.0,
-    "number_of_assignments": 100,
     "built_alignments": null
   },
   "transitions_args": {
@@ -69,5 +71,7 @@
   "two_d": false,
   "output_dir": "./",
   "constraint_trim": null,
-  "diagonal_expansion": null
+  "diagonal_expansion": null,
+  "traceBackDiagonals": 100,
+  "filter_reads": 7
 }

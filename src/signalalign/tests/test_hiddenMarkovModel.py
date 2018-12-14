@@ -175,6 +175,17 @@ class HiddenMarkovTests(unittest.TestCase):
         prob = hdp_handle.grid_spline_interp(query_x, x, y, slope, length)
         self.assertEqual(prob, 0.12328410496683605)
 
+    def test_write_new_model(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            test_model_file = os.path.join(tempdir, "fake.hmm")
+
+            hmm_handle = HmmModel(ont_model_file=self.model_file)
+            hmm_handle.write_new_model(out_path=test_model_file, alphabet="ATGCF", replacement_base="A")
+            hmm_handle2 = HmmModel(ont_model_file=test_model_file)
+            self.assertEqual(hmm_handle.kmer_length, hmm_handle2.kmer_length)
+            self.assertEqual(hmm_handle2.alphabet, "ACFGT")
+            self.assertEqual(hmm_handle2.alphabet_size, 5)
+            self.assertRaises(AssertionError, hmm_handle.write_new_model, test_model_file, "ATGCW", "A")
 
 
 if __name__ == '__main__':

@@ -8,7 +8,8 @@
 # History: 08/10/18 Created
 ########################################################################
 
-from signalalign.hiddenMarkovModel import HmmModel
+from signalalign.hiddenMarkovModel import HmmModel, parse_alignment_file
+from signalalign.train.trainModels import parse_assignment_file
 from argparse import ArgumentParser
 
 
@@ -52,16 +53,25 @@ def main():
     # load model files
     model_handle = HmmModel(args.ont_model, args.hdp_model, rna=args.rna)
 
+    alignment_data = None
+    if args.build_alignment_file:
+        with open(args.build_alignment_file, 'r') as fh:
+            n_cols = len(fh.readline().split())
+            if n_cols == 4:
+                alignment_data = parse_assignment_file(args.build_alignment_file)
+            if n_cols == 15:
+                alignment_data = parse_alignment_file(args.build_alignment_file)
+
     # output a single plot or one for each kmer
     if args.kmer:
         model_handle.plot_kmer_distribution(args.kmer,
-                                            alignment_file=args.build_alignment_file,
+                                            alignment_file_data=alignment_data,
                                             savefig_dir=args.output_dir)
     else:
         assert args.all_kmers, "Must pick a single kmer to plot using --kmer or pass the flag --all_kmers"
         for kmer in model_handle.sorted_kmer_tuple:
             model_handle.plot_kmer_distribution(kmer,
-                                                alignment_file=args.build_alignment_file,
+                                                alignment_file_data=alignment_data,
                                                 savefig_dir=args.output_dir)
 
 

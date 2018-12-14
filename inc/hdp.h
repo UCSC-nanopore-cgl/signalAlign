@@ -3,6 +3,8 @@
 
 #include <inttypes.h>
 #include <stdbool.h>
+#include <stdio.h>
+
 
 typedef struct HierarchicalDirichletProcess HierarchicalDirichletProcess;
 typedef struct DistributionMetricMemo DistributionMetricMemo;

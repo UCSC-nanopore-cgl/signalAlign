@@ -3310,6 +3310,7 @@ HierarchicalDirichletProcess* deserialize_hdp(FILE* in) {
             
             free(line);
             line = stFile_getLineFromFile(in);
+            stList_destruct(tokens);
         }
         stList_destruct(fctr_list);
     }

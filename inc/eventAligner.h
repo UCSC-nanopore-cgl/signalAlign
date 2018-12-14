@@ -33,10 +33,44 @@ typedef struct {
     basecalled_event *event;
 } basecalled_event_table;
 
+//join directory and file
+char* path_join_two_strings(char* directory, char* file_name);
+
+// check if file has correct extension
+bool check_file_ext(char* file_path, char* ext);
+
+// write fastqs from directory to outpath
+int write_fastqs_to_file(char* fast5_dir, char* output_path);
+
+// get a string dataset
+char *fast5_get_string(hid_t hdf5_file, char* path);
+
+// get fastq from fast5
+char *fast5_get_fastq(hid_t hdf5_file);
+
+// check if group exists
+bool hdf5_group_exists(hid_t hdf5_file, char* path);
 
 // open the file and return the hdf ID
 hid_t fast5_open(char* filename);
 
+// write readdb file: sequence_name /t fast5_name /n
+int write_readdb_file1(char* fast5_dir, char* output_path);
+
+//write both fastq and readdb file
+int write_fastq_and_readdb_file1(char* fast5_dir, char* fastq_output_path, char* readdb_output_path);
+
+typedef struct {
+    char* name;
+    char* comment;
+    char* seq;
+    char* qual;
+} fastq_entry;
+
+// parse fastq string from fast5 file
+fastq_entry* parse_fastq_string(char* fastq_string);
+
+void fastq_entry_destruct(fastq_entry* fastq);
 
 // From scrappie
 typedef struct {

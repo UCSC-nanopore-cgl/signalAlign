@@ -39,17 +39,14 @@ HOME = os.path.abspath(os.path.dirname(__file__))
 
 sonlib_include = os.path.join(HOME, "sonLib/C/inc")
 sa_include = os.path.join(HOME, "inc")
-h5_include = os.path.join(HOME, "include")
-htsLib_include = os.path.join(HOME, "htslib/htslib")
 
 signalAlign_a = os.path.join(HOME, "sonLib/lib/signalAlignLib.a")
-h5_lib_a = os.path.join(HOME, "lib/libhdf5.a")
 son_Lib_a = os.path.join(HOME, "sonLib/lib/sonLib.a")
 cu_test_a = os.path.join(HOME, "sonLib/lib/cuTest.a")
 
-libraries = ['dl', 'z', 'm', 'pthread', 'gomp']
-extra_objects = [h5_lib_a, signalAlign_a, son_Lib_a]
-include_dirs = [h5_include, sa_include, sonlib_include, htsLib_include]
+libraries = ['dl', 'z', 'm', 'pthread', 'gomp', 'hdf5']
+extra_objects = [signalAlign_a, son_Lib_a]
+include_dirs = [sa_include, sonlib_include]
 c_compile_args = ['-pedantic', '-Wall', '-std=c99', '-DNDEBUG', '-fstrict-aliasing', '-fopenmp',
                   '-L{}'.format(os.path.join(HOME, 'lib'))]
 
@@ -78,5 +75,6 @@ setup(name="signalAlign",
                         "PyYAML>=3.12",
                         "Cython>=0.26",
                         "scikit-learn==0.19.0",
-                        "matplotlib==2.0.2"]
+                        "matplotlib==2.0.2",
+                        "pathos==0.2.1"]
       )

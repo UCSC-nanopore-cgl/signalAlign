@@ -13,7 +13,6 @@ import sys
 import os
 import colorsys
 import matplotlib.pyplot as plt
-# import matplotlib.pyplot as plt
 import matplotlib.patches as mplpatches
 from matplotlib.collections import LineCollection
 
@@ -23,8 +22,8 @@ from collections import defaultdict
 from timeit import default_timer as timer
 from argparse import ArgumentParser
 from signalalign.alignedsignal import AlignedSignal, CreateLabels
+from signalalign.nanoporeRead import NanoporeRead
 from py3helpers.utils import list_dir
-
 
 MEA = 'm'
 SA_FULL = 's'
@@ -59,6 +58,10 @@ def parse_args():
                         dest='mea', required=False,
                         help="Option to plot the maximum expected accuracy alignment from signalalign")
 
+    parser.add_argument('--tombo', nargs='+',
+                        dest='tombo', required=False,
+                        help="Option to plot the alignment from Tombo (RawGenomeCorrected)")
+
     parser.add_argument('--sa_full', nargs='+',
                         dest='sa_full', required=False,
                         help="Option to plot all of the posterior probabilities from the signalalign output")
@@ -69,6 +72,10 @@ def parse_args():
 
     parser.add_argument('--plot_alpha', action='store_true', default=False, dest="plot_alpha", required=False,
                         help="If set, will plot probability information as the alpha associated with each data point")
+
+    parser.add_argument('--trim', action='store', default=0, dest="trim", required=False, type=int,
+                        help="If set, will trim runs of matches")
+
 
     args = parser.parse_args()
     return args
@@ -143,14 +150,12 @@ class PlotSignal(object):
         color_selection = 0
         # plot signal alignments
         for i, alignment in enumerate(self.alignments):
-            handle, = panel1.plot(alignment[0], alignment[1], color=colors[color_selection], alpha=1)
+            handle, = panel1.plot(alignment[0], alignment[1]-(i*0.5), color=colors[color_selection], alpha=1)
             color_selection += 1
             handles.append(handle)
 
         # plot predictions (signal align outputs)
         for i, prediction in enumerate(self.predictions):
-            print(color_selection)
-            print(self.names[color_selection])
             rgba_colors = np.tile(np.array(colors[color_selection]), (len(prediction[0]), 1))
             if plot_alpha or "full_signalalign" in self.names[color_selection] or False:
                 rgba_colors = np.insert(rgba_colors, 3, prediction[3].tolist(), axis=1)
@@ -208,6 +213,61 @@ class PlotSignal(object):
             pass
 
 
+def plot_basecalled_sequences(events1, events2=None, signal=None, save_fig_path=False):
+    """Plot the basecalled event table with the kmers on the y axis and signal on x axis"""
+    #
+    handles = list()
+    names = []
+    plt.figure(figsize=(6, 8))
+    panel1 = plt.axes([0.1, 0.22, .8, .7])
+    panel2 = plt.axes([0.1, 0.09, .8, .1], sharex=panel1)
+    panel1.set_xlabel('Events')
+    panel1.set_ylabel('Basecalled Sequence')
+    panel1.xaxis.set_label_position('top')
+    panel1.invert_yaxis()
+    panel1.xaxis.tick_top()
+    panel1.grid(color='black', linestyle='-', linewidth=1)
+
+    sequence = NanoporeRead.sequence_from_events(events1)
+    sequence2 = NanoporeRead.sequence_from_events(events2)
+    assert sequence2 == sequence, "Basecalled sequences are different"
+    event_map = NanoporeRead.make_event_map(events1, kmer_length=len(events1[0]["model_state"]))
+    # for y, x in enumerate([events1[x]["raw_start"] for x in event_map]):
+    #     panel1.text(x, y, sequence[y])
+
+    handle = panel1.scatter([events1[x]["raw_start"] for x in event_map], range(len(event_map)),
+                            marker='.',
+                            c='blue')
+    handles.append(handle)
+    names.append("Original Event Table")
+    if events2 is not None:
+        event_map = NanoporeRead.make_event_map(events2, kmer_length=len(events2[0]["model_state"]))
+
+        handle2 = panel1.scatter([events2[x]["raw_start"] for x in event_map], range(len(event_map)),
+                                 marker='.',
+                                 c='red')
+        handles.append(handle2)
+        names.append("Load_from_raw Event Table")
+
+    if signal is not None:
+        handle, = panel2.plot(signal, color="black", lw=0.4)
+
+        handles.append(handle)
+        names.append("signal")
+
+    panel2.set_xlabel('Time')
+    panel2.set_ylabel('Current (pA)')
+
+    panel1.legend(handles, names, loc='upper center', bbox_to_anchor=(0.5, -0.05),
+                  fancybox=True, shadow=True, ncol=5)
+
+    if save_fig_path:
+        plt.savefig(save_fig_path)
+    else:
+        plt.show()
+        pass
+
+
 def get_spaced_colors(n):
     """Create n evenly spaced RGB colors
     :param n: number of colors needed
@@ -228,6 +288,7 @@ def analyze_event_skips(mea_events, sa_full_events, basecall_events,
 
     # build datastructure holding all events by raw start
     raw_start_to_event = dict()
+
     def add_event(event, type):
         key = raw_start(event)
         if key not in raw_start_to_event:
@@ -236,6 +297,7 @@ def analyze_event_skips(mea_events, sa_full_events, basecall_events,
             if event_rank(raw_start_to_event[key][type]) > event_rank(event):
                 return
         raw_start_to_event[key][type] = event
+
     list(map(lambda x: add_event(x, MEA), mea_events))
     list(map(lambda x: add_event(x, SA_FULL), sa_full_events))
     list(map(lambda x: add_event(x, BASECALL), basecall_events))
@@ -243,8 +305,8 @@ def analyze_event_skips(mea_events, sa_full_events, basecall_events,
     # enumerating events
     all_event_keys = list(raw_start_to_event.keys())
     all_event_keys.sort()
-    raw_start_to_event_idx = {s:i for i, s in enumerate(all_event_keys)}
-    event_idx_to_raw_start = {i:s for i, s in enumerate(all_event_keys)}
+    raw_start_to_event_idx = {s: i for i, s in enumerate(all_event_keys)}
+    event_idx_to_raw_start = {i: s for i, s in enumerate(all_event_keys)}
     max_event_idx = max(event_idx_to_raw_start.keys())
 
     # finding distance to basecall
@@ -301,12 +363,14 @@ def analyze_event_skips(mea_events, sa_full_events, basecall_events,
     summaries__mea_event_idx = list(map(lambda x: x[EVENT_INDEX], list(filter(lambda x: x[MEA], summaries))))
     summaries__mea_difference = list(map(lambda x: x[SA_ALIGNMENT_DIFF], list(filter(lambda x: x[MEA], summaries))))
     summaries__no_mea_event_idx = list(map(lambda x: x[EVENT_INDEX], list(filter(lambda x: not x[MEA], summaries))))
-    summaries__no_mea_difference = list(map(lambda x: x[SA_ALIGNMENT_DIFF], list(filter(lambda x: not x[MEA], summaries))))
+    summaries__no_mea_difference = list(
+        map(lambda x: x[SA_ALIGNMENT_DIFF], list(filter(lambda x: not x[MEA], summaries))))
 
     # plot it if appropriate
     if generate_plot is not None and generate_plot:
         plt.plot(summaries__mea_event_idx, summaries__mea_difference, color='blue', label='MEA')
-        plt.scatter(summaries__no_mea_event_idx, summaries__no_mea_difference, color='red', label='Not MEA', alpha=.5, s=10)
+        plt.scatter(summaries__no_mea_event_idx, summaries__no_mea_difference, color='red', label='Not MEA', alpha=.5,
+                    s=10)
         plt.xlabel("Event Index")
         plt.ylabel("Reference Alignment Difference: (SignalAlignRefPos - CigarStringRefPos)")
         plt.legend()
@@ -326,49 +390,68 @@ def main(args=None):
 
     args = args if args is not None else parse_args()
 
+    main_plot = True
+
     if args.dir:
         f5_locations = list_dir(args.dir, ext="fast5")
     else:
         f5_locations = [args.f5_path]
 
-
     for f5_path in f5_locations:
-        save_fig_path = None
-        cl_handle = CreateLabels(f5_path)
-        if args.output_dir:
-            save_fig_path = "{}.png".format(os.path.join(args.output_dir,
-                                                         os.path.splitext(os.path.basename(f5_path))[0]))
+        try:
+            save_fig_path = None
+            cl_handle = CreateLabels(f5_path, kmer_index=2)
+            if args.output_dir:
+                save_fig_path = "{}.png".format(os.path.join(args.output_dir,
+                                                             os.path.splitext(os.path.basename(f5_path))[0]))
 
-        mea_list = list()
-        if args.mea:
-            for number in args.mea:
-                mea = cl_handle.add_mea_labels(number=int(number))
-                mea_list.append(mea)
+            mea_list = list()
+            if args.mea:
+                for number in args.mea:
+                    mea = cl_handle.add_mea_labels(number=int(number))
+                    mea_list.append(mea)
 
-        sa_full_list = list()
-        if args.sa_full:
-            for number in args.sa_full:
-                sa_full = cl_handle.add_signal_align_predictions(number=int(number))
-                sa_full_list.append(sa_full)
+            sa_full_list = list()
+            if args.sa_full:
+                for number in args.sa_full:
+                    sa_full = cl_handle.add_signal_align_predictions(number=int(number), add_basecall=True)
+                    sa_full_list.append(sa_full)
 
-        basecall_list = list()
-        if args.basecall:
-            for number in args.basecall:
-                matches, mismatches = cl_handle.add_basecall_alignment_prediction(number=int(number))
-                basecall = list()
-                basecall.extend(matches)
-                basecall.extend(mismatches)
-                basecall.sort(key=lambda x: x['raw_start'])
-                basecall_list.append(basecall)
+            tombo_full_list = list()
+            if args.tombo:
+                for number in args.tombo:
+                    tombo_full = cl_handle.add_tombo_labels(number=int(number))
+                    tombo_full_list.append(tombo_full)
 
-        max_analysis_index = min(map(lambda x: len(x), [mea_list, sa_full_list])) if args.basecall else []
-        for i in range(max_analysis_index):
-            print("Analyzing events for index {}".format(i))
-            analyze_event_skips(mea_list[i], sa_full_list[i], basecall_list[i])
+            basecall_list = list()
+            if args.basecall:
+                events_list = []
+                for number in args.basecall:
+                    matches, mismatches = cl_handle.add_basecall_alignment_prediction(number=int(number), trim=args.trim)
+                    basecall = list()
+                    basecall.extend(matches)
+                    basecall.extend(mismatches)
+                    basecall.sort(key=lambda x: x['raw_start'])
+                    basecall_list.append(basecall)
+                    events = cl_handle.get_basecalled_data_by_number(int(number))
+                    events_list.append(events)
+                if len(events_list) > 1:
+                    main_plot = False
+                    print("Plotting {}".format(args.f5_path))
+                    plot_basecalled_sequences(events_list[0], events2=events_list[1],
+                                              signal=cl_handle.aligned_signal.scaled_signal)
 
-        print("Plotting {}".format(args.f5_path))
-        ps = PlotSignal(cl_handle.aligned_signal)
-        ps.plot_alignment(save_fig_path=save_fig_path, plot_alpha=args.plot_alpha)
+            max_analysis_index = min(map(lambda x: len(x), [mea_list, sa_full_list])) if args.basecall else 0
+            for i in range(max_analysis_index):
+                print("Analyzing events for index {}".format(i))
+                analyze_event_skips(mea_list[i], sa_full_list[i], basecall_list[i])
+
+            if main_plot:
+                print("Plotting {}".format(f5_path))
+                ps = PlotSignal(cl_handle.aligned_signal)
+                ps.plot_alignment(save_fig_path=save_fig_path, plot_alpha=args.plot_alpha)
+        except KeyError as e:
+            print("FAILED: {}: {}".format(e, f5_path))
 
     stop = timer()
     print("Running Time = {} seconds".format(stop - start), file=sys.stderr)

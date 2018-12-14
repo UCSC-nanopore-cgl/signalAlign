@@ -12,14 +12,316 @@
 #include <eventAligner.h>
 #include "sonLib.h"
 #include "signalMachineUtils.h"
+#include "kseq.h"
+#include <zlib.h>
 
 #define RAW_ROOT "/Raw/Reads/"
+
 //#define DEBUG_ADAPTIVE 1
 //#define DEBUG_FAST5_IO 1
 //#define DEBUG_PRINT_STATS 1
 
+
+int write_readdb_file1(char* fast5_dir, char* output_path){
+    assert(stFile_isDir(fast5_dir));
+    char* fast5_file;
+    char* fastq;
+    char* fast5_path;
+    fastq_entry *fastqEntry;
+    FILE *fH = fopen(output_path, "a");
+    hid_t f5_handle;
+    if (!check_file_ext(output_path, "readdb")){
+        st_errAbort("Output path must end with readdb: %s", output_path);
+    }
+    stList* fast5_files = stFile_getFileNamesInDirectory(fast5_dir);
+    for (int i = 0; i < stList_length(fast5_files); i++){
+        fast5_file = stList_get(fast5_files, i);
+        if (check_file_ext(fast5_file, "fast5")){
+            fast5_path = path_join_two_strings(fast5_dir, fast5_file);
+            f5_handle = fast5_open(fast5_path);
+            fastq = fast5_get_fastq(f5_handle);
+            if (stString_eq(fastq, "")){
+                printf("Fastq not found in: %s\n", fast5_path);
+            } else {
+                fastqEntry = parse_fastq_string(fastq);
+                fprintf(fH, "%s\t%s\n", fastqEntry->name, fast5_file);
+                fastq_entry_destruct(fastqEntry);
+            }
+        }
+    }
+    stList_destruct(fast5_files);
+    fclose(fH);
+    return 0;
+}
+
+int write_fastq_and_readdb_file1(char* fast5_dir, char* fastq_output_path, char* readdb_output_path){
+    assert(stFile_isDir(fast5_dir));
+    char* fast5_file;
+    char* fastq;
+    char* fast5_path;
+    char* read_id;
+    fastq_entry *fastqEntry;
+    FILE *db_fH = fopen(readdb_output_path, "a");
+    FILE *fq_fH = fopen(fastq_output_path, "a");
+
+    hid_t f5_handle;
+    if (!check_file_ext(readdb_output_path, "readdb")){
+        st_errAbort("Output path must end with readdb: %s", readdb_output_path);
+    }
+    if (!check_file_ext(fastq_output_path, "fastq") && !check_file_ext(fastq_output_path, "fq")){
+        st_errAbort("Output path must end with fastq: %s", fastq_output_path);
+    }
+    stList* fast5_files = stFile_getFileNamesInDirectory(fast5_dir);
+    for (int i = 0; i < stList_length(fast5_files); i++){
+        fast5_file = stList_get(fast5_files, i);
+        if (check_file_ext(fast5_file, "fast5")){
+            fast5_path = path_join_two_strings(fast5_dir, fast5_file);
+            f5_handle = fast5_open(fast5_path);
+            fastq = fast5_get_fastq(f5_handle);
+            if (stString_eq(fastq, "")){
+                read_id = fast5_get_read_id(f5_handle);
+                fprintf(db_fH, "%s\t%s\n", read_id, fast5_file);
+                printf("Fastq not found in: %s\n", fast5_path);
+            } else {
+                fastqEntry = parse_fastq_string(fastq);
+                fprintf(db_fH, "%s\t%s\n", fastqEntry->name, fast5_file);
+                fprintf(fq_fH, "%s", fastq);
+                fastq_entry_destruct(fastqEntry);
+            }
+            fast5_close(f5_handle);
+        }
+    }
+    stList_destruct(fast5_files);
+    fclose(db_fH);
+    fclose(fq_fH);
+    return 0;
+}
+
+//int write_readdb_file2(char* fast5_dir, char* fasta, char* output_path){
+//
+//}
+
+void fastq_entry_destruct(fastq_entry *fastq) {
+    free(fastq);
+}
+
+
+fastq_entry *parse_fastq_string(char* fastq_string){
+    fastq_entry *fastq = malloc(sizeof(fastq_entry));
+    char* name;
+    stList *all_fields = stString_splitByString(fastq_string, "\n");
+    name = stList_get(all_fields, 0);
+
+//    check header
+    if (name[0] != '@'){
+        st_errAbort("Fastq string does not start with @.\n");
+    }
+    if (!stString_eq(stList_get(all_fields, 2), "+")){
+        st_errAbort("Fastq string's third line is not +.\n");
+    }
+
+    stList *header = stString_split(name);
+
+    if (stList_length(header) > 1) {
+        name = stList_get(header, 0);
+        fastq->comment = stList_get(header, 1);
+    } else {
+        fastq->comment = "";
+    }
+    fastq->name = stString_getSubString(name, 1, (int64_t) strlen(name));
+
+//    fastq.comment = stList_get(all_fields, 0);
+    fastq->seq = stList_get(all_fields, 1);
+    fastq->qual = stList_get(all_fields, 3);
+    if (strlen(fastq->seq) != strlen(fastq->qual)){
+        st_errAbort("Fastq seq len and qual lengths do not match.\n");
+    }
+    return fastq;
+}
+
+int write_fastqs_to_file(char* fast5_dir, char* output_path){
+//    get fast5s
+    assert(stFile_isDir(fast5_dir));
+    char* fast5_file;
+    char* fastq;
+    char* fast5_path;
+    // open the file for output
+    FILE *fH = fopen(output_path, "a");
+    hid_t f5_handle;
+    stList* fast5_files = stFile_getFileNamesInDirectory(fast5_dir);
+    for (int i = 0; i < stList_length(fast5_files); i++){
+        fast5_file = stList_get(fast5_files, i);
+        if (check_file_ext(fast5_file, "fast5")){
+            fast5_path = path_join_two_strings(fast5_dir, fast5_file);
+            f5_handle = fast5_open(fast5_path);
+            fastq = fast5_get_fastq(f5_handle);
+            if (stString_eq(fastq, "")){
+                printf("Fastq not found in: %s\n", fast5_path);
+            } else {
+                fprintf(fH, "%s", fastq);
+            }
+        }
+    }
+    stList_destruct(fast5_files);
+    fclose(fH);
+    return 0;
+}
+
+char* path_join_two_strings(char* directory, char* file_name){
+    stList *path_list = stString_splitByString(directory, "/");
+    if (stString_eq((char*) stList_get(path_list, stList_length(path_list)-1), "\0")){
+        stList_remove(path_list, stList_length(path_list)-1);
+    }
+    stList_append(path_list, file_name);
+    char *final_path = stString_join2("/", path_list);
+    return final_path;
+}
+
+
+bool check_file_ext(char* file_path, char* ext){
+    stList *split_file = stString_splitByString(file_path, ".");
+    if (stString_eq(stList_get(split_file, (stList_length(split_file)-1)), ext)){
+        return TRUE;
+    } else {
+        return FALSE;
+    }
+}
+
+bool hdf5_group_exists(hid_t hdf5_file, char* path){
+    hid_t group;
+    bool output;
+    H5E_BEGIN_TRY {
+        group = H5Gopen(hdf5_file, path, H5P_DEFAULT);
+        if (group == -1){
+            output = FALSE;
+        } else {
+            output = TRUE;
+        }
+
+    } H5E_END_TRY;
+    return output;
+}
+
+
+char *fast5_get_fastq(hid_t hdf5_file) {
+    int i = 0;
+    bool keep_going = TRUE;
+    char str[10];
+    char* keep = "not_found";
+    char* maybe;
+
+    while (keep_going){
+        sprintf(str, "%d", i);
+        maybe = stString_concat("Analyses/Basecall_1D_00", str);
+        if (!hdf5_group_exists(hdf5_file, maybe)){
+            keep_going = FALSE;
+        } else {
+            if (i > 0){
+                free(keep);
+            }
+            keep = maybe;
+            ++i;
+        }
+    }
+    free(maybe);
+    if (stString_eq(keep, "not_found")){
+        return "";
+    } else{
+        char* path = stString_concat(keep, "/BaseCalled_template/Fastq");
+        free(keep);
+        char* fastq = fast5_get_string(hdf5_file, path);
+        if (fastq[(size_t) strlen(fastq)-1] != '\n'){
+            fastq = stString_concat(fastq, "\n");
+        }
+        free(path);
+        return fastq;
+    }
+}
+
+
+char *fast5_get_string(hid_t hdf5_file, char* path){
+
+    hid_t       file, filetype, memtype, space, dset;
+    /* Handles */
+    herr_t      status;
+    hsize_t     dims[1] = {1};
+    char        **rdata;
+    int         ndims;
+    char*       out_string;
+
+    dset = H5Dopen (hdf5_file, path, H5P_DEFAULT);
+    /*
+     * Get the datatype.
+     */
+    filetype = H5Dget_type (dset);
+
+    /*
+     * Get dataspace and allocate memory for read buffer.
+     */
+    space = H5Dget_space (dset);
+    ndims = H5Sget_simple_extent_dims (space, dims, NULL);
+    rdata = (char **) malloc (dims[0] * sizeof (char *));
+
+    /*
+     * Create the memory datatype.
+     */
+    memtype = H5Tcopy (H5T_C_S1);
+    H5T_cset_t string_dtype = H5Tget_cset(filetype);
+    status =  H5Tset_cset(memtype, string_dtype);
+    size_t sdim = H5Tget_size(filetype);
+    if (sdim == sizeof(char *)){
+//        variable length string
+        status = H5Tset_size (memtype, H5T_VARIABLE);
+        /*
+         * Read the data.
+         */
+        status = H5Dread (dset, memtype, H5S_ALL, H5S_ALL, H5P_DEFAULT, rdata);
+
+        out_string = stString_copy(rdata[0]);
+        status = H5Dvlen_reclaim (memtype, space, H5P_DEFAULT, rdata);
+        free(rdata);
+
+    } else{
+//        set size of string dataset
+        sdim++;
+        rdata = (char **) malloc (dims[0] * sizeof (char *));
+        rdata[0] = (char *) malloc (dims[0] * sdim * sizeof (char));
+        /*
+         * Set the rest of the pointers to rows to the correct addresses.
+         */
+        for (int i=1; i<dims[0]; i++)
+            rdata[i] = rdata[0] + i * sdim;
+
+        /*
+         * Create the memory datatype.
+         */
+        status = H5Tset_size (memtype, sdim);
+
+        /*
+         * Read the data.
+         */
+        status = H5Dread (dset, memtype, H5S_ALL, H5S_ALL, H5P_DEFAULT, rdata[0]);
+//        cleanup
+        out_string = stString_copy(rdata[0]);
+        free (rdata[0]);
+        free (rdata);
+
+    }
+
+    status = H5Dclose (dset);
+    status = H5Sclose (space);
+    status = H5Tclose (filetype);
+    status = H5Tclose (memtype);
+
+    return out_string;
+}
+
+
 hid_t fast5_open(char* filename)
     {
+    if (!stFile_exists(filename)){
+        st_errAbort("File does not exist: %s", filename);
+    }
     hid_t hdf5file = H5Fopen(filename, H5F_ACC_RDWR, H5P_DEFAULT);
     return hdf5file;
     }
@@ -29,7 +331,6 @@ herr_t fast5_close(hid_t hdf5_file)
 {
     return H5Fclose(hdf5_file);
 }
-
 
 
 char* fast5_get_raw_read_name(hid_t hdf5_file)
