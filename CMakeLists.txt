@@ -64,11 +64,15 @@ set(DEBUGGING debugging.c)
 #set(EVENTDETECT eventdetection/filters.c)
 set(EVENTALIGNERTESTS tests/eventAlignerTests.c)
 set(EXTRACT extract.c)
+set(HDPUTIL buildHdpUtil.c)
 
 
 #add_executable(filters ${EVENTDETECT})
 
 add_executable(signalMachine ${SOURCE_FILES} ${SIGNAL_MACHINE})
+target_link_libraries(signalMachine ${SA_LIBRARY})
+
+add_executable(buildHdpUtil ${SOURCE_FILES} ${HDPUTIL})
 target_link_libraries(signalMachine ${SA_LIBRARY})
 
 add_executable(kmerEventAlign ${SOURCE_FILES} kmerEventAlign.c)

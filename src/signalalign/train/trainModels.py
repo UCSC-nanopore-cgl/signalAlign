@@ -81,6 +81,39 @@ def generate_buildAlignments(assignments_pd, kmer_list, max_assignments=10, stra
     final_output = []
     for strand in strands:
         by_strand = assignments_pd.loc[assignments_pd['strand'] == strand]
+        by_strand.sort_values(by='kmer', inplace=True)
+        by_strand.set_index(keys=['kmer'], drop=False, inplace=True)
+        for k in kmer_list:
+            kmer_assignments = by_strand.loc[by_strand.kmer == k]
+            if kmer_assignments.empty and verbose:
+                print("missing kmer {}, continuing".format(k))
+                continue
+            kmer_assignments = kmer_assignments.sort_values(['prob'], ascending=0)[:max_assignments]
+            final_output.append(kmer_assignments)
+            if len(kmer_assignments) < max_assignments and verbose:
+                print("WARNING didn't find {max} requested assignments for {kmer} only found {found}"
+                      "".format(max=max_assignments, kmer=k, found=len(kmer_assignments)))
+    return pd.concat(final_output)
+
+
+def generate_buildAlignments2(assignments_pd, kmer_list, max_assignments=10, strands=('t', 'c'), verbose=False):
+    """Convert assignments to alignment line format for HDP training.
+
+    Filter assignments on a minimum probability, read strand, and a max number of kmer assignments
+
+    :param assignments_pd: giant assignments pandas data table
+    :param verbose: option to print update statements
+    :param strands: 't' or 'c' representing template or complement strand of read
+    :param kmer_list: list of kmers to write to alignment file
+    :param max_assignments: max number of assignments to process for each kmer
+    :param min_probability: the minimum probability to use for assigning kmers
+    """
+    # loop through for each strand in the assignments
+    assert isinstance(strands, list) and len(strands) > 0, \
+        "strands must be a list and not be empty. strands: {}".format(strands)
+    final_output = []
+    for strand in strands:
+        by_strand = assignments_pd.loc[assignments_pd['strand'] == strand]
 
         for k in kmer_list:
             kmer_assignments = by_strand.loc[by_strand['kmer'] == k]
