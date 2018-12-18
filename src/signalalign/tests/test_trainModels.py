@@ -9,14 +9,10 @@
 ########################################################################
 
 
-import sys
 import os
-import numpy as np
 import unittest
 import tempfile
-from collections import defaultdict
 from shutil import copyfile
-from scipy import sparse
 from signalalign.signalAlignment import create_sa_sample_args
 from signalalign.train.trainModels import *
 from signalalign.utils.fileHandlers import FolderHandler
