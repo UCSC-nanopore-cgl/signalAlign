@@ -124,22 +124,6 @@ class AggregateOverReads(object):
         return predicted_data
 
 
-def compare_to_positions(true_positions_data, predicted_data, variants):
-    """Report accuracy compared to positions data"""
-    for i, position in predicted_data.iterrows():
-        probs = [float(position[x]) for x in variants]
-        max_prob = max(probs)
-        max_char = variants[probs.index(max_prob)]
-        contig = position["contig"]
-        strand = position["strand"]
-        position = position["position"]
-        true_char = get_true_character(true_positions_data, contig, strand, position)
-        if true_char is not None:
-            yield contig, strand, position, max_char, true_char, max_prob
-        else:
-            print("Position not found in truth set. contig:{} strand:{} position:{}".format(contig, strand, position))
-
-
 def get_true_character(true_positions_data, contig, strand, position):
     """Get true character from an positions/ambiguity file"""
     true_char = true_positions_data.loc[(true_positions_data['contig'] == contig) &

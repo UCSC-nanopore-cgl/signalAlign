@@ -13,16 +13,13 @@ scrappie_build = ${rootPath}/scrappie/build
 
 LIBS= -lz -lm -lhts -lhdf5 -lgomp -fopenmp
 
-all : sL bD python-utils ${libPath}/signalAlignLib.a ${signalAlignBin}/signalAlignLibTests \
+all : sL bD ${libPath}/signalAlignLib.a ${signalAlignBin}/signalAlignLibTests \
 	  ${signalAlignBin}/compareDistributions ${signalAlignBin}/kmerEventAlign \
 	  ${signalAlignBin}/signalMachine ${signalAlignBin}/runSignalAlign \
 	  ${signalAlignBin}/variantCallingLib.py ${signalAlignBin}/alignmentAnalysisLib.py \
 	  ${signalAlignBin}/buildHdpUtil ${signalAlignBin}/trainModels all_tests \
 	  externals python_setup ${signalAlignBin}/filterReads ${signalAlignBin}/extract \
 	  ${signalAlignBin}/sequencing_summary ${signalAlignBin}/plot_kmer_distributions
-
-python-utils :
-	cd python_utils && python3 setup.py install
 
 
 #${rootPath}/lib/libhdf5.a:
@@ -86,7 +83,6 @@ test :
 		fi;\
 	done; \
 	if [ $$FAIL -ne 0 ]; then exit -1; fi;
-	cd python_utils && pytest
 
 
 ${signalAlignBin}/compareDistributions : compareDistributions.c ${libPath}/signalAlignLib.a ${signalAlignDependencies}

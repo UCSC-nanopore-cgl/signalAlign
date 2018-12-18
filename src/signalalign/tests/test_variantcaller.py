@@ -8,8 +8,6 @@
 # History: 12/13/18 Created
 ########################################################################
 
-
-import sys
 import os
 import unittest
 import tempfile
@@ -34,8 +32,25 @@ class TestVariantCaller(unittest.TestCase):
         aor_h = AggregateOverReads(self.variant_files, "CE")
         all_data = aor_h.aggregate_all_variantcalls()
         for i, data in all_data.iterrows():
+            self.assertEqual(data["contig"], "gi_ecoli")
+            self.assertLessEqual(data["C"]+data["E"], 1)
+
+    def test_marginalize_over_all_reads(self):
+        aor_h = AggregateOverReads(self.variant_files, "CE")
+        all_data = aor_h.marginalize_over_all_reads()
+        for i, data in all_data.iterrows():
             self.assertEqual(data[0], "gi_ecoli")
-            self.assertLessEqual(data[3]+data[4], 1)
+            self.assertLessEqual(data["C"]+data["E"], 1)
+
+    def test_write_data(self):
+        aor_h = AggregateOverReads(self.variant_files, "CE")
+        all_data = aor_h.marginalize_over_all_reads()
+
+        with tempfile.TemporaryDirectory() as tempdir:
+            new_file = os.path.join(tempdir, "test.txt")
+            aor_h.write_data(new_file)
+            data = pd.read_csv(new_file, delimiter="\t")
+            self.assertTrue(data.equals(all_data))
 
     def test_normalize_all_data(self):
         aor_h = AggregateOverReads(self.variant_files, "CE")
@@ -53,6 +68,35 @@ class TestVariantCaller(unittest.TestCase):
                 # self.contig, pos, self.strand], nuc_data
                 self.assertEqual(data["contig"], "gi_ecoli")
                 self.assertLessEqual(data["E"] + data["C"], 1)
+
+    def test_create_labels_from_positions_file(self):
+        labels = create_labels_from_positions_file(self.ecoli_positions, "CE")
+        for i, label in labels.iterrows():
+            if label["change_to"] == "C":
+                self.assertTrue(label["C"] == 1)
+                self.assertTrue(label["E"] == 0)
+            if label["change_to"] == "E":
+                self.assertTrue(label["E"] == 1)
+                self.assertTrue(label["C"] == 0)
+
+    def test_get_true_character(self):
+        labels = create_labels_from_positions_file(self.ecoli_positions, "CE")
+        for i, label in labels.iterrows():
+            self.assertEqual(get_true_character(labels, "gi_ecoli", label["strand"], label["position"]), label["change_to"])
+
+    def test_generate_labels(self):
+        labels = create_labels_from_positions_file(self.ecoli_positions, "CE")
+        aor_h = AggregateOverReads(self.variant_files, "CE")
+        all_data = aor_h.aggregate_all_variantcalls()
+        data = aor_h.generate_labels(labels, all_data)
+        for i, row in data.iterrows():
+            if row["C"] > row["E"]:
+                self.assertEqual(1, row["label_E"])
+                self.assertEqual(0, row["label_C"])
+
+            if row["C"] > row["E"]:
+                self.assertEqual(0, row["label_E"])
+                self.assertEqual(1, row["label_C"])
 
 
 if __name__ == '__main__':
