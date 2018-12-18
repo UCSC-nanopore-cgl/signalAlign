@@ -310,7 +310,7 @@ class TrainSignalAlign(object):
         self.working_path = self.working_folder.open_folder(os.path.join(self.args.output_dir,
                                                                          "tempFiles_trainModels_" + str(append)))
 
-    def train_hdp(self):
+    def train_hdp(self, iteration=""):
         """Train hdp.... duh?
         :param outpath: output file path
         :param build_alignment: path to alignment file
@@ -344,6 +344,9 @@ class TrainSignalAlign(object):
         :param kmer_length: length of kmer
         :return: dictionary of hdp training options
         """
+        if iteration:
+            iteration = iteration + "."
+
         if self.args.hdp_args.built_alignments:
             assert os.path.isfile(self.args.hdp_args.built_alignments), \
                 "Build alignment file does not exist. {}".format(self.args.hdp_args.built_alignments)
@@ -367,12 +370,12 @@ class TrainSignalAlign(object):
 
         verbose_flag = "--verbose "
         # create the output paths for the models
-        template_hdp_location = os.path.join(self.working_path, "template." + self.args.hdp_args.hdp_type + ".nhdp")
+        template_hdp_location = os.path.join(self.working_path, "template." + iteration + self.args.hdp_args.hdp_type + ".nhdp")
         complement_hdp_location = None
         if self.two_d:
             one_d = None
             complement_hdp_location = os.path.join(self.working_path,
-                                                   "complement." + self.args.hdp_args.hdp_type + ".nhdp")
+                                                   "complement." + iteration + self.args.hdp_args.hdp_type + ".nhdp")
         else:
             one_d = '--oneD'
 
@@ -425,9 +428,11 @@ class TrainSignalAlign(object):
         self.state_machine_type = "threeStateHdp"
         return self.template_hdp_model_path, self.complement_hdp_model_path
 
-    def train_normal_hmm(self, transitions=True, emissions=False):
+    def train_normal_hmm(self, transitions=True, emissions=False, iteration=""):
         """Train model transitions"""
         i = 0
+        if iteration:
+            iteration = "_"+iteration
         # start iterating
         while i < self.args.transitions_args.iterations:
             # align all the samples
@@ -439,11 +444,18 @@ class TrainSignalAlign(object):
                                            if x.endswith(".template.expectations.tsv")]
 
             if len(template_expectations_files) > 0:
+                new_template_hmm = self.working_folder.add_file_path("template_trained_{}{}.hmm".format(i, iteration))
+                copyfile(self.template_hmm_model_path, new_template_hmm)
+                self.template_hmm_model_path = new_template_hmm
                 self.template_model.add_and_normalize_expectations(files=template_expectations_files,
                                                                    hmm_file=self.template_hmm_model_path,
                                                                    update_transitions=transitions,
                                                                    update_emissions=emissions)
             if self.two_d:
+                new_complement_hmm = self.working_folder.add_file_path("complement_trained_{}{}.hmm".format(i, iteration))
+                copyfile(self.complement_hmm_model_path, new_complement_hmm)
+                self.complement_hmm_model_path = new_complement_hmm
+
                 complement_expectations_files = [x for x in all_sample_files
                                                  if x.endswith(".complement.expectations.tsv")]
                 if len(complement_expectations_files) > 0:
@@ -492,14 +504,14 @@ class TrainSignalAlign(object):
             for i in range(1, self.args.training.em_iterations + 1):
                 print("[trainModels] Training HMM transition distributions. iteration: {}".format(i))
                 # first train the model transitions
-                self.train_normal_hmm()
+                self.train_normal_hmm(iteration=str(i))
                 print("[trainModels] Running Assignment with new HMM transition distributions. "
                       "iteration: {}".format(i))
                 # next get assignments
                 self.run_signal_align()
                 print("[trainModels] Training HDP emission distributions. iteration: {}".format(i))
                 # make new hdp
-                self.train_hdp()
+                self.train_hdp(iteration=str(i))
                 print([sample.analysis_files for sample in self.samples])
                 print(self.template_hdp_model_path)
                 print(self.template_hmm_model_path)
@@ -510,12 +522,12 @@ class TrainSignalAlign(object):
             if self.args.training.transitions:
                 print("[trainModels] Training HMM transition distributions.")
                 # self.train_transitions()
-                self.train_normal_hmm()
+                self.train_normal_hmm(iteration="")
             if self.args.training.hdp_emissions:
                 print("[trainModels] Training HDP emission distributions.")
                 if not self.args.hdp_args.built_alignments:
                     self.run_signal_align(check_samples=True)
-                self.train_hdp()
+                self.train_hdp(iteration="")
         else:
             raise AssertionError("Must set one of the following to True. "
                                  "training.transitions: {}, training.hdp_emissions: {}, "

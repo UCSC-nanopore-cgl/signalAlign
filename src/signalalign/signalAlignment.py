@@ -894,9 +894,10 @@ class SignalAlignSample(object):
     def process_references(self):
         """Process a set of Fast5 files. Creates edited reference sequences if needed"""
         if self.fw_fasta_path is None:
-            assert os.path.isfile(
-                self.bwa_reference), "Must specify a bwa_reference in order to create signalAlignments. {}" \
-                                     "".format(self.bwa_reference)
+            if not self.alignment_file:
+                assert os.path.isfile(
+                    self.bwa_reference), "Must specify a bwa_reference in order to create signalAlignments. {}" \
+                                         "".format(self.bwa_reference)
             self.fw_fasta_path, self.bw_fasta_path = processReferenceFasta(fasta=self.bwa_reference,
                                                                            work_folder=self.working_folder,
                                                                            motifs=self.motifs,

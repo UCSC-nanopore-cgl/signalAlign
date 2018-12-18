@@ -57,6 +57,7 @@ clean :
 	cd sonLib && make clean
 
 python_setup :
+	which python3
 	python3 setup.py install
 
 pip_install : .FORCE

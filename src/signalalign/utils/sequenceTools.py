@@ -8,7 +8,6 @@
 # History: 5/21/18 Created
 ########################################################################
 
-import re
 import os
 import sys
 import string
@@ -16,14 +15,11 @@ import array
 import subprocess
 import numpy as np
 import pandas as pd
-
+import pysam
+from contextlib import closing
 from collections import Counter
-
-from signalalign.motif import getMotif
 from signalalign.utils.parsers import read_fasta
 from py3helpers.utils import find_substring_indices, all_string_permutations
-from contextlib import closing
-import pysam
 
 
 def find_gatc_motifs(sequence):
@@ -72,55 +68,30 @@ def find_modification_index_and_character(canonical_motif, replacement_motif):
     return pos, old_char, new_char
 
 
-# def make_positions_file(reference, output_path, *args):
-#     """Creates a tsv file with the following format ("contig", "position", "strand", "change_from", "change_to").
-#     Given a reference sequence and sets of sequence motif changes we report the location of each change.
-#
-#     ex: x : args = [("CCAGG","CFAGG"), ("CCTGG","CFTGG")]"""
-#     with open(output_path, "w") as outfile:
-#         for header, comment, sequence in read_fasta(reference):
-#             for pair in args:
-#                 motif = pair[0]
-#                 modified = pair[1]
-#                 # get pos, old character and the replacement character
-#                 pos, old_char, new_char = find_modification_index_and_character(motif, modified)
-#                 # get get rev_complement of motif and modified
-#                 motif_comp = get_motif_REVcomplement(motif)
-#                 # changed from rev complement to expand the alphabet and not contain
-#                 # replacements to a single character, it can be different across motifs
-#                 modified_comp = motif_comp[:rev_comp_pos] + new_char + \
-#                                 motif_comp[rev_comp_pos+1:]
-#
-#                 seq_str_fwd = reference.replace(motif, modified)
-#                 seq_str_bwd = reference.replace(motif_comp, modified_comp)
-#                 nuc_positions = nuc_position(seq_str_fwd, new_char)
-#                 for pos in nuc_positions:
-#                     outfile.write(seq_name + "\t" + np.str(pos) + "\t" + "+" + "\t"
-#                                   + old_char +"\t" + new_char + "\n")
-#                 nuc_positions = nuc_position(seq_str_bwd, new_char)
-#                 for pos in nuc_positions:
-#                     outfile.write(seq_name + "\t" + np.str(pos) + "\t" + "-" + "\t"
-#                                   + old_char +"\t" + new_char + "\n")
+def make_positions_file(reference, output_path, motifs, overlap=False):
+    """Creates a tsv file with the following format ("contig", "position", "strand", "change_from", "change_to").
+    Given a reference sequence and sets of sequence motif changes we report the location of each change.
 
-#
-# def make_gatc_position_file(fasta, outfile):
-#     outfile = os.path.abspath(outfile)
-#     fH = open(outfile, 'w')
-#     fH.write("X\t")
-#
-#     seq = get_first_seq(fasta)
-#     for i in find_gatc_motifs(seq):
-#         assert seq[i] == "A"
-#         fH.write("{}\t".format(i))
-#     fH.write("\n")
-#     fH.write("X\t")
-#     for i in find_gatc_motifs(seq):
-#         t_pos = i + 1
-#         assert seq[t_pos] == "T"
-#         fH.write("{}\t".format(t_pos))  # + 1 because this is for the reverse complement
-#     fH.write("\n")
-#     fH.close()
-#     return outfile
+    NOTE: the motifs cannot create new characters on the opposite strand!
+
+    :param reference: path to reference sequence
+    :param output_path: output path of positions file
+    :param motifs: list of lists of find replace motifs ex: [("CCAGG","CFAGG"), ("CCTGG","CFTGG")]
+    :param overlap: if the motif can overlap with its self, find index of overlap if set to true
+    """
+    with open(output_path, "w") as outfile:
+        for header, comment, sequence in read_fasta(reference):
+            fwd_seq = sequence
+            bwd_seq = reverse_complement(fwd_seq, reverse=False, complement=True).upper()
+            for index, old_char, substitution_char in find_motifs_sequence_positions(fwd_seq, motifs, overlap=overlap):
+                outfile.write(header + "\t" + np.str(index) + "\t" + "+" + "\t"
+                              + old_char + "\t" + substitution_char + "\n")
+            for index, old_char, substitution_char in find_motifs_sequence_positions(bwd_seq, motifs, overlap=overlap):
+                outfile.write(header + "\t" + np.str(index) + "\t" + "-" + "\t"
+                              + old_char + "\t" + substitution_char + "\n")
+
+    return output_path
+
 
 def replace_motifs_sequence_positions(sequence, motifs, overlap=False):
     """Edit nucleotide sequence using find and replace motifs
@@ -132,6 +103,21 @@ def replace_motifs_sequence_positions(sequence, motifs, overlap=False):
     :param overlap: boolean option to look for motif overlaps
     """
     new_sequence = list(sequence)
+    for index, old_char, substitution_char in find_motifs_sequence_positions(sequence, motifs, overlap=overlap):
+        new_sequence[index] = substitution_char
+    subst_sequence = ''.join(new_sequence).upper()
+    return subst_sequence
+
+
+def find_motifs_sequence_positions(sequence, motifs, overlap=False):
+    """Find locations of edited nucleotide nucleotide sequence using find and replace motifs
+
+    note: we convert sequence to uppercase
+
+    :param sequence: nucleotide sequence
+    :param motifs: list of motif's which need to be replaced: eg [[find, replace]], [["CCAGG", "CEAGG"]]
+    :param overlap: boolean option to look for motif overlaps
+    """
     already_repaced_indexes = set()
     # gather motifs
     for motif_pair in motifs:
@@ -139,15 +125,13 @@ def replace_motifs_sequence_positions(sequence, motifs, overlap=False):
             motif_pair) is list, "Motifs must be structured as list of lists, even for one motif find and replace"
         # find edit character and offset
         offset, old_char, substitution_char = find_modification_index_and_character(motif_pair[0], motif_pair[1])
-        for index in find_substring_indices(sequence, motif_pair[0], offset=offset, overlap=overlap):
-            new_sequence[index] = substitution_char
+        for index in find_substring_indices(sequence.upper(), motif_pair[0].upper(), offset=offset, overlap=overlap):
             # make sure that there is no overlapping assignments of characters
             assert index not in already_repaced_indexes, "Motifs has two different edits to a single nucleotide " \
                                                          "location. Check motifs {}".format(motifs)
             already_repaced_indexes.add(index)
 
-    subst_sequence = ''.join(new_sequence).upper()
-    return subst_sequence
+            yield index, old_char, substitution_char
 
 
 def replace_periodic_sequence_positions(sequence, step_size, offset, substitution_char):
@@ -292,7 +276,7 @@ def get_motif_kmers(motif_pair, k, alphabet="ATGC"):
     front_overlap, back_overlap = get_front_back_kmer_overlap(k, motif_len, mod_index)
     # pre-compute kmers
     kmer_set_dict = dict()
-    for i in range(1, max(front_overlap, back_overlap)+1):
+    for i in range(1, max(front_overlap, back_overlap) + 1):
         kmer_set_dict[i] = [x for x in all_string_permutations(alphabet, i)]
     kmer_set_dict[0] = ['']
 
@@ -303,18 +287,19 @@ def get_motif_kmers(motif_pair, k, alphabet="ATGC"):
             front_index = i - front_overlap
             prepend_kmers = ['']
         else:
-            prepend_kmers = kmer_set_dict[front_overlap-i]
+            prepend_kmers = kmer_set_dict[front_overlap - i]
             front_index = 0
         # get append kmers and index for back of motif
         if i > bases_after:
             append_kmers = kmer_set_dict[i - bases_after]
             back_index = motif_len
         else:
-            back_index = mod_index+i+1
+            back_index = mod_index + i + 1
             append_kmers = ['']
 
         kmer = modified[front_index:back_index]
-        motif_kmers.extend([front+kmer+back for front in prepend_kmers for back in append_kmers if front+kmer+back is not ''])
+        motif_kmers.extend(
+            [front + kmer + back for front in prepend_kmers for back in append_kmers if front + kmer + back is not ''])
 
     return set(motif_kmers)
 
@@ -419,7 +404,6 @@ def getFastaDictionary(fastaFile):
     return dict(namesAndSequences)  # Hash of names to sequences
 
 
-
 def kmer_iterator(dna, k):
     """Generates kmers of length k from a string with one step between kmers
 
@@ -515,11 +499,11 @@ class CustomAmbiguityPositions(object):
         return pd.read_table(ambig_filepath,
                              usecols=(0, 1, 2, 3, 4),
                              names=["contig", "position", "strand", "change_from", "change_to"],
-                             dtype={"contig"      : np.str,
-                                    "position"    : np.int,
-                                    "strand"      : np.str,
-                                    "change_from" : np.str,
-                                    "change_to"   : np.str})
+                             dtype={"contig": np.str,
+                                    "position": np.int,
+                                    "strand": np.str,
+                                    "change_from": np.str,
+                                    "change_to": np.str})
 
     def getForwardSequence(self, contig, raw_sequence):
         """Edit 'raw_sequence' given a ambiguity positions file. Assumes raw_sequence is forward direction( 5'-3')
@@ -549,8 +533,9 @@ class CustomAmbiguityPositions(object):
         raw_sequence = list(raw_sequence)
         for _, row in contif_df.iterrows():
             if raw_sequence[row["position"]] != row["change_from"]:
-                raise RuntimeError("[CustomAmbiguityPositions._get_substituted_sequence]Illegal substitution requesting "
-                                   "change from %s to %s, row: %s" % (raw_sequence[row["position"]], row["change_to"], row))
+                raise RuntimeError(
+                    "[CustomAmbiguityPositions._get_substituted_sequence]Illegal substitution requesting "
+                    "change from %s to %s, row: %s" % (raw_sequence[row["position"]], row["change_to"], row))
             raw_sequence[row["position"]] = row["change_to"]
         return "".join(raw_sequence)
 
@@ -560,7 +545,8 @@ class CustomAmbiguityPositions(object):
         :param contig: name of contig to find
         :param strand: '+' or '-' to indicate strand
         """
-        df = self.ambig_df.loc[(self.ambig_df["contig"] == contig) & (self.ambig_df["strand"] == strand)].drop_duplicates()
+        df = self.ambig_df.loc[
+            (self.ambig_df["contig"] == contig) & (self.ambig_df["strand"] == strand)].drop_duplicates()
         assert len(df['position']) == len(set(df['position'])), "Multiple different changes for a single position. {}" \
             .format(df['position'])
         return df
@@ -658,42 +644,3 @@ def get_full_nucleotide_read_from_alignment(alignment_location, read_name, hardc
             break
 
     return sequence, qualities, hardclipped_start, hardclipped_end, aligned_segment
-
-
-# def get_full_nucleotide_read_from_aligned_segment(aligned_segment, read_name, hardclip_character=None):
-#     sequence, qualities, hardclipped_start, hardclipped_end = None, None, 0, 0
-#
-#     BAM_CHARD_CLIP = 5
-#     # get data and sanity check
-#     sequence = aligned_segment.query_sequence.upper()
-#     qualities = aligned_segment.qual
-#     cigar_tuples = aligned_segment.cigartuples
-#     if cigar_tuples is None or len(cigar_tuples) == 0:
-#         print("[get_full_nucleotide_read_from_alignment] no alignment found for {} in {}".format(
-#             read_name, aligned_segment), file=sys.stderr)
-#
-#     else:
-#         # check for hard clipping
-#         if cigar_tuples[0][0] == BAM_CHARD_CLIP:
-#             hardclipped_start = cigar_tuples[0][1]
-#             if hardclip_character is not None:
-#                 sequence = (hardclip_character * hardclipped_start) + sequence
-#                 if qualities is not None and len(qualities) != 0:
-#                     qualities = ("!" * hardclipped_start) + qualities
-#         if cigar_tuples[-1][0] == BAM_CHARD_CLIP:
-#             hardclipped_end = cigar_tuples[-1][1]
-#             if hardclip_character is not None:
-#                 sequence = sequence + (hardclip_character * hardclipped_end)
-#                 if qualities is not None and len(qualities) != 0:
-#                     qualities = qualities + ("!" * hardclipped_end)
-#
-#         # check for reverse mapping
-#         if aligned_segment.is_reverse:
-#             sequence = reverse_complement(sequence, reverse=True, complement=True)
-#             if qualities is not None and len(qualities) != 0:
-#                 qualities = ''.join(reversed(list(qualities)))
-#             tmp = hardclipped_end
-#             hardclipped_end = hardclipped_start
-#             hardclipped_start = tmp
-#
-#     return sequence, qualities, hardclipped_start, hardclipped_end, aligned_segment
