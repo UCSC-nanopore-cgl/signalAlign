@@ -123,11 +123,11 @@ def parse_read_name_map_file(read_map, directories, recursive=False):
                     for dir_path2 in directories2:
                         full_path = os.path.join(dir_path2, split_line[path_index])
                         if os.path.exists(full_path):
-                            yield split_line[name_index], full_path
+                            yield split_line[name_index], os.path.abspath(full_path)
                 else:
                     full_path = os.path.join(dir_path, split_line[path_index])
                     if os.path.exists(full_path):
-                        yield split_line[name_index], full_path
+                        yield split_line[name_index], os.path.abspath(full_path)
 
 
 def filter_reads(alignment_file, readdb, read_dirs, quality_threshold=7, recursive=False, trim=False):
