@@ -105,4 +105,9 @@ int main(int argc, char *argv[]) {
     } else {
         write_fastq_and_readdb_file1(fast5dir, fastq_out_file, readdb_out_file);
     }
+    free(fast5dir);
+    free(output_file);
+    free(fastq_out_file);
+    free(readdb_out_file);
+    stList_destruct(find_dots);
 }
