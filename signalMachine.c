@@ -839,7 +839,7 @@ int main(int argc, char *argv[]) {
             // write to file
             if (posteriorProbsFile != NULL) {
                 outputAlignment(outFmt, posteriorProbsFile, readLabel, sMc, npRead->complementParams,
-                                npRead->complementEvents, R->getComplementTargetSequence(R), forward, pA->contig1,
+                                npRead->complementEvents, R->getComplementTargetSequence(R), !forward, pA->contig1,
                                 cCoordinateShift, rCoordinateShift_c, complementAlignedPairs, complementPosteriorScore,
                                 complement, rna);
             }
