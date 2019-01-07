@@ -65,6 +65,7 @@ int write_fastq_and_readdb_file1(char* fast5_dir, char* fastq_output_path, char*
     FILE *fq_fH = fopen(fastq_output_path, "a");
 
     hid_t f5_handle;
+    herr_t status;
     if (!check_file_ext(readdb_output_path, "readdb")){
         st_errAbort("Output path must end with readdb: %s", readdb_output_path);
     }
@@ -88,7 +89,7 @@ int write_fastq_and_readdb_file1(char* fast5_dir, char* fastq_output_path, char*
                 fprintf(fq_fH, "%s", fastq);
                 fastq_entry_destruct(fastqEntry);
             }
-            fast5_close(f5_handle);
+            status = fast5_close(f5_handle);
         }
     }
     stList_destruct(fast5_files);
