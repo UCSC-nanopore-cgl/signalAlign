@@ -326,6 +326,18 @@ class SignalAlignmentTest(unittest.TestCase):
             # run signalAlign
             result = call(alignment_command, shell=True, bufsize=-1)
 
+    def test_read_in_signal_align_tsv(self):
+        example = os.path.join(self.HOME, "tests/test_assignment_files/d6160b0b-a35e-43b5-947f-adaa1abade28.sm.assignments.tsv")
+        data = SignalAlignment.read_in_signal_align_tsv(example, "assignments")
+        self.assertEqual(NanoporeRead.bytes_to_string(data["k-mer"][0]), "GCCTTA")
+        with tempfile.TemporaryDirectory() as tempdir:
+            file1 = os.path.join(tempdir, "test.txt")
+            with open(file1, "w") as f:
+                subprocess.call(["head", "-1", example], stdout=f)
+            data = SignalAlignment.read_in_signal_align_tsv(file1, "assignments")
+            self.assertEqual(NanoporeRead.bytes_to_string(data["k-mer"][0]), "GCCTTA")
+
+
 
 
 if __name__ == '__main__':

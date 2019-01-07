@@ -573,7 +573,7 @@ class SignalAlignment(object):
                          ('base', 'S6'), ('posterior_probability', float), ('strand', 'S1'),
                          ('forward_mapped', "S8"), ('read_file', 'S57'), ('posterior_score', float), ('contig', 'S100')]
 
-            event_table = np.loadtxt(tsvin, dtype=dtype)
+            event_table = np.loadtxt(tsvin, dtype=dtype, ndmin=1)
 
             def remove_field_name(a, name):
                 names = list(a.dtype.names)
