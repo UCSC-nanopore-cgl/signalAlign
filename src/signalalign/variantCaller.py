@@ -78,6 +78,8 @@ class AggregateOverReads(object):
         all_data = pd.DataFrame()
 
         for v_tsv in self.variant_tsvs:
+            if os.stat(v_tsv).st_size == 0:
+                continue
             mv_h = MarginalizeVariants(v_tsv, variants=self.variants)
             position_probs = mv_h.get_data()
             all_data = all_data.append(position_probs, ignore_index=True)
@@ -119,7 +121,10 @@ class AggregateOverReads(object):
             strand = predicted_data.loc[i]["strand"]
             position = predicted_data.loc[i]["position"]
             true_char = get_true_character(labelled_positions, contig, strand, position)
-            predicted_data.loc[i, true_char+"_label"] = 1
+            if true_char is None:
+                print("No variant found in labelled data at chr:{} pos:{} strand:{}: Check positions file".format(contig, position, strand))
+            else:
+                predicted_data.loc[i, true_char+"_label"] = 1
 
         return predicted_data
 
