@@ -165,11 +165,11 @@ void writePosteriorProbsVC(char *posteriorProbsFile, char *readLabel, StateMachi
                            Strand strand, double posteriorScore, bool rna, char *contig) {
     // label for tsv output
     char *strandLabel = strand == template ? "t" : "c";
-    if (rna || strand == template){
+    if (rna || strand != template){
         forward = !forward;
     }
     char *forwardLabel = forward ? "forward" : "backward";
-    if (rna || strand == template){
+    if (rna || strand != template){
         forward = !forward;
     }
 
