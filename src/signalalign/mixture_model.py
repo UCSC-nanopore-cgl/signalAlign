@@ -99,7 +99,7 @@ def fit_model_to_kmer_dist(all_assignments, kmer, n_normals=2):
 
 
 def main():
-    base_model = "/Users/andrewbailey/CLionProjects/nanopore-RNN/submodules/signalAlign/models/testModelR9_acgt_template.model"
+    base_model = "/Users/andrewbailey/CLionProjects/nanopore-RNN/submodules/signalAlign/models/testModelR9_5mer_acgt_template.model"
     # assignment_dir = "/Users/andrewbailey/CLionProjects/nanopore-RNN/submodules/signalAlign/tests/test_assignment_files"
     # alphabet = "ATGCJL"
     built_model = "/Users/andrewbailey/CLionProjects/nanopore-RNN/submodules/signalAlign/models/buildAlignment.tsv"
@@ -109,17 +109,20 @@ def main():
     # X = assignments['descaled_event_mean'].reshape((-1, 1))
     main_kmer = "TAATT"
     new_kmer = "TAJTT"
-
+    new_model_path = "/Users/andrewbailey/CLionProjects/nanopore-RNN/submodules/signalAlign/models/test_ACGJT_5mer.model"
     # print(assignments[assignments["k-mer"] == main_kmer]["descaled_event_mean"])
 
+    mixture_model = fit_model_to_kmer_dist(assignments, main_kmer, n_normals=2)
+    # new_model = create_new_model(base_model, new_model_path, [("A", "J")])
 
+    new_model_h = HmmModel(new_model_path)
+    mixture_normals = get_mus_and_sigmas_1d(mixture_model)
+    original, other = closest_to_canonical(mixture_normals, new_model_h.get_event_mean_gaussian_parameters(main_kmer)[0])
+    new_model_h.set_kmer_event_mean(new_kmer, other[0][0][0])
+    new_model_h.set_kmer_event_sd(new_kmer, other[0][1][0])
 
-    fit_model_to_kmer_dist(assignments, main_kmer, n_normals=2)
-    with tempfile.TemporaryDirectory() as tempdir:
-        test_model_file = os.path.join(tempdir, "fake.hmm")
-        new_model = create_new_model(base_model, test_model_file, (("A", "J")))
-    new_model.plot_kmer_distribution(main_kmer)
-    new_model.plot_kmer_distribution(new_kmer)
+    # new_model_h.plot_kmer_distribution(main_kmer)
+    new_model_h.plot_kmer_distributions([main_kmer, new_kmer])
 
 
     ##################################################

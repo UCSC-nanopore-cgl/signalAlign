@@ -562,7 +562,12 @@ class HmmModel(object):
             return t_right * y[idx_left] + t_left * y[idx_right] + t_left * t_right * (a * t_right + b * t_left)
 
     def plot_kmer_distribution(self, kmer, alignment_file=None, alignment_file_data=None, savefig_dir=None):
-        """Plot the distribution of a kmer with ONT and/or HDP distributions"""
+        """Plot the distribution of a kmer with ONT and/or HDP distributions
+        :param kmer: kmer to plot
+        :param alignment_file: path to alignment file if you want to plot alignment data as well
+        :param alignment_file_data: use alignment data if it has already been loaded in
+        :param savefig_dir: path to plot save directory
+        """
         assert self.has_ont_model, "Must have ONT model loaded"
         if savefig_dir:
             assert os.path.exists(savefig_dir), "Save figure directory does not exist: {}".format(savefig_dir)
@@ -827,6 +832,138 @@ class HmmModel(object):
         k = self.get_kmer_index(kmer)
         self.event_model["noise_lambdas"][k] = noise_lambdas
 
+    def plot_kmer_distributions(self, kmer_list, alignment_file=None, alignment_file_data=None, savefig_dir=None):
+        """Plot multiple kmer distribution onto a single plot with ONT and/or HDP distributions
+        :param kmer_list: list of kmers to plot
+        :param alignment_file: path to alignment file if you want to plot alignment data as well
+        :param alignment_file_data: use alignment data if it has already been loaded in
+        :param savefig_dir: path to plot save directory
+        """
+        assert self.has_ont_model, "Must have ONT model loaded"
+        if savefig_dir:
+            assert os.path.exists(savefig_dir), "Save figure directory does not exist: {}".format(savefig_dir)
+        # keep track of handles and text depending on which models are loaded
+        handles1 = []
+        legend_text1 = []
+        handles2 = []
+        legend_text2 = []
+        plt.figure(figsize=(12, 8))
+        panel1 = plt.axes([0.1, 0.1, .6, .8])
+        panel1.set_xlabel('pA')
+        panel1.set_ylabel('Density')
+        panel1.grid(color='black', linestyle='-', linewidth=1, alpha=0.5)
+        panel1.xaxis.set_major_locator(ticker.AutoLocator())
+        panel1.xaxis.set_minor_locator(ticker.AutoMinorLocator())
+        min_x = 1000
+        max_x = 0
+
+        for kmer in kmer_list:
+            normal_mean, normal_sd = self.get_event_mean_gaussian_parameters(kmer)
+
+            tmp_min_x = normal_mean-(5*normal_sd)
+            tmp_max_x = normal_mean+(5*normal_sd)
+            if min_x > tmp_min_x:
+                min_x = tmp_min_x
+            if max_x < tmp_max_x:
+                max_x = tmp_max_x
+
+            # plot ont normal distribution
+            x = np.linspace(normal_mean - 4*normal_sd, normal_mean + 4*normal_sd, 200)
+            ont_handle, = panel1.plot(x, norm.pdf(x, normal_mean, normal_sd), label=kmer)
+            # panel1.plot([normal_mean, normal_mean], [0, norm.pdf(normal_mean, normal_mean, normal_sd)], lw=2)
+            ont_model_name = os.path.basename(self.ont_model_file)
+            txt_handle1, = panel1.plot([], [], ' ')
+            txt_handle2, = panel1.plot([], [], ' ')
+            txt_handle3, = panel1.plot([], [], ' ')
+
+            handles1.append(ont_handle)
+            legend_text1.append("{} ONT Normal".format(kmer))
+
+            handles2.extend([txt_handle1, txt_handle2, txt_handle3])
+            legend_text2.extend(["{} ONT Model: \n  {}".format(kmer, ont_model_name),
+                                 "{} ONT Event Mean: {}".format(kmer, normal_mean),
+                                 "{} ONT Event SD: {}".format(kmer, normal_sd)])
+
+            if self.has_hdp_model:
+                # plot HDP predicted distribution
+                kmer_id = self.get_kmer_index(kmer)
+                x = self.linspace
+                panel1.set_xlim(min(x), max(x))
+                hdp_y = self.all_posterior_pred[kmer_id]
+                hdp_handle, = panel1.plot(x, hdp_y, '-')
+                handles1.append(hdp_handle)
+                legend_text1.append("{} HDP Distribution".format(kmer))
+
+                # # compute entropy and hellinger distance
+                # ont_normal_dist = norm.pdf(self.linspace, normal_mean, normal_sd)
+
+                # kl_distance = entropy(pk=hdp_y, qk=ont_normal_dist, base=2)
+                # h_distance = hellinger2(p=hdp_y, q=ont_normal_dist)
+                #
+                # hdp_model_name = os.path.basename(self.hdp_path)
+
+                # # deal with some extra text
+                # txt_handle4, = panel1.plot([], [], ' ')
+                # txt_handle5, = panel1.plot([], [], ' ')
+                # txt_handle6, = panel1.plot([], [], ' ')
+                #
+                # handles2.extend([txt_handle4, txt_handle5, txt_handle6])
+                # legend_text2.extend(["HDP Model: \n  {}".format(hdp_model_name),
+                # "Kullback–Leibler divergence: {}".format(np.round(kl_distance, 4)),
+                #                      "Hellinger distance: {}".format(np.round(h_distance, 4))])
+
+            if alignment_file is not None or alignment_file_data is not None:
+                # option to parse file or not
+                if alignment_file is not None:
+                    data = parse_assignment_file(alignment_file)
+                else:
+                    data = alignment_file_data
+
+                kmer_assignments = data.loc[data['kmer'] == kmer]
+                kmer_data = kmer_assignments["level_mean"]
+                # get event means and linspace in correct format
+                x = np.asarray(kmer_data).reshape(len(kmer_data), 1)
+                x_plot = self.linspace[:, np.newaxis]
+                # get estimate for data
+                if len(kmer_data) > 0:
+
+                    kde = KernelDensity(kernel="gaussian", bandwidth=0.5).fit(x)
+                    # estimate across the linspace
+                    log_dens = kde.score_samples(x_plot)
+                    kde_handle, = panel1.plot(x_plot[:, 0], np.exp(log_dens), '-')
+                    raw_data_handle, = panel1.plot(x[:, 0], -0.005 - 0.01 * np.random.random(x.shape[0]), '+k')
+                    # add to legend
+                    handles1.extend([kde_handle, raw_data_handle])
+                    legend_text1.extend(["Gaussian KDE Estimate", "Event Means: {} points".format(len(kmer_data))])
+                    txt_handle7, = panel1.plot([], [], ' ')
+                    if alignment_file:
+                        alignment_file_name = os.path.basename(alignment_file)
+                        handles2.append(txt_handle7)
+                        legend_text2.append("RAW event data file: \n  {}".format(alignment_file_name))
+                else:
+                    print("{} not found in alignment file".format(kmer))
+
+        # create legend
+        first_legend = panel1.legend(handles1, legend_text1, fancybox=True, shadow=True,
+                                     loc='lower left', bbox_to_anchor=(1, .8))
+        ax = plt.gca().add_artist(first_legend)
+
+        panel1.legend(handles2, legend_text2, loc='upper left', bbox_to_anchor=(1, 0.2))
+
+        panel1.set_xlim(min_x, max_x)
+        panel1.set_title("Kmer distribution comparisons")
+
+        # option to save figure or just show it
+        if savefig_dir:
+            base_name = "DNA_comparison"
+            if self.rna:
+                base_name = "RNA_comparison"
+            name = "{}{}.png".format(base_name, "_".join(kmer_list))
+            out_path = os.path.join(savefig_dir, name)
+            plt.savefig(out_path)
+        else:
+            plt.show()
+
 
 def hellinger2(p, q):
     return euclidean(np.sqrt(p), np.sqrt(q)) / _SQRT2
@@ -847,7 +984,7 @@ def parse_alignment_file(file_path):
     return data
 
 
-def create_new_model(model_path, new_model_path, find_replace_dict):
+def create_new_model(model_path, new_model_path, find_replace_set):
     """Write a correctly formatted new model file with a new alphabet.
     :param model_path: path to original HMM model
     :param new_model_path: path to new model
@@ -856,11 +993,11 @@ def create_new_model(model_path, new_model_path, find_replace_dict):
     note: will retain same kmer size and can handle multiple new nucleotides as long as they are not IUPAC bases
     """
     model_h = HmmModel(model_path)
-    n_new_bases = len(find_replace_dict)
+    n_new_bases = len(find_replace_set)
     counter = 1
     base_name = os.path.basename(new_model_path)
     with tempfile.TemporaryDirectory() as tempdir:
-        for old, new in find_replace_dict:
+        for old, new in find_replace_set:
             if counter == n_new_bases:
                 new_file_name = new_model_path
             else:
