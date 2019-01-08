@@ -22,7 +22,7 @@ class SeqToolsTests(unittest.TestCase):
         cls.HOME = '/'.join(os.path.abspath(__file__).split("/")[:-1])
 
     def test_something(self):
-        pass
+        self.assertTrue(True)
 
 
 if __name__ == '__main__':

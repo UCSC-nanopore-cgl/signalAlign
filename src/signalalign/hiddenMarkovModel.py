@@ -76,6 +76,8 @@ class HmmModel(object):
         self.event_assignments = []
         self.assignments_record = []
         self.symbol_set_size = 0
+        self.linspace = np.linspace(30, 160, num=2000)
+
         # event model for describing normal distributions for each kmer
         self.event_model = {"means": np.zeros(self.symbol_set_size),
                             "SDs": np.zeros(self.symbol_set_size),

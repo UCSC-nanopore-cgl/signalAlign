@@ -15,8 +15,7 @@ import os
 import tempfile
 from sklearn.mixture import GaussianMixture
 from sklearn.datasets.samples_generator import make_blobs
-from signalalign.hiddenMarkovModel import HmmModel, create_new_model
-from signalalign.signalAlignment import SignalAlignment
+from signalalign.hiddenMarkovModel import HmmModel, create_new_model, parse_assignment_file
 from signalalign.train.trainModels import make_master_assignment_table
 
 
@@ -93,7 +92,8 @@ def fit_model_to_kmer_dist(all_assignments, kmer, n_normals=2):
     :param n_normals: number of normal gaussians to fit to distirbution
     """
     kmer = str.encode(kmer)
-    samples = np.array(all_assignments[all_assignments["k-mer"] == kmer]["descaled_event_mean"]).reshape(-1, 1)
+    samples = all_assignments[all_assignments["kmer"] == "TAATT"]["level_mean"].values.reshape(-1, 1)
+    # samples = np.array(all_assignments[all_assignments["k-mer"] == kmer]["descaled_event_mean"]).reshape(-1, 1)
     model = get_nanopore_gauss_mixture(samples, n_normals)
     return model
 
@@ -104,7 +104,7 @@ def main():
     # alphabet = "ATGCJL"
     built_model = "/Users/andrewbailey/CLionProjects/nanopore-RNN/submodules/signalAlign/models/buildAlignment.tsv"
     model_h = HmmModel(base_model)
-    assignments = SignalAlignment.read_in_signal_align_tsv(built_model, "assignments")
+    assignments = parse_assignment_file(built_model)
     # assignments = make_master_assignment_table(assignment_dir)
     # X = assignments['descaled_event_mean'].reshape((-1, 1))
     main_kmer = "TAATT"
@@ -122,7 +122,7 @@ def main():
     new_model_h.set_kmer_event_sd(new_kmer, other[0][1][0])
 
     # new_model_h.plot_kmer_distribution(main_kmer)
-    new_model_h.plot_kmer_distributions([main_kmer, new_kmer])
+    new_model_h.plot_kmer_distributions([main_kmer, new_kmer], alignment_file_data=assignments)
 
 
     ##################################################
