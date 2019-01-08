@@ -76,5 +76,6 @@ setup(name="signalAlign",
                         "Cython>=0.26",
                         "scikit-learn==0.19.0",
                         "matplotlib==2.0.2",
-                        "pathos==0.2.1"]
+                        "pathos==0.2.1",
+                        "py3helpers>=0.0.6"]
       )

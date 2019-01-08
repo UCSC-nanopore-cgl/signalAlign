@@ -162,14 +162,14 @@ void writePosteriorProbsFull(char *posteriorProbsFile, char *readLabel, StateMac
 
 void writePosteriorProbsVC(char *posteriorProbsFile, char *readLabel, StateMachine *sM, char *target, bool forward,
                            int64_t eventSequenceOffset, int64_t referenceSequenceOffset, stList *alignedPairs,
-                           Strand strand, double posteriorScore, bool rna) {
+                           Strand strand, double posteriorScore, bool rna, char *contig) {
     // label for tsv output
     char *strandLabel = strand == template ? "t" : "c";
-    if (rna){
+    if (rna || strand == template){
         forward = !forward;
     }
     char *forwardLabel = forward ? "forward" : "backward";
-    if (rna){
+    if (rna || strand == template){
         forward = !forward;
     }
 
@@ -223,8 +223,8 @@ void writePosteriorProbsVC(char *posteriorProbsFile, char *readLabel, StateMachi
             char base = pathKmer[queryPosition];
             // position in the reference we're reporting on
             int64_t reportPosition = x_adj + unadjustedQueryPosition;
-            fprintf(fH, "%"PRId64"\t%"PRId64"\t%c\t%f\t%s\t%s\t%s\t%f\n", y, reportPosition, base, p,
-                    strandLabel, forwardLabel, readLabel, posteriorScore);
+            fprintf(fH, "%"PRId64"\t%"PRId64"\t%c\t%f\t%s\t%s\t%s\t%f\t%s\n", y, reportPosition, base, p,
+                    strandLabel, forwardLabel, readLabel, posteriorScore, contig);
         }
         free(k_i);
         free(refKmer);
@@ -294,7 +294,7 @@ void outputAlignment(
             break;
         case variantCaller:
             writePosteriorProbsVC(posteriorProbsFile, readLabel, sM, target, forward, eventSequenceOffset,
-                                  referenceSequenceOffset, alignedPairs, strand, posteriorScore, rna);
+                                  referenceSequenceOffset, alignedPairs, strand, posteriorScore, rna, contig);
             break;
         case assignments:
             writeAssignments(posteriorProbsFile, sM, events, eventSequenceOffset, npp, alignedPairs, strand);

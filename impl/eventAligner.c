@@ -47,6 +47,9 @@ int write_readdb_file1(char* fast5_dir, char* output_path){
                 fprintf(fH, "%s\t%s\n", fastqEntry->name, fast5_file);
                 fastq_entry_destruct(fastqEntry);
             }
+            free(fast5_path);
+            free(fastq);
+            fast5_close(f5_handle);
         }
     }
     stList_destruct(fast5_files);
@@ -65,7 +68,10 @@ int write_fastq_and_readdb_file1(char* fast5_dir, char* fastq_output_path, char*
     FILE *fq_fH = fopen(fastq_output_path, "a");
 
     hid_t f5_handle;
-    if (!check_file_ext(readdb_output_path, "readdb")){
+    herr_t status;
+    H5Eset_auto(NULL, NULL, NULL);
+
+  if (!check_file_ext(readdb_output_path, "readdb")){
         st_errAbort("Output path must end with readdb: %s", readdb_output_path);
     }
     if (!check_file_ext(fastq_output_path, "fastq") && !check_file_ext(fastq_output_path, "fq")){
@@ -88,7 +94,11 @@ int write_fastq_and_readdb_file1(char* fast5_dir, char* fastq_output_path, char*
                 fprintf(fq_fH, "%s", fastq);
                 fastq_entry_destruct(fastqEntry);
             }
-            fast5_close(f5_handle);
+            free(fastq);
+            free(fast5_path);
+            status = fast5_close(f5_handle);
+
+
         }
     }
     stList_destruct(fast5_files);
@@ -102,6 +112,7 @@ int write_fastq_and_readdb_file1(char* fast5_dir, char* fastq_output_path, char*
 //}
 
 void fastq_entry_destruct(fastq_entry *fastq) {
+    free(fastq->name);
     free(fastq);
 }
 
@@ -136,6 +147,8 @@ fastq_entry *parse_fastq_string(char* fastq_string){
     if (strlen(fastq->seq) != strlen(fastq->qual)){
         st_errAbort("Fastq seq len and qual lengths do not match.\n");
     }
+    stList_destruct(all_fields);
+    stList_destruct(header);
     return fastq;
 }
 
@@ -160,6 +173,7 @@ int write_fastqs_to_file(char* fast5_dir, char* output_path){
             } else {
                 fprintf(fH, "%s", fastq);
             }
+            free(fast5_path);
         }
     }
     stList_destruct(fast5_files);
@@ -168,23 +182,32 @@ int write_fastqs_to_file(char* fast5_dir, char* output_path){
 }
 
 char* path_join_two_strings(char* directory, char* file_name){
+
+    char *new_file_name = stString_copy(file_name);
+
     stList *path_list = stString_splitByString(directory, "/");
     if (stString_eq((char*) stList_get(path_list, stList_length(path_list)-1), "\0")){
         stList_remove(path_list, stList_length(path_list)-1);
     }
-    stList_append(path_list, file_name);
+    stList_append(path_list, new_file_name);
+
     char *final_path = stString_join2("/", path_list);
+
+    stList_destruct(path_list);
     return final_path;
 }
 
 
 bool check_file_ext(char* file_path, char* ext){
     stList *split_file = stString_splitByString(file_path, ".");
+    bool return_item;
     if (stString_eq(stList_get(split_file, (stList_length(split_file)-1)), ext)){
-        return TRUE;
+        return_item = TRUE;
     } else {
-        return FALSE;
+        return_item = FALSE;
     }
+    stList_destruct(split_file);
+    return return_item;
 }
 
 bool hdf5_group_exists(hid_t hdf5_file, char* path){
@@ -197,7 +220,7 @@ bool hdf5_group_exists(hid_t hdf5_file, char* path){
         } else {
             output = TRUE;
         }
-
+        H5Gclose(group);
     } H5E_END_TRY;
     return output;
 }
@@ -241,7 +264,7 @@ char *fast5_get_fastq(hid_t hdf5_file) {
 
 char *fast5_get_string(hid_t hdf5_file, char* path){
 
-    hid_t       file, filetype, memtype, space, dset;
+    hid_t       filetype, memtype, space, dset;
     /* Handles */
     herr_t      status;
     hsize_t     dims[1] = {1};
@@ -260,7 +283,6 @@ char *fast5_get_string(hid_t hdf5_file, char* path){
      */
     space = H5Dget_space (dset);
     ndims = H5Sget_simple_extent_dims (space, dims, NULL);
-    rdata = (char **) malloc (dims[0] * sizeof (char *));
 
     /*
      * Create the memory datatype.
@@ -270,6 +292,8 @@ char *fast5_get_string(hid_t hdf5_file, char* path){
     status =  H5Tset_cset(memtype, string_dtype);
     size_t sdim = H5Tget_size(filetype);
     if (sdim == sizeof(char *)){
+        rdata = (char **) malloc (dims[0] * sizeof (char *));
+
 //        variable length string
         status = H5Tset_size (memtype, H5T_VARIABLE);
         /*
