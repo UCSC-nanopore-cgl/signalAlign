@@ -71,8 +71,7 @@ int write_fastq_and_readdb_file1(char* fast5_dir, char* fastq_output_path, char*
     herr_t status;
     H5Eset_auto(NULL, NULL, NULL);
 
-
-    if (!check_file_ext(readdb_output_path, "readdb")){
+  if (!check_file_ext(readdb_output_path, "readdb")){
         st_errAbort("Output path must end with readdb: %s", readdb_output_path);
     }
     if (!check_file_ext(fastq_output_path, "fastq") && !check_file_ext(fastq_output_path, "fq")){
@@ -98,6 +97,7 @@ int write_fastq_and_readdb_file1(char* fast5_dir, char* fastq_output_path, char*
             free(fastq);
             free(fast5_path);
             status = fast5_close(f5_handle);
+
 
         }
     }

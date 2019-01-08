@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Test BuildModels.py"""
+"""Test trainModels.py"""
 ########################################################################
 # File: test_trainModels.py
 #  executable: test_trainModels.py
@@ -9,19 +9,15 @@
 ########################################################################
 
 
-import sys
 import os
-import numpy as np
 import unittest
 import tempfile
-from collections import defaultdict
 from shutil import copyfile
-from scipy import sparse
 from signalalign.signalAlignment import create_sa_sample_args
 from signalalign.train.trainModels import *
 from signalalign.utils.fileHandlers import FolderHandler
 from signalalign.hiddenMarkovModel import HmmModel
-from py3helpers.utils import captured_output, load_json, save_json, count_lines_in_file
+from py3helpers.utils import captured_output, load_json, time_it
 
 
 class TrainSignalAlignTest(unittest.TestCase):
@@ -132,6 +128,15 @@ class TrainSignalAlignTest(unittest.TestCase):
         self.assertRaises(AssertionError, generate_buildAlignments, assignments, kmer_list=["ATGC", "AAAA"],
                           max_assignments=2,
                           strands=[], verbose=False)
+
+    def test_generate_buildAlignments2(self):
+        sample_assignment_table = make_master_assignment_table([self.assignment_file], min_probability=0.0)
+        # get kmers associated with each sample
+        kmers = get_kmers(6, alphabet="ATGC")
+        # write correctly formated output
+        data1, time1 = time_it(generate_buildAlignments, sample_assignment_table, kmers, 100000, ["t", "c"], False)
+        data2, time2 = time_it(generate_buildAlignments2, sample_assignment_table, kmers, 100000, ["t", "c"], False)
+        self.assertGreater(time2, time1)
 
     def test_CreateHdpTrainingData(self):
         with tempfile.TemporaryDirectory() as tempdir:
