@@ -85,7 +85,6 @@ test :
 		fi;\
 	done; \
 	if [ $$FAIL -ne 0 ]; then exit -1; fi;
-	cd python_utils && pytest
 
 
 ${signalAlignBin}/compareDistributions : compareDistributions.c ${libPath}/signalAlignLib.a ${signalAlignDependencies}
