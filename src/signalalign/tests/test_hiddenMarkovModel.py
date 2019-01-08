@@ -187,6 +187,49 @@ class HiddenMarkovTests(unittest.TestCase):
             self.assertEqual(hmm_handle2.alphabet_size, 5)
             self.assertRaises(AssertionError, hmm_handle.write_new_model, test_model_file, "ATGCW", "A")
 
+    def test_create_new_model(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            test_model_file = os.path.join(tempdir, "fake.hmm")
+            new_model = create_new_model(self.model_file, test_model_file, (("A", "F"), ("A", "J")))
+            self.assertEqual(new_model.kmer_length, 5)
+            self.assertEqual(new_model.alphabet, "ACFGJT")
+            self.assertEqual(new_model.alphabet_size, 6)
+            mean1 = new_model.get_event_mean_gaussian_parameters("AAAAA")
+            mean2 = new_model.get_event_mean_gaussian_parameters("AAAJA")
+            mean3 = new_model.get_event_mean_gaussian_parameters("AAAFA")
+            mean4 = new_model.get_event_mean_gaussian_parameters("AAJFA")
+            mean5 = new_model.get_event_mean_gaussian_parameters("AAJJJ")
+            mean6 = new_model.get_event_mean_gaussian_parameters("FFJJJ")
+            self.assertEqual(mean1, mean2)
+            self.assertEqual(mean2, mean3)
+            self.assertEqual(mean3, mean4)
+            self.assertEqual(mean4, mean5)
+            self.assertEqual(mean5, mean6)
+
+    def test_set_kmer_event_mean(self):
+        hmm_handle = HmmModel(ont_model_file=self.model_file)
+        hmm_handle.set_kmer_event_mean("AAAAA", 1000)
+        mean, sd = hmm_handle.get_event_mean_gaussian_parameters("AAAAA")
+        self.assertEqual(mean, 1000)
+
+    def test_set_kmer_event_sd(self):
+        hmm_handle = HmmModel(ont_model_file=self.model_file)
+        hmm_handle.set_kmer_event_sd("AAAAA", 1000)
+        mean, sd = hmm_handle.get_event_mean_gaussian_parameters("AAAAA")
+        self.assertEqual(sd, 1000)
+
+    def test_set_kmer_noise_means(self):
+        hmm_handle = HmmModel(ont_model_file=self.model_file)
+        hmm_handle.set_kmer_noise_means("AAAAA", 1000)
+        mean, sd = hmm_handle.get_event_sd_inv_gaussian_parameters("AAAAA")
+        self.assertEqual(mean, 1000)
+
+    def test_set_kmer_noise_lambdas(self):
+        hmm_handle = HmmModel(ont_model_file=self.model_file)
+        hmm_handle.set_kmer_noise_lambdas("AAAAA", 1000)
+        mean, sd = hmm_handle.get_event_sd_inv_gaussian_parameters("AAAAA")
+        self.assertEqual(sd, 1000)
+
 
 if __name__ == '__main__':
     unittest.main()

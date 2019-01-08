@@ -14,6 +14,7 @@ import sys
 import os
 import numpy as np
 import pandas as pd
+import tempfile
 
 from itertools import product
 from scipy.stats import norm, invgauss, entropy
@@ -740,7 +741,7 @@ class HmmModel(object):
         """Write a correctly formatted new model file with a new alphabet.
         :param out_path: path to output hmm
         :param alphabet: new alphabet
-        :param replacement_base: base to replace new character
+        :param replacement_base: base to replaced by the new character
 
         note: will retain same kmer size and assumes only one new character
         """
@@ -763,7 +764,7 @@ class HmmModel(object):
         new_base = (set(alphabet) - set(self.alphabet)).pop()
 
         alphabet_size = len(alphabet)
-        new_kmers = all_string_permutations(alphabet)
+        new_kmers = all_string_permutations(alphabet, length=self.kmer_length)
         with open(out_path, 'w') as f:
 
             # line 0
@@ -786,6 +787,46 @@ class HmmModel(object):
                                   noise_lambda=self.event_model["noise_lambdas"][k]))
             f.write("\n")
 
+    def set_kmer_event_mean(self, kmer, event_mean):
+        """Set ont event mean for a given kmer
+        :param kmer: valid K-mer
+        :param event_mean: value to set as new mean
+        """
+        k = self.get_kmer_index(kmer)
+        self.event_model["means"][k] = event_mean
+
+    def set_kmer_event_sd(self, kmer, event_sd):
+        """Set ont event mean for a given kmer
+        :param kmer: valid K-mer
+        :param event_sd: value to set as new kmer mean sd
+        """
+        k = self.get_kmer_index(kmer)
+        self.event_model["SDs"][k] = event_sd
+
+    def set_kmer_noise_means(self, kmer, noise_means):
+        """Set ont event mean for a given kmer
+        :param kmer: valid K-mer
+        :param noise_means: value to set as new kmer noise_means
+        """
+        k = self.get_kmer_index(kmer)
+        self.event_model["noise_means"][k] = noise_means
+
+    def set_kmer_noise_SDs(self, kmer, noise_SDs):
+        """Set ont event mean for a given kmer
+        :param kmer: valid K-mer
+        :param noise_SDs: value to set as new kmer noise_SDs
+        """
+        k = self.get_kmer_index(kmer)
+        self.event_model["noise_SDs"][k] = noise_SDs
+
+    def set_kmer_noise_lambdas(self, kmer, noise_lambdas):
+        """Set ont event mean for a given kmer
+        :param kmer: valid K-mer
+        :param noise_lambdas: value to set as new kmer noise_lambdas
+        """
+        k = self.get_kmer_index(kmer)
+        self.event_model["noise_lambdas"][k] = noise_lambdas
+
 
 def hellinger2(p, q):
     return euclidean(np.sqrt(p), np.sqrt(q)) / _SQRT2
@@ -804,6 +845,32 @@ def parse_alignment_file(file_path):
                          dtype={"kmer": np.str, "strand": np.str, "level_mean": np.float64, "prob": np.float64},
                          header=None)
     return data
+
+
+def create_new_model(model_path, new_model_path, find_replace_dict):
+    """Write a correctly formatted new model file with a new alphabet.
+    :param model_path: path to original HMM model
+    :param new_model_path: path to new model
+    :param find_replace_set: set of tuples with first index as find character and second is the replace character
+    :returns HMM model with new alphabet
+    note: will retain same kmer size and can handle multiple new nucleotides as long as they are not IUPAC bases
+    """
+    model_h = HmmModel(model_path)
+    n_new_bases = len(find_replace_dict)
+    counter = 1
+    base_name = os.path.basename(new_model_path)
+    with tempfile.TemporaryDirectory() as tempdir:
+        for old, new in find_replace_dict:
+            if counter == n_new_bases:
+                new_file_name = new_model_path
+            else:
+                new_file_name = os.path.join(tempdir, str(counter)+base_name)
+
+            model_h.write_new_model(new_file_name, alphabet=model_h.alphabet+new, replacement_base=old)
+            model_h = HmmModel(new_file_name)
+            counter += 1
+
+    return model_h
 
 
 def main():
