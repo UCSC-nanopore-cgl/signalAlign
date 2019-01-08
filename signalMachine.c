@@ -165,11 +165,11 @@ void writePosteriorProbsVC(char *posteriorProbsFile, char *readLabel, StateMachi
                            Strand strand, double posteriorScore, bool rna, char *contig) {
     // label for tsv output
     char *strandLabel = strand == template ? "t" : "c";
-    if (rna){
+    if (rna || strand == template){
         forward = !forward;
     }
     char *forwardLabel = forward ? "forward" : "backward";
-    if (rna){
+    if (rna || strand == template){
         forward = !forward;
     }
 
@@ -839,7 +839,7 @@ int main(int argc, char *argv[]) {
             // write to file
             if (posteriorProbsFile != NULL) {
                 outputAlignment(outFmt, posteriorProbsFile, readLabel, sMc, npRead->complementParams,
-                                npRead->complementEvents, R->getComplementTargetSequence(R), !forward, pA->contig1,
+                                npRead->complementEvents, R->getComplementTargetSequence(R), forward, pA->contig1,
                                 cCoordinateShift, rCoordinateShift_c, complementAlignedPairs, complementPosteriorScore,
                                 complement, rna);
             }
