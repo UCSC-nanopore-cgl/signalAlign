@@ -10,7 +10,6 @@
 
 import os
 import unittest
-from py3helpers.mixture_model import *
 
 
 class SeqToolsTests(unittest.TestCase):

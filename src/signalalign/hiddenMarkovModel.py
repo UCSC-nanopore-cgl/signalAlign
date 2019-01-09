@@ -892,9 +892,10 @@ class HmmModel(object):
                 x = self.linspace
                 panel1.set_xlim(min(x), max(x))
                 hdp_y = self.all_posterior_pred[kmer_id]
-                hdp_handle, = panel1.plot(x, hdp_y, '-')
-                handles1.append(hdp_handle)
-                legend_text1.append("{} HDP Distribution".format(kmer))
+                if len(hdp_y) == len(x):
+                    hdp_handle, = panel1.plot(x, hdp_y, '-')
+                    handles1.append(hdp_handle)
+                    legend_text1.append("{} HDP Distribution".format(kmer))
 
                 # # compute entropy and hellinger distance
                 # ont_normal_dist = norm.pdf(self.linspace, normal_mean, normal_sd)

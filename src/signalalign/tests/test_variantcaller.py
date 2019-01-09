@@ -30,8 +30,7 @@ class TestVariantCaller(unittest.TestCase):
 
     def test_aggregate_all_variantcalls(self):
         aor_h = AggregateOverReads(self.variant_files, "CE")
-        all_data = aor_h.aggregate_all_variantcalls()
-        for i, data in all_data.iterrows():
+        for i, data in aor_h.per_position_data.iterrows():
             self.assertEqual(data["contig"], "gi_ecoli")
             self.assertLessEqual(data["C"]+data["E"], 1)
 
@@ -54,8 +53,7 @@ class TestVariantCaller(unittest.TestCase):
 
     def test_normalize_all_data(self):
         aor_h = AggregateOverReads(self.variant_files, "CE")
-        all_data = aor_h.aggregate_all_variantcalls()
-        data_gen = aor_h._normalize_all_data(all_data)
+        data_gen = aor_h._normalize_all_data(aor_h.per_position_data)
         for data in data_gen:
             self.assertEqual(data[0], "gi_ecoli")
             self.assertLessEqual(data[3]+data[4], 1)
@@ -68,6 +66,9 @@ class TestVariantCaller(unittest.TestCase):
                 # self.contig, pos, self.strand], nuc_data
                 self.assertEqual(data["contig"], "gi_ecoli")
                 self.assertLessEqual(data["E"] + data["C"], 1)
+            for i, data in mv_h.per_read_calls.iterrows():
+                self.assertLessEqual(data["E"] + data["C"], 1)
+                self.assertEqual(data["contig"], "gi_ecoli")
 
     def test_create_labels_from_positions_file(self):
         labels = create_labels_from_positions_file(self.ecoli_positions, "CE")
@@ -87,8 +88,7 @@ class TestVariantCaller(unittest.TestCase):
     def test_generate_labels(self):
         labels = create_labels_from_positions_file(self.ecoli_positions, "CE")
         aor_h = AggregateOverReads(self.variant_files, "CE")
-        all_data = aor_h.aggregate_all_variantcalls()
-        data = aor_h.generate_labels(labels, all_data)
+        data = aor_h.generate_labels(labels, aor_h.per_position_data)
         for i, row in data.iterrows():
             if row["C"] > row["E"]:
                 self.assertEqual(1, row["label_E"])

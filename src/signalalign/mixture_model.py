@@ -107,97 +107,100 @@ def main():
     assignments = parse_assignment_file(built_model)
     # assignments = make_master_assignment_table(assignment_dir)
     # X = assignments['descaled_event_mean'].reshape((-1, 1))
-    main_kmer = "TAATT"
-    new_kmer = "TAJTT"
-    new_model_path = "/Users/andrewbailey/CLionProjects/nanopore-RNN/submodules/signalAlign/models/test_ACGJT_5mer.model"
+    main_kmer = "AGGAG"
+
+    new_kmer = "FGGAG"
+    new_model_path = "/Users/andrewbailey/CLionProjects/nanopore-RNN/submodules/signalAlign/models/test_ACGFT_5mer_rna.model"
     # print(assignments[assignments["k-mer"] == main_kmer]["descaled_event_mean"])
 
     mixture_model = fit_model_to_kmer_dist(assignments, main_kmer, n_normals=2)
-    # new_model = create_new_model(base_model, new_model_path, [("A", "J")])
-
-    new_model_h = HmmModel(new_model_path)
+    # new_model = create_new_model("/Users/andrewbailey/CLionProjects/nanopore-RNN/submodules/signalAlign/models/testModelR9p4_5mer_acgt_RNA.model", new_model_path, [("A", "F")])
+    hdp_rna_model = "/Users/andrewbailey/CLionProjects/nanopore-RNN/submodules/signalAlign/models/template.singleLevelFixedM6A.nhdp"
+    new_model_h = HmmModel(new_model_path, rna=True)
     mixture_normals = get_mus_and_sigmas_1d(mixture_model)
     original, other = closest_to_canonical(mixture_normals, new_model_h.get_event_mean_gaussian_parameters(main_kmer)[0])
     new_model_h.set_kmer_event_mean(new_kmer, other[0][0][0])
     new_model_h.set_kmer_event_sd(new_kmer, other[0][1][0])
+    new_model_h.set_kmer_event_mean(main_kmer, original[0][0])
+    new_model_h.set_kmer_event_sd(main_kmer, original[1][0])
 
     # new_model_h.plot_kmer_distribution(main_kmer)
-    new_model_h.plot_kmer_distributions([main_kmer, new_kmer], alignment_file_data=assignments)
+    # new_model_h.plot_kmer_distributions([main_kmer, new_kmer], alignment_file_data=assignments)
 
 
     ##################################################
     ##################################################
     ##################################################
 
-    # X = np.array(assignments[assignments["k-mer"] == b'TAATT']["descaled_event_mean"]).reshape(-1, 1)
-    #
-    # min_range = 10
-    # max_range = 140
-    # original_mu = 100
-    # # ------------------------------------------------------------
-    # # X, y_true = make_blobs(n_samples=400, n_features=1, centers=4,
-    # #                        cluster_std=4, random_state=0, center_box=(min_range, max_range))
-    # # ------------------------------------------------------------
-    # # Learn the best-fit GMM models
-    # #  Here we'll use GMM in the standard way: the fit() method
-    # #  uses an Expectation-Maximization approach to find the best
-    # #  mixture of Gaussians for the data
-    #
-    # # model = find_best_1d_gaussian_fit(X, 3)
-    # N = np.arange(1, 8)
-    # models = [None for i in range(len(N))]
-    #
-    # for i in range(len(N)):
-    #     models[i] = GaussianMixture(N[i]).fit(X)
-    #
-    # # use AIC or BIC for model selection
-    # aic = [m.aic(X) for m in models]
-    # bic = [m.bic(X) for m in models]
-    #
-    # fig = plt.figure(figsize=(10, 3))
-    # fig.subplots_adjust(left=0.12, right=0.97,
-    #                     bottom=0.21, top=0.9, wspace=0.5)
-    #
-    # # plot 1: data + best-fit mixture
-    # ax = fig.add_subplot(131)
-    # M_best = models[np.argmin(aic)]
-    # print(M_best.means_)
-    # print(M_best.covariances_)
-    # print(M_best.weights_)
-    # x = np.linspace(min_range, max_range, 1000).reshape(1000, 1)
-    # responsibilities = M_best.predict_proba(x)
-    # logprob = M_best.score_samples(x)
-    #
-    # pdf = np.exp(logprob)
-    # pdf_individual = responsibilities * pdf[:, np.newaxis]
-    #
-    # ax.hist(X, 30, normed=True, histtype='stepfilled', alpha=0.4)
-    # ax.plot(x, pdf, '-k', label="mixture pdf")
-    # ax.plot(x, pdf_individual, '--k', label="individual pdf")
-    # ax.set_title("Best-fit Mixture")
-    # ax.set_xlabel('$x$')
-    # ax.set_ylabel('$p(x)$')
-    #
-    # mixture_normals = get_mus_and_sigmas_1d(M_best)
-    # closest, the_rest = closest_to_canonical(mixture_normals, original_mu)
-    # # plot the closest to original
-    # x = np.linspace(closest[0] - 3 * closest[1], closest[0] + 3 * closest[1], 100)
-    # ax.plot(x, mlab.normpdf(x, closest[0], closest[1]), label="Closest to Original")
-    #
-    # for mu, sigma in the_rest:
-    #     x = np.linspace(mu - 3 * sigma, mu + 3 * sigma, 100)
-    #     ax.plot(x, mlab.normpdf(x, mu, sigma), label="New_models")
-    # ax.legend(loc=2)
-    #
-    # # plot 2: AIC and BIC
-    # ax = fig.add_subplot(132)
-    # ax.plot(N, aic, '-k', label='AIC')
-    # ax.plot(N, bic, '--k', label='BIC')
-    # ax.set_xlabel('n. components')
-    # ax.set_ylabel('information criterion')
-    # ax.legend(loc=2)
-    #
-    # plt.show()
+    X = assignments[assignments["kmer"] == main_kmer]["level_mean"].values.reshape(-1, 1)
+
+    min_range = 60
+    max_range = 140
+    original_mu = new_model_h.get_event_mean_gaussian_parameters(main_kmer)[0]
+    # ------------------------------------------------------------
+    # X, y_true = make_blobs(n_samples=400, n_features=1, centers=4,
+    #                        cluster_std=4, random_state=0, center_box=(min_range, max_range))
+    # ------------------------------------------------------------
+    # Learn the best-fit GMM models
+    #  Here we'll use GMM in the standard way: the fit() method
+    #  uses an Expectation-Maximization approach to find the best
+    #  mixture of Gaussians for the data
+
+    # model = find_best_1d_gaussian_fit(X, 3)
+    N = np.arange(1, 8)
+    models = [None for i in range(len(N))]
+
+    for i in range(len(N)):
+        models[i] = GaussianMixture(N[i]).fit(X)
+
+    # use AIC or BIC for model selection
+    aic = [m.aic(X) for m in models]
+    bic = [m.bic(X) for m in models]
+
+    fig = plt.figure(figsize=(10, 3))
+    fig.subplots_adjust(left=0.12, right=0.97,
+                        bottom=0.21, top=0.9, wspace=0.5)
+
+    # plot 1: data + best-fit mixture
+    ax = fig.add_subplot(121)
+    M_best = models[np.argmin(aic)]
+    print(M_best.means_)
+    print(M_best.covariances_)
+    print(M_best.weights_)
+    x = np.linspace(min_range, max_range, 1000).reshape(1000, 1)
+    responsibilities = M_best.predict_proba(x)
+    logprob = M_best.score_samples(x)
+
+    pdf = np.exp(logprob)
+    pdf_individual = responsibilities * pdf[:, np.newaxis]
+
+    ax.hist(X, 30, normed=True, histtype='stepfilled', alpha=0.4)
+    ax.plot(x, pdf, '-k', label="mixture pdf")
+    ax.plot(x, pdf_individual, '--k', label="individual pdf")
+    ax.set_title("Best-fit Mixture: {}".format(main_kmer))
+    ax.set_xlabel('$x$')
+    ax.set_ylabel('$p(x)$')
+
+    mixture_normals = get_mus_and_sigmas_1d(M_best)
+    closest, the_rest = closest_to_canonical(mixture_normals, original_mu)
+    # plot the closest to original
+    x = np.linspace(closest[0] - 3 * closest[1], closest[0] + 3 * closest[1], 100)
+    ax.plot(x, mlab.normpdf(x, closest[0], closest[1]), label="Closest to Original")
+
+    for mu, sigma in the_rest:
+        x = np.linspace(mu - 3 * sigma, mu + 3 * sigma, 100)
+        ax.plot(x, mlab.normpdf(x, mu, sigma), label="New_models")
+    ax.legend(loc=2)
+
+    # plot 2: AIC and BIC
+    ax = fig.add_subplot(122)
+    ax.plot(N, aic, '-k', label='AIC')
+    ax.plot(N, bic, '--k', label='BIC')
+    ax.set_xlabel('n. components')
+    ax.set_ylabel('information criterion')
+    ax.legend(loc=2)
+
+    plt.show()
 
 
 if __name__ == '__main__':

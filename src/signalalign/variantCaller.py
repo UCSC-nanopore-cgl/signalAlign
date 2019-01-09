@@ -26,34 +26,51 @@ class MarginalizeVariants(object):
         self.variants = sorted(variants)
         self.columns = merge_lists([['read_name', 'contig', 'position', 'strand'], list(self.variants)])
         self.contig = NanoporeRead.bytes_to_string(self.variant_data["contig"][0])
-        self.strand = "-"
-
-        if NanoporeRead.bytes_to_string(self.variant_data["forward_mapped"][0]) == "forward":
-            self.strand = "+"
         self.position_probs = pd.DataFrame()
         self.has_data = False
+        self.per_read_calls = pd.DataFrame()
+        self.per_read_columns = merge_lists([['read_name', 'contig', 'strand'], list(self.variants)])
 
     def get_data(self):
-        """Calculate the probability of each nucleotide"""
+        """Calculate the normalized probability of variant for each nucleotide and across the read"""
+        # final location of per position data and per read data
         data = []
-        for pos in set(self.variant_data["reference_position"]):
-            pos_data = self.variant_data[self.variant_data["reference_position"] == pos]
-            total_prob = 0
-            position_nuc_dict = {x: 0.0 for x in self.variants}
-            # Get total probability for each nucleotide
-            for nuc in set(pos_data["base"]):
-                nuc_data = pos_data[pos_data["base"] == nuc]
-                nuc_prob = sum(nuc_data["posterior_probability"])
-                total_prob += nuc_prob
-                position_nuc_dict[NanoporeRead.bytes_to_string(nuc)] = nuc_prob
-            # normalize probabilities over each position
-            nuc_data = [0] * len(self.variants)
-            for nuc in position_nuc_dict.keys():
-                index = self.variants.index(nuc)
-                nuc_data[index] = position_nuc_dict[nuc] / total_prob
+        per_read_data = []
+        for mapping_strand in set(self.variant_data["forward_mapped"]):
+            strand = "-"
+            if mapping_strand == b"forward":
+                strand = "+"
 
-            data.append(merge_lists([[self.read_name, self.contig, pos, self.strand], nuc_data]))
+            stand_specifc_data = self.variant_data[self.variant_data["forward_mapped"] == mapping_strand]
+            # get positions on strand
+            positions = set(stand_specifc_data["reference_position"])
+            n_positions = len(positions)
+            strand_read_nuc_data = [0] * len(self.variants)
+
+            # marginalize probabilities for each position
+            for pos in positions:
+                pos_data = stand_specifc_data[stand_specifc_data["reference_position"] == pos]
+                total_prob = 0
+                position_nuc_dict = {x: 0.0 for x in self.variants}
+                # Get total probability for each nucleotide
+                for nuc in set(pos_data["base"]):
+                    nuc_data = pos_data[pos_data["base"] == nuc]
+                    nuc_prob = max(nuc_data["posterior_probability"])
+                    total_prob += nuc_prob
+                    position_nuc_dict[NanoporeRead.bytes_to_string(nuc)] = nuc_prob
+                # normalize probabilities over each position
+                nuc_data = [0] * len(self.variants)
+                for nuc in position_nuc_dict.keys():
+                    index = self.variants.index(nuc)
+                    nuc_data[index] = position_nuc_dict[nuc] / total_prob
+                    strand_read_nuc_data[index] += nuc_data[index]
+                data.append(merge_lists([[self.read_name, self.contig, pos, strand], nuc_data]))
+
+            per_read_data.append(merge_lists([[self.read_name, self.contig, strand],
+                                              [prob / n_positions for prob in strand_read_nuc_data]]))
+
         self.position_probs = pd.DataFrame(data, columns=self.columns)
+        self.per_read_calls = pd.DataFrame(per_read_data, columns=self.per_read_columns)
         self.has_data = True
 
         return self.position_probs
@@ -71,28 +88,28 @@ class AggregateOverReads(object):
         self.columns = merge_lists([['contig', 'position', 'strand'], list(self.variants)])
         self.variant_tsvs = list_dir(self.variant_tsv_dir, ext="tsv")
         self.aggregate_position_probs = pd.DataFrame()
-        self.has_data = False
+        self.per_position_data = pd.DataFrame()
+        self.per_read_data = pd.DataFrame()
+        self.has_data = self._aggregate_all_variantcalls()
 
-    def aggregate_all_variantcalls(self):
+    def _aggregate_all_variantcalls(self):
         """Aggregate all the variant calls"""
-        all_data = pd.DataFrame()
-
         for v_tsv in self.variant_tsvs:
             if os.stat(v_tsv).st_size == 0:
                 continue
             mv_h = MarginalizeVariants(v_tsv, variants=self.variants)
-            position_probs = mv_h.get_data()
-            all_data = all_data.append(position_probs, ignore_index=True)
+            mv_h.get_data()
+            self.per_position_data = self.per_position_data.append(mv_h.position_probs, ignore_index=True)
+            self.per_read_data = self.per_read_data.append(mv_h.per_read_calls, ignore_index=True)
 
-        return all_data
+        return True
 
     def marginalize_over_all_reads(self):
         """Calculate the per position posterior probability"""
-        all_data = self.aggregate_all_variantcalls()
+        assert self.has_data, "AggregateOverReads does not have data. Make sure you initialized correctly"
         self.aggregate_position_probs = pd.concat([pd.DataFrame([i], columns=self.columns)
-                                                   for i in self._normalize_all_data(all_data)],
+                                                   for i in self._normalize_all_data(self.per_position_data)],
                                                   ignore_index=True)
-        self.has_data = True
         return self.aggregate_position_probs
 
     def _normalize_all_data(self, all_data):
