@@ -1,3 +1,6 @@
+[![Build Status](https://travis-ci.org/UCSC-nanopore-cgl/signalAlign.svg?branch=master)](https://github.com/UCSC-nanopore-cgl/signalAlign)
+
+
 ## SignalAlign Manual
 
 ### Introduction
