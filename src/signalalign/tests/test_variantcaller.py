@@ -11,10 +11,9 @@
 import os
 import unittest
 import tempfile
-from shutil import copyfile
-from py3helpers.utils import list_dir
+from py3helpers.utils import list_dir, load_json
 from signalalign.variantCaller import *
-
+from signalalign.visualization.plot_variant_accuracy import plot_roc_from_config
 
 class TestVariantCaller(unittest.TestCase):
 
@@ -27,6 +26,7 @@ class TestVariantCaller(unittest.TestCase):
         cls.runSA_config = os.path.join(cls.HOME, "tests/test_variantCalled_files/runSignalAlign-config_tmp.json")
         cls.ecoli_positions = os.path.join(cls.HOME, "tests/test_position_files/ecoli_positions_CCAGG.tsv")
         cls.variant_files = os.path.join(cls.HOME, "tests/test_variantCalled_files")
+        cls.plot_variants_config = os.path.join(cls.HOME, "tests/test_variantCalled_files/plot_variants_config.json")
 
     def test_aggregate_all_variantcalls(self):
         aor_h = AggregateOverReads(self.variant_files, "CE")
@@ -97,6 +97,13 @@ class TestVariantCaller(unittest.TestCase):
             if row["C"] > row["E"]:
                 self.assertEqual(0, row["label_E"])
                 self.assertEqual(1, row["label_C"])
+
+    def test_plot_variants(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            config_dict = load_json(self.plot_variants_config)
+            config_dict["save_fig_dir"] = tempdir
+            retcode = plot_roc_from_config(config_dict)
+            self.assertEqual(retcode, 0)
 
 
 if __name__ == '__main__':

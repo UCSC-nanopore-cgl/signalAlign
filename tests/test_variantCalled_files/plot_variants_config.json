@@ -1,0 +1,18 @@
+{
+  "variants": "CE",
+  "save_fig_dir": "./tests/test_position_files/",
+  "samples": [
+    {
+      "name": "canonical",
+      "variant_tsvs": "./tests/test_variantCalled_files",
+      "positions_file": "./tests/test_position_files/ecoli_positions_CCAGG.tsv",
+      "label": "C"
+    },
+    {
+      "name": "5-mC",
+      "variant_tsvs": "./tests/test_variantCalled_files",
+      "positions_file": "./tests/test_position_files/ecoli_positions_CCAGG_C_E.tsv",
+      "label": "E"
+    }
+  ]
+}

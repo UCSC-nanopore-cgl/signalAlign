@@ -19,7 +19,8 @@ all : sL bD ${libPath}/signalAlignLib.a ${signalAlignBin}/signalAlignLibTests \
 	  ${signalAlignBin}/variantCallingLib.py ${signalAlignBin}/alignmentAnalysisLib.py \
 	  ${signalAlignBin}/buildHdpUtil ${signalAlignBin}/trainModels all_tests \
 	  externals python_setup ${signalAlignBin}/filterReads ${signalAlignBin}/extract \
-	  ${signalAlignBin}/sequencing_summary ${signalAlignBin}/plot_kmer_distributions
+	  ${signalAlignBin}/sequencing_summary ${signalAlignBin}/plot_kmer_distributions \
+	  ${signalAlignBin}/plot_variant_accuracy
 
 
 #${rootPath}/lib/libhdf5.a:
@@ -124,6 +125,9 @@ ${signalAlignBin}/plot_kmer_distributions : ${rootPath}src/signalalign/visualiza
 	cp ${rootPath}src/signalalign/visualization/plot_kmer_distributions.py ${signalAlignBin}/plot_kmer_distributions
 	chmod +x ${signalAlignBin}/plot_kmer_distributions
 
+${signalAlignBin}/plot_variant_accuracy : ${rootPath}src/signalalign/visualization/plot_variant_accuracy.py
+	cp ${rootPath}src/signalalign/visualization/plot_variant_accuracy.py ${signalAlignBin}/plot_variant_accuracy
+	chmod +x ${signalAlignBin}/plot_variant_accuracy
 
 all_tests : .FORCE
 
