@@ -4,6 +4,9 @@ channels:
   - anaconda
   - defaults
   - adbailey4
+  - intel
+  - conda-forge
+  - defaults
 dependencies:
   - bzip2=1.0.6
   - curl=7.62.0

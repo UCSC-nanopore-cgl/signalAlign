@@ -10,7 +10,7 @@ notifications: # set notification options
 
 os:
 - linux
-#- osx
+- osx
 
 git:
   submodules: false
@@ -40,9 +40,9 @@ before_install:
 
 
 install:
-- export PATH="$HOME/anaconda3/bin:$PATH"
-- export C_INCLUDE_PATH="$HOME/anaconda3/envs/signalalign/include:$C_INCLUDE_PATH"
-- export LD_LIBRARY_PATH="$HOME/anaconda3/envs/signalalign/lib:$LD_LIBRARY_PATH"
+- export PATH="$PATH:$HOME/anaconda3/bin"
+- export C_INCLUDE_PATH="$C_INCLUDE_PATH:$HOME/anaconda3/envs/signalalign/include"
+- export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$HOME/anaconda3/envs/signalalign/lib"
 - export LIBRARY_PATH="$LIBRARY_PATH:$HOME/anaconda3/envs/signalalign/lib"
 
 - hash -r
@@ -51,7 +51,7 @@ install:
 # Useful for debugging any issues with conda
 - conda info -a
 - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
-  conda env create -f requirements2.yml python=3.6;
+  conda env create -f requirements.yml python=3.6;
   else
   conda env create -f requirements.yml python=3.6;
   fi
@@ -70,4 +70,10 @@ before_script: # configure a headless display to test plot generation
 script:
 - export PATH=$PATH:$PWD/bin
 - make test
+
+#export PATH="$HOME/anaconda3/bin:$PATH"
+#export C_INCLUDE_PATH="$HOME/anaconda3/envs/signalalign/include:$C_INCLUDE_PATH"
+#export LD_LIBRARY_PATH="$HOME/anaconda3/envs/signalalign/lib:$LD_LIBRARY_PATH"
+#export LIBRARY_PATH="$LIBRARY_PATH:$HOME/anaconda3/envs/signalalign/lib"
+#export CPLUS_INCLUDE_PATH="$HOME/anaconda3/envs/signalalign/include:$CPLUS_INCLUDE_PATH"
 

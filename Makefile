@@ -11,7 +11,7 @@ signalAlignLib = ${basicLibs}
 test_directory = ${rootPath}/src/signalalign/tests/
 scrappie_build = ${rootPath}/scrappie/build
 
-LIBS= -lz -lm -lhts -lhdf5 -lgomp -fopenmp
+LIBS= -lhts -lhdf5
 
 all : sL bD ${libPath}/signalAlignLib.a ${signalAlignBin}/signalAlignLibTests \
 	  ${signalAlignBin}/compareDistributions ${signalAlignBin}/kmerEventAlign \
@@ -50,6 +50,11 @@ clean :
 	if [ -d ${signalAlignBin} ]; then rm -r ${signalAlignBin}; fi
 	if [ -d build/ ]; then rm -r build/; fi
 	if [ -d lib/ ]; then rm -r lib/; fi
+	if [ -d dist/ ]; then rm -r dist/; fi
+	if [ -d eventdetection/lib/ ]; then rm -r eventdetection/lib/; fi
+	if [ -d eventdetection/build/ ]; then rm -r eventdetection/build/; fi
+	if [ -d eventdetection/dist/ ]; then rm -r eventdetection/dist/; fi
+
 	rm -f ${libPath}/signalAlignLib.a
 	cd externalTools && make clean
 	cd sonLib && make clean
