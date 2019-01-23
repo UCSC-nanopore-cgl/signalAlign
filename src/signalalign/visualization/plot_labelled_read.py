@@ -12,6 +12,12 @@ from __future__ import print_function
 import sys
 import os
 import colorsys
+import matplotlib as mpl
+if os.environ.get('DISPLAY', '') == '':
+    print('no display found. Using non-interactive Agg backend')
+    mpl.use('Agg')
+mpl.use("TkAgg")
+
 import matplotlib.pyplot as plt
 import matplotlib.patches as mplpatches
 from matplotlib.collections import LineCollection

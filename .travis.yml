@@ -21,6 +21,7 @@ before_install:
   brew update;
   brew install gcc@5 automake make open-mpi;
   gcc --version;
+  alias make='gmake';
   ln -s /usr/local/bin/gcc-5 /usr/local/bin/gcc;
   alias gcc='gcc-5';
   alias g++='g++-5';
