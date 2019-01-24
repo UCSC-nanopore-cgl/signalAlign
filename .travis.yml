@@ -19,7 +19,7 @@ before_install:
 - git submodule update --init
 - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
   brew update;
-  brew install gcc@5 automake make open-mpi;
+  brew install gcc@5 automake make open-mpi hdf5;
   gcc --version;
   alias make='gmake';
   ln -s /usr/local/bin/gcc-5 /usr/local/bin/gcc;
@@ -32,7 +32,7 @@ before_install:
   else
 
     sudo apt-get update -qq;
-    sudo apt-get install autotools-dev autoconf cmake make;
+    sudo apt-get install autotools-dev autoconf cmake make libhdf5-serial-dev;
     sudo apt-get update;
     wget https://repo.anaconda.com/archive/Anaconda3-5.3.0-Linux-x86_64.sh -O anaconda.sh;
 
@@ -45,9 +45,9 @@ install:
 #- export C_INCLUDE_PATH="$C_INCLUDE_PATH:/usr/local/Cellar/gcc@5/5.5.0_2/include:/usr/include:/usr/local/include:$HOME/anaconda3/envs/signalalign/include"
 #- export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/usr/local/Cellar/gcc@5/5.5.0_2/lib/gcc/5:/usr/lib:/usr/local/lib:$HOME/anaconda3/envs/signalalign/lib"
 #- export LIBRARY_PATH="$LIBRARY_PATH:/usr/local/Cellar/gcc@5/5.5.0_2/lib/gcc/5:/usr/local/lib:/usr/lib:$HOME/anaconda3/envs/signalalign/lib"
-- export C_INCLUDE_PATH="$C_INCLUDE_PATH:/usr/include:/usr/local/include:$HOME/anaconda3/envs/signalalign/include"
-- export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/usr/lib:/usr/local/lib:$HOME/anaconda3/envs/signalalign/lib"
-- export LIBRARY_PATH="$LIBRARY_PATH:/usr/local/lib:/usr/lib:$HOME/anaconda3/envs/signalalign/lib"
+- export C_INCLUDE_PATH="$C_INCLUDE_PATH:$HOME/anaconda3/envs/signalalign/include"
+- export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$HOME/anaconda3/envs/signalalign/lib"
+- export LIBRARY_PATH="$LIBRARY_PATH:$HOME/anaconda3/envs/signalalign/lib"
 
 - hash -r
 - conda config --set always_yes yes --set changeps1 no
@@ -56,7 +56,6 @@ install:
 - conda info -a
 - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
   conda env create -f requirements.yml python=3.6;
-  brew install hdf5;
   else
   conda env create -f requirements.yml python=3.6;
   fi
