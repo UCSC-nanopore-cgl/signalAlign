@@ -10,7 +10,6 @@ channels:
 dependencies:
   - bzip2=1.0.6
   - curl=7.62.0
-  - hdf5=1.10.2
   - pip=18.1=py36_0
   - py=1.7.0=py36_0
   - python=3.6.7
