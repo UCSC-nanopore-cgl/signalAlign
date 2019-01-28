@@ -20,7 +20,7 @@ all : sL bD ${libPath}/signalAlignLib.a ${signalAlignBin}/signalAlignLibTests \
 	  ${signalAlignBin}/buildHdpUtil ${signalAlignBin}/trainModels all_tests \
 	  externals python_setup ${signalAlignBin}/filterReads ${signalAlignBin}/extract \
 	  ${signalAlignBin}/sequencing_summary ${signalAlignBin}/plot_kmer_distributions \
-	  ${signalAlignBin}/plot_variant_accuracy
+	  ${signalAlignBin}/plot_variant_accuracy #${signalAlignBin}/compare_trained_models
 
 
 #${rootPath}/lib/libhdf5.a:
@@ -95,7 +95,7 @@ ${signalAlignBin}/compareDistributions : compareDistributions.c ${libPath}/signa
 	${cxx} ${cflags}  -I inc -I${libPath} -o ${signalAlignBin}/compareDistributions compareDistributions.c ${libPath}/signalAlignLib.a ${signalAlignLib} ${LIBS}
 
 ${signalAlignBin}/signalAlignLibTests : ${libTests} tests/*.h ${libPath}/signalAlignLib.a ${signalAlignDependencies} .FORCE
-	${cxx} ${cflags}  -I inc -I${libPath}   -Wno-error -o ${signalAlignBin}/signalAlignLibTests ${libTests} ${libPath}/signalAlignLib.a ${signalAlignLib}  ${LIBS}
+	${cxx} ${cflags}  -I inc -I${libPath}   -Wno-error -o ${signalAlignBin}/signalAlignLibTests ${libTests} ${libPath}/signalAlignLib.a ${signalAlignLib}  ${LIBS} -v
 
 ${signalAlignBin}/signalMachine : signalMachine.c ${libPath}/signalAlignLib.a ${signalAlignDependencies}
 	${cxx} ${cflags}  -I inc -I${libPath}   -o ${signalAlignBin}/signalMachine signalMachine.c ${libPath}/signalAlignLib.a ${signalAlignLib} ${LIBS}
@@ -133,6 +133,10 @@ ${signalAlignBin}/plot_kmer_distributions : ${rootPath}src/signalalign/visualiza
 ${signalAlignBin}/plot_variant_accuracy : ${rootPath}src/signalalign/visualization/plot_variant_accuracy.py
 	cp ${rootPath}src/signalalign/visualization/plot_variant_accuracy.py ${signalAlignBin}/plot_variant_accuracy
 	chmod +x ${signalAlignBin}/plot_variant_accuracy
+
+#${signalAlignBin}/compare_trained_models : ${rootPath}src/signalalign/visualization/compare_trained_models.py
+#	cp ${rootPath}src/signalalign/visualization/compare_trained_models.py ${signalAlignBin}/compare_trained_models
+#	chmod +x ${signalAlignBin}/compare_trained_models
 
 all_tests : .FORCE
 
