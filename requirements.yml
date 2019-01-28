@@ -1,11 +1,10 @@
 name: signalalign
 channels:
+  - conda-forge
   - bioconda
   - anaconda
-  - defaults
   - adbailey4
   - intel
-  - conda-forge
   - defaults
 dependencies:
   - bzip2=1.0.6
