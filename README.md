@@ -4,6 +4,15 @@
 
 ### Cheat sheet/Quick Start
 
+### Docker
+You can take a look at the config files which point to data already stored within the Docker image. If you want to run SignalAlign using your own data, you just need to place your data and config into a 
+directory and set the config up so that it points to the data correctly once you mount the local directory to the docker image. 
+
+
+1. `docker run -v /complete/path/to/signalAlign/tests/test_Docker/:/data adbailey4/train_sa_models run --config /data/trainModels-config.json`
+2. `docker run -v /complete/path/to/signalAlign/tests/test_Docker/:/data adbailey4/signalalign run --config /data/runSignalAlign-config.json`
+
+
 ### Pre-installation
 1. `sudo apt-get update`
 2. `sudo apt-get install wget git make g++ zlib1g-dev libbz2-dev liblzma-dev python3-dev python3-setuptools` 
