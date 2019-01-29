@@ -19,7 +19,7 @@ before_install:
 - git submodule update --init
 - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
   brew update;
-  brew install gcc@5 automake make open-mpi hdf5;
+  brew install gcc@5 automake make open-mpi hdf5 htslib;
   gcc --version;
   alias make='gmake';
   ln -s /usr/local/bin/gcc-5 /usr/local/bin/gcc;
@@ -60,11 +60,11 @@ install:
 - alias g++='g++-5'
 - gcc --version
 - make
-- if [[ "$TRAVIS_OS_NAME" != "osx" ]]; then
-      "export DISPLAY=:99.0";
-      "sh -e /etc/init.d/xvfb start";
-      sleep 3; # give xvfb some time to start
-  fi
+#- if [[ "$TRAVIS_OS_NAME" != "osx" ]]; then
+#      "export DISPLAY=:99.0";
+#      "sh -e /etc/init.d/xvfb start";
+#      sleep 3; # give xvfb some time to start
+#  fi
 
 
 

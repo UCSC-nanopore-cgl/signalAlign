@@ -16,6 +16,10 @@ from py3helpers.classification import ClassificationMetrics
 from py3helpers.utils import load_json, create_dot_dict
 from signalalign.variantCaller import AggregateOverReads
 from signalalign.utils.sequenceTools import CustomAmbiguityPositions
+import matplotlib as mpl
+if os.environ.get('DISPLAY', '') == '':
+    print('no display found. Using non-interactive Agg backend')
+    mpl.use('Agg')
 
 
 def parse_args():
