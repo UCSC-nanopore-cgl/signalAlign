@@ -98,12 +98,12 @@ class TestVariantCaller(unittest.TestCase):
                 self.assertEqual(0, row["label_E"])
                 self.assertEqual(1, row["label_C"])
 
-    # def test_plot_variants(self):
-#     with tempfile.TemporaryDirectory() as tempdir:
-#         config_dict = load_json(self.plot_variants_config)
-#         config_dict["save_fig_dir"] = tempdir
-#         retcode = plot_roc_from_config(config_dict)
-#         self.assertEqual(retcode, 0)
+    def test_plot_variants(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            config_dict = load_json(self.plot_variants_config)
+            config_dict["save_fig_dir"] = tempdir
+            retcode = plot_roc_from_config(config_dict)
+            self.assertEqual(retcode, 0)
 
 
 if __name__ == '__main__':
