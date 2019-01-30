@@ -52,10 +52,26 @@ def parse_assignment_file(file_path):
     return data
 
 
+def parse_alignment_file(file_path):
+    """Parse the buildAlignment.tsv output file from CreateHdpTrainingData
+
+    :param file_path: path to alignment file
+    :return: panda DataFrame with column names "kmer", "strand", "level_mean", "prob"
+    """
+    assert os.path.exists(file_path), "File path does not exist: {}".format(file_path)
+    data = pd.read_table(file_path,
+                         usecols=(4, 9, 12, 13),
+                         names=["strand", "kmer", "prob", "level_mean"],
+                         dtype={"kmer": np.str, "strand": np.str, "level_mean": np.float64, "prob": np.float64},
+                         header=None)
+    return data
+
+
 class HmmModel(object):
-    def __init__(self, ont_model_file, hdp_model_file=None, rna=False):
+    def __init__(self, ont_model_file, hdp_model_file=None, rna=False, name=None):
         # TODO Need to create docs here
         assert os.path.exists(ont_model_file)
+        self.name = name
         self.rna = rna
         self.ont_model_file = ont_model_file
         self.match_model_params = 5  # level_mean, level_sd, noise_mean, noise_sd, noise_lambda
@@ -261,7 +277,7 @@ class HmmModel(object):
         """
         assert set(kmer).issubset(set(alphabet)) is True, "Nucleotide not found in model alphabet: kmer={}, " \
                                                           "alphabet={}".format(kmer, alphabet)
-        assert len(kmer) == kmer_length, "Kmer length does not match model kmer length"
+        assert len(kmer) == kmer_length, "Kmer ({}) length  does not match model kmer length: {}".format(kmer, kmer_length)
 
         alphabet_dict = {base: index for index, base in enumerate(sorted(alphabet))}
         kmer_index = 0
@@ -512,11 +528,11 @@ class HmmModel(object):
                     pass
                     # print(num_factor_children)
 
-            for id in range(self.num_dps):
+            for _ in range(self.num_dps):
                 post_pred = [float(x) for x in hdp_fh.readline().split()]
                 self.all_posterior_pred.append(post_pred)
 
-            for id in range(self.num_dps):
+            for _ in range(self.num_dps):
                 spline_slopes = [float(x) for x in hdp_fh.readline().split()]
                 self.all_spline_slopes.append(spline_slopes)
 
@@ -629,8 +645,9 @@ class HmmModel(object):
             legend_text1.append("HDP Distribution")
 
             handles2.extend([txt_handle4, txt_handle5, txt_handle6])
-            legend_text2.extend(["HDP Model: \n  {}".format(hdp_model_name), "Kullback–Leibler divergence: {}".format(np.round(kl_distance, 4)),
-                                "Hellinger distance: {}".format(np.round(h_distance, 4))])
+            legend_text2.extend(["HDP Model: \n  {}".format(hdp_model_name),
+                                 "Kullback–Leibler divergence: {}".format(np.round(kl_distance, 4)),
+                                 "Hellinger distance: {}".format(np.round(h_distance, 4))])
 
         if alignment_file is not None or alignment_file_data is not None:
             # option to parse file or not
@@ -970,21 +987,6 @@ class HmmModel(object):
 
 def hellinger2(p, q):
     return euclidean(np.sqrt(p), np.sqrt(q)) / _SQRT2
-
-
-def parse_alignment_file(file_path):
-    """Parse the buildAlignment.tsv output file from CreateHdpTrainingData
-
-    :param file_path: path to alignment file
-    :return: panda DataFrame with column names "kmer", "strand", "level_mean", "prob"
-    """
-    assert os.path.exists(file_path), "File path does not exist: {}".format(file_path)
-    data = pd.read_table(file_path,
-                         usecols=(4, 9, 12, 13),
-                         names=["strand", "kmer", "prob", "level_mean"],
-                         dtype={"kmer": np.str, "strand": np.str, "level_mean": np.float64, "prob": np.float64},
-                         header=None)
-    return data
 
 
 def create_new_model(model_path, new_model_path, find_replace_set):

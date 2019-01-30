@@ -55,7 +55,7 @@ class MarginalizeVariants(object):
                 # Get total probability for each nucleotide
                 for nuc in set(pos_data["base"]):
                     nuc_data = pos_data[pos_data["base"] == nuc]
-                    nuc_prob = max(nuc_data["posterior_probability"])
+                    nuc_prob = sum(nuc_data["posterior_probability"])
                     total_prob += nuc_prob
                     position_nuc_dict[NanoporeRead.bytes_to_string(nuc)] = nuc_prob
                 # normalize probabilities over each position
@@ -142,6 +142,16 @@ class AggregateOverReads(object):
                 print("No variant found in labelled data at chr:{} pos:{} strand:{}: Check positions file".format(contig, position, strand))
             else:
                 predicted_data.loc[i, true_char+"_label"] = 1
+
+        return predicted_data
+
+    def generate_labels2(self, predicted_data, true_char):
+        """Generate labels for predictions given labelled positions"""
+        for char in self.variants:
+            predicted_data.loc[:, char+"_label"] = pd.Series(0, index=predicted_data.index)
+
+        for i in range(len(predicted_data)):
+            predicted_data.loc[i, true_char+"_label"] = 1
 
         return predicted_data
 

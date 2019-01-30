@@ -79,6 +79,10 @@ def make_positions_file(reference, output_path, motifs, overlap=False):
     :param motifs: list of lists of find replace motifs ex: [("CCAGG","CFAGG"), ("CCTGG","CFTGG")]
     :param overlap: if the motif can overlap with its self, find index of overlap if set to true
     """
+    rev_motifs = []
+    for motif in motifs:
+        rev_motifs.append([x[::-1] for x in motif])
+
     with open(output_path, "w") as outfile:
         for header, comment, sequence in read_fasta(reference):
             fwd_seq = sequence
@@ -86,7 +90,8 @@ def make_positions_file(reference, output_path, motifs, overlap=False):
             for index, old_char, substitution_char in find_motifs_sequence_positions(fwd_seq, motifs, overlap=overlap):
                 outfile.write(header + "\t" + np.str(index) + "\t" + "+" + "\t"
                               + old_char + "\t" + substitution_char + "\n")
-            for index, old_char, substitution_char in find_motifs_sequence_positions(bwd_seq, motifs, overlap=overlap):
+
+            for index, old_char, substitution_char in find_motifs_sequence_positions(bwd_seq, rev_motifs, overlap=overlap):
                 outfile.write(header + "\t" + np.str(index) + "\t" + "-" + "\t"
                               + old_char + "\t" + substitution_char + "\n")
 

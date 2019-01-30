@@ -938,6 +938,7 @@ def multithread_signal_alignment_samples(samples, signal_align_arguments, worker
                                           "".format(names)
     for sample in samples:
         # correct signal align arguments
+        print("[multithread_signal_alignment_samples] Running SignalAlign on sample: {}".format(sample.name))
         sample.process_reads(trim=trim)
         signal_align_arguments["degenerate"] = sample.degenerate
         signal_align_arguments["alignment_file"] = sample.alignment_file
@@ -951,6 +952,7 @@ def multithread_signal_alignment_samples(samples, signal_align_arguments, worker
         assert sample.filter_read_generator is not None, \
             "Sample {} does not have a filter read generator. " \
             "Must pass in alignment_file and readdb and quality_threshold".format(sample.name)
+
         output_files = multithread_signal_alignment(signal_align_arguments, [], worker_count, debug=debug,
                                                     filter_reads_to_string_wrapper=sample.filter_read_generator)
         sample.analysis_files = output_files

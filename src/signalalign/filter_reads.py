@@ -113,6 +113,8 @@ def parse_read_name_map_file(read_map, directories, recursive=False):
     else:
         name_index = 1
         path_index = 0
+    for dir_path in directories:
+        assert os.path.isdir(dir_path), "Path provided does not exist or is not a directory: {}".format(dir_path)
 
     with open(read_map, 'r') as fh:
         for line in fh:

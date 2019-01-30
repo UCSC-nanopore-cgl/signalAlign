@@ -98,7 +98,7 @@ _Optional_
 * `--in_complement_hmm`, `-C` complement HMM parameters file 
 * `--template_hdp`, `-tH` template HDP model file
 * `--complement_hdp`, `-cH` complement HDP model file 
-* `--degenerate`, `-x` nucleotide options for degenerate or _ambiguous_ positions. `m6a` = {AF}, `variant` = {A,C,G,T} `cytosine2` = {CE} `cytosine3` = {CEO} `adenosine` = {AI}. **n.b.** E = 5-methylcytosine, O = 5-hydroxymethylcytosine, F = 6-methyladenine, I = Inosine
+* `--degenerate`, `-x` nucleotide options for degenerate or _ambiguous_ positions. `m6a` = {AF}, `variant` = {A,C,G,T} `cytosine2` = {CE} `cytosine3` = {CEO} `adenosine` = {AI}. **n.b.** E = 5-methylcytosine, O = 5-hydroxymethylcytosine, I = 6-methyladenine
 * `--stateMachineType`, `-smt` HMM to use. Options: `threeState` and `threeStateHdp`. Default: `threeState`.
 * `--file_of_files`, `-fofn` a file containing the absolute path to files to align with, one file path per line
 * `--threshold`, `-t`. Minimum posterior match probability threshold (matches below this threshold will not be tabulated). Default: 0.01.
