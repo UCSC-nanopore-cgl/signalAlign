@@ -5,13 +5,13 @@
     {
       "name": "canonical",
       "variant_tsvs": "./tests/test_variantCalled_files",
-      "positions_file": "./tests/test_position_files/ecoli_positions_CCAGG.tsv",
+      "positions_file": "./tests/test_position_files/CCWGG_ecoli_k12_mg1655_CC.positions",
       "label": "C"
     },
     {
       "name": "5-mC",
       "variant_tsvs": "./tests/test_variantCalled_files",
-      "positions_file": "./tests/test_position_files/ecoli_positions_CCAGG_C_E.tsv",
+      "positions_file": "./tests/test_position_files/CCWGG_ecoli_k12_mg1655.positions",
       "label": "E"
     }
   ]

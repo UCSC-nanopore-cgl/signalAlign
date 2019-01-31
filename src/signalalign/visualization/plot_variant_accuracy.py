@@ -10,6 +10,7 @@
 
 from argparse import ArgumentParser
 import pandas as pd
+import pickle
 import os
 import matplotlib as mpl
 if os.environ.get('DISPLAY', '') == '':
@@ -58,8 +59,27 @@ def plot_roc_from_config(config):
         aor_h = AggregateOverReads(tsvs, variants)
         aor_h.marginalize_over_all_reads()
         aor_handles.append(aor_h)
+        assert positions or label, "Must provide either a label: {} or a positions file: {}".format(label, positions)
+        # use character as label if given
+        if label:
+            plot_genome_position_aggregate = True
+            plot_per_call = True
+            plot_per_read = True
+            for nuc in variants:
+                if nuc == label:
+                    # set
+                    aor_h.per_read_data.loc[:, "{}_label".format(nuc)] = pd.Series(1, index=aor_h.per_read_data.index)
+                else:
+                    aor_h.per_read_data.loc[:, "{}_label".format(nuc)] = pd.Series(0, index=aor_h.per_read_data.index)
+            genome_wide_aggregate_label = aor_h.generate_labels2(predicted_data=aor_h.aggregate_position_probs,
+                                                                 true_char=label)
+            gwa_lables_list.append(genome_wide_aggregate_label)
+
+            per_site_label = aor_h.generate_labels2(predicted_data=aor_h.per_position_data, true_char=label)
+            per_site_label_list.append(per_site_label)
+
         # if positions file is given, check accuracy from that
-        if positions:
+        elif positions:
             plot_genome_position_aggregate = True
             plot_per_call = True
 
@@ -71,16 +91,6 @@ def plot_roc_from_config(config):
             per_site_label = aor_h.generate_labels(labelled_positions=genome_position_labels,
                                                    predicted_data=aor_h.per_position_data)
             per_site_label_list.append(per_site_label)
-
-        # use character as label if given
-        if label:
-            plot_per_read = True
-            for nuc in variants:
-                if nuc == label:
-                    # set
-                    aor_h.per_read_data.loc[:, "{}_label".format(nuc)] = pd.Series(1, index=aor_h.per_read_data.index)
-                else:
-                    aor_h.per_read_data.loc[:, "{}_label".format(nuc)] = pd.Series(0, index=aor_h.per_read_data.index)
 
     # plot per read ROC curve
     if plot_per_read:
@@ -97,6 +107,12 @@ def plot_roc_from_config(config):
                 path = os.path.join(save_fig_dir, "per_read_roc_{}".format(variant))
 
             roc_h.plot_roc(variant, title="Per read ROC for {}".format(variant), save_fig_path=path)
+        print("Per read confusion matrix")
+        print(roc_h.confusion_matrix())
+        # save pickle of classification metrics class
+        path = os.path.join(save_fig_dir, "per_read_classificationMetrics.pkl")
+        with open(path, "wb") as f:
+            pickle.dump(roc_h, f)
 
     # plot per call ROC curve
     if plot_per_call:
@@ -111,6 +127,12 @@ def plot_roc_from_config(config):
                 path = os.path.join(save_fig_dir, "per_site_per_read_roc_{}".format(variant))
 
             roc_h.plot_roc(variant, title="Per site per read ROC for {}".format(variant), save_fig_path=path)
+        print("Per site per read confusion matrix")
+        print(roc_h.confusion_matrix())
+        # save pickle of classification metrics class
+        path = os.path.join(save_fig_dir, "per_site_per_read_classificationMetrics.pkl")
+        with open(path, "wb") as f:
+            pickle.dump(roc_h, f)
 
     # plot genome position calls
     if plot_genome_position_aggregate:
@@ -125,6 +147,13 @@ def plot_roc_from_config(config):
                 path = os.path.join(save_fig_dir, "per_site_genomic_roc_{}".format(variant))
 
             roc_h.plot_roc(variant, title="Per site on genome ROC for {}".format(variant), save_fig_path=path)
+        # confusion matrix
+        print("Per site on genome confusion matrix")
+        print(roc_h.confusion_matrix())
+        # save pickle of classification metrics class
+        path = os.path.join(save_fig_dir, "per_site_genomic_classificationMetrics.pkl")
+        with open(path, "wb") as f:
+            pickle.dump(roc_h, f)
 
     return 0
 
