@@ -15,6 +15,7 @@ from py3helpers.utils import list_dir, load_json
 from signalalign.variantCaller import *
 from signalalign.visualization.plot_variant_accuracy import plot_roc_from_config
 
+
 class TestVariantCaller(unittest.TestCase):
 
     @classmethod
@@ -24,7 +25,7 @@ class TestVariantCaller(unittest.TestCase):
         # cls.positions_file = os.path.join(cls.HOME, "tests/test_sequences/pUC19_SspI_Zymo.fa")
         cls.f5_files = os.path.join(cls.HOME, "tests/minion_test_reads/canonical_ecoli_R9")
         cls.runSA_config = os.path.join(cls.HOME, "tests/test_variantCalled_files/runSignalAlign-config_tmp.json")
-        cls.ecoli_positions = os.path.join(cls.HOME, "tests/test_position_files/ecoli_positions_CCAGG.tsv")
+        cls.ecoli_positions = os.path.join(cls.HOME, "tests/test_position_files/CCWGG_ecoli_k12_mg1655_CC.positions")
         cls.variant_files = os.path.join(cls.HOME, "tests/test_variantCalled_files")
         cls.plot_variants_config = os.path.join(cls.HOME, "tests/test_variantCalled_files/plot_variants_config.json")
 
@@ -32,14 +33,14 @@ class TestVariantCaller(unittest.TestCase):
         aor_h = AggregateOverReads(self.variant_files, "CE")
         for i, data in aor_h.per_position_data.iterrows():
             self.assertEqual(data["contig"], "gi_ecoli")
-            self.assertLessEqual(data["C"]+data["E"], 1)
+            self.assertAlmostEqual(data["C"] + data["E"], 1)
 
     def test_marginalize_over_all_reads(self):
         aor_h = AggregateOverReads(self.variant_files, "CE")
         all_data = aor_h.marginalize_over_all_reads()
         for i, data in all_data.iterrows():
             self.assertEqual(data[0], "gi_ecoli")
-            self.assertLessEqual(data["C"]+data["E"], 1)
+            self.assertLessEqual(data["C"] + data["E"], 1)
 
     def test_write_data(self):
         aor_h = AggregateOverReads(self.variant_files, "CE")
@@ -49,14 +50,14 @@ class TestVariantCaller(unittest.TestCase):
             new_file = os.path.join(tempdir, "test.txt")
             aor_h.write_data(new_file)
             data = pd.read_csv(new_file, delimiter="\t")
-            self.assertTrue(data.equals(all_data))
+            self.assertTrue(data["position"].equals(all_data["position"]))
 
     def test_normalize_all_data(self):
         aor_h = AggregateOverReads(self.variant_files, "CE")
         data_gen = aor_h._normalize_all_data(aor_h.per_position_data)
         for data in data_gen:
             self.assertEqual(data[0], "gi_ecoli")
-            self.assertLessEqual(data[3]+data[4], 1)
+            self.assertLessEqual(data[4] + data[5], 1)
 
     def test_MarginalizeVariants(self):
         for test_file in list_dir(self.variant_files, ext="tsv"):
@@ -65,9 +66,9 @@ class TestVariantCaller(unittest.TestCase):
             for i, data in position_probs.iterrows():
                 # self.contig, pos, self.strand], nuc_data
                 self.assertEqual(data["contig"], "gi_ecoli")
-                self.assertLessEqual(data["E"] + data["C"], 1)
+                self.assertAlmostEqual(data["E"] + data["C"], 1)
             for i, data in mv_h.per_read_calls.iterrows():
-                self.assertLessEqual(data["E"] + data["C"], 1)
+                self.assertAlmostEqual(data["E"] + data["C"], 1)
                 self.assertEqual(data["contig"], "gi_ecoli")
 
     def test_create_labels_from_positions_file(self):
@@ -83,20 +84,22 @@ class TestVariantCaller(unittest.TestCase):
     def test_get_true_character(self):
         labels = create_labels_from_positions_file(self.ecoli_positions, "CE")
         for i, label in labels.iterrows():
-            self.assertEqual(get_true_character(labels, "gi_ecoli", label["strand"], label["position"]), label["change_to"])
+            if i > 100:
+                break
+            self.assertEqual(get_true_character(labels, "gi_ecoli", label["strand"], label["position"]),
+                             label["change_to"])
 
     def test_generate_labels(self):
         labels = create_labels_from_positions_file(self.ecoli_positions, "CE")
         aor_h = AggregateOverReads(self.variant_files, "CE")
         data = aor_h.generate_labels(labels, aor_h.per_position_data)
         for i, row in data.iterrows():
-            if row["C"] > row["E"]:
-                self.assertEqual(1, row["label_E"])
-                self.assertEqual(0, row["label_C"])
-
-            if row["C"] > row["E"]:
-                self.assertEqual(0, row["label_E"])
-                self.assertEqual(1, row["label_C"])
+            if row["read_name"] == '6e520d79-dcc5-4af3-a69f-cf5134a4c563.sm.tsv':
+                self.assertEqual(1, row["E_label"])
+                self.assertEqual(0, row["C_label"])
+            else:
+                self.assertEqual(0, row["E_label"])
+                self.assertEqual(1, row["C_label"])
 
     def test_plot_variants(self):
         with tempfile.TemporaryDirectory() as tempdir:
