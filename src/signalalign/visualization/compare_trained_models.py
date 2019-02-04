@@ -70,8 +70,8 @@ class MultipleModelHandler(object):
         legend_text1 = []
         handles2 = []
         legend_text2 = []
-        plt.figure(figsize=(12, 9))
-        panel1 = plt.axes([0.1, 0.37, .8, .6])
+        plt.figure(figsize=(20, 9))
+        panel1 = plt.axes([0.1, 0.3, .8, .6])
         panel1.set_xlabel('pA')
         panel1.set_ylabel('Density')
         panel1.grid(color='black', linestyle='-', linewidth=1, alpha=0.5)
@@ -185,10 +185,10 @@ class MultipleModelHandler(object):
 
                 titles.append(name)
         # create legend
-        first_legend = panel1.legend(handles1, legend_text1, bbox_to_anchor=(0.43, -.05))
+        first_legend = panel1.legend(handles1, legend_text1, bbox_to_anchor=(0, -0.1), loc='upper left')
         ax = plt.gca().add_artist(first_legend)
 
-        panel1.legend(handles2, legend_text2, bbox_to_anchor=(1.1, -.07))
+        panel1.legend(handles2, legend_text2, bbox_to_anchor=(0.5, -.1), loc='upper left')
 
         panel1.set_xlim(min_x, max_x)
         panel1.set_title("Kmer distribution comparisons")
@@ -204,20 +204,20 @@ class MultipleModelHandler(object):
 
     def plot_all_model_comparisons(self, write_log_file=True):
         """Plot every comparison between each model"""
-        plt.figure(figsize=(8, 8))
-        panel1 = plt.axes([0.05, 0.08, .9, .2])
+        plt.figure(figsize=(10, 8))
+        panel1 = plt.axes([0.1, 0.08, .85, .2])
         panel1.set_title("Kullback–Leibler Divergence between distributions", x=0.5, y=1.0)
         panel1.set_xlabel('KL Divergence Distance')
         panel1.set_ylabel('Count')
         panel1.grid(color='black', linestyle='-', linewidth=1, alpha=0.5)
 
-        panel2 = plt.axes([0.05, 0.4, .9, .2])
+        panel2 = plt.axes([0.1, 0.4, .85, .2])
         panel2.set_title("Hellinger Distance between distributions")
         panel2.set_xlabel('Hellinger Distance')
         panel2.set_ylabel('Count')
         panel2.grid(color='black', linestyle='-', linewidth=1, alpha=0.5)
 
-        panel3 = plt.axes([0.05, 0.72, .9, .2])
+        panel3 = plt.axes([0.1, 0.72, .85, .2])
         panel3.set_title("abs(Median Delta) between distributions")
         panel3.set_xlabel('abs(Median Delta)')
         panel3.set_ylabel('Count')
@@ -423,7 +423,6 @@ def main(config=None):
         config = load_json(args.config)
 
     args = create_dot_dict(config)
-    save_json(args, os.path.join(args.save_fig_dir, "compare_trained_models_config.json"))
     # load model files
     models = []
     kmer_lists = []
@@ -457,6 +456,9 @@ def main(config=None):
     # Start plotting
     for kmer_list in zip_longest(*kmer_lists):
         mmh.plot_kmer_distribution(kmer_list)
+
+    if args.save_fig_dir:
+        save_json(args, os.path.join(args.save_fig_dir, "compare_trained_models_config.json"))
 
 
 if __name__ == "__main__":
