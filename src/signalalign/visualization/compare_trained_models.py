@@ -12,6 +12,7 @@ import os
 import numpy as np
 import csv
 import matplotlib as mpl
+
 if os.environ.get('DISPLAY', '') == '':
     print('no display found. Using non-interactive Agg backend')
     mpl.use('Agg')
@@ -28,8 +29,6 @@ from scipy.spatial.distance import euclidean
 
 from py3helpers.utils import load_json, create_dot_dict, save_json
 from signalalign.hiddenMarkovModel import HmmModel, parse_assignment_file, parse_alignment_file, hellinger2
-
-
 
 
 def parse_args():
@@ -185,7 +184,7 @@ class MultipleModelHandler(object):
 
                 titles.append(name)
         # create legend
-        first_legend = panel1.legend(handles1, legend_text1, bbox_to_anchor=(0, -0.1), loc='upper left')
+        first_legend = panel1.legend(handles1, legend_text1, bbox_to_anchor=(-0.1, -0.1), loc='upper left')
         ax = plt.gca().add_artist(first_legend)
 
         panel1.legend(handles2, legend_text2, bbox_to_anchor=(0.5, -.1), loc='upper left')
@@ -235,35 +234,51 @@ class MultipleModelHandler(object):
                 kmers = model_pair[0].sorted_kmer_tuple
                 model_names = "{}_{}".format(model_pair[0].name, model_pair[1].name)
                 hellinger_outpath = os.path.join(self.savefig_dir,
-                                                 "{}_{}".format(model_names, "hellinger_distances.tsv"))
-                kl_outpath = os.path.join(self.savefig_dir, "{}_{}".format(model_names, "kl_divergences.tsv"))
-                delta_outpath = os.path.join(self.savefig_dir, "{}_{}".format(model_names, "median_deltas.tsv"))
+                                                 "{}_{}".format(model_names, "kl_hellinger_delta_distances.tsv"))
                 # write kmer_differences
                 self.write_kmer_distribution_comparison_logfile(kmers, kl_divergences, hellinger_distances,
                                                                 median_deltas, outfile=hellinger_outpath)
 
-            kl_divergences = [x for x in kl_divergences if x is not None]
-            all_hellinger_distances.append(hellinger_distances)
-            all_kl_divergences.append(kl_divergences)
-            all_median_deltas.append(median_deltas)
+            kl_divergences = [x for x in kl_divergences if x is not None if x > 0]
+            hellinger_distances = [x for x in hellinger_distances if x > 0]
+            median_deltas = [x for x in median_deltas if x > 0]
+
+            if len(hellinger_distances) > 0:
+                all_hellinger_distances.append(hellinger_distances)
+            else:
+                all_hellinger_distances.append([0])
+
+            if len(kl_divergences) > 0:
+                all_kl_divergences.append(kl_divergences)
+            else:
+                all_kl_divergences.append([0])
+
+            if len(median_deltas) > 0:
+                all_median_deltas.append(median_deltas)
+            else:
+                all_median_deltas.append([0])
 
         max_hellinger = max([max(x) for x in all_hellinger_distances])
         max_kl = max([max(x) for x in all_kl_divergences])
         max_delta = max([max(x) for x in all_median_deltas])
-        panel1_bins = np.linspace(0, max_hellinger, num=30)
-        panel2_bins = np.linspace(0, max_kl, num=30)
+        panel1_bins = np.linspace(0, max_kl, num=30)
+        panel2_bins = np.linspace(0, max_hellinger, num=30)
         panel3_bins = np.linspace(0, max_delta, num=30)
 
         for i, model_pair in enumerate(itertools.combinations(self.models, 2)):
             panel1.hist(all_kl_divergences[i], bins=panel1_bins,
-                        label="KL divergences: {} vs {}".format(model_pair[0].name,
-                                                                model_pair[1].name))
+                        label="KL divergences: {} vs {} | {}/{}".format(model_pair[0].name,
+                                                                        model_pair[1].name, len(all_kl_divergences[i]),
+                                                                        len(model_pair[0].sorted_kmer_tuple)))
             panel2.hist(all_hellinger_distances[i], bins=panel2_bins,
-                        label="Hellinger distances: {} vs {}".format(model_pair[0].name,
-                                                                     model_pair[1].name))
+                        label="Hellinger distances: {} vs {} | {}/{}".format(model_pair[0].name,
+                                                                             model_pair[1].name,
+                                                                             len(all_hellinger_distances[i]),
+                                                                             len(model_pair[0].sorted_kmer_tuple)))
             panel3.hist(all_median_deltas[i], bins=panel3_bins,
-                        label="Median Deltas: {} vs {}".format(model_pair[0].name,
-                                                               model_pair[1].name))
+                        label="Median Deltas: {} vs {} | {}/{}".format(model_pair[0].name,
+                                                                       model_pair[1].name, len(all_median_deltas[i]),
+                                                                       len(model_pair[0].sorted_kmer_tuple)))
 
             panel1.legend(loc='upper right', fancybox=True, shadow=True)
             panel2.legend(loc='upper right', fancybox=True, shadow=True)
