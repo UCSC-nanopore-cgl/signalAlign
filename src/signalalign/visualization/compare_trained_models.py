@@ -11,6 +11,12 @@
 import os
 import numpy as np
 import csv
+import matplotlib as mpl
+if os.environ.get('DISPLAY', '') == '':
+    print('no display found. Using non-interactive Agg backend')
+    mpl.use('Agg')
+import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
 
 from argparse import ArgumentParser
 from itertools import zip_longest
@@ -23,14 +29,7 @@ from scipy.spatial.distance import euclidean
 from py3helpers.utils import load_json, create_dot_dict, save_json
 from signalalign.hiddenMarkovModel import HmmModel, parse_assignment_file, parse_alignment_file, hellinger2
 
-import matplotlib as mpl
 
-if os.environ.get('DISPLAY', '') == '':
-    print('no display found. Using non-interactive Agg backend')
-    mpl.use('Agg')
-mpl.use("TkAgg")
-import matplotlib.pyplot as plt
-import matplotlib.ticker as ticker
 
 
 def parse_args():
