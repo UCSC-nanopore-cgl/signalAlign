@@ -20,7 +20,7 @@ all : sL bD ${libPath}/signalAlignLib.a ${signalAlignBin}/signalAlignLibTests \
 	  ${signalAlignBin}/buildHdpUtil ${signalAlignBin}/trainModels all_tests \
 	  externals python_setup ${signalAlignBin}/filterReads ${signalAlignBin}/extract \
 	  ${signalAlignBin}/sequencing_summary ${signalAlignBin}/plot_kmer_distributions \
-	  ${signalAlignBin}/plot_variant_accuracy #${signalAlignBin}/compare_trained_models
+	  ${signalAlignBin}/plot_variant_accuracy ${signalAlignBin}/compare_trained_models
 
 
 #${rootPath}/lib/libhdf5.a:
@@ -134,9 +134,9 @@ ${signalAlignBin}/plot_variant_accuracy : ${rootPath}src/signalalign/visualizati
 	cp ${rootPath}src/signalalign/visualization/plot_variant_accuracy.py ${signalAlignBin}/plot_variant_accuracy
 	chmod +x ${signalAlignBin}/plot_variant_accuracy
 
-#${signalAlignBin}/compare_trained_models : ${rootPath}src/signalalign/visualization/compare_trained_models.py
-#	cp ${rootPath}src/signalalign/visualization/compare_trained_models.py ${signalAlignBin}/compare_trained_models
-#	chmod +x ${signalAlignBin}/compare_trained_models
+${signalAlignBin}/compare_trained_models : ${rootPath}src/signalalign/visualization/compare_trained_models.py
+	cp ${rootPath}src/signalalign/visualization/compare_trained_models.py ${signalAlignBin}/compare_trained_models
+	chmod +x ${signalAlignBin}/compare_trained_models
 
 all_tests : .FORCE
 

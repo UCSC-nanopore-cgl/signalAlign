@@ -175,6 +175,29 @@ class HiddenMarkovTests(unittest.TestCase):
         prob = hdp_handle.grid_spline_interp(query_x, x, y, slope, length)
         self.assertEqual(prob, 0.12328410496683605)
 
+    def test_get_hdp_probability(self):
+        hdp_model = os.path.join(self.HOME, "models/template_RNA.singleLevelFixedCanonical.nhdp")
+        hdp_handle = HmmModel(ont_model_file=self.model_file, hdp_model_file=hdp_model)
+        query_x = 83.674161662792542
+        prob = hdp_handle.get_hdp_probability("AACAT", query_x)
+        self.assertEqual(prob, 0.29228949476718646)
+        query_x = 81.55860779063407
+        prob = hdp_handle.get_hdp_probability("AACAT", query_x)
+        self.assertEqual(prob, 0.12927539337648492)
+        query_x = 80.605230545769458
+        prob = hdp_handle.get_hdp_probability("CATTT", query_x)
+        self.assertEqual(prob, 0.12328410496683605)
+
+    def test_get_new_linspace_hdp_probability_distribution(self):
+        hdp_model = os.path.join(self.HOME, "models/template_RNA.singleLevelFixedCanonical.nhdp")
+        hdp_handle = HmmModel(ont_model_file=self.model_file, hdp_model_file=hdp_model)
+        kmer = "AACAT"
+        linspace = hdp_handle.linspace
+        kmer_id = hdp_handle.get_kmer_index(kmer)
+        y = hdp_handle.all_posterior_pred[kmer_id]
+        new_y = hdp_handle.get_new_linspace_hdp_probability_distribution(kmer, linspace)
+        self.assertSequenceEqual(new_y, y)
+
     def test_write_new_model(self):
         with tempfile.TemporaryDirectory() as tempdir:
             test_model_file = os.path.join(tempdir, "fake.hmm")
@@ -205,6 +228,7 @@ class HiddenMarkovTests(unittest.TestCase):
             self.assertEqual(mean3, mean4)
             self.assertEqual(mean4, mean5)
             self.assertEqual(mean5, mean6)
+            new_model = create_new_model(self.model_file, test_model_file, [("A", "J")])
 
     def test_set_kmer_event_mean(self):
         hmm_handle = HmmModel(ont_model_file=self.model_file)

@@ -984,6 +984,37 @@ class HmmModel(object):
         else:
             plt.show()
 
+    def get_hdp_probability(self, kmer, event_mean):
+        """Get the probability that an event mean came from hdp distribution for the given kmer
+        :param kmer: kmer that must be in model
+        :param event_mean: event mean to compare
+        :return: probability that the event mean came from the hdp distribution
+        """
+        assert self.has_hdp_model, "HmmModel does not have HDP model. Must have hdp model to get probability"
+        kmer_id = self.get_kmer_index(kmer)
+        y = self.all_posterior_pred[kmer_id]
+        if len(y) == 0:
+            return None
+        slope = self.all_spline_slopes[kmer_id]
+        prob = self.grid_spline_interp(event_mean, self.linspace, y, slope, self.grid_length)
+        return prob
+
+    def get_new_linspace_hdp_probability_distribution(self, kmer, linspace):
+        """Get newly descretized distribution given a new linspace
+        :param kmer: kmer from model
+        :param linspace: array of evenly spaced floats to get probability at each point
+        """
+        new_linspace_probs = []
+        kmer_id = self.get_kmer_index(kmer)
+        y = self.all_posterior_pred[kmer_id]
+        if len(y) == 0:
+            return None
+        slope = self.all_spline_slopes[kmer_id]
+        for x in linspace:
+            new_linspace_probs.append(self.grid_spline_interp(x, self.linspace, y, slope, self.grid_length))
+
+        return new_linspace_probs
+
 
 def hellinger2(p, q):
     return euclidean(np.sqrt(p), np.sqrt(q)) / _SQRT2
