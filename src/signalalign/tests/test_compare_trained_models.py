@@ -31,24 +31,24 @@ class TestCompareTrainedModels(unittest.TestCase):
             plotted_files = list_dir(tempdir)
             self.assertEqual(len(plotted_files), 5)
 
-    # def test_read_and_write_kmer_distribution_comparison_logfile(self):
-    #     with tempfile.TemporaryDirectory() as tempdir:
-    #         outfile = os.path.join(tempdir, "test.tsv")
-    #         d1 = list(range(10))
-    #         d2 = list(range(9))
-    #         d3 = list(range(11))
-    #
-    #         d1.append(None)
-    #         d2.extend([None, None])
-    #
-    #         kmers = list("ISATEST!!!r")
-    #         MultipleModelHandler.write_kmer_distribution_comparison_logfile(kmers, d1, d2, d3, outfile)
-    #         data = MultipleModelHandler.read_kmer_distribution_comparison_logfile(outfile)
-    #
-    #         correct_data = [[k, d1, d2, d3] for k, d1, d2, d3 in zip(kmers, d1, d2, d3) if d1 is not None]
-    #         correct_data.sort(key=lambda x: x[1], reverse=True)
-    #         correct_data.append(["r", None, None, 10])
-    #         self.assertEqual(data, correct_data)
+    def test_read_and_write_kmer_distribution_comparison_logfile(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            outfile = os.path.join(tempdir, "test.tsv")
+            d1 = list(range(10))
+            d2 = list(range(9))
+            d3 = list(range(11))
+
+            d1.append(None)
+            d2.extend([None, None])
+
+            kmers = list("ISATEST!!!r")
+            MultipleModelHandler.write_kmer_distribution_comparison_logfile(kmers, d1, d2, d3, outfile)
+            data = MultipleModelHandler.read_kmer_distribution_comparison_logfile(outfile)
+
+            correct_data = [[k, d1, d2, d3] for k, d1, d2, d3 in zip(kmers, d1, d2, d3) if d1 is not None]
+            correct_data.sort(key=lambda x: x[1], reverse=True)
+            correct_data.append(["r", None, None, 10])
+            self.assertEqual(data, correct_data)
 
 
 if __name__ == '__main__':
