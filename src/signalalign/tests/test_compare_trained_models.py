@@ -21,8 +21,7 @@ class TestCompareTrainedModels(unittest.TestCase):
     def setUpClass(cls):
         super(TestCompareTrainedModels, cls).setUpClass()
         cls.HOME = '/'.join(os.path.abspath(__file__).split("/")[:-4])
-        # cls.test_compare_train_config = load_json(os.path.join(cls.HOME, "tests/test_compare_trained_models/compare_trained_models.config.json"))
-        cls.test_compare_train_config = load_json("/Users/andrewbailey/data/compare_HDP_models/compare_trained_models.config.json")
+        cls.test_compare_train_config = load_json(os.path.join(cls.HOME, "tests/test_compare_trained_models/compare_trained_models.config.json"))
 
     def test_compare_trained_models(self):
         with tempfile.TemporaryDirectory() as tempdir:
