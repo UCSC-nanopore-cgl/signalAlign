@@ -5,6 +5,7 @@
 from __future__ import print_function
 import sys
 import os
+from timeit import default_timer as timer
 from argparse import ArgumentParser
 from random import shuffle
 from shutil import copyfile
@@ -141,6 +142,8 @@ def concat_variant_call_files(path):
 
 def main(args):
     # parse args
+    start = timer()
+
     args = parse_args()
     if args.command == "run":
         if not os.path.exists(args.config):
@@ -194,7 +197,7 @@ def main(args):
 
         print("\n#  signalAlign - finished alignments\n", file=sys.stderr)
         print("\n#  signalAlign - finished alignments\n", file=sys.stdout)
-
+        stop = timer()
     else:
         command_line = " ".join(sys.argv[:])
         print(os.getcwd())
@@ -312,9 +315,13 @@ def main(args):
         # setup workers for multiprocessing
         multithread_signal_alignment(alignment_args, fast5s, args.nb_jobs, debug=args.DEBUG,
                                      filter_reads_to_string_wrapper=filter_read_generator)
+        stop = timer()
 
         print("\n#  signalAlign - finished alignments\n", file=sys.stderr)
         print("\n#  signalAlign - finished alignments\n", file=sys.stdout)
+
+    print("[signalAlign] Complete")
+    print("Running Time = {} seconds".format(stop - start))
 
 
 if __name__ == "__main__":
