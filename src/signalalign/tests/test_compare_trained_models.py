@@ -28,7 +28,7 @@ class TestCompareTrainedModels(unittest.TestCase):
             self.test_compare_train_config["save_fig_dir"] = tempdir
             main(self.test_compare_train_config)
             plotted_files = list_dir(tempdir)
-            self.assertEqual(len(plotted_files), 5)
+            self.assertEqual(len(plotted_files), 7)
 
     def test_read_and_write_kmer_distribution_comparison_logfile(self):
         with tempfile.TemporaryDirectory() as tempdir:

@@ -229,7 +229,7 @@ class MultipleModelHandler(object):
                 self.compare_distributions_between_models(model_pair[0], model_pair[1])
 
             if write_log_file and self.savefig_dir:
-                kmers = model_pair[0].sorted_kmer_tuple
+                kmers = self.get_overlap_kmers(model_pair[0], model_pair[1])
                 model_names = "{}_{}".format(model_pair[0].name, model_pair[1].name)
                 hellinger_outpath = os.path.join(self.savefig_dir,
                                                  "{}_{}".format(model_names, "kl_hellinger_delta_distances.tsv"))
