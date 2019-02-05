@@ -11,7 +11,8 @@
 typedef enum {
     full = 0,
     variantCaller = 1,
-    assignments = 2
+    assignments = 2,
+    both = 3
 } OutputFormat;
 
 void usage() {
@@ -286,7 +287,8 @@ void outputAlignment(
         stList *alignedPairs, 
         double posteriorScore,
         Strand strand,
-        bool rna) {
+        bool rna,
+        char *posteriorProbsFile2) {
     switch (fmt) {
         case full:
             writePosteriorProbsFull(posteriorProbsFile, readLabel, sM, npp, events, target, forward, contig,
@@ -299,6 +301,12 @@ void outputAlignment(
         case assignments:
             writeAssignments(posteriorProbsFile, sM, events, eventSequenceOffset, npp, alignedPairs, strand);
             break;
+        case both:
+            writePosteriorProbsFull(posteriorProbsFile, readLabel, sM, npp, events, target, forward, contig,
+                                    eventSequenceOffset, referenceSequenceOffset, alignedPairs, strand, rna);
+
+            writePosteriorProbsVC(posteriorProbsFile2, readLabel, sM, target, forward, eventSequenceOffset,
+                                  referenceSequenceOffset, alignedPairs, strand, posteriorScore, rna, contig);
         default:
             fprintf(stderr, "signalAlign - No valid output format provided\n");
             return;
@@ -461,7 +469,7 @@ int main(int argc, char *argv[]) {
     char *complementHdp = NULL;
     char *forward_reference_path = NULL;
     char *backward_reference_path = NULL;
-
+    char *posteriorProbsFile2 = NULL;
     const char *sequence_name = NULL;
 
 
@@ -491,11 +499,12 @@ int main(int argc, char *argv[]) {
                 {"backward_reference_path", optional_argument,  0,  'b'},
                 {"sequence_name",           required_argument,  0,  'n'},
                 {"traceBackDiagonals",      optional_argument,  0,  'g'},
+                {"posteriorProbsFile2",     optional_argument,  0,  'i'},
                 {0, 0, 0, 0} };
 
         int option_index = 0;
 
-        key = getopt_long(argc, argv, "h:d:e:s:r:o:a:T:C:L:q:f:b:g:p:u:v:w:t:c:x:D:m:n:",
+        key = getopt_long(argc, argv, "h:d:e:s:r:o:a:T:C:L:q:f:b:g:i:p:u:v:w:t:c:x:D:m:n:",
                           long_options, &option_index);
 
         if (key == -1) {
@@ -585,6 +594,9 @@ int main(int argc, char *argv[]) {
                 assert (traceBackDiagonals >= 0);
                 traceBackDiagonals = (int64_t)traceBackDiagonals;
                 break;
+            case 'i':
+                posteriorProbsFile2 = stString_copy(optarg);
+                break;
             default:
                 usage();
                 return 1;
@@ -595,6 +607,10 @@ int main(int argc, char *argv[]) {
     // check for models
     if ((templateModelFile == NULL) || (complementModelFile == NULL && twoD)) {
         st_errAbort("Missing model files, exiting\n");
+        return 1;
+    }
+    if ((outFmt == 3) & (posteriorProbsFile2 == NULL)) {
+        st_errAbort("Must pass in posteriorProbsFile2 if using 'both' outFmt\n");
         return 1;
     }
 
@@ -805,7 +821,7 @@ int main(int argc, char *argv[]) {
         if (posteriorProbsFile != NULL) {
             outputAlignment(outFmt, posteriorProbsFile, readLabel, sMt, npRead->templateParams, npRead->templateEvents,
                             R->getTemplateTargetSequence(R), forward, pA->contig1, tCoordinateShift, rCoordinateShift_t,
-                            templateAlignedPairs, templatePosteriorScore,template, rna);
+                            templateAlignedPairs, templatePosteriorScore,template, rna, posteriorProbsFile2);
         }
 
         stList *complementAlignedPairs;
@@ -841,7 +857,7 @@ int main(int argc, char *argv[]) {
                 outputAlignment(outFmt, posteriorProbsFile, readLabel, sMc, npRead->complementParams,
                                 npRead->complementEvents, R->getComplementTargetSequence(R), forward, pA->contig1,
                                 cCoordinateShift, rCoordinateShift_c, complementAlignedPairs, complementPosteriorScore,
-                                complement, rna);
+                                complement, rna, posteriorProbsFile2);
             }
 
         }

@@ -92,7 +92,7 @@ class AggregateOverReads(object):
         self.variant_tsv_dir = variant_tsv_dir
         self.variants = sorted(variants)
         self.columns = merge_lists([['contig', 'position', 'strand', 'forward_mapped'], list(self.variants)])
-        self.variant_tsvs = list_dir(self.variant_tsv_dir, ext="tsv")
+        self.variant_tsvs = list_dir(self.variant_tsv_dir, ext=".vc.tsv")
         self.aggregate_position_probs = pd.DataFrame()
         self.per_position_data = pd.DataFrame()
         self.per_read_data = pd.DataFrame()
