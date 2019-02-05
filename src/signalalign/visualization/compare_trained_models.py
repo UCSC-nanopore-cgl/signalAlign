@@ -70,7 +70,7 @@ class MultipleModelHandler(object):
         handles2 = []
         legend_text2 = []
         plt.figure(figsize=(20, 9))
-        panel1 = plt.axes([0.1, 0.3, .8, .6])
+        panel1 = plt.axes([0.1, 0.5, .8, .45])
         panel1.set_xlabel('pA')
         panel1.set_ylabel('Density')
         panel1.grid(color='black', linestyle='-', linewidth=1, alpha=0.5)
@@ -109,18 +109,16 @@ class MultipleModelHandler(object):
                 ont_model_name = os.path.basename(model.ont_model_file)
                 txt_handle1, = panel1.plot([], [], ' ')
                 txt_handle2, = panel1.plot([], [], ' ')
-                txt_handle3, = panel1.plot([], [], ' ')
 
                 handles1.append(ont_handle)
                 legend_text1.append("{} ONT Normal".format(name))
 
-                handles2.extend([txt_handle1, txt_handle2, txt_handle3])
+                handles2.extend([txt_handle1, txt_handle2])
                 print("{} ONT Model: {}".format(name, ont_model_name))
                 print("{} ONT Event Mean: {}".format(name, normal_mean))
                 print("{} ONT Event SD: {}".format(name, normal_sd))
                 legend_text2.extend(["{} ONT Model: {}".format(name, ont_model_name),
-                                     "{} ONT Event Mean: {}".format(name, normal_mean),
-                                     "{} ONT Event SD: {}".format(name, normal_sd)])
+                                     "{} ONT Event Mean: {}".format(name, normal_mean)])
 
                 if model.has_hdp_model:
                     # plot HDP predicted distribution
@@ -266,19 +264,20 @@ class MultipleModelHandler(object):
         panel3_bins = np.linspace(0, max_delta, num=30)
 
         for i, model_pair in enumerate(itertools.combinations(self.models, 2)):
+            n_kmers = len(self.get_overlap_kmers(model_pair[0], model_pair[1]))
             panel1.hist(all_kl_divergences[i], bins=panel1_bins,
                         label="KL divergences: {} vs {} | {}/{}".format(model_pair[0].name,
                                                                         model_pair[1].name, len(all_kl_divergences[i]),
-                                                                        len(model_pair[0].sorted_kmer_tuple)))
+                                                                        n_kmers))
             panel2.hist(all_hellinger_distances[i], bins=panel2_bins,
                         label="Hellinger distances: {} vs {} | {}/{}".format(model_pair[0].name,
                                                                              model_pair[1].name,
                                                                              len(all_hellinger_distances[i]),
-                                                                             len(model_pair[0].sorted_kmer_tuple)))
+                                                                             n_kmers))
             panel3.hist(all_median_deltas[i], bins=panel3_bins,
                         label="Median Deltas: {} vs {} | {}/{}".format(model_pair[0].name,
                                                                        model_pair[1].name, len(all_median_deltas[i]),
-                                                                       len(model_pair[0].sorted_kmer_tuple)))
+                                                                       n_kmers))
 
             panel1.legend(loc='upper right', fancybox=True, shadow=True)
             panel2.legend(loc='upper right', fancybox=True, shadow=True)
@@ -351,7 +350,7 @@ class MultipleModelHandler(object):
         else:
             linspace = model2.linspace
 
-        for kmer in model1.sorted_kmer_tuple:
+        for kmer in self.get_overlap_kmers(model1, model2):
             # if statements used if the HDP model does not have information on the kmer distribution
             if hdp and model1.has_hdp_model:
                 m1_dist = self.get_hdp_kmer_posterior_prediction(model1, kmer, linspace, get_new_linspace)
@@ -372,6 +371,19 @@ class MultipleModelHandler(object):
             median_deltas.append(self.get_median_delta(m1_dist, m2_dist, linspace))
 
         return hellinger_distances, kl_divergences, median_deltas
+
+    @staticmethod
+    def get_overlap_kmers(model1, model2):
+        """Get the kmers that are in both models
+        :param model1: HmmModel
+        :param model2: HmmModel
+        """
+        kmers = set(model1.sorted_kmer_tuple) & set(model2.sorted_kmer_tuple)
+        if len(kmers) < len(model1.sorted_kmer_tuple) or len(kmers) < len(model1.sorted_kmer_tuple):
+            print("[Warning] Not including kmers that do not exist in both models")
+        return kmers
+
+
 
     @staticmethod
     def get_hdp_kmer_posterior_prediction(model, kmer, linspace, get_new_linspace=False):

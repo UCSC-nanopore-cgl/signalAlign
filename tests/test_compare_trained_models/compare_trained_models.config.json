@@ -8,7 +8,7 @@
       "name": "model2_complement",
       "hdp_model": null,
       "ont_model": "./models/testModelR9_complement.model",
-      "builtAlignment_tsv": null,
+      "builtAlignment_tsv": "./tests/test_assignment_files/d6160b0b-a35e-43b5-947f-adaa1abade28.sm.assignments.tsv",
       "strand": "c"
     },
     {
@@ -17,6 +17,15 @@
       "name": "model1_template",
       "hdp_model": "./models/templateSingleLevelFixed.nhdp",
       "ont_model": "./models/testModelR9_template.model",
+      "builtAlignment_tsv": "./tests/test_assignment_files/d6160b0b-a35e-43b5-947f-adaa1abade28.sm.assignments.tsv",
+      "strand": "t"
+    },
+    {
+      "rna": false,
+      "kmers": ["AAAAAT", "AAAAAA"],
+      "name": "model1_template2",
+      "hdp_model": null,
+      "ont_model": "./models/testModelR9p4_acegt_template.model",
       "builtAlignment_tsv": "./tests/test_assignment_files/d6160b0b-a35e-43b5-947f-adaa1abade28.sm.assignments.tsv",
       "strand": "t"
     }
