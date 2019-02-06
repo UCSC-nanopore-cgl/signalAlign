@@ -311,33 +311,35 @@ class SignalAlignmentTest(unittest.TestCase):
             self.assertEqual(NanoporeRead.bytes_to_string(data["k-mer"][0]), "GCCTTA")
 
     def test_embed_with_both(self):
-        signal_file_reads = os.path.join(self.HOME, "tests/minion_test_reads/no_event_data_1D_ecoli")
-        template_model = os.path.join(self.HOME, "models/testModelR9p4_5mer_acegt_template.model")
-        ecoli_reference = os.path.join(self.HOME, "tests/test_sequences/E.coli_K12.fasta")
-        signal_file_guide_alignment = os.path.join(self.HOME, "tests/minion_test_reads/oneD_alignments.sam")
+        signal_file_reads = os.path.join(self.HOME, "tests/minion_test_reads/pUC/")
+        template_model = os.path.join(self.HOME, "models/testModelR9_5mer_acegt_template.model")
+        complement_model = os.path.join(self.HOME, "models/testModelR9_5mer_acegt_complement.model")
 
+        puc_reference = os.path.join(self.HOME, "tests/test_sequences/pUC19_SspI.fa")
+        signal_file_guide_alignment = os.path.join(self.HOME, "tests/minion_test_reads/pUC/puc.bam")
         with tempfile.TemporaryDirectory() as tempdir:
             new_dir = os.path.join(tempdir, "new_dir")
+            if os.path.exists(new_dir):
+                shutil.rmtree(new_dir)
             working_folder = FolderHandler()
             working_folder.open_folder(os.path.join(tempdir, "test_dir"))
 
             shutil.copytree(signal_file_reads, new_dir)
 
-            args = create_signalAlignment_args(alignment_file=signal_file_guide_alignment, bwa_reference=ecoli_reference,
-                                               forward_reference=ecoli_reference, in_templateHmm=template_model,
+            args = create_signalAlignment_args(alignment_file=signal_file_guide_alignment, bwa_reference=puc_reference,
+                                               forward_reference=puc_reference, in_templateHmm=template_model,
                                                path_to_bin=self.path_to_bin, destination=working_folder.path,
-                                               embed=True, output_format="both")
-            final_args = merge_dicts([args, dict(in_fast5=os.path.join(new_dir, "LomanLabz_PC_20161025_FNFAB42699_MN17633_sequencing_run_20161025_E_coli_native_450bps_82361_ch6_read347_strand.fast5"))])
+                                               embed=True, output_format="both", filter_reads=0, twoD_chemistry=True,
+                                               in_complementHmm=complement_model, delete_tmp=True)
+            final_args = merge_dicts([args, dict(in_fast5=os.path.join(new_dir, "makeson_PC_20160807_FNFAD20242_MN17284_sequencing_run_MA_470_R9_pUC_g_PCR_BC_08_07_16_93165_ch1_read176_strand.fast5"))])
             handle = SignalAlignment(**final_args)
             handle.run()
-            f5fh = Fast5(os.path.join(new_dir, "LomanLabz_PC_20161025_FNFAB42699_MN17633_sequencing_run_20161025_E_coli_native_450bps_82361_ch6_read347_strand.fast5"))
+            f5fh = Fast5(os.path.join(new_dir, "makeson_PC_20160807_FNFAD20242_MN17284_sequencing_run_MA_470_R9_pUC_g_PCR_BC_08_07_16_93165_ch1_read176_strand.fast5"))
             mea = f5fh.get_signalalign_events(mea=True)
             sam = f5fh.get_signalalign_events(sam=True)
-            self.assertEqual(mea[0]["raw_start"], 153)
-            self.assertEqual(sam[0], "9")
+            self.assertEqual(mea[0]["raw_start"], 2879)
+            self.assertEqual(sam[0], "0")
             self.assertEqual(len(os.listdir(working_folder.path)), 2)
-            self.assertEqual(sorted(os.listdir(working_folder.path))[0], "9e4d14b1-8167-44ef-9fdb-5c29dd0763fd.sm.backward.tsv")
-            self.assertEqual(sorted(os.listdir(working_folder.path))[1], "9e4d14b1-8167-44ef-9fdb-5c29dd0763fd.sm.vc.tsv")
 
 
 if __name__ == '__main__':

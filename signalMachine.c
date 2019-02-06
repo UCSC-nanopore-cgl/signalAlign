@@ -307,6 +307,7 @@ void outputAlignment(
 
             writePosteriorProbsVC(posteriorProbsFile2, readLabel, sM, target, forward, eventSequenceOffset,
                                   referenceSequenceOffset, alignedPairs, strand, posteriorScore, rna, contig);
+            break;
         default:
             fprintf(stderr, "signalAlign - No valid output format provided\n");
             return;

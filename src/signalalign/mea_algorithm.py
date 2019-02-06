@@ -369,15 +369,24 @@ def get_events_from_path(event_matrix, path, dtype):
     return events
 
 
-def add_events_to_signalalign(sa_events=None, event_detections=None):
+def add_events_to_signalalign(sa_events=None, event_detections=None, complement_event_detections=None):
     """Match event index with event detection data and keep the entirety of the signalAlign event output"""
     assert sa_events is not None, "Must pass signal alignment events"
     assert event_detections is not None, "Must pass event_detections events"
+    sa_template_events = sa_events[sa_events["strand"] == b't']
+    sa_complement_events = sa_events[sa_events["strand"] == b'c']
 
-    raw_starts = [event_detections[x]["raw_start"] for x in sa_events["event_index"]]
-    raw_lengths = [event_detections[x]["raw_length"] for x in sa_events["event_index"]]
-    new_data = append_fields(sa_events, "raw_start", raw_starts, usemask=False)
+    raw_starts = [event_detections[x]["raw_start"] for x in sa_template_events["event_index"]]
+    raw_lengths = [event_detections[x]["raw_length"] for x in sa_template_events["event_index"]]
+    new_data = append_fields(sa_template_events, "raw_start", raw_starts, usemask=False)
     new_data = append_fields(new_data, "raw_length", raw_lengths, usemask=False)
+
+    if complement_event_detections is not None:
+        raw_starts = [complement_event_detections[x]["raw_start"] for x in sa_complement_events["event_index"]]
+        raw_lengths = [complement_event_detections[x]["raw_length"] for x in sa_complement_events["event_index"]]
+        complement_new_data = append_fields(sa_complement_events, "raw_start", raw_starts, usemask=False)
+        complement_new_data = append_fields(complement_new_data, "raw_length", raw_lengths, usemask=False)
+        new_data = np.append(new_data, complement_new_data)
 
     return new_data
 

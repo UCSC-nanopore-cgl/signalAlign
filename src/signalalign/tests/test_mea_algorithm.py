@@ -221,10 +221,36 @@ class MeaTest(unittest.TestCase):
         event_detects = np.zeros(4, dtype=[('raw_start', int), ('raw_length', int)])
         event_detects["raw_start"] = [10, 11, 12, 13]
         event_detects["raw_length"] = [1, 1, 1, 1]
+        events["strand"] = ["t", "t", "t", "t"]
+
 
         new_data = add_events_to_signalalign(sa_events=events, event_detections=event_detects)
         self.assertSequenceEqual(new_data["raw_start"].tolist(), [10, 11, 12, 13])
         self.assertSequenceEqual(new_data["raw_length"].tolist(), [1, 1, 1, 1])
+
+        events = np.zeros(4, dtype=[('reference_index', '<i8'), ('reference_kmer', 'S5'),
+                                    ('strand', 'S1'),
+                                    ('event_index', '<i8'), ('event_mean', '<f8'), ('event_noise', '<f8'),
+                                    ('event_duration', '<f8'), ('aligned_kmer', 'S5'),
+                                    ('scaled_mean_current', '<f8'), ('scaled_noise', '<f8'),
+                                    ('posterior_probability', '<f8'), ('descaled_event_mean', '<f8'),
+                                    ('ont_model_mean', '<f8'), ('path_kmer', 'S5')])
+        events["event_index"] = [0, 1, 0, 1]
+        event_detects = np.zeros(4, dtype=[('raw_start', int), ('raw_length', int)])
+        event_detects["raw_start"] = [10, 11, 12, 13]
+        event_detects["raw_length"] = [1, 1, 1, 1]
+
+        events["strand"] = ["t", "t", "c", "c"]
+        event_detects2 = np.zeros(4, dtype=[('raw_start', int), ('raw_length', int)])
+        event_detects2["raw_start"] = [10, 11, 12, 13]
+        event_detects2["raw_length"] = [1, 1, 1, 1]
+
+        new_data = add_events_to_signalalign(sa_events=events, event_detections=event_detects,
+                                                        complement_event_detections=event_detects2)
+        self.assertSequenceEqual(new_data["raw_start"].tolist(), [10, 11, 10, 11])
+        self.assertSequenceEqual(new_data["raw_length"].tolist(), [1, 1, 1, 1])
+
+
 
     def test_create_label_from_events(self):
         events = np.zeros(4, dtype=[('reference_index', '<i8'), ('path_kmer', 'S5'),

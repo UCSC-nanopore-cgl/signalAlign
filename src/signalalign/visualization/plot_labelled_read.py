@@ -16,8 +16,8 @@ import matplotlib as mpl
 if os.environ.get('DISPLAY', '') == '':
     print('no display found. Using non-interactive Agg backend')
     mpl.use('Agg')
-mpl.use("TkAgg")
-
+if os.name == "posix":
+    mpl.use("macosx")
 import matplotlib.pyplot as plt
 import matplotlib.patches as mplpatches
 from matplotlib.collections import LineCollection
@@ -78,6 +78,9 @@ def parse_args():
 
     parser.add_argument('--plot_alpha', action='store_true', default=False, dest="plot_alpha", required=False,
                         help="If set, will plot probability information as the alpha associated with each data point")
+
+    parser.add_argument('--mea_complement', action='store_true', default=False, dest="mea_complement", required=False,
+                        help="Plot's complement mea")
 
     parser.add_argument('--trim', action='store', default=0, dest="trim", required=False, type=int,
                         help="If set, will trim runs of matches")
@@ -416,6 +419,9 @@ def main(args=None):
                 for number in args.mea:
                     mea = cl_handle.add_mea_labels(number=int(number))
                     mea_list.append(mea)
+                    if args.mea_complement:
+                        mea = cl_handle.add_mea_labels(number=int(number), complement=True)
+                        mea_list.append(mea)
 
             sa_full_list = list()
             if args.sa_full:

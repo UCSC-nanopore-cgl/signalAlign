@@ -78,7 +78,7 @@ class AlignedSignal(object):
         """Add event start indices to the class"""
         self.raw_starts = np.asarray(raw_starts)
 
-    def add_label(self, label, name, label_type, guide_name=None):
+    def add_label(self, label, name, label_type, guide_name=None, check_strand=True):
         """Add labels to class.
 
         :param label: label numpy array with required fields ['raw_start', 'raw_length', 'reference_index',
@@ -106,8 +106,8 @@ class AlignedSignal(object):
             raise IndexError("labels are longer than signal")
 
         label1 = np.sort(label, order=['raw_start'], kind='mergesort')
-
-        self.check_strand_mapping(label1)
+        if check_strand:
+            self.check_strand_mapping(label1)
         # set label with the specified name
         if label_type == 'label':
             self.label[name] = label1
@@ -196,16 +196,18 @@ class CreateLabels(Fast5):
             data["reference_index"] += self.kmer_index
         return data
 
-    def add_mea_labels(self, number=None):
+    def add_mea_labels(self, number=None, complement=False):
         """Gather mea_alignment labels information from fast5 file.
-        :param number: integer representing which signal align predictions to plot"""
+        :param number: integer representing which signal align predictions to plot
+        :param complement: option to look for mea_complement data
+        """
         if number is not None:
             assert type(number) is int, "Number must be an integer"
             path = self.__default_signalalign_events__.format(number)
-            mea_alignment = self.get_signalalign_events(mea=True, override_path=path)
+            mea_alignment = self.get_signalalign_events(mea=True, override_path=path, complement=complement)
             # print("mea_alignment path: {}".format(path))
 
-            name = "mea_signalalign_{}".format(number)
+            name = "mea_signalalign_{}_{}".format(number, "complement" if complement else "template")
         else:
             mea_alignment = self.get_signalalign_events(mea=True)
             name = "mea_signalalign"
@@ -215,7 +217,7 @@ class CreateLabels(Fast5):
 
         mea_alignment = self.fix_sa_reference_indexes(mea_alignment)
 
-        self.aligned_signal.add_label(mea_alignment, name=name, label_type='label')
+        self.aligned_signal.add_label(mea_alignment, name=name, label_type='label', check_strand=not complement)
         return mea_alignment
 
     def add_signal_align_predictions(self, number=None, add_basecall=False):
