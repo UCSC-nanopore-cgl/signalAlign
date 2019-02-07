@@ -20,7 +20,8 @@ all : sL bD ${libPath}/signalAlignLib.a ${signalAlignBin}/signalAlignLibTests \
 	  ${signalAlignBin}/buildHdpUtil ${signalAlignBin}/trainModels all_tests \
 	  externals python_setup ${signalAlignBin}/filterReads ${signalAlignBin}/extract \
 	  ${signalAlignBin}/sequencing_summary ${signalAlignBin}/plot_kmer_distributions \
-	  ${signalAlignBin}/plot_variant_accuracy ${signalAlignBin}/compare_trained_models
+	  ${signalAlignBin}/plot_variant_accuracy ${signalAlignBin}/compare_trained_models \
+	  ${signalAlignBin}/remove_sa_analyses
 
 
 #${rootPath}/lib/libhdf5.a:
@@ -137,6 +138,10 @@ ${signalAlignBin}/plot_variant_accuracy : ${rootPath}src/signalalign/visualizati
 ${signalAlignBin}/compare_trained_models : ${rootPath}src/signalalign/visualization/compare_trained_models.py
 	cp ${rootPath}src/signalalign/visualization/compare_trained_models.py ${signalAlignBin}/compare_trained_models
 	chmod +x ${signalAlignBin}/compare_trained_models
+
+${signalAlignBin}/remove_sa_analyses : ${rootPath}src/signalalign/remove_sa_analyses.py
+	cp ${rootPath}src/signalalign/remove_sa_analyses.py ${signalAlignBin}/remove_sa_analyses
+	chmod +x ${signalAlignBin}/remove_sa_analyses
 
 all_tests : .FORCE
 
