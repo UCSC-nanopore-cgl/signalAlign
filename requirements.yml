@@ -26,7 +26,7 @@ dependencies:
   - setuptools=40.6.2=py36_0
   - wheel=0.32.3=py36_0
   - pysam=0.15.0
-  - py3helpers=0.0.9
+  - py3helpers=0.1.2
   - biopython=1.72
   - pip:
     - cycler==0.10.0
