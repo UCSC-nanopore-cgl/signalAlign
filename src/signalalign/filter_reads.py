@@ -377,6 +377,37 @@ def multiprocess_filter_reads(in_dir, alignment_file, readdb, trim=False,
     return best_files
 
 
+def find_fast5s_from_ids_readdb(readdb, read_ids, read_dirs, recursive=False):
+    """Find the corresponding fast5 files given readids"""
+    for name, fast5 in parse_read_name_map_file(readdb, read_dirs, recursive=recursive):
+        if name.split("_")[0] in read_ids:
+            yield name, fast5
+
+
+def write_readdb(list_of_names_and_fast5s, out_path):
+    """Write a readdb file given a list of pairs of names and fast5 files"""
+    with open(out_path, "w") as fh:
+        for pair in list_of_names_and_fast5s:
+            fh.write(pair[0]+"\t"+os.path.basename(pair[1])+"\n")
+    return 0
+
+
+def copy_files_from_readdb(readdb, directories, new_dir, recursive=False):
+    """Copy files from a readdb file to another location
+    :param readdb: readdb file
+    :param directories: directories to search for fast5 files
+    :param new_dir: new directory to copy files into
+    :param recursive: recursive option for looking for files
+    """
+    assert os.path.isdir(new_dir), "New directory must exist already"
+    n_files_copied = 0
+    for name, path in parse_read_name_map_file(readdb, directories, recursive=recursive):
+        new_path = os.path.join(new_dir, os.path.basename(path))
+        shutil.copy(path, new_path)
+        n_files_copied +=1
+    return n_files_copied
+
+
 def main():
     args = parse_args()
     # Make output dir if it doesn't exist

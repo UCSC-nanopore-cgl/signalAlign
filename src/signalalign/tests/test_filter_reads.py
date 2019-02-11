@@ -33,6 +33,14 @@ class FilterReadsTest(unittest.TestCase):
         cls.readdb = os.path.join(cls.HOME, "tests/minion_test_reads/oneD.fastq.index.readdb")
         cls.bam = os.path.join(cls.HOME, "tests/minion_test_reads/oneD.bam")
 
+    def test_write_readdb(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            tmp_file = os.path.join(temp_dir, "test.readdb")
+            write_this = [[name, path] for name, path in parse_readdb(self.readdb, [self.test_dir])]
+            write_readdb(write_this, tmp_file)
+            read_this = [[name, path] for name, path in parse_readdb(tmp_file, [self.test_dir])]
+            self.assertSequenceEqual(read_this, write_this)
+
     def test_parse_readdb(self):
         for name, path in parse_readdb(self.readdb, [self.test_dir]):
             self.assertTrue(name.endswith("template"))
@@ -90,6 +98,17 @@ class FilterReadsTest(unittest.TestCase):
             self.assertTrue(os.path.exists(read))
             counter += 1
         self.assertEqual(counter, len(list_dir(self.test_dir, ext="fast5")))
+
+    def test_find_fast5s_from_ids_readdb(self):
+        read_ids = ["5cc86bac-79fd-4897-8631-8f1c55954a45"]
+        path = [y for x, y in find_fast5s_from_ids_readdb(self.readdb, read_ids, [self.dna_dir])]
+        self.assertEqual(os.path.basename(path[0]), "LomanLabz_PC_20161025_FNFAB42699_MN17633_sequencing_run_20161025_E_coli_native_450bps_82361_ch92_read1108_strand.fast5")
+
+    def test_copy_files_from_readdb(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            n_files = copy_files_from_readdb(self.readdb, [self.dna_dir], tempdir, recursive=False)
+            self.assertEqual(n_files, 3)
+            self.assertEqual(len(list_dir(tempdir)), 3)
 
     @classmethod
     def tearDownClass(cls):
