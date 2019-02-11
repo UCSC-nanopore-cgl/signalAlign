@@ -22,6 +22,7 @@ if platform.system() == "Darwin":
 from py3helpers.utils import list_dir
 from py3helpers.classification import ClassificationMetrics
 from py3helpers.utils import load_json, create_dot_dict
+from signalalign.filter_reads import find_fast5s_from_ids_readdb, write_readdb, copy_files_from_readdb
 from signalalign.variantCaller import AggregateOverReads
 from signalalign.utils.sequenceTools import CustomAmbiguityPositions
 
@@ -156,14 +157,12 @@ def plot_all_roc_curves(all_labels, variants, save_fig_dir, data_type_name, labe
         all_labels.to_csv(os.path.join(save_fig_dir, data_type_name + ".tsv"), sep='\t', index=False)
 
 
-def log_tp_fn_overlap(tp_classifications, fn_classifications, class_name, out_path):
+def log_tp_fn_overlap(tp_classifications, fn_classifications, class_name):
     """Write out ids that overlap between true positives and false negatves"""
     tp_ids = set(tp_classifications.get_tp_ids(class_name))
     fn_ids = set(fn_classifications.get_fn_ids(class_name))
-    ids_to_write = tp_ids & fn_ids
-    with open(out_path, "w") as fh:
-        fh.writelines(ids_to_write)
-    return len(ids_to_write)
+    ids = tp_ids & fn_ids
+    return ids
 
 
 def load_classifcation_metrics_pkl(classification_pkl):
@@ -171,6 +170,25 @@ def load_classifcation_metrics_pkl(classification_pkl):
     with open(classification_pkl, 'rb') as fh:
         cm_h = pickle.load(fh)
     return cm_h
+
+
+def write_tp_fn_overlap_readdb(readdb, tp_pkl, fn_pkl, class_n, out_path, read_dirs, recursive=False):
+    """Write a readdb file of reads which were true positives in one experiment and false negatives
+    in another experiment
+    :param readdb: read db file with ids for all data in both experiments
+    :param tp_pkl: path to ClassificationMetrics pkl data where  true positives are going to be gathered
+    :param fn_pkl: path to ClassificationMetrics pkl data where false negatives are going to be gathered
+    :param class_n: name of the class to inspect
+    :param out_path: output path for readdb file
+    """
+    tp_metrics = load_classifcation_metrics_pkl(tp_pkl)
+    fn_metrics = load_classifcation_metrics_pkl(fn_pkl)
+    overlap_ids = log_tp_fn_overlap(tp_metrics, fn_metrics, class_n)
+    data = [[id_name, f5_path] for id_name, f5_path in find_fast5s_from_ids_readdb(readdb, overlap_ids,
+                                                                                   read_dirs, recursive=recursive)]
+    write_readdb(data, out_path)
+    print("{} tp in {} and fp in {}".format(len(overlap_ids), tp_pkl, fn_pkl))
+    return len(overlap_ids)
 
 
 def main(config=None):
