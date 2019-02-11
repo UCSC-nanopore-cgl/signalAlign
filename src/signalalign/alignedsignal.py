@@ -220,10 +220,12 @@ class CreateLabels(Fast5):
         self.aligned_signal.add_label(mea_alignment, name=name, label_type='label', check_strand=not complement)
         return mea_alignment
 
-    def add_signal_align_predictions(self, number=None, add_basecall=False):
+    def add_signal_align_predictions(self, number=None, add_basecall=False, two_d=False):
         """Create prediction using probabilities from full output format from signalAlign
         :param number: integer representing which signal align predictions to plot
-        :param add_basecall: if set to true, will add basecalled event table"""
+        :param add_basecall: if set to true, will add basecalled event table
+        :param two_d: boolean option to visualize 2d reads
+        """
         if number is not None:
             assert type(number) is int, "Number must be an integer"
             path = self.__default_signalalign_events__.format(number)
@@ -247,11 +249,13 @@ class CreateLabels(Fast5):
             self.add_basecall_alignment_prediction(my_events=events,
                                                    number=basecall_events_path[24],
                                                    sam=sam)
+        if not two_d:
+            sa_events = sa_events[sa_events["strand"] == b"t"]
         predictions = create_label_from_events(sa_events)
 
         predictions = self.fix_sa_reference_indexes(predictions)
 
-        self.aligned_signal.add_label(predictions, name=name, label_type='prediction')
+        self.aligned_signal.add_label(predictions, name=name, label_type='prediction', check_strand=not two_d)
         return predictions
 
     def add_basecall_alignment_prediction(self, sam=None, number=None, add_mismatches=False, my_events=None, trim=None):

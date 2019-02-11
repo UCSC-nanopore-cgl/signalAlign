@@ -14,6 +14,7 @@ import os
 import platform
 import colorsys
 import matplotlib as mpl
+
 if os.environ.get('DISPLAY', '') == '':
     print('no display found. Using non-interactive Agg backend')
     mpl.use('Agg')
@@ -30,7 +31,8 @@ from timeit import default_timer as timer
 from argparse import ArgumentParser
 from signalalign.alignedsignal import AlignedSignal, CreateLabels
 from signalalign.nanoporeRead import NanoporeRead
-from py3helpers.utils import list_dir
+from py3helpers.utils import list_dir, find_substring_indices
+from py3helpers.seq_tools import initialize_aligned_segment_wrapper, ReverseComplement
 
 MEA = 'm'
 SA_FULL = 's'
@@ -80,12 +82,14 @@ def parse_args():
     parser.add_argument('--plot_alpha', action='store_true', default=False, dest="plot_alpha", required=False,
                         help="If set, will plot probability information as the alpha associated with each data point")
 
-    parser.add_argument('--mea_complement', action='store_true', default=False, dest="mea_complement", required=False,
+    parser.add_argument('--two_d', action='store_true', default=False, dest="two_d", required=False,
                         help="Plot's complement mea")
 
     parser.add_argument('--trim', action='store', default=0, dest="trim", required=False, type=int,
                         help="If set, will trim runs of matches")
 
+    parser.add_argument('--kmers', action='store', nargs='+', default=None, dest="kmers", required=False, type=str,
+                        help="Highlight kmers in reference sequence")
 
     args = parser.parse_args()
     return args
@@ -128,7 +132,7 @@ class PlotSignal(object):
         if self.signal_h.raw_starts is not None:
             self.event_starts = self.signal_h.raw_starts
 
-    def plot_alignment(self, save_fig_path=None, plot_alpha=False, plot_lines=False):
+    def plot_alignment(self, save_fig_path=None, plot_alpha=False, plot_lines=False, kmer_info=None):
         """Plot the alignment between events and reference with the guide alignment and mea alignment
         :param plot_lines: boolean option, if set to true, lines will be plotted instead of points
         :param save_fig_path: if set, will write image to path
@@ -152,7 +156,7 @@ class PlotSignal(object):
         panel1.grid(color='black', linestyle='-', linewidth=1)
 
         handles = list()
-        # colors = ['blue', 'green', 'red', 'yellow', 'magenta', 'deepskyblue', 'purple', 'lime']
+        colors2 = ['blue', 'green', 'red', 'yellow', 'magenta', 'deepskyblue', 'purple', 'lime']
         colors = [[0.0, 0.0, 1.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0],
                   [1.0, 0.0, 1.0], [1.0, 0.5, 0.0], [0.0, 1.0, 1.0], [0.0, 0.0, 0.0]]
 
@@ -160,14 +164,14 @@ class PlotSignal(object):
         color_selection = 0
         # plot signal alignments
         for i, alignment in enumerate(self.alignments):
-            handle, = panel1.plot(alignment[0], alignment[1]-(i*0.5), color=colors[color_selection], alpha=1)
+            handle, = panel1.plot(alignment[0], alignment[1] - (i * 0.5), color=colors[color_selection], alpha=1)
             color_selection += 1
             handles.append(handle)
 
         # plot predictions (signal align outputs)
         for i, prediction in enumerate(self.predictions):
             rgba_colors = np.tile(np.array(colors[color_selection]), (len(prediction[0]), 1))
-            if plot_alpha or "full_signalalign" in self.names[color_selection] or False:
+            if plot_alpha and "full_signalalign" in self.names[color_selection]:
                 rgba_colors = np.insert(rgba_colors, 3, prediction[3].tolist(), axis=1)
             else:
                 rgba_colors = np.insert(rgba_colors, 3, [1 for _ in range(len(prediction[3].tolist()))], axis=1)
@@ -187,6 +191,27 @@ class PlotSignal(object):
                                         c=rgba_colors)
             handles.append(handle)
             color_selection += 1
+
+        # if kmers provided plot them
+
+        if kmer_info:
+            kmer_blocks = kmer_info[0]
+            positions = kmer_info[1]
+            for i, kmer_block in enumerate(kmer_blocks):
+                color = colors2[i]
+                for ref_start, length in kmer_block:
+                    rectangle = plt.Rectangle((0, ref_start), len(self.signal_h.scaled_signal), length,
+                                              alpha=0.4, color=color)
+                    panel1.add_patch(rectangle)
+
+            def format_func(value, tick_number):
+                # find number of multiples of pi/2
+                if positions[value] != 0:
+                    return positions[value]
+                else:
+                    return value
+
+            panel1.yaxis.set_major_formatter(plt.FuncFormatter(format_func))
 
         # plot original basecalled events
         if self.guide_alignments:
@@ -394,6 +419,26 @@ def analyze_event_skips(mea_events, sa_full_events, basecall_events,
     return summaries
 
 
+def generate_kmer_info_for_plotting(kmers, aligned_segment):
+    """Create the correct data structure to bed fed into the plot_alignment function"""
+    ref_seq = aligned_segment.get_reference_sequence()
+    ref_start = aligned_segment.alignment_segment.reference_start
+    almost_final_dict = defaultdict(int)
+    all_blocks = []
+    for kmer in kmers:
+        blocks = [[x + ref_start, len(kmer)] for x in
+                  find_substring_indices(aligned_segment.get_reference_sequence(),
+                                         kmer,
+                                         offset=0)]
+        all_blocks.append(blocks)
+        for block in blocks:
+            for i, base in enumerate(kmer):
+                almost_final_dict[block[0] + i] = base
+
+    kmer_info = [all_blocks, almost_final_dict]
+    return kmer_info
+
+
 def main(args=None):
     """Plot event to reference labelled ONT nanopore reads """
     start = timer()
@@ -420,14 +465,16 @@ def main(args=None):
                 for number in args.mea:
                     mea = cl_handle.add_mea_labels(number=int(number))
                     mea_list.append(mea)
-                    if args.mea_complement:
+                    if args.two_d:
                         mea = cl_handle.add_mea_labels(number=int(number), complement=True)
                         mea_list.append(mea)
 
             sa_full_list = list()
             if args.sa_full:
                 for number in args.sa_full:
-                    sa_full = cl_handle.add_signal_align_predictions(number=int(number), add_basecall=True)
+                    sa_full = cl_handle.add_signal_align_predictions(number=int(number),
+                                                                     add_basecall=True,
+                                                                     two_d=args.two_d)
                     sa_full_list.append(sa_full)
 
             tombo_full_list = list()
@@ -440,7 +487,8 @@ def main(args=None):
             if args.basecall:
                 events_list = []
                 for number in args.basecall:
-                    matches, mismatches = cl_handle.add_basecall_alignment_prediction(number=int(number), trim=args.trim)
+                    matches, mismatches = cl_handle.add_basecall_alignment_prediction(number=int(number),
+                                                                                      trim=args.trim)
                     basecall = list()
                     basecall.extend(matches)
                     basecall.extend(mismatches)
@@ -459,10 +507,15 @@ def main(args=None):
                 print("Analyzing events for index {}".format(i))
                 analyze_event_skips(mea_list[i], sa_full_list[i], basecall_list[i])
 
+            if args.kmers:
+                aligned_segment = initialize_aligned_segment_wrapper(cl_handle.get_signalalign_events(sam=True))
+                kmer_info = generate_kmer_info_for_plotting(args.kmers, aligned_segment)
+
             if main_plot:
+                print(args.kmers)
                 print("Plotting {}".format(f5_path))
                 ps = PlotSignal(cl_handle.aligned_signal)
-                ps.plot_alignment(save_fig_path=save_fig_path, plot_alpha=args.plot_alpha)
+                ps.plot_alignment(save_fig_path=save_fig_path, plot_alpha=args.plot_alpha, kmer_info=kmer_info)
         except KeyError as e:
             print("FAILED: {}: {}".format(e, f5_path))
 
