@@ -183,7 +183,7 @@ def write_tp_fn_overlap_readdb(readdb, tp_pkl, fn_pkl, class_n, out_path, read_d
     """
     tp_metrics = load_classifcation_metrics_pkl(tp_pkl)
     fn_metrics = load_classifcation_metrics_pkl(fn_pkl)
-    overlap_ids = log_tp_fn_overlap(tp_metrics, fn_metrics, class_n)
+    overlap_ids = [x.split(".")[0] for x in log_tp_fn_overlap(tp_metrics, fn_metrics, class_n)]
     data = [[id_name, f5_path] for id_name, f5_path in find_fast5s_from_ids_readdb(readdb, overlap_ids,
                                                                                    read_dirs, recursive=recursive)]
     write_readdb(data, out_path)
