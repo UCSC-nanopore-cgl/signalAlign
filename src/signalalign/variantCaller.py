@@ -14,15 +14,13 @@ from signalalign.utils.sequenceTools import CustomAmbiguityPositions
 
 class MarginalizeVariants(object):
 
-    def __init__(self, variant_tsv, variants):
+    def __init__(self, variant_data, variants, read_name):
         """Marginalize over all posterior probabilities to give a per position read probability
         :param variants: bases to track probabilities
         :param variant_tsv: path to variantCaller tsv file
         """
-        self.variant_tsv = variant_tsv
-        self.read_name = os.path.basename(variant_tsv)
-        assert os.path.exists(self.variant_tsv), "Variant tsv path does not exist: {}".format(variant_tsv)
-        self.variant_data = SignalAlignment.read_in_signal_align_tsv(self.variant_tsv, "variantCaller")
+        self.read_name = read_name
+        self.variant_data = variant_data
         self.variants = sorted(variants)
         self.columns = merge_lists([['read_name', 'contig', 'position', 'strand', 'forward_mapped'], list(self.variants)])
         self.contig = NanoporeRead.bytes_to_string(self.variant_data["contig"][0])
@@ -70,8 +68,9 @@ class MarginalizeVariants(object):
                         index = self.variants.index(nuc)
                         nuc_data[index] = position_nuc_dict[nuc] / total_prob
                         strand_read_nuc_data[index] += nuc_data[index]
-                    data.append(merge_lists([[self.read_name, self.contig, pos, read_strand, mapping_strand], nuc_data]))
 
+                    data.append(merge_lists([[self.read_name, self.contig, pos, read_strand, mapping_strand],
+                                             nuc_data]))
                 per_read_data.append(merge_lists([[self.read_name, self.contig, read_strand, mapping_strand],
                                                   [prob / n_positions for prob in strand_read_nuc_data]]))
 
@@ -103,7 +102,9 @@ class AggregateOverReads(object):
         for v_tsv in self.variant_tsvs:
             if os.stat(v_tsv).st_size == 0:
                 continue
-            mv_h = MarginalizeVariants(v_tsv, variants=self.variants)
+            read_name = os.path.basename(v_tsv)
+            variant_data = SignalAlignment.read_in_signal_align_tsv(v_tsv, "variantCaller")
+            mv_h = MarginalizeVariants(variant_data, variants=self.variants, read_name=read_name)
             mv_h.get_data()
             self.per_position_data = self.per_position_data.append(mv_h.position_probs, ignore_index=True)
             self.per_read_data = self.per_read_data.append(mv_h.per_read_calls, ignore_index=True)

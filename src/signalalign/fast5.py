@@ -375,7 +375,7 @@ class Fast5(h5py.File):
             raise IndexError('File does not contain analysis with name: {}'.format(name))
         return events
 
-    def get_signalalign_events(self, mea=False, sam=False, override_path=None, complement=False):
+    def get_signalalign_events(self, mea=False, sam=False, override_path=None, complement=False, variant=False):
         """Get signal align events, sam or mea alignment
         :param mea: boolean option to grab the MEA_alignment_labels
         :param sam: boolean option to grab sam file
@@ -400,6 +400,9 @@ class Fast5(h5py.File):
             elif sam:
                 field = "sam"
                 events = str(np.asarray(reads[field]))
+            elif variant:
+                field = "variantCaller"
+                events = np.asarray(reads[field])
             else:
                 field = "full"
                 events = np.asarray(reads[field])
@@ -709,6 +712,14 @@ class Fast5(h5py.File):
         self[data_path] = raw
 
         ###
+
+    def get_read_id(self):
+        reads = list(self[self.__raw_path__])
+        if len(reads) != 1:
+            return False
+        read_loc = os.path.join(self.__raw_path__, reads[0])
+        read_label = self.bytes_to_string(self[read_loc].attrs.get('read_id'))
+        return read_label
     # Analysis path resolution
 
     def get_analysis_latest(self, name):

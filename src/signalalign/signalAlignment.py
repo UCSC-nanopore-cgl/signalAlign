@@ -505,7 +505,8 @@ class SignalAlignment(object):
         if self.output_format == "both":
             output_path = npRead._join_path(signal_align_path, "full")
             npRead.write_data(sa_events, output_path)
-            sa_events2 = add_events_to_signalalign(sa_events=data2, event_detections=template_events)
+            sa_events2 = add_events_to_signalalign(sa_events=data2, event_detections=template_events,
+                                                   complement_event_detections=complement_events)
 
             output_path = npRead._join_path(signal_align_path, "variantCaller")
             npRead.write_data(sa_events2, output_path)

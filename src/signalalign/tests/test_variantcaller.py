@@ -61,7 +61,9 @@ class TestVariantCaller(unittest.TestCase):
 
     def test_MarginalizeVariants(self):
         for test_file in list_dir(self.variant_files, ext="tsv"):
-            mv_h = MarginalizeVariants(test_file, variants="CE")
+            read_name = os.path.basename(test_file)
+            variant_data = SignalAlignment.read_in_signal_align_tsv(test_file, "variantCaller")
+            mv_h = MarginalizeVariants(variant_data, variants="CE", read_name=read_name)
             position_probs = mv_h.get_data()
             for i, data in position_probs.iterrows():
                 # self.contig, pos, self.strand], nuc_data

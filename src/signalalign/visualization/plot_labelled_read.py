@@ -25,7 +25,7 @@ import matplotlib.patches as mplpatches
 from matplotlib.collections import LineCollection
 
 import numpy as np
-
+import pandas as pd
 from collections import defaultdict
 from timeit import default_timer as timer
 from argparse import ArgumentParser
@@ -75,6 +75,10 @@ def parse_args():
                         dest='sa_full', required=False,
                         help="Option to plot all of the posterior probabilities from the signalalign output")
 
+    parser.add_argument('--variant', nargs='+',
+                        dest='variant', required=False,
+                        help="Path to variant data tsv file")
+
     parser.add_argument('--output_dir', action='store',
                         dest='output_dir', required=False, type=str,
                         help="If set, will write out to output directory otherwise the graph is just shown")
@@ -108,6 +112,7 @@ class PlotSignal(object):
         self.names = []
         self.alignments = []
         self.predictions = []
+        self.variant_calls = []
         self.event_starts = None
         self.guide_alignments = defaultdict(list)
 
@@ -128,12 +133,23 @@ class PlotSignal(object):
                 self.guide_alignments[whole_guide_name].append([sub_guide['raw_start'], sub_guide['reference_index']])
             # gather tail ends of alignments
             self.names.append(whole_guide_name)
+
+        # variant calling data
+        for name, v_c in self.signal_h.variant_calls.items():
+            self.names.append(name)
+            self.variant_calls.append(v_c)
+
+
         # add raw starts
         if self.signal_h.raw_starts is not None:
             self.event_starts = self.signal_h.raw_starts
 
     def plot_alignment(self, save_fig_path=None, plot_alpha=False, plot_lines=False, kmer_info=None):
         """Plot the alignment between events and reference with the guide alignment and mea alignment
+        :param kmer_info: plot kmer data if provided.
+
+                    data structure : [[[ref_start, length], [ref_start2, length2] ], {pos: base, pos2: base2}]]
+
         :param plot_lines: boolean option, if set to true, lines will be plotted instead of points
         :param save_fig_path: if set, will write image to path
         :param plot_alpha: boolean:
@@ -192,13 +208,39 @@ class PlotSignal(object):
             handles.append(handle)
             color_selection += 1
 
-        # if kmers provided plot them
+        # plot original basecalled events
+        if self.guide_alignments:
+            for i, (name, guide) in enumerate(self.guide_alignments.items()):
+                for j, sub_guide in enumerate(guide):
+                    handle, = panel1.plot(sub_guide[0], sub_guide[1], c=colors[color_selection])
+                handles.append(handle)
+                color_selection += 1
 
+        colors2_index = -1
+        if self.variant_calls is not []:
+            for i, data in enumerate(self.variant_calls):
+                variants = set(data.columns) - {'forward_mapped', 'raw_start', 'position', 'raw_length', 'read_name', 'contig', 'strand'}
+                colors2_index += 1
+                color = colors2[colors2_index]
+                for j, position in data.iterrows():
+                    rectangle = plt.Rectangle((position["raw_start"], position["position"]-5), position["raw_length"],
+                                              11, alpha=0.4, color=color)
+
+                    panel1.add_patch(rectangle)
+                    variant_string = ""
+                    for variant_base in variants:
+                        variant_string += "p({} = {}) = {}\n".format(position["position"], variant_base,
+                                                                     position[variant_base])
+
+                    panel1.text(position["raw_start"] + 10, position["position"]-6, "{}".format(variant_string))
+
+        # if kmers provided plot them
         if kmer_info:
             kmer_blocks = kmer_info[0]
             positions = kmer_info[1]
             for i, kmer_block in enumerate(kmer_blocks):
-                color = colors2[i]
+                color = colors2[colors2_index]
+                colors2_index += 1
                 for ref_start, length in kmer_block:
                     rectangle = plt.Rectangle((0, ref_start), len(self.signal_h.scaled_signal), length,
                                               alpha=0.4, color=color)
@@ -213,13 +255,7 @@ class PlotSignal(object):
 
             panel1.yaxis.set_major_formatter(plt.FuncFormatter(format_func))
 
-        # plot original basecalled events
-        if self.guide_alignments:
-            for i, (name, guide) in enumerate(self.guide_alignments.items()):
-                for j, sub_guide in enumerate(guide):
-                    handle, = panel1.plot(sub_guide[0], sub_guide[1], c=colors[color_selection])
-                handles.append(handle)
-                color_selection += 1
+
 
         panel2.set_xlabel('Time')
         panel2.set_ylabel('Current (pA)')
@@ -427,7 +463,7 @@ def generate_kmer_info_for_plotting(kmers, aligned_segment):
     all_blocks = []
     for kmer in kmers:
         blocks = [[x + ref_start, len(kmer)] for x in
-                  find_substring_indices(aligned_segment.get_reference_sequence(),
+                  find_substring_indices(ref_seq,
                                          kmer,
                                          offset=0)]
         all_blocks.append(blocks)
@@ -477,11 +513,9 @@ def main(args=None):
                                                                      two_d=args.two_d)
                     sa_full_list.append(sa_full)
 
-            tombo_full_list = list()
             if args.tombo:
                 for number in args.tombo:
                     tombo_full = cl_handle.add_tombo_labels(number=int(number))
-                    tombo_full_list.append(tombo_full)
 
             basecall_list = list()
             if args.basecall:
@@ -502,11 +536,18 @@ def main(args=None):
                     plot_basecalled_sequences(events_list[0], events2=events_list[1],
                                               signal=cl_handle.aligned_signal.scaled_signal)
 
+            if args.variant is not None:
+                for number in args.variant:
+                    cl_handle.add_variant_data(number=int(number), complement=False)
+                    if args.two_d:
+                        cl_handle.add_variant_data(number=int(number), complement=True)
+
             max_analysis_index = min(map(lambda x: len(x), [mea_list, sa_full_list])) if args.basecall else 0
             for i in range(max_analysis_index):
                 print("Analyzing events for index {}".format(i))
                 analyze_event_skips(mea_list[i], sa_full_list[i], basecall_list[i])
 
+            kmer_info = None
             if args.kmers:
                 aligned_segment = initialize_aligned_segment_wrapper(cl_handle.get_signalalign_events(sam=True))
                 kmer_info = generate_kmer_info_for_plotting(args.kmers, aligned_segment)
