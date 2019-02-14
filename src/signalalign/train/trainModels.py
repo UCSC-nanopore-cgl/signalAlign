@@ -493,7 +493,7 @@ class TrainSignalAlign(object):
                                                  if x.endswith(".complement.expectations.tsv")]
                 if len(complement_expectations_files) > 0:
                     self.complement_model.add_and_normalize_expectations(files=complement_expectations_files,
-                                                                         hmm_file=self.complement_model_path,
+                                                                         hmm_file=self.complement_hmm_model_path,
                                                                          update_transitions=transitions,
                                                                          update_emissions=emissions)
 
