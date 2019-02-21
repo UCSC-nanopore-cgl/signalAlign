@@ -172,6 +172,7 @@ class CreateLabels(Fast5):
         self.kmer_index = kmer_index
         self.rna = self.is_read_rna()
         self.aligned_signal = self._initialize()
+        self.has_guide_alignment = False
 
     def _initialize(self):
         """Initialize AlignedSignal class by adding the raw and scaled signal"""
@@ -205,7 +206,7 @@ class CreateLabels(Fast5):
         final_data = match_ref_position_with_raw_start_band(data, variant_data)
 
         self.aligned_signal.add_variant_call(final_data, name=name)
-        return data
+        return final_data
 
     def fix_sa_reference_indexes(self, data):
         """Fix reference indexes based on kmer length and kmer index"""
@@ -324,7 +325,7 @@ class CreateLabels(Fast5):
         if add_mismatches:
             self.aligned_signal.add_label(mismatches, name=mismatches_name, label_type='prediction')
         self.aligned_signal.add_raw_starts(raw_starts)
-
+        self.has_guide_alignment = True
         return matches, mismatches
 
     def get_basecalled_data_by_number(self, number):
@@ -379,6 +380,45 @@ class CreateLabels(Fast5):
     #         lables["reference_index"] += self.kmer_index
     #
     #     self.aligned_signal.add_label(lables, name='eventAlign', label_type='label')
+
+
+def get_distance_from_guide_alignment(data, guide_data, reference_index_key="position", minus_strand=False):
+    """Calculate the distance of input data alignment to the guide alignment.
+    :param data: input data with at least "raw_start", "raw_length", and reference_index_key fields
+    :param guide_data: guide alignmnet data
+    :param reference_index_key: key to grab reference index from data
+    :param minus_strand: boolean option if data is aligned to minus strand
+    :return: modified data with "guide_delta" field
+    """
+    variant_data = data.sort_values(by=reference_index_key)
+    if minus_strand:
+        guide_data = guide_data[::-1]
+
+    distance_to_guide = []
+    variant_index = 0
+    len_variant_data = len(variant_data)
+    v_position = variant_data.iloc[variant_index][reference_index_key]
+    for i, guide in enumerate(guide_data.itertuples()):
+        if getattr(guide, "reference_index") >= v_position:
+            if getattr(guide, "reference_index") == v_position:
+                guide_index = i
+            else:
+                guide_index = i-1
+
+            v_position_middle = (variant_data.iloc[variant_index]["raw_start"] +
+                                 (variant_data.iloc[variant_index]["raw_length"] / 2))
+            guide_middle_position = np.round((guide_data.iloc[guide_index]["raw_start"] + (guide_data.iloc[guide_index]["raw_length"] / 2)))
+
+            distance_to_guide.append(v_position_middle - guide_middle_position)
+            variant_index += 1
+            if variant_index < len_variant_data:
+                v_position = variant_data.iloc[variant_index][reference_index_key]
+            else:
+                break
+
+    distance = pd.DataFrame(distance_to_guide, columns=['guide_delta'])
+    final_data = pd.concat([variant_data, distance], axis=1)
+    return final_data
 
 
 def match_ref_position_with_raw_start_band(aggregate_reference_position, per_event_data):

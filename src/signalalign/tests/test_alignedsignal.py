@@ -18,7 +18,7 @@ import pysam
 from signalalign.alignedsignal import *
 from signalalign.visualization.plot_labelled_read import PlotSignal
 from signalalign.signalAlignment import SignalAlignment, create_signalAlignment_args
-from py3helpers.utils import merge_dicts
+from py3helpers.utils import merge_dicts, binary_search
 from py3helpers.seq_tools import ReverseComplement, sam_string_to_aligned_segment
 
 
@@ -58,6 +58,8 @@ class CreateLabelsTest(unittest.TestCase):
         cls.rna_sam = os.path.join(cls.HOME, "tests/minion_test_reads/RNA_edge_cases/rna_reads.bam")
         cls.dna_sam = os.path.join(cls.HOME, "tests/minion_test_reads/oneD.bam")
         cls.bin_path = os.path.join(cls.HOME, "bin")
+        # kmer index
+        cls.kmer_index = 2
 
         # copy file to tmp directory
         shutil.copy(dna_file, cls.tmp_dna_file)
@@ -95,13 +97,17 @@ class CreateLabelsTest(unittest.TestCase):
         sa_h = SignalAlignment(**merge_dicts([args, {'in_fast5': cls.tmp_dna_file2}]))
         sa_h.run()
 
-        cls.kmer_index = 2
         cls.dna_handle = CreateLabels(cls.tmp_dna_file, kmer_index=cls.kmer_index)
         cls.dna_handle2 = CreateLabels(cls.tmp_dna_file2, kmer_index=cls.kmer_index)
 
         cls.rna1_handle = CreateLabels(cls.tmp_rna_file1, kmer_index=cls.kmer_index)
         cls.rna2_handle = CreateLabels(cls.tmp_rna_file2, kmer_index=cls.kmer_index)
         cls.rev_comp = ReverseComplement()
+
+        cls.tmp_dna_file3 = os.path.join(cls.HOME,
+                                         "tests/minion_test_reads/embedded_files/miten_PC_20160820_FNFAD20259_MN17223_sequencing_run_AMS_158_R9_WGA_Ecoli_08_20_16_43623_ch100_read2324_strand.fast5")
+        cls.dna3_handle = CreateLabels(cls.tmp_dna_file3, kmer_index=cls.kmer_index)
+
 
     def test_initialize(self):
         self.assertEqual(self.dna_handle.aligned_signal.raw_signal[0], 1172)
@@ -439,6 +445,16 @@ class AlignedSignalTest(unittest.TestCase):
         handle = AlignedSignal(scaled_signal=[1.1, 2.2, 1.1, 2.2, 1.1, 2.2], rna=True)
         handle.check_strand_mapping(label)
         self.assertEqual(handle.minus_strand, True)
+
+    def test_get_distance_from_guide_alignment(self):
+        data = self.dna3_handle.add_variant_data(number=0)
+        basecall_data = self.dna3_handle.add_basecall_alignment_prediction(number=0)
+        get_distance_from_guide_alignment(pd.DataFrame(data),pd.DataFrame(basecall_data[0]), reference_index_key="position", minus_strand=self.dna3_handle.aligned_signal.minus_strand)
+
+    def test_add_variant_data(self):
+        data = self.dna3_handle.add_variant_data(number=0)
+        self.assertEqual(len(data), 8)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -392,7 +392,8 @@ class TrainSignalAlign(object):
             if self.two_d:
                 complement = True
             # create instance
-            hdp_data = CreateHdpTrainingData(self.samples, os.path.join(self.working_path, "buildAlignment.tsv"),
+            hdp_data = CreateHdpTrainingData(self.samples, os.path.join(self.working_path,
+                                                                        "buildAlignment"+iteration+".tsv"),
                                              template=template,
                                              complement=complement,
                                              verbose=self.debug,

@@ -1,0 +1,44 @@
+{
+  "threshold": 0.5,
+  "save_fig_dir": "./tests/test_plot_acc_alignment_deviation/",
+  "plot": [
+    {
+      "name": "some_params",
+      "sa_number": 0,
+      "samples": [
+      {
+        "positives": false,
+        "variant_tsvs": "./tests/test_variantCalled_files",
+        "embedded_fast5_dir": "./tests/minion_test_reads/embedded_files",
+        "label": "C",
+        "classification_metric_tsv": null
+      },
+      {
+        "positives": true,
+        "variant_tsvs": "./tests/test_variantCalled_files",
+        "embedded_fast5_dir": "./tests/minion_test_reads/embedded_files",
+        "label": "E",
+        "classification_metric_tsv": null
+      }]},
+    {
+      "name": "some_params2",
+      "sa_number": 0,
+      "samples": [
+      {
+        "positives": false,
+        "variant_tsvs": "./tests/test_variantCalled_files",
+        "readdb": null,
+        "embedded_fast5_dir": "./tests/minion_test_reads/embedded_files",
+        "label": "C",
+        "classification_metric_tsv": null
+      },
+      {
+        "positives": true,
+        "variant_tsvs": "./tests/test_variantCalled_files",
+        "embedded_fast5_dir": "./tests/minion_test_reads/embedded_files",
+        "label": "E",
+        "classification_metric_tsv": null
+      }]
+    }
+  ]
+}

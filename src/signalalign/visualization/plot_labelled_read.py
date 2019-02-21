@@ -1,8 +1,8 @@
 #!/usr/bin/env python
-"""Plot speeds of maximum expected accuracy methods"""
+"""Plot labelled read"""
 ########################################################################
-# File: plot_mea_speeds.py
-#  executable: plot_mea_speeds.py
+# File: plot_labelled_read.py
+#  executable: plot_labelled_read.py
 #
 # Author: Andrew Bailey
 # History: Created 02/24/18
@@ -230,7 +230,7 @@ class PlotSignal(object):
                     variant_string = ""
                     for variant_base in variants:
                         variant_string += "p({} = {}) = {}\n".format(position["position"], variant_base,
-                                                                     position[variant_base])
+                                                                     np.round(position[variant_base], 3))
 
                     panel1.text(position["raw_start"] + 10, position["position"]-6, "{}".format(variant_string))
 
@@ -481,8 +481,6 @@ def main(args=None):
 
     args = args if args is not None else parse_args()
 
-    main_plot = True
-
     if args.dir:
         f5_locations = list_dir(args.dir, ext="fast5")
     else:
@@ -490,6 +488,7 @@ def main(args=None):
 
     for f5_path in f5_locations:
         try:
+            main_plot = True
             save_fig_path = None
             cl_handle = CreateLabels(f5_path, kmer_index=2)
             if args.output_dir:

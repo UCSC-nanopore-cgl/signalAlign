@@ -268,16 +268,16 @@ class MultipleModelHandler(object):
             panel1.hist(all_kl_divergences[i], bins=panel1_bins,
                         label="KL divergences: {} vs {} | {}/{}".format(model_pair[0].name,
                                                                         model_pair[1].name, len(all_kl_divergences[i]),
-                                                                        n_kmers))
+                                                                        n_kmers), alpha=0.6)
             panel2.hist(all_hellinger_distances[i], bins=panel2_bins,
                         label="Hellinger distances: {} vs {} | {}/{}".format(model_pair[0].name,
                                                                              model_pair[1].name,
                                                                              len(all_hellinger_distances[i]),
-                                                                             n_kmers))
+                                                                             n_kmers), alpha=0.6)
             panel3.hist(all_median_deltas[i], bins=panel3_bins,
                         label="Median Deltas: {} vs {} | {}/{}".format(model_pair[0].name,
                                                                        model_pair[1].name, len(all_median_deltas[i]),
-                                                                       n_kmers))
+                                                                       n_kmers), alpha=0.6)
 
             panel1.legend(loc='upper right', fancybox=True, shadow=True)
             panel2.legend(loc='upper right', fancybox=True, shadow=True)
