@@ -307,7 +307,7 @@ class CreateLabelsTest(unittest.TestCase):
         self.assertEqual(base_raw_lengths[self.kmer_index], first_event["raw_length"])
         self.assertEqual(probs[self.kmer_index], first_event["p_model_state"])
 
-    def test_index_bases_from_events(self):
+    def test_index_bases_from_events2(self):
         """Test index_bases_from_events"""
         # make sure each event is corresponding to correct nucleotide
         events = np.zeros(4, dtype=[('raw_start', int), ('raw_length', int), ('move', int),
@@ -334,14 +334,20 @@ class CreateLabelsTest(unittest.TestCase):
         self.assertSequenceEqual(probs, [1, 1, 1, 1, 1, 1, 1, 1])
         self.assertSequenceEqual(base_raw_starts, [0, 0, 0, 0, 0, 1, 2, 3])
 
-    # def test_get_corrected_events_dna(self):
-    #     pass
+    def test_get_distance_from_guide_alignment(self):
+        data = self.dna3_handle.add_variant_data(number=0)
+        basecall_data = self.dna3_handle.add_basecall_alignment_prediction(number=0)
+        get_distance_from_guide_alignment(pd.DataFrame(data),pd.DataFrame(basecall_data[0]), reference_index_key="position", minus_strand=self.dna3_handle.aligned_signal.minus_strand)
+
+    def test_add_variant_data(self):
+        data = self.dna3_handle.add_variant_data(number=0)
+        self.assertEqual(len(data), 8)
 
     @classmethod
     def tearDownClass(cls):
         shutil.rmtree(cls.tmp_directory)
 
-#
+
 class AlignedSignalTest(unittest.TestCase):
     """Test the class AlignedSignal"""
 
@@ -445,15 +451,6 @@ class AlignedSignalTest(unittest.TestCase):
         handle = AlignedSignal(scaled_signal=[1.1, 2.2, 1.1, 2.2, 1.1, 2.2], rna=True)
         handle.check_strand_mapping(label)
         self.assertEqual(handle.minus_strand, True)
-
-    def test_get_distance_from_guide_alignment(self):
-        data = self.dna3_handle.add_variant_data(number=0)
-        basecall_data = self.dna3_handle.add_basecall_alignment_prediction(number=0)
-        get_distance_from_guide_alignment(pd.DataFrame(data),pd.DataFrame(basecall_data[0]), reference_index_key="position", minus_strand=self.dna3_handle.aligned_signal.minus_strand)
-
-    def test_add_variant_data(self):
-        data = self.dna3_handle.add_variant_data(number=0)
-        self.assertEqual(len(data), 8)
 
 
 if __name__ == "__main__":
