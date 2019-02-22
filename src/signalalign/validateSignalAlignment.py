@@ -142,10 +142,11 @@ def flag_large_gaps(event_summaries, aln_dist_threshold=10, verbose=True):
     return all_flagged_event_sets
 
 
-def get_all_event_summaries(fast5s, alignment_args, aln_dist_threshold=10, generate_plot=True, verbose=False,
-                            run_sa=True):
+def get_all_event_summaries(fast5s, alignment_args=None, aln_dist_threshold=10, generate_plot=True, verbose=False,
+                            run_sa=False, sa_number=0):
     start = timer()
     all_event_summaries = dict()
+    all_all_flagged_event_sets = dict()
     if run_sa:
         # argments required for this to work
         alignment_args['output_format'] = 'full'
@@ -161,8 +162,8 @@ def get_all_event_summaries(fast5s, alignment_args, aln_dist_threshold=10, gener
         # get data
         try:
             cl_handle = CreateLabels(f5_path)
-            mea = cl_handle.add_mea_labels()
-            sa_full = cl_handle.add_signal_align_predictions()
+            mea = cl_handle.add_mea_labels(number=sa_number)
+            sa_full = cl_handle.add_signal_align_predictions(number=sa_number)
             matches, mismatches = cl_handle.add_basecall_alignment_prediction()
             basecall = list()
             basecall.extend(matches)
@@ -193,21 +194,23 @@ def get_all_event_summaries(fast5s, alignment_args, aln_dist_threshold=10, gener
             # gather stats on consecutive events
             if verbose: print("Consecutive events flagged by distance threshold")
             all_flagged_event_sets = flag_large_gaps(event_summaries, aln_dist_threshold, verbose)
-
+            all_all_flagged_event_sets[f5_path] = all_flagged_event_sets
             # summarize all flaged events
             print("Found {} flagged event sets".format(len(all_flagged_event_sets)))
-            print("Of {} total events, {} were flagged ({:2.5f}%)".format(
-                total_events, total_failed_events, 100.0 * total_failed_events / total_events))
+            # print("Of {} total events, {} were flagged ({:2.5f}%)".format(
+            #     total_events, total_failed_events, 100.0 * total_failed_events / total_events))
             if len(all_flagged_event_sets) > 0:
                 # maybe do some analysis of all these?
+
                 pass
+            cl_handle.close()
         except Exception as e:
-            # print(e)
+            cl_handle.close()
             continue
 
     stop = timer()
     print("Running Time = {} seconds".format(stop - start), file=sys.stderr)
-    return all_event_summaries
+    return all_event_summaries, all_all_flagged_event_sets
 
 
 def main():

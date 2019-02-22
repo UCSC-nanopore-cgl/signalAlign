@@ -1,5 +1,6 @@
 {
   "threshold": 0.5,
+  "gap_threshold": 100,
   "save_fig_dir": "./tests/test_plot_acc_alignment_deviation/",
   "plot": [
     {

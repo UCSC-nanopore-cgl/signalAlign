@@ -54,7 +54,7 @@ def multiprocess_get_distance_from_guide(in_dir, sa_number, threshold, label, wo
     if debug:
         output = []
         for f5_path in list_dir(in_dir, ext="fast5"):
-            data = get_distance_from_gruide_alignment_wrapper(f5_path, sa_number, threshold, label)
+            data = get_distance_from_guide_alignment_wrapper(f5_path, sa_number, threshold, label)
             if data is not None:
                 output.append(data)
     else:
@@ -82,7 +82,7 @@ def get_distance_from_guide_service(work_queue, done_queue, service_name="get_di
         for f in iter(work_queue.get, 'STOP'):
             # catch exceptions on each element
             try:
-                reads = get_distance_from_gruide_alignment_wrapper(**f)
+                reads = get_distance_from_guide_alignment_wrapper(**f)
                 done_queue.put(reads)
             except Exception as e:
                 # get error and log it
@@ -112,7 +112,7 @@ def get_distance_from_guide_service(work_queue, done_queue, service_name="get_di
             done_queue.put("{}:{}".format(multithread.MEM_USAGE_KEY, ",".join(map(str, mem_usages))))
 
 
-def get_distance_from_gruide_alignment_wrapper(f5_path, sa_number, threshold, label):
+def get_distance_from_guide_alignment_wrapper(f5_path, sa_number, threshold, label):
     f5_data = None
     try:
         cl_handle = CreateLabels(f5_path, kmer_index=2)
