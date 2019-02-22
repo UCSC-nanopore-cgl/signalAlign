@@ -126,11 +126,13 @@ class SignalAlignAlignmentTest(unittest.TestCase):
                 obs_kmer = row[2]
                 strand = row[3]
                 exp_kmer = get_kmer(ref_pos)
-                self.assertEqual(obs_kmer, exp_kmer[::-1], msg="kmer at index {idx} on strand {strand} is {obs} "
+                if rna:
+                    exp_kmer = exp_kmer[::-1]
+                self.assertEqual(obs_kmer, exp_kmer, msg="kmer at index {idx} on strand {strand} is {obs} "
                                                                "should be {exp}, file {f}".format(idx=ref_pos,
                                                                                                   strand=strand,
                                                                                                   obs=obs_kmer,
-                                                                                                  exp=exp_kmer[::-1],
+                                                                                                  exp=exp_kmer,
                                                                                                   f=alignment))
             signal_align_event_count = len(obs)
             intial_event_count = alignment2events[alignment]
@@ -233,7 +235,7 @@ def main():
     testSuite.addTest(SignalAlignAlignmentTest('test_pUC_r9_reads_6mer'))
     testSuite.addTest(SignalAlignAlignmentTest('test_Ecoli1D_reads_5mer'))
     testSuite.addTest(SignalAlignAlignmentTest('test_RNA_edge_alignments_reads_5mer'))
-    # testSuite.addTest(SignalAlignAlignmentTest('test_signal_files_without_events'))
+    testSuite.addTest(SignalAlignAlignmentTest('test_signal_files_without_events'))
 
     # deprecated
     # testSuite.addTest(SignalAlignAlignmentTest('test_zymo_reads'))

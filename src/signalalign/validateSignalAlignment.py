@@ -210,7 +210,7 @@ def get_all_event_summaries(fast5s, alignment_args=None, aln_dist_threshold=10, 
 
     stop = timer()
     print("Running Time = {} seconds".format(stop - start), file=sys.stderr)
-    return all_event_summaries, all_all_flagged_event_sets
+    return all_event_summaries
 
 
 def main():
