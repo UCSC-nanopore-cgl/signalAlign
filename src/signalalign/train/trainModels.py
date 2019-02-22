@@ -194,7 +194,7 @@ class CreateHdpTrainingData(object):
                     make_master_assignment_table(assignment_files,
                                                  min_probability=sample.probability_threshold)
 
-                self.set_kmer_len(len(sample_assignment_table.iloc[0]['kmer']))
+            self.set_kmer_len(len(sample_assignment_table.iloc[0]['kmer']))
             # get kmers associated with each sample
             kmers = self.get_sample_kmers(sample)
             # write correctly formated output
