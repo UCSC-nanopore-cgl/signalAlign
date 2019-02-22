@@ -18,13 +18,13 @@ from py3helpers.utils import create_dot_dict, merge_lists, all_string_permutatio
 
 from signalalign.signalAlignment import multithread_signal_alignment_samples, create_signalAlignment_args, \
     SignalAlignSample
-from signalalign.hiddenMarkovModel import HmmModel, parse_assignment_file
+from signalalign.hiddenMarkovModel import HmmModel, parse_assignment_file, parse_alignment_file
 from signalalign.utils.fileHandlers import FolderHandler
 from signalalign.utils.parsers import read_fasta
 from signalalign.utils.sequenceTools import get_motif_kmers, get_sequence_kmers
 
 
-def make_master_assignment_table(list_of_assignment_paths, min_probability=0.0):
+def make_master_assignment_table(list_of_assignment_paths, min_probability=0.0, full=False):
     """Create a master assignment table from a list of assignment paths
 
     :param list_of_assignment_paths: list of all paths to assignment.tsv files to concat
@@ -33,7 +33,10 @@ def make_master_assignment_table(list_of_assignment_paths, min_probability=0.0):
     """
     assignment_dfs = []
     for f in list_of_assignment_paths:
-        data = parse_assignment_file(f)
+        if full:
+            data = parse_alignment_file(f)
+        else:
+            data = parse_assignment_file(f)
         assignment_dfs.append(data.loc[data['prob'] >= min_probability])
     return pd.concat(assignment_dfs)
 
@@ -172,18 +175,26 @@ class CreateHdpTrainingData(object):
             if len(sample.analysis_files) == 0:
                 assert sample.assignments_dir is not None, \
                     "Received no assignments_dir or analysis files in sample {}".format(sample.name)
-                sample_assignment_table = make_master_assignment_table(list_dir(sample.assignments_dir,
-                                                                                ext="assignments.tsv"),
-                                                                       min_probability=sample.probability_threshold)
+                assignment_files = list_dir(sample.assignments_dir, ext="assignments.tsv")
+                if len(assignment_files) > 0:
+                    sample_assignment_table = make_master_assignment_table(assignment_files,
+                                                                           min_probability=sample.probability_threshold)
+                else:
+                    print("[CreateHdpTrainingData] filtering 'full' output files")
+                    assignment_files = list_dir(sample.assignments_dir, ext="ard.tsv")
+                    sample_assignment_table = \
+                        make_master_assignment_table(assignment_files, min_probability=sample.probability_threshold,
+                                                     full=True)
             else:
                 if sample.assignments_dir is not None:
                     print("[CreateHdpTrainingData] WARNING: Using sample analysis files when "
                           "assignments_dir is also set: {}".format(sample.name))
+                assignment_files = [x for x in sample.analysis_files if x.endswith("assignments.tsv")]
                 sample_assignment_table = \
-                    make_master_assignment_table([x for x in sample.analysis_files if x.endswith("assignments.tsv")],
+                    make_master_assignment_table(assignment_files,
                                                  min_probability=sample.probability_threshold)
 
-            self.set_kmer_len(len(sample_assignment_table.iloc[0]['kmer']))
+                self.set_kmer_len(len(sample_assignment_table.iloc[0]['kmer']))
             # get kmers associated with each sample
             kmers = self.get_sample_kmers(sample)
             # write correctly formated output
@@ -393,7 +404,7 @@ class TrainSignalAlign(object):
                 complement = True
             # create instance
             hdp_data = CreateHdpTrainingData(self.samples, os.path.join(self.working_path,
-                                                                        "buildAlignment"+iteration+".tsv"),
+                                                                        "buildAlignment" + iteration + ".tsv"),
                                              template=template,
                                              complement=complement,
                                              verbose=self.debug,
@@ -404,7 +415,8 @@ class TrainSignalAlign(object):
 
         verbose_flag = "--verbose "
         # create the output paths for the models
-        template_hdp_location = os.path.join(self.working_path, "template." + iteration + self.args.hdp_args.hdp_type + ".nhdp")
+        template_hdp_location = os.path.join(self.working_path,
+                                             "template." + iteration + self.args.hdp_args.hdp_type + ".nhdp")
         complement_hdp_location = None
         if self.two_d:
             one_d = None
@@ -424,7 +436,8 @@ class TrainSignalAlign(object):
                                               cHdpLoc=complement_hdp_location,
                                               buildAln=build_alignment_path,
                                               gibbs_samples=self.args.hdp_args.gibbs_samples,
-                                              burnIn=min(30000000, int(self.args.hdp_args.burnin_multiplier * num_alignments)),
+                                              burnIn=min(30000000,
+                                                         int(self.args.hdp_args.burnin_multiplier * num_alignments)),
                                               thin=self.args.hdp_args.thinning,
                                               start=self.args.hdp_args.grid_start,
                                               end=self.args.hdp_args.grid_end,
@@ -466,7 +479,7 @@ class TrainSignalAlign(object):
         """Train model transitions"""
         i = 0
         if iteration:
-            iteration = "_"+iteration
+            iteration = "_" + iteration
         # start iterating
         while i < self.args.transitions_args.iterations:
             # align all the samples
@@ -486,7 +499,8 @@ class TrainSignalAlign(object):
                                                                    update_transitions=transitions,
                                                                    update_emissions=emissions)
             if self.two_d:
-                new_complement_hmm = self.working_folder.add_file_path("complement_trained_{}{}.hmm".format(i, iteration))
+                new_complement_hmm = self.working_folder.add_file_path(
+                    "complement_trained_{}{}.hmm".format(i, iteration))
                 copyfile(self.complement_hmm_model_path, new_complement_hmm)
                 self.complement_hmm_model_path = new_complement_hmm
 
