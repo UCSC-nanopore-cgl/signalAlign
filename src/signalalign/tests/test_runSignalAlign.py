@@ -183,15 +183,18 @@ class SignalAlignAlignmentTest(unittest.TestCase):
         edge_case_true_alignments = os.path.join(SIGNALALIGN_ROOT,
                                                  "tests/test_alignments/RNA_edge_case_tempFiles_alignment/")
         edge_case_reads = os.path.join(SIGNALALIGN_ROOT, "tests/minion_test_reads/RNA_edge_cases/")
-        edge_case_reference = os.path.join(SIGNALALIGN_ROOT, "tests/test_sequences/fake_rna_ref.fa")
-        rna_alignments = os.path.join(SIGNALALIGN_ROOT, "tests/minion_test_reads/RNA_edge_cases/rna_reads.sam")
-        self.check_alignments(true_alignments=edge_case_true_alignments,
-                              reads=edge_case_reads,
-                              reference=edge_case_reference,
-                              kmer_length=5,
-                              contig_name="rna_fake",
-                              extra_args="-T=../models/testModelR9p4_5mer_acgt_RNA.model "
-                                         "--alignment_file {}".format(rna_alignments), rna=True)
+        with tempfile.TemporaryDirectory() as tempdir:
+            new_dir = os.path.join(tempdir, "new_dir")
+            shutil.copytree(edge_case_reads, new_dir)
+            edge_case_reference = os.path.join(SIGNALALIGN_ROOT, "tests/test_sequences/fake_rna_ref.fa")
+            rna_alignments = os.path.join(SIGNALALIGN_ROOT, "tests/minion_test_reads/RNA_edge_cases/rna_reads.sam")
+            self.check_alignments(true_alignments=edge_case_true_alignments,
+                                  reads=new_dir,
+                                  reference=edge_case_reference,
+                                  kmer_length=5,
+                                  contig_name="rna_fake",
+                                  extra_args="-T=../models/testModelR9p4_5mer_acgt_RNA.model "
+                                             "--alignment_file {}".format(rna_alignments), rna=True)
 
     def test_signal_files_without_events(self):
         """Test if signalAlign can handle signal files without event information"""

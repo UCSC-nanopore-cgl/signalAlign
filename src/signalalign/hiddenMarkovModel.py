@@ -24,6 +24,7 @@ from py3helpers.utils import all_string_permutations
 from py3helpers.seq_tools import is_non_canonical_iupac_base
 
 import matplotlib as mpl
+
 if os.environ.get('DISPLAY', '') == '':
     print('no display found. Using non-interactive Agg backend')
     mpl.use('Agg')
@@ -43,12 +44,11 @@ def parse_assignment_file(file_path):
     :param file_path: path to assignments file
     :return: panda DataFrame with column names "kmer", "strand", "level_mean", "prob"
     """
-    data = pd.read_table(file_path,
-                         usecols=(0, 1, 2, 3),
-                         names=["kmer", "strand", "level_mean", "prob"],
-                         dtype={"kmer": np.str, "strand": np.str, "level_mean": np.float64, "prob": np.float64},
-                         header=None
-                         )
+    data = pd.read_csv(file_path, delimiter="\t",
+                       usecols=(0, 1, 2, 3),
+                       names=["kmer", "strand", "level_mean", "prob"],
+                       dtype={"kmer": np.str, "strand": np.str, "level_mean": np.float64, "prob": np.float64},
+                       header=None)
     return data
 
 
@@ -59,11 +59,11 @@ def parse_alignment_file(file_path):
     :return: panda DataFrame with column names "kmer", "strand", "level_mean", "prob"
     """
     assert os.path.exists(file_path), "File path does not exist: {}".format(file_path)
-    data = pd.read_table(file_path,
-                         usecols=(4, 9, 12, 13),
-                         names=["strand", "kmer", "prob", "level_mean"],
-                         dtype={"kmer": np.str, "strand": np.str, "level_mean": np.float64, "prob": np.float64},
-                         header=None)
+    data = pd.read_csv(file_path, delimiter="\t",
+                       usecols=(4, 9, 13, 12),
+                       names=["strand", "kmer", "prob", "level_mean"],
+                       dtype={"kmer": np.str, "strand": np.str, "level_mean": np.float64, "prob": np.float64},
+                       header=None)[["kmer", "strand", "level_mean", "prob"]]
     return data
 
 
@@ -76,8 +76,8 @@ class HmmModel(object):
         self.ont_model_file = ont_model_file
         self.match_model_params = 5  # level_mean, level_sd, noise_mean, noise_sd, noise_lambda
         self.state_number = 3
-        self.transitions = np.zeros(self.state_number**2)
-        self.transitions_expectations = np.zeros(self.state_number**2)
+        self.transitions = np.zeros(self.state_number ** 2)
+        self.transitions_expectations = np.zeros(self.state_number ** 2)
         self.likelihood = 0.0
         self.running_likelihoods = []
         self.alphabet_size = 0
@@ -146,15 +146,15 @@ class HmmModel(object):
                 self.transitions_expectations[i + to_state] = self.transitions_expectations[i + to_state] / j
 
     def set_default_transitions(self):
-        MATCH_CONTINUE = np.exp(-0.23552123624314988)     # stride
-        GAP_OPEN_X = np.exp(-1.6269694202638481)          # skip
-        GAP_OPEN_Y = np.exp(-4.3187242127300092)          # 1 - (skip + stride)
+        MATCH_CONTINUE = np.exp(-0.23552123624314988)  # stride
+        GAP_OPEN_X = np.exp(-1.6269694202638481)  # skip
+        GAP_OPEN_Y = np.exp(-4.3187242127300092)  # 1 - (skip + stride)
 
-        MATCH_FROM_GAP_X = np.exp(-0.21880828092192281)   # 1 - skip'
-        GAP_EXTEND_X = np.exp(-1.6269694202638481)        # skip'
+        MATCH_FROM_GAP_X = np.exp(-0.21880828092192281)  # 1 - skip'
+        GAP_EXTEND_X = np.exp(-1.6269694202638481)  # skip'
         GAP_SWITCH_TO_Y = 0.0
 
-        GAP_EXTEND_Y = np.exp(-4.3187242127239411)        # stay (1 - (skip + stay))
+        GAP_EXTEND_Y = np.exp(-4.3187242127239411)  # stay (1 - (skip + stay))
         MATCH_FROM_GAP_Y = np.exp(-0.013406326748077823)  # 1 - (skip + stay)
         GAP_SWITCH_TO_X = 0.000000001
         self.transitions = [
@@ -171,7 +171,8 @@ class HmmModel(object):
         :param expectations_file: path to expectations file for error reporting
         :return: True if assert statements pass
         """
-        assert len(line) == 4, "signalHmm.check_header_line - incorrect header (param line): {}".format(expectations_file)
+        assert len(line) == 4, "signalHmm.check_header_line - incorrect header (param line): {}".format(
+            expectations_file)
         assert int(line[0]) == self.state_number, "signalHmm.check_header_line - state number error should be {exp} " \
                                                   "got {obs}".format(exp=self.state_number, obs=line[0])
         assert int(line[1]) == self.alphabet_size, "signalHmm.check_header_line - alphabet size error incorrect " \
@@ -198,21 +199,21 @@ class HmmModel(object):
         assert os.path.exists(model_file), "signalHmm.load_model - didn't find model here: {}".format(model_file)
 
         with open(model_file, 'r') as fH:
-
             line = fH.readline().split()
             # check for correct header length
             assert len(line) == 4, "signalHmm.load_model - incorrect line length line:{}".format(''.join(line))
             # check stateNumber
-            assert int(line[0]) == self.state_number, "signalHmm.load_model - incorrect stateNumber got {got} should be {exp}" \
-                                                      "".format(got=int(line[0]), exp=self.state_number)
+            assert int(
+                line[0]) == self.state_number, "signalHmm.load_model - incorrect stateNumber got {got} should be {exp}" \
+                                               "".format(got=int(line[0]), exp=self.state_number)
             # load model parameters
             self.alphabet_size = int(line[1])
             self.alphabet = line[2]
             self.kmer_length = int(line[3])
-            self.symbol_set_size = self.alphabet_size**self.kmer_length
+            self.symbol_set_size = self.alphabet_size ** self.kmer_length
             assert self.symbol_set_size > 0, "signalHmm.load_model - Got 0 for symbol_set_size"
-            assert self.symbol_set_size <= 6**6, "signalHmm.load_model - Got more than 6^6 for symbol_set_size got {}" \
-                                                 "".format(self.symbol_set_size)
+            assert self.symbol_set_size <= 6 ** 6, "signalHmm.load_model - Got more than 6^6 for symbol_set_size got {}" \
+                                                   "".format(self.symbol_set_size)
 
             line = list(map(float, fH.readline().split()))
             assert len(line) == len(self.transitions) + 1, "signalHmm.load_model incorrect transitions line"
@@ -230,8 +231,10 @@ class HmmModel(object):
 
             assert not np.any(self.event_model["means"] == 0.0), "signalHmm.load_model, this model has 0 E_means"
             assert not np.any(self.event_model["SDs"] == 0.0), "signalHmm.load_model, this model has 0 E_means"
-            assert not np.any(self.event_model["noise_means"] == 0.0), "signalHmm.load_model, this model has 0 E_noise_means"
-            assert not np.any(self.event_model["noise_SDs"] == 0.0), "signalHmm.load_model, this model has 0 E_noise_SDs"
+            assert not np.any(
+                self.event_model["noise_means"] == 0.0), "signalHmm.load_model, this model has 0 E_noise_means"
+            assert not np.any(
+                self.event_model["noise_SDs"] == 0.0), "signalHmm.load_model, this model has 0 E_noise_SDs"
             self._create_kmer_index_map()
             self.has_ont_model = True
 
@@ -264,7 +267,8 @@ class HmmModel(object):
             for k in range(self.symbol_set_size):
                 f.write("{level_mean}\t{level_sd}\t{noise_mean}\t{noise_sd}\t{noise_lambda}\t"
                         "".format(level_mean=self.event_model["means"][k], level_sd=self.event_model["SDs"][k],
-                                  noise_mean=self.event_model["noise_means"][k], noise_sd=self.event_model["noise_SDs"][k],
+                                  noise_mean=self.event_model["noise_means"][k],
+                                  noise_sd=self.event_model["noise_SDs"][k],
                                   noise_lambda=self.event_model["noise_lambdas"][k]))
             f.write("\n")
 
@@ -277,12 +281,13 @@ class HmmModel(object):
         """
         assert set(kmer).issubset(set(alphabet)) is True, "Nucleotide not found in model alphabet: kmer={}, " \
                                                           "alphabet={}".format(kmer, alphabet)
-        assert len(kmer) == kmer_length, "Kmer ({}) length  does not match model kmer length: {}".format(kmer, kmer_length)
+        assert len(kmer) == kmer_length, "Kmer ({}) length  does not match model kmer length: {}".format(kmer,
+                                                                                                         kmer_length)
 
         alphabet_dict = {base: index for index, base in enumerate(sorted(alphabet))}
         kmer_index = 0
         for index, nuc in enumerate(kmer):
-            kmer_index += alphabet_dict[nuc]*(alphabet_size**(kmer_length-index-1))
+            kmer_index += alphabet_dict[nuc] * (alphabet_size ** (kmer_length - index - 1))
         return kmer_index
 
     def get_kmer_index(self, kmer):
@@ -347,7 +352,7 @@ class HmmModel(object):
         :param kmer: kmer for model distribution selection
         """
         inv_gauss_mean, inv_gauss_lambda = self.get_event_sd_inv_gaussian_parameters(kmer)
-        return invgauss(inv_gauss_mean/inv_gauss_lambda, scale=inv_gauss_lambda).logpdf(event_sd)
+        return invgauss(inv_gauss_mean / inv_gauss_lambda, scale=inv_gauss_lambda).logpdf(event_sd)
 
     def add_expectations_file(self, expectations_file):
         """Add expectations file to the HMM. This is used for generating expectations of transition probabilities or
@@ -423,8 +428,8 @@ class HmmModel(object):
         if update_transitions is True:
             # normalize transitions expectations
             self.normalize_transitions_expectations()
-            for i in range(self.state_number**2):
-                    self.transitions[i] = self.transitions_expectations[i]
+            for i in range(self.state_number ** 2):
+                self.transitions[i] = self.transitions_expectations[i]
 
         # calculate the new expected mean and standard deviation for the kmer normal distributions
         if update_emissions:
@@ -604,12 +609,12 @@ class HmmModel(object):
         panel1.grid(color='black', linestyle='-', linewidth=1, alpha=0.5)
         panel1.xaxis.set_major_locator(ticker.AutoLocator())
         panel1.xaxis.set_minor_locator(ticker.AutoMinorLocator())
-        min_x = normal_mean-(5*normal_sd)
-        max_x = normal_mean+(5*normal_sd)
+        min_x = normal_mean - (5 * normal_sd)
+        max_x = normal_mean + (5 * normal_sd)
         panel1.set_xlim(min_x, max_x)
         panel1.set_title(label=kmer)
         # plot ont normal distribution
-        x = np.linspace(normal_mean - 4*normal_sd, normal_mean + 4*normal_sd, 200)
+        x = np.linspace(normal_mean - 4 * normal_sd, normal_mean + 4 * normal_sd, 200)
         ont_handle, = panel1.plot(x, norm.pdf(x, normal_mean, normal_sd))
         # panel1.plot([normal_mean, normal_mean], [0, norm.pdf(normal_mean, normal_mean, normal_sd)], lw=2)
         ont_model_name = os.path.basename(self.ont_model_file)
@@ -621,7 +626,8 @@ class HmmModel(object):
         legend_text1.append("ONT Normal Distribution")
 
         handles2.extend([txt_handle1, txt_handle2, txt_handle3])
-        legend_text2.extend(["ONT Model: \n  {}".format(ont_model_name), "ONT Event Mean: {}".format(normal_mean), "ONT Event SD: {}".format(normal_sd)])
+        legend_text2.extend(["ONT Model: \n  {}".format(ont_model_name), "ONT Event Mean: {}".format(normal_mean),
+                             "ONT Event SD: {}".format(normal_sd)])
 
         if self.has_hdp_model:
             # plot HDP predicted distribution
@@ -734,7 +740,7 @@ class HmmModel(object):
             # print("[Median Delta] No HDP data for {}".format(kmer))
             return None
         normal_mean, normal_sd = self.get_event_mean_gaussian_parameters(kmer)
-        delta = self.linspace[hdp_y.index(max(hdp_y))]-normal_mean
+        delta = self.linspace[hdp_y.index(max(hdp_y))] - normal_mean
         return abs(delta)
 
     def compare_distributions(self):
@@ -807,7 +813,8 @@ class HmmModel(object):
                 k = self.get_kmer_index(generic_kmer)
                 f.write("{level_mean}\t{level_sd}\t{noise_mean}\t{noise_sd}\t{noise_lambda}\t"
                         "".format(level_mean=self.event_model["means"][k], level_sd=self.event_model["SDs"][k],
-                                  noise_mean=self.event_model["noise_means"][k], noise_sd=self.event_model["noise_SDs"][k],
+                                  noise_mean=self.event_model["noise_means"][k],
+                                  noise_sd=self.event_model["noise_SDs"][k],
                                   noise_lambda=self.event_model["noise_lambdas"][k]))
             f.write("\n")
 
@@ -879,15 +886,15 @@ class HmmModel(object):
         for kmer in kmer_list:
             normal_mean, normal_sd = self.get_event_mean_gaussian_parameters(kmer)
 
-            tmp_min_x = normal_mean-(5*normal_sd)
-            tmp_max_x = normal_mean+(5*normal_sd)
+            tmp_min_x = normal_mean - (5 * normal_sd)
+            tmp_max_x = normal_mean + (5 * normal_sd)
             if min_x > tmp_min_x:
                 min_x = tmp_min_x
             if max_x < tmp_max_x:
                 max_x = tmp_max_x
 
             # plot ont normal distribution
-            x = np.linspace(normal_mean - 4*normal_sd, normal_mean + 4*normal_sd, 200)
+            x = np.linspace(normal_mean - 4 * normal_sd, normal_mean + 4 * normal_sd, 200)
             ont_handle, = panel1.plot(x, norm.pdf(x, normal_mean, normal_sd), label=kmer)
             # panel1.plot([normal_mean, normal_mean], [0, norm.pdf(normal_mean, normal_mean, normal_sd)], lw=2)
             ont_model_name = os.path.basename(self.ont_model_file)
@@ -1037,9 +1044,9 @@ def create_new_model(model_path, new_model_path, find_replace_set):
             if counter == n_new_bases:
                 new_file_name = new_model_path
             else:
-                new_file_name = os.path.join(tempdir, str(counter)+base_name)
+                new_file_name = os.path.join(tempdir, str(counter) + base_name)
 
-            model_h.write_new_model(new_file_name, alphabet=model_h.alphabet+new, replacement_base=old)
+            model_h.write_new_model(new_file_name, alphabet=model_h.alphabet + new, replacement_base=old)
             model_h = HmmModel(new_file_name)
             counter += 1
 
@@ -1066,8 +1073,6 @@ def main():
     # ﻿ RRACH
     #     R= A/G
     #     H = A/C/T
-
-
 
 
 if __name__ == "__main__":
