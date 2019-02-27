@@ -19,7 +19,7 @@ import timeit
 import filecmp
 from itertools import product
 from py3helpers.utils import get_random_string, find_substring_indices
-from py3helpers.seq_tools import ReverseComplement
+from py3helpers.seq_tools import ReverseComplement, ReferenceHandler
 
 from signalalign.utils.sequenceTools import *
 from signalalign.utils.fileHandlers import FolderHandler
@@ -32,6 +32,7 @@ class TestMakePositionsFiles(unittest.TestCase):
         super(TestMakePositionsFiles, cls).setUpClass()
         cls.HOME = '/'.join(os.path.abspath(__file__).split("/")[:-4])
         cls.reference = os.path.join(cls.HOME, "tests/test_sequences/pUC19_SspI_Zymo.fa")
+        cls.ecoli_reference = os.path.join(cls.HOME, "tests/test_sequences/E.coli_K12.fasta")
         cls.ambiguity_positions_file = os.path.join(cls.HOME, "tests/test_position_files/test_positions_file3.tsv")
 
     def test_make_positions_file(self):
@@ -39,6 +40,17 @@ class TestMakePositionsFiles(unittest.TestCase):
             out_path = os.path.join(tempdir, "test.txt")
             file_path = make_positions_file(self.reference, out_path, [["ATTATTGAAG", "ABTATTGAAG"]])
             self.assertTrue(filecmp.cmp(file_path, self.ambiguity_positions_file))
+            file_path = make_positions_file(self.ecoli_reference, out_path, [["CCAGG", "CEAGG"]])
+            data = CustomAmbiguityPositions.parseAmbiguityFile(file_path)
+            rh = ReferenceHandler(self.ecoli_reference)
+            forward_strand_data = data[data["strand"] == '+']
+            rev_strand_data = data[data["strand"] == '-']
+
+            for i, line in forward_strand_data.iterrows():
+                self.assertEqual("CCAGG", rh.get_sequence(line["contig"], line["position"] - 1, line["position"] + 4))
+
+            for i, line in rev_strand_data.iterrows():
+                self.assertEqual("CCAGG", reverse_complement(rh.get_sequence(line["contig"], line["position"] - 3, line["position"] + 2)))
 
     def test_find_gatc_motifs(self):
         indices = find_gatc_motifs("gatcgatc")
