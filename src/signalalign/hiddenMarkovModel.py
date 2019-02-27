@@ -52,6 +52,35 @@ def parse_assignment_file(file_path):
     return data
 
 
+def read_in_alignment_file(file_path):
+    """Parse the buildAlignment.tsv output file from CreateHdpTrainingData
+
+    :param file_path: path to alignment file
+    :return: panda DataFrame with column names "kmer", "strand", "level_mean", "prob"
+    """
+    assert os.path.exists(file_path), "File path does not exist: {}".format(file_path)
+
+    data = pd.read_csv(file_path, delimiter="\t",
+                       names=['contig', 'reference_index',
+                              'reference_kmer', 'read_file',
+                              'strand', 'event_index',
+                              'event_mean', 'event_noise',
+                              'event_duration', 'aligned_kmer',
+                              'scaled_mean_current', 'scaled_noise',
+                              'posterior_probability', 'descaled_event_mean',
+                              'ont_model_mean', 'path_kmer'],
+                       dtype={'contig': np.str, 'reference_index': np.int64,
+                              'reference_kmer': np.str, 'read_file': np.str,
+                              'strand': 'S1', 'event_index': np.int64,
+                              'event_mean': np.float64, 'event_noise': np.float64,
+                              'event_duration': np.float64, 'aligned_kmer': np.str,
+                              'scaled_mean_current': np.float64, 'scaled_noise': np.float64,
+                              'posterior_probability': np.float64, 'descaled_event_mean': np.float64,
+                              'ont_model_mean': np.float64, 'path_kmer': np.str},
+                       header=None)
+    return data
+
+
 def parse_alignment_file(file_path):
     """Parse the buildAlignment.tsv output file from CreateHdpTrainingData
 
@@ -584,12 +613,13 @@ class HmmModel(object):
 
             return t_right * y[idx_left] + t_left * y[idx_right] + t_left * t_right * (a * t_right + b * t_left)
 
-    def plot_kmer_distribution(self, kmer, alignment_file=None, alignment_file_data=None, savefig_dir=None):
+    def plot_kmer_distribution(self, kmer, alignment_file=None, alignment_file_data=None, savefig_dir=None, name=""):
         """Plot the distribution of a kmer with ONT and/or HDP distributions
         :param kmer: kmer to plot
         :param alignment_file: path to alignment file if you want to plot alignment data as well
         :param alignment_file_data: use alignment data if it has already been loaded in
         :param savefig_dir: path to plot save directory
+        :param name: prefix for plots
         """
         assert self.has_ont_model, "Must have ONT model loaded"
         if savefig_dir:
@@ -602,7 +632,7 @@ class HmmModel(object):
 
         normal_mean, normal_sd = self.get_event_mean_gaussian_parameters(kmer)
 
-        plt.figure(figsize=(12, 8))
+        fig = plt.figure(figsize=(12, 8))
         panel1 = plt.axes([0.1, 0.1, .6, .8])
         panel1.set_xlabel('pA')
         panel1.set_ylabel('Density')
@@ -697,11 +727,12 @@ class HmmModel(object):
             base_name = "DNA_"
             if self.rna:
                 base_name = "RNA_"
-            name = "{}{}.png".format(base_name, kmer)
-            out_path = os.path.join(savefig_dir, name)
+            out_name = "{}_{}_{}.png".format(name, base_name, kmer)
+            out_path = os.path.join(savefig_dir, out_name)
             plt.savefig(out_path)
         else:
             plt.show()
+        plt.close(fig)
 
     def get_kl_divergence(self, kmer):
         """Get Kullback–Leibler divergence between the HDP and ONT models for a specific kmer"""
@@ -858,12 +889,14 @@ class HmmModel(object):
         k = self.get_kmer_index(kmer)
         self.event_model["noise_lambdas"][k] = noise_lambdas
 
-    def plot_kmer_distributions(self, kmer_list, alignment_file=None, alignment_file_data=None, savefig_dir=None):
+    def plot_kmer_distributions(self, kmer_list, alignment_file=None, alignment_file_data=None, savefig_dir=None,
+                                name=""):
         """Plot multiple kmer distribution onto a single plot with ONT and/or HDP distributions
         :param kmer_list: list of kmers to plot
         :param alignment_file: path to alignment file if you want to plot alignment data as well
         :param alignment_file_data: use alignment data if it has already been loaded in
         :param savefig_dir: path to plot save directory
+        :param name: prefix for file output
         """
         assert self.has_ont_model, "Must have ONT model loaded"
         if savefig_dir:
@@ -873,7 +906,7 @@ class HmmModel(object):
         legend_text1 = []
         handles2 = []
         legend_text2 = []
-        plt.figure(figsize=(12, 8))
+        fig = plt.figure(figsize=(12, 8))
         panel1 = plt.axes([0.1, 0.1, .6, .8])
         panel1.set_xlabel('pA')
         panel1.set_ylabel('Density')
@@ -985,11 +1018,12 @@ class HmmModel(object):
             base_name = "DNA_comparison"
             if self.rna:
                 base_name = "RNA_comparison"
-            name = "{}{}.png".format(base_name, "_".join(kmer_list))
-            out_path = os.path.join(savefig_dir, name)
+            out_name = "{}_{}_{}.png".format(name, base_name, "_".join(kmer_list))
+            out_path = os.path.join(savefig_dir, out_name)
             plt.savefig(out_path)
         else:
             plt.show()
+        plt.close(fig)
 
     def get_hdp_probability(self, kmer, event_mean):
         """Get the probability that an event mean came from hdp distribution for the given kmer

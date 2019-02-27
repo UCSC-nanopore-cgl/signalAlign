@@ -20,7 +20,7 @@ from shutil import copyfile
 
 from signalalign.hiddenMarkovModel import *
 from signalalign.fast5 import Fast5
-from py3helpers.utils import all_string_permutations, get_random_string
+from py3helpers.utils import all_string_permutations, get_random_string, list_dir
 
 
 class HiddenMarkovTests(unittest.TestCase):
@@ -254,6 +254,26 @@ class HiddenMarkovTests(unittest.TestCase):
         mean, sd = hmm_handle.get_event_sd_inv_gaussian_parameters("AAAAA")
         self.assertEqual(sd, 1000)
 
+    def test_read_in_alignment_file(self):
+        assignments_dir = os.path.join(self.HOME, "tests/test_alignments/ecoli1D_test_alignments_sm3")
+        data = read_in_alignment_file(list_dir(assignments_dir)[0])
+        self.assertEqual(len(data["contig"]), 16852)
+        self.assertEqual(len(data["reference_index"]), 16852)
+        self.assertEqual(len(data["reference_kmer"]), 16852)
+        self.assertEqual(len(data["read_file"]), 16852)
+        self.assertEqual(len(data["strand"]), 16852)
+        self.assertEqual(len(data["event_index"]), 16852)
+        self.assertEqual(len(data["event_mean"]), 16852)
+        self.assertEqual(len(data["event_noise"]), 16852)
+        self.assertEqual(len(data["event_duration"]), 16852)
+        self.assertEqual(len(data["aligned_kmer"]), 16852)
+        self.assertEqual(len(data["scaled_mean_current"]), 16852)
+        self.assertEqual(len(data["scaled_noise"]), 16852)
+        self.assertEqual(len(data["posterior_probability"]), 16852)
+        self.assertEqual(len(data["descaled_event_mean"]), 16852)
+        self.assertEqual(len(data["ont_model_mean"]), 16852)
+        self.assertEqual(len(data["path_kmer"]), 16852)
+        self.assertEqual(len(data), 16852)
 
 if __name__ == '__main__':
     unittest.main()
