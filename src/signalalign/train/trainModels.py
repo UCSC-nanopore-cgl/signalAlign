@@ -111,6 +111,25 @@ def make_master_full_alignments_table(files, min_probability=0.0):
     return pd.concat(assignment_dfs)
 
 
+def write_and_generate_build_alignments_positions(full_alignments_dirs, positions_file, outpath, min_probability=0.0,
+                                                  max_assignments=10, verbose=True):
+    """Writes the built alignments from 'full' assignments given that the kmers cover the positions file
+    :param full_alignments_dirs: list of assignment directories
+    :param positions_file: positions file
+    :param min_probability: minimum probability for kmer assignments
+    :param max_assignments: maximum number of kmer assignments
+    :param verbose: boolean option for print statements
+    :return: all kmer assignemnts with at least the min probability and no more than max assignments
+    """
+    data = generate_build_alignments_positions(full_alignments_dirs, positions_file, min_probability=min_probability,
+                                               max_assignments=max_assignments, verbose=verbose)
+    data.rename(index=str, columns={"path_kmer": "kmer", "event_mean": "level_mean", "posterior_probability": "prob"},
+                inplace=True)
+    data = data[["kmer", "strand", "level_mean", "prob"]]
+    data.to_csv(outpath, sep='\t', header=False, index=False)
+    return data
+
+
 def generate_build_alignments_positions(full_alignments_dirs, positions_file, min_probability=0.0,
                                         max_assignments=10, verbose=True):
     """Generate built alignments from 'full' assignments given that the kmers cover the positions file
@@ -122,6 +141,8 @@ def generate_build_alignments_positions(full_alignments_dirs, positions_file, mi
     :return: all kmer assignemnts with at least the min probability and no more than max assignments
     """
     all_data = []
+    positions_data = CustomAmbiguityPositions.parseAmbiguityFile(positions_file)
+
     for full_alignments_dir in full_alignments_dirs:
         # Get forward data and backward data from directory
         forward_data = make_master_full_alignments_table(list_dir(full_alignments_dir, ext="forward.tsv"),
@@ -129,8 +150,6 @@ def generate_build_alignments_positions(full_alignments_dirs, positions_file, mi
 
         backward_data = make_master_full_alignments_table(list_dir(full_alignments_dir, ext="backward.tsv"),
                                                           min_probability=min_probability)
-
-        positions_data = CustomAmbiguityPositions.parseAmbiguityFile(positions_file)
 
         forward_data = build_alignments_positions(forward_data, positions_data, forward=True)
         backward_data = build_alignments_positions(backward_data, positions_data, forward=False)
@@ -147,6 +166,7 @@ def build_alignments_positions(full_sa_output_pd, positions_data, forward):
 
     :param full_sa_output_pd: all data with "contig" "strand" and "reference_index"
     :param positions_data: positions data with "contig", "strand" and "position" fields
+    :param forward: boolean option for dealing with forward positions or backward strand positions
     """
     # loop through for each strand in the assignments
     final_output = []
@@ -162,7 +182,8 @@ def build_alignments_positions(full_sa_output_pd, positions_data, forward):
         data_by_contig = full_sa_output_pd[full_sa_output_pd['contig'] == contig]
         contig_positions = stranded_positions[stranded_positions["contig"] == contig]
 
-        all_positions_to_keep = set(merge_lists([list(range(x-(kmer_len-1), x+1)) for x in contig_positions["position"]]))
+        all_positions_to_keep = set(
+            merge_lists([list(range(x - (kmer_len - 1), x + 1)) for x in contig_positions["position"]]))
 
         keepers = data_by_contig[[x in all_positions_to_keep for x in data_by_contig["reference_index"]]]
         final_output.append(keepers)
@@ -172,13 +193,14 @@ def build_alignments_positions(full_sa_output_pd, positions_data, forward):
 
 def filter_top_n_kmers(kmer_data, max_n=10, verbose=True):
     """Filter out only the top N most probable kmers
+    :param verbose: boolean option to print warnings when there are not enough events for a given kmer
     :param kmer_data: pd dataframe with "path_kmer" and "posterior_probability"
     :param max_n: max number of kmers to keep
     """
     output = []
     kmers = set(kmer_data["path_kmer"])
     for kmer in kmers:
-        specific_kmer_data = kmer_data[kmer_data["path_kmer"]==kmer]
+        specific_kmer_data = kmer_data[kmer_data["path_kmer"] == kmer]
         top_n_kmers = specific_kmer_data.sort_values(["posterior_probability"], ascending=False)[:max_n]
         output.append(top_n_kmers)
         if len(top_n_kmers) < max_n and verbose:
@@ -186,6 +208,7 @@ def filter_top_n_kmers(kmer_data, max_n=10, verbose=True):
                   "".format(max=max_n, kmer=kmer, found=len(top_n_kmers)))
 
     return pd.concat(output)
+
 
 def generate_buildAlignments2(assignments_pd, kmer_list, max_assignments=10, strands=('t', 'c'), verbose=False):
     """Convert assignments to alignment line format for HDP training.

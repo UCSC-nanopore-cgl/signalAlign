@@ -19,7 +19,7 @@ from py3helpers.utils import load_json, create_dot_dict
 from scipy.stats import norm
 from sklearn.neighbors import KernelDensity
 
-from signalalign.hiddenMarkovModel import HmmModel, parse_assignment_file
+from signalalign.hiddenMarkovModel import HmmModel, parse_assignment_file, parse_alignment_file
 from signalalign.utils.sequenceTools import get_motif_kmers, find_modification_index_and_character
 
 import tempfile
@@ -304,7 +304,11 @@ def main(config=None):
 
     args = create_dot_dict(config)
     # get assignments and load model
-    assignments = parse_assignment_file(args.assignments)
+    try:
+        assignments = parse_assignment_file(args.assignments)
+    except ValueError:
+        assignments = parse_alignment_file(args.assignments)
+
     model_h = HmmModel(args.model_path, rna=args.rna)
     target_model = None
     if args.target_hmm_model is not None:

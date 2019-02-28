@@ -437,21 +437,33 @@ class TrainSignalAlignTest(unittest.TestCase):
     def test_generate_buildAlignments_given_motifs(self):
         assignments_dir = os.path.join(self.HOME, "tests/test_alignments/ecoli1D_test_alignments_sm3")
         positions_file = os.path.join(self.HOME, "tests/test_position_files/CCWGG_ecoli_k12_mg1655.positions")
-
         all_data = generate_build_alignments_positions([assignments_dir], positions_file, verbose=False)
-
         rh = ReferenceHandler(self.ecoli_reference)
-        # d = dict(kmer=["AGG", "AGG", "AGG", "AGG"], strand=['t', 'c', 't', 'c'],
-        #          level_mean=[99.9, 89.9, 99.9, 89.9], prob=[0.01, 0.99, 0.01, 0.99])
-        # assignments = pd.DataFrame(d)
-        # motifs = [["A", "C"], ["G", "A"]]
+
+        # all_data = read_in_alignment_file("/Users/andrewbailey/data/ccwgg_new_em_trained_model/mixture_models/high_sd_models/built_alignments_wide_sd_02_28_19.tsv")
+        # rh = ReferenceHandler("/Users/andrewbailey/data/references/ecoli/ecoli_k12_mg1655.fa")
+        # positions_file = os.path.join("/Users/andrewbailey/data/references/ecoli/CCWGG_ecoli_k12_mg1655_C_C.positions")
+        # positions_data = CustomAmbiguityPositions.parseAmbiguityFile(positions_file)
+        #
+        # stranded_positions = positions_data[positions_data["strand"] == "t"]
+        #
+        # all_positions_to_keep = set(merge_lists([list(range(x-(5-1), x+1)) for x in stranded_positions["position"]]))
+
         rc = ReverseComplement()
         for i, row in all_data.iterrows():
             seq = rh.get_sequence(row["contig"], row["reference_index"]-9, row["reference_index"]+9)
             if row["path_kmer"] == row["reference_kmer"]:
+                # if not ("CCAGG" in seq or "CCTGG" in seq):
+                #     print(row, seq)
+                #     print("pos in seq is {}".format(row["reference_index"] in all_positions_to_keep))
                 self.assertTrue("CCAGG" in seq or "CCTGG" in seq)
             else:
+                # if not ("CCAGG" in rc.reverse_complement(seq) or "CCTGG" in rc.reverse_complement(seq)):
+                #     print(row, rc.reverse_complement(seq))
+                #     print("pos in seq is {}".format(row["reference_index"] in all_positions_to_keep))
+
                 self.assertTrue("CCAGG" in rc.reverse_complement(seq) or "CCTGG" in rc.reverse_complement(seq))
+            # print(i)
 
 
 if __name__ == '__main__':
