@@ -71,7 +71,7 @@ def read_in_alignment_file(file_path):
                               'ont_model_mean', 'path_kmer'],
                        dtype={'contig': np.str, 'reference_index': np.int64,
                               'reference_kmer': np.str, 'read_file': np.str,
-                              'strand': 'S1', 'event_index': np.int64,
+                              'strand': np.str, 'event_index': np.int64,
                               'event_mean': np.float64, 'event_noise': np.float64,
                               'event_duration': np.float64, 'aligned_kmer': np.str,
                               'scaled_mean_current': np.float64, 'scaled_noise': np.float64,
