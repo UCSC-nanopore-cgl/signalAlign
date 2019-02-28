@@ -21,7 +21,6 @@ def parse_args():
                         dest='dir', type=str, default=None,
                         help="Path to json config file")
 
-
     args = parser.parse_args()
     return args
 
