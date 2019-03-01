@@ -160,6 +160,21 @@ def generate_build_alignments_positions(full_alignments_dirs, positions_file, mi
     return final_data
 
 
+def get_kmers_covering_positions(full_sa_output_pd, positions, kmer_len):
+    """Get all kmers that cover a list of positions. It is assumed that the contig/chromosome is the same
+    :param full_sa_output_pd: data that we want to filter for kmers that cover certain positions
+    :param positions: list of positions we want to include
+    :param kmer_len: kmer_len
+    :return: kmer alignment data that covers the positions passed in
+    """
+
+    all_positions_to_keep = set(
+        merge_lists([list(range(x - (kmer_len - 1), x + 1)) for x in positions]))
+
+    keepers = full_sa_output_pd[[x in all_positions_to_keep for x in full_sa_output_pd["reference_index"]]]
+    return keepers
+
+
 def build_alignments_positions(full_sa_output_pd, positions_data, forward):
     """Convert assignments to alignment line format for HDP training given the kmer covers certain reference positions
 
@@ -174,21 +189,21 @@ def build_alignments_positions(full_sa_output_pd, positions_data, forward):
 
     kmer_len = len(full_sa_output_pd["path_kmer"][0])
     if forward is True:
-        strand = "+"
+        strand_pairs = [["+", "t"], ["-", "c"]]
     else:
-        strand = "-"
-    stranded_positions = positions_data[positions_data["strand"] == strand]
+        strand_pairs = [["-", "t"], ["+", "c"]]
 
-    for contig in set(positions_data["contig"]):
+    for contig in set(full_sa_output_pd["contig"]):
         data_by_contig = full_sa_output_pd[full_sa_output_pd['contig'] == contig]
-        contig_positions = stranded_positions[stranded_positions["contig"] == contig]
+        contig_positions = positions_data[positions_data["contig"] == contig]
 
-        all_positions_to_keep = set(
-            merge_lists([list(range(x - (kmer_len - 1), x + 1)) for x in contig_positions["position"]]))
+        for strand_pair in strand_pairs:
+            stranded_positions = contig_positions[contig_positions["strand"] == strand_pair[0]]
 
-        keepers = data_by_contig[[x in all_positions_to_keep for x in data_by_contig["reference_index"]]]
-        final_output.append(keepers)
-
+            data_by_strand = data_by_contig[data_by_contig['strand'] == strand_pair[1]]
+            final_output.append(get_kmers_covering_positions(data_by_strand,
+                                                             stranded_positions["position"],
+                                                             kmer_len=kmer_len))
     return pd.concat(final_output, ignore_index=True)
 
 

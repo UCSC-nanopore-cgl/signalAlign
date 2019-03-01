@@ -111,8 +111,11 @@ def fit_model_to_kmer_dist(all_assignments, kmer, n_normals=2):
     :param n_normals: number of normal gaussians to fit to distirbution
     """
     samples = all_assignments[all_assignments["kmer"] == kmer]["level_mean"].values.reshape(-1, 1)
-    # samples = np.array(all_assignments[all_assignments["k-mer"] == kmer]["descaled_event_mean"]).reshape(-1, 1)
-    model = get_nanopore_gauss_mixture(samples, n_normals)
+    model = False
+    if len(samples) == 0:
+        print("No alignments found for kmer: {}".format(kmer))
+    else:
+        model = get_nanopore_gauss_mixture(samples, n_normals)
     return model
 
 
@@ -141,29 +144,30 @@ def generate_gaussian_mixture_model_for_motifs(model_h, assignments, all_kmer_pa
 
         # fit
         mixture_model = fit_model_to_kmer_dist(assignments, old_kmer, n_normals=2)
-        mixture_normals = get_mus_and_sigmas_1d(mixture_model)
-        kmer_mean, kmer_sd = model_h.get_event_mean_gaussian_parameters(old_kmer)
-        match, other, distance = closest_to_canonical(mixture_normals, kmer_mean)
-        # set parameters
-        model_h.set_kmer_event_mean(new_kmer, other[0][0][0])
-        model_h.set_kmer_event_sd(new_kmer, other[0][1][0])
-        canonical_mixture_components_comparison.append(
-            [old_kmer, kmer_mean, kmer_sd, match[0][0], match[1][0], other[0][0][0],
-             other[0][1][0], distance[0], strand])
-        print(old_kmer, mixture_normals)
-        if plot:
-            # model_h.plot_kmer_distributions([old_kmer, new_kmer],
-            #                                 alignment_file_data=assignments,
-            #                                 savefig_dir=output_dir,
-            #                                 name=strand)
-            plot_output_dir = output_dir
-            if show:
-                plot_output_dir = None
-            plot_mixture_model_distribution(old_kmer, new_kmer, kmer_mean, kmer_sd, match[0][0], match[1][0],
-                                            other[0][0][0], other[0][1][0], strand, mixture_model=mixture_model,
-                                            kmer_assignments=assignments,
-                                            save_fig_dir=plot_output_dir,
-                                            target_model=target_model)
+        if mixture_model:
+            mixture_normals = get_mus_and_sigmas_1d(mixture_model)
+            kmer_mean, kmer_sd = model_h.get_event_mean_gaussian_parameters(old_kmer)
+            match, other, distance = closest_to_canonical(mixture_normals, kmer_mean)
+            # set parameters
+            model_h.set_kmer_event_mean(new_kmer, other[0][0][0])
+            model_h.set_kmer_event_sd(new_kmer, other[0][1][0])
+            canonical_mixture_components_comparison.append(
+                [old_kmer, kmer_mean, kmer_sd, match[0][0], match[1][0], other[0][0][0],
+                 other[0][1][0], distance[0], strand])
+            print(old_kmer, mixture_normals)
+            if plot:
+                # model_h.plot_kmer_distributions([old_kmer, new_kmer],
+                #                                 alignment_file_data=assignments,
+                #                                 savefig_dir=output_dir,
+                #                                 name=strand)
+                plot_output_dir = output_dir
+                if show:
+                    plot_output_dir = None
+                plot_mixture_model_distribution(old_kmer, new_kmer, kmer_mean, kmer_sd, match[0][0], match[1][0],
+                                                other[0][0][0], other[0][1][0], strand, mixture_model=mixture_model,
+                                                kmer_assignments=assignments,
+                                                save_fig_dir=plot_output_dir,
+                                                target_model=target_model)
     model_h.normalize(False, False)
     model_h.write(output_model_path)
 

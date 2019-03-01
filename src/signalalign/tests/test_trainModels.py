@@ -18,8 +18,10 @@ from signalalign.train.trainModels import *
 from signalalign.utils.fileHandlers import FolderHandler
 from signalalign.hiddenMarkovModel import HmmModel, read_in_alignment_file
 from signalalign.utils.sequenceTools import CustomAmbiguityPositions
+from signalalign.mixture_model import get_motif_kmer_pairs
 from py3helpers.utils import captured_output, load_json, time_it
 from py3helpers.seq_tools import ReferenceHandler, ReverseComplement
+
 
 class TrainSignalAlignTest(unittest.TestCase):
 
@@ -437,33 +439,30 @@ class TrainSignalAlignTest(unittest.TestCase):
     def test_generate_buildAlignments_given_motifs(self):
         assignments_dir = os.path.join(self.HOME, "tests/test_alignments/ecoli1D_test_alignments_sm3")
         positions_file = os.path.join(self.HOME, "tests/test_position_files/CCWGG_ecoli_k12_mg1655.positions")
-        all_data = generate_build_alignments_positions([assignments_dir], positions_file, verbose=False)
+        all_data = generate_build_alignments_positions([assignments_dir, assignments_dir], positions_file, verbose=False)
         rh = ReferenceHandler(self.ecoli_reference)
-
+        #
         # all_data = read_in_alignment_file("/Users/andrewbailey/data/ccwgg_new_em_trained_model/mixture_models/high_sd_models/built_alignments_wide_sd_02_28_19.tsv")
         # rh = ReferenceHandler("/Users/andrewbailey/data/references/ecoli/ecoli_k12_mg1655.fa")
         # positions_file = os.path.join("/Users/andrewbailey/data/references/ecoli/CCWGG_ecoli_k12_mg1655_C_C.positions")
         # positions_data = CustomAmbiguityPositions.parseAmbiguityFile(positions_file)
-        #
-        # stranded_positions = positions_data[positions_data["strand"] == "t"]
-        #
-        # all_positions_to_keep = set(merge_lists([list(range(x-(5-1), x+1)) for x in stranded_positions["position"]]))
+        # data_dir = "/Users/andrewbailey/data/ccwgg_new_em_trained_model/mixture_models/test_output/canonical"
+        # # stranded_positions = positions_data[positions_data["strand"] == "t"]
+        # all_data = generate_build_alignments_positions([data_dir], positions_file, verbose=True)
+        all_kmer_pairs = set()
+        motifs = [["CCAGG", "CEAGG"], ["CCTGG", "CETGG"]]
+        for motif in motifs:
+            all_kmer_pairs |= set(tuple(row) for row in get_motif_kmer_pairs(motif_pair=motif, k=5))
+        all_possible_kmers = set([x[0] for x in all_kmer_pairs])
 
         rc = ReverseComplement()
         for i, row in all_data.iterrows():
             seq = rh.get_sequence(row["contig"], row["reference_index"]-9, row["reference_index"]+9)
+            self.assertTrue(row["path_kmer"] in all_possible_kmers)
             if row["path_kmer"] == row["reference_kmer"]:
-                # if not ("CCAGG" in seq or "CCTGG" in seq):
-                #     print(row, seq)
-                #     print("pos in seq is {}".format(row["reference_index"] in all_positions_to_keep))
                 self.assertTrue("CCAGG" in seq or "CCTGG" in seq)
             else:
-                # if not ("CCAGG" in rc.reverse_complement(seq) or "CCTGG" in rc.reverse_complement(seq)):
-                #     print(row, rc.reverse_complement(seq))
-                #     print("pos in seq is {}".format(row["reference_index"] in all_positions_to_keep))
-
                 self.assertTrue("CCAGG" in rc.reverse_complement(seq) or "CCTGG" in rc.reverse_complement(seq))
-            # print(i)
 
 
 if __name__ == '__main__':
