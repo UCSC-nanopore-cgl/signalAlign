@@ -38,7 +38,7 @@ def make_master_assignment_table(list_of_assignment_paths, min_probability=0.0, 
         else:
             data = parse_assignment_file(f)
         assignment_dfs.append(data.loc[data['prob'] >= min_probability])
-    return pd.concat(assignment_dfs)
+    return pd.concat(assignment_dfs, ignore_index=True)
 
 
 def get_kmers(kmer_len, alphabet="ATGC", motifs=None, reference=None):
@@ -96,7 +96,7 @@ def generate_buildAlignments(assignments_pd, kmer_list, max_assignments=10, stra
             if len(kmer_assignments) < max_assignments and verbose:
                 print("WARNING didn't find {max} requested assignments for {kmer} only found {found}"
                       "".format(max=max_assignments, kmer=k, found=len(kmer_assignments)))
-    return pd.concat(final_output)
+    return pd.concat(final_output, ignore_index=True)
 
 
 def make_master_full_alignments_table(files, min_probability=0.0):
@@ -108,7 +108,7 @@ def make_master_full_alignments_table(files, min_probability=0.0):
     for f in files:
         data = read_in_alignment_file(f)
         assignment_dfs.append(data.loc[data['posterior_probability'] >= min_probability])
-    return pd.concat(assignment_dfs)
+    return pd.concat(assignment_dfs, ignore_index=True)
 
 
 def write_and_generate_build_alignments_positions(full_alignments_dirs, positions_file, outpath, min_probability=0.0,
@@ -119,6 +119,7 @@ def write_and_generate_build_alignments_positions(full_alignments_dirs, position
     :param min_probability: minimum probability for kmer assignments
     :param max_assignments: maximum number of kmer assignments
     :param verbose: boolean option for print statements
+    :param outpath: where to write the output file
     :return: all kmer assignemnts with at least the min probability and no more than max assignments
     """
     data = generate_build_alignments_positions(full_alignments_dirs, positions_file, min_probability=min_probability,
@@ -155,7 +156,7 @@ def generate_build_alignments_positions(full_alignments_dirs, positions_file, mi
         backward_data = build_alignments_positions(backward_data, positions_data, forward=False)
         all_data.extend([forward_data, backward_data])
 
-    final_data = filter_top_n_kmers(pd.concat(all_data), max_n=max_assignments, verbose=verbose)
+    final_data = filter_top_n_kmers(pd.concat(all_data, ignore_index=True), max_n=max_assignments, verbose=verbose)
     return final_data
 
 
@@ -188,7 +189,7 @@ def build_alignments_positions(full_sa_output_pd, positions_data, forward):
         keepers = data_by_contig[[x in all_positions_to_keep for x in data_by_contig["reference_index"]]]
         final_output.append(keepers)
 
-    return pd.concat(final_output)
+    return pd.concat(final_output, ignore_index=True)
 
 
 def filter_top_n_kmers(kmer_data, max_n=10, verbose=True):
@@ -207,7 +208,7 @@ def filter_top_n_kmers(kmer_data, max_n=10, verbose=True):
             print("WARNING didn't find {max} requested assignments for {kmer} only found {found}"
                   "".format(max=max_n, kmer=kmer, found=len(top_n_kmers)))
 
-    return pd.concat(output)
+    return pd.concat(output, ignore_index=True)
 
 
 def generate_buildAlignments2(assignments_pd, kmer_list, max_assignments=10, strands=('t', 'c'), verbose=False):
@@ -238,7 +239,7 @@ def generate_buildAlignments2(assignments_pd, kmer_list, max_assignments=10, str
             if len(kmer_assignments) < max_assignments and verbose:
                 print("WARNING didn't find {max} requested assignments for {kmer} only found {found}"
                       "".format(max=max_assignments, kmer=k, found=len(kmer_assignments)))
-    return pd.concat(final_output)
+    return pd.concat(final_output, ignore_index=True)
 
 
 class CreateHdpTrainingData(object):
@@ -311,7 +312,7 @@ class CreateHdpTrainingData(object):
             final_output.append(generate_buildAlignments(sample_assignment_table, kmers,
                                                          max_assignments=sample.number_of_kmer_assignments,
                                                          strands=self.strands, verbose=verbose))
-        master_assignment_table = pd.concat(final_output)
+        master_assignment_table = pd.concat(final_output, ignore_index=True)
         self.n_assignments = len(master_assignment_table)
         master_assignment_table.to_csv(self.out_file_path, sep='\t', header=False, index=False)
         return self.out_file_path

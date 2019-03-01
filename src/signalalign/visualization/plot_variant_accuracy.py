@@ -101,19 +101,19 @@ def plot_roc_from_config(config):
 
     # plot per read ROC curve
     if plot_per_read:
-        all_per_read_labels = pd.concat([x.per_read_data for x in aor_handles])
+        all_per_read_labels = pd.concat([x.per_read_data for x in aor_handles], ignore_index=True)
         data_type_name = "per_read"
         plot_all_roc_curves(all_per_read_labels, variants, save_fig_dir, data_type_name)
 
     # plot per call ROC curve
     if plot_per_call:
-        all_site_labels = pd.concat([x for x in per_site_label_list])
+        all_site_labels = pd.concat([x for x in per_site_label_list], ignore_index=True)
         data_type_name = "per_site_per_read"
         plot_all_roc_curves(all_site_labels, variants, save_fig_dir, data_type_name)
 
     # plot genome position calls
     if plot_genome_position_aggregate:
-        all_genome_positions_labels = pd.concat([x for x in gwa_lables_list])
+        all_genome_positions_labels = pd.concat([x for x in gwa_lables_list], ignore_index=True)
         data_type_name = "per_genomic_site"
         plot_all_roc_curves(all_genome_positions_labels, variants, save_fig_dir, data_type_name, label_key="contig")
 
