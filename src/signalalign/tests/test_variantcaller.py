@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Test trainModels.py"""
+"""Test variantcaller.py"""
 ########################################################################
 # File: test_variantcaller.py
 #  executable: test_variantcaller.py
@@ -14,6 +14,7 @@ import tempfile
 from py3helpers.utils import list_dir, load_json
 from signalalign.variantCaller import *
 from signalalign.visualization.plot_variant_accuracy import plot_roc_from_config
+from signalalign.train.trainModels import read_in_alignment_file
 
 
 class TestVariantCaller(unittest.TestCase):
@@ -28,6 +29,7 @@ class TestVariantCaller(unittest.TestCase):
         cls.ecoli_positions = os.path.join(cls.HOME, "tests/test_position_files/CCWGG_ecoli_k12_mg1655_CC.positions")
         cls.variant_files = os.path.join(cls.HOME, "tests/test_variantCalled_files")
         cls.plot_variants_config = os.path.join(cls.HOME, "tests/test_variantCalled_files/plot_variants_config.json")
+        cls.variant_files2 = os.path.join(cls.HOME, "tests/test_test_variant_caller")
 
     def test_aggregate_all_variantcalls(self):
         aor_h = AggregateOverReads(self.variant_files, "CE")
@@ -73,6 +75,20 @@ class TestVariantCaller(unittest.TestCase):
                 self.assertAlmostEqual(data["E"] + data["C"], 1)
                 self.assertEqual(data["contig"], "gi_ecoli")
 
+    def test_MarginalizeFullVariants(self):
+        forward_mapped_files = list_dir(self.variant_files2, ext="forward.tsv")
+        for test_file in forward_mapped_files:
+            read_name = os.path.basename(test_file)
+            full_data = read_in_alignment_file(test_file)
+            mv_h = MarginalizeFullVariants(full_data, variants="CE", read_name=read_name, forward_mapped=True)
+            position_probs = mv_h.get_data()
+            for i, data in position_probs.iterrows():
+                self.assertEqual(data["contig"], "pUC19")
+                self.assertAlmostEqual(data["E"] + data["C"], 1)
+            for i, data in mv_h.per_read_calls.iterrows():
+                self.assertAlmostEqual(data["E"] + data["C"], 1)
+                self.assertEqual(data["contig"], "pUC19")
+
     def test_create_labels_from_positions_file(self):
         labels = create_labels_from_positions_file(self.ecoli_positions, "CE")
         for i, label in labels.iterrows():
@@ -102,6 +118,41 @@ class TestVariantCaller(unittest.TestCase):
             else:
                 self.assertEqual(0, row["E_label"])
                 self.assertEqual(1, row["C_label"])
+
+    def test_generate_labels_full(self):
+        labels = create_labels_from_positions_file(self.ecoli_positions, "CE")
+        aor_h = AggregateOverReadsFull(self.variant_files2, "CE")
+        data = aor_h.generate_labels(labels, aor_h.per_position_data)
+        for i, row in data.iterrows():
+            if row["read_name"] == '6e520d79-dcc5-4af3-a69f-cf5134a4c563.sm.tsv':
+                self.assertEqual(1, row["E_label"])
+                self.assertEqual(0, row["C_label"])
+            else:
+                self.assertEqual(0, row["E_label"])
+                self.assertEqual(1, row["C_label"])
+
+    def test_aggregate_all_variantcalls_full(self):
+        aor_h = AggregateOverReadsFull(self.variant_files2, "CE")
+        for i, data in aor_h.per_position_data.iterrows():
+            self.assertEqual(data["contig"], "pUC19")
+            self.assertAlmostEqual(data["C"] + data["E"], 1)
+
+    def test_marginalize_over_all_reads_full(self):
+        aor_h = AggregateOverReadsFull(self.variant_files2, "CE")
+        all_data = aor_h.marginalize_over_all_reads()
+        for i, data in all_data.iterrows():
+            self.assertEqual(data[0], "pUC19")
+            self.assertLessEqual(data["C"] + data["E"], 1)
+
+    def test_write_data_full(self):
+        aor_h = AggregateOverReadsFull(self.variant_files2, "CE")
+        all_data = aor_h.marginalize_over_all_reads()
+
+        with tempfile.TemporaryDirectory() as tempdir:
+            new_file = os.path.join(tempdir, "test.txt")
+            aor_h.write_data(new_file)
+            data = pd.read_csv(new_file, delimiter="\t")
+            self.assertTrue(data["position"].equals(all_data["position"]))
 
     def test_plot_variants(self):
         with tempfile.TemporaryDirectory() as tempdir:

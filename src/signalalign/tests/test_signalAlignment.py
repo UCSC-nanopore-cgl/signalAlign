@@ -343,8 +343,8 @@ class SignalAlignmentTest(unittest.TestCase):
 
     def test_variant_calling_with_multiple_paths(self):
         signal_file_reads = os.path.join(self.HOME, "tests/minion_test_reads/pUC/")
-        template_model = os.path.join(self.HOME, "models/testModelR9_5mer_acegt_template.model")
-        complement_model = os.path.join(self.HOME, "models/testModelR9_5mer_acegt_complement.model")
+        template_model = os.path.join(self.HOME, "models/test_testModelR9_acegt_template.model")
+        complement_model = os.path.join(self.HOME, "models/testModelR9_acegt_complement.model")
 
         puc_reference = os.path.join(self.HOME, "tests/test_sequences/pUC19_SspI.fa")
         forward_reference = os.path.join(self.HOME, "tests/test_sequences/pUC19_SspI_forward_cpg.fa")
