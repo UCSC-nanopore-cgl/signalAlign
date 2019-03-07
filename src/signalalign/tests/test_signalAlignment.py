@@ -341,6 +341,46 @@ class SignalAlignmentTest(unittest.TestCase):
             self.assertEqual(sam[0], "0")
             self.assertEqual(len(os.listdir(working_folder.path)), 2)
 
+    def test_variant_calling_with_multiple_paths(self):
+        signal_file_reads = os.path.join(self.HOME, "tests/minion_test_reads/pUC/")
+        template_model = os.path.join(self.HOME, "models/testModelR9_5mer_acegt_template.model")
+        complement_model = os.path.join(self.HOME, "models/testModelR9_5mer_acegt_complement.model")
+
+        puc_reference = os.path.join(self.HOME, "tests/test_sequences/pUC19_SspI.fa")
+        forward_reference = os.path.join(self.HOME, "tests/test_sequences/pUC19_SspI_forward_cpg.fa")
+        backward_reference = os.path.join(self.HOME, "tests/test_sequences/pUC19_SspI_backward_cpg.fa")
+
+        signal_file_guide_alignment = os.path.join(self.HOME, "tests/minion_test_reads/pUC/puc.bam")
+        with tempfile.TemporaryDirectory() as tempdir:
+            new_dir = os.path.join(tempdir, "new_dir")
+            if os.path.exists(new_dir):
+                shutil.rmtree(new_dir)
+            working_folder = FolderHandler()
+            working_folder.open_folder(os.path.join(tempdir, "test_dir"))
+
+            shutil.copytree(signal_file_reads, new_dir)
+
+            args = create_signalAlignment_args(alignment_file=signal_file_guide_alignment, bwa_reference=puc_reference,
+                                               forward_reference=forward_reference,
+                                               backward_reference=backward_reference,
+                                               in_templateHmm=template_model,
+                                               path_to_bin=self.path_to_bin, destination=working_folder.path,
+                                               embed=True, output_format="both", filter_reads=0, twoD_chemistry=True,
+                                               in_complementHmm=complement_model, delete_tmp=True,
+                                               degenerate="cytosine2")
+            final_args = merge_dicts([args, dict(in_fast5=os.path.join(new_dir, "makeson_PC_20160807_FNFAD20242_MN17284_sequencing_run_MA_470_R9_pUC_g_PCR_BC_08_07_16_93165_ch1_read176_strand.fast5"))])
+            handle = SignalAlignment(**final_args)
+            handle.run()
+            f5fh = Fast5(os.path.join(new_dir, "makeson_PC_20160807_FNFAD20242_MN17284_sequencing_run_MA_470_R9_pUC_g_PCR_BC_08_07_16_93165_ch1_read176_strand.fast5"))
+            mea = f5fh.get_signalalign_events(mea=True)
+            sam = f5fh.get_signalalign_events(sam=True)
+            variant_calls = f5fh.get_signalalign_events(variant=True)
+            full_output = f5fh.get_signalalign_events()
+            f5fh.get_read()
+            self.assertEqual(mea[0]["raw_start"], 2879)
+            self.assertEqual(sam[0], "0")
+            self.assertEqual(len(os.listdir(working_folder.path)), 2)
+
 
 if __name__ == '__main__':
     unittest.main()
