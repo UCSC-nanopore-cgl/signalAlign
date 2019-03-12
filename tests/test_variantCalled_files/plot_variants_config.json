@@ -4,13 +4,13 @@
   "samples": [
     {
       "name": "canonical",
-      "variant_tsvs": "./tests/test_variantCalled_files",
+      "full_tsvs": "./tests/test_variantCalled_files/canonical",
       "positions_file": "./tests/test_position_files/CCWGG_ecoli_k12_mg1655_CC.positions",
       "label": "C"
     },
     {
       "name": "5-mC",
-      "variant_tsvs": "./tests/test_variantCalled_files",
+      "full_tsvs": "./tests/test_variantCalled_files/methylated",
       "positions_file": "./tests/test_position_files/CCWGG_ecoli_k12_mg1655.positions",
       "label": "E"
     }

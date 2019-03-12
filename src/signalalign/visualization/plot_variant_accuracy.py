@@ -12,8 +12,10 @@ from argparse import ArgumentParser
 import pandas as pd
 import pickle
 import os
+import sys
 import platform
 import matplotlib as mpl
+
 if os.environ.get('DISPLAY', '') == '':
     print('no display found. Using non-interactive Agg backend')
     mpl.use('Agg')
@@ -23,8 +25,9 @@ from py3helpers.utils import list_dir
 from py3helpers.classification import ClassificationMetrics
 from py3helpers.utils import load_json, create_dot_dict
 from signalalign.filter_reads import find_fast5s_from_ids_readdb, write_readdb, copy_files_from_readdb
-from signalalign.variantCaller import AggregateOverReads
+from signalalign.variantCaller import AggregateOverReadsFull
 from signalalign.utils.sequenceTools import CustomAmbiguityPositions
+from timeit import default_timer as timer
 
 
 def parse_args():
@@ -57,10 +60,10 @@ def plot_roc_from_config(config):
 
     # process samples
     for sample in samples:
-        tsvs = sample.variant_tsvs
+        tsvs = sample.full_tsvs
         positions = sample.positions_file
         label = sample.label
-        aor_h = AggregateOverReads(tsvs, variants)
+        aor_h = AggregateOverReadsFull(tsvs, variants, verbose=True)
         aor_h.marginalize_over_all_reads()
         aor_handles.append(aor_h)
         assert positions or label, "Must provide either a label: {} or a positions file: {}".format(label,
@@ -70,20 +73,12 @@ def plot_roc_from_config(config):
             plot_genome_position_aggregate = True
             plot_per_call = True
             plot_per_read = True
-            for nuc in variants:
-                if nuc == label:
-                    # set
-                    aor_h.per_read_data.loc[:, "{}_label".format(nuc)] = pd.Series(1,
-                                                                                   index=aor_h.per_read_data.index)
-                else:
-                    aor_h.per_read_data.loc[:, "{}_label".format(nuc)] = pd.Series(0,
-                                                                                   index=aor_h.per_read_data.index)
-            genome_wide_aggregate_label = aor_h.generate_labels2(predicted_data=aor_h.aggregate_position_probs,
-                                                                 true_char=label)
-            gwa_lables_list.append(genome_wide_aggregate_label)
-
-            per_site_label = aor_h.generate_labels2(predicted_data=aor_h.per_position_data, true_char=label)
-            per_site_label_list.append(per_site_label)
+            aor_h.aggregate_position_probs = aor_h.generate_labels2(predicted_data=aor_h.aggregate_position_probs,
+                                                                    true_char=label)
+            aor_h.per_read_data = aor_h.generate_labels2(predicted_data=aor_h.per_read_data,
+                                                         true_char=label)
+            aor_h.per_position_data = aor_h.generate_labels2(predicted_data=aor_h.per_position_data,
+                                                             true_char=label)
 
         # if positions file is given, check accuracy from that
         elif positions:
@@ -91,13 +86,10 @@ def plot_roc_from_config(config):
             plot_per_call = True
 
             genome_position_labels = CustomAmbiguityPositions.parseAmbiguityFile(positions)
-            genome_wide_aggregate_label = aor_h.generate_labels(labelled_positions=genome_position_labels,
-                                                                predicted_data=aor_h.aggregate_position_probs)
-            gwa_lables_list.append(genome_wide_aggregate_label)
-
-            per_site_label = aor_h.generate_labels(labelled_positions=genome_position_labels,
-                                                   predicted_data=aor_h.per_position_data)
-            per_site_label_list.append(per_site_label)
+            aor_h.aggregate_position_probs = aor_h.generate_labels(labelled_positions=genome_position_labels,
+                                                                   predicted_data=aor_h.aggregate_position_probs)
+            aor_h.per_position_data = aor_h.generate_labels(labelled_positions=genome_position_labels,
+                                                            predicted_data=aor_h.per_position_data)
 
     # plot per read ROC curve
     if plot_per_read:
@@ -107,27 +99,34 @@ def plot_roc_from_config(config):
 
     # plot per call ROC curve
     if plot_per_call:
-        all_site_labels = pd.concat([x for x in per_site_label_list], ignore_index=True)
+        all_site_labels = pd.concat([x.per_position_data for x in aor_handles], ignore_index=True)
         data_type_name = "per_site_per_read"
         plot_all_roc_curves(all_site_labels, variants, save_fig_dir, data_type_name)
 
     # plot genome position calls
     if plot_genome_position_aggregate:
-        all_genome_positions_labels = pd.concat([x for x in gwa_lables_list], ignore_index=True)
+        all_genome_positions_labels = pd.concat([x.aggregate_position_probs for x in aor_handles], ignore_index=True)
         data_type_name = "per_genomic_site"
         plot_all_roc_curves(all_genome_positions_labels, variants, save_fig_dir, data_type_name, label_key="contig")
 
     return 0
 
 
-def plot_roc_and_save_data(per_read_labels_only, per_read_probs_only, name, variants, save_fig_dir, label_ids=None):
+def plot_roc_and_precision_and_save_data(per_read_labels_only, per_read_probs_only, name, variants, save_fig_dir,
+                                         label_ids=None):
     roc_h = ClassificationMetrics(per_read_labels_only, per_read_probs_only, label_ids=label_ids)
     for variant in variants:
-        path = None
-        if save_fig_dir:
-            path = os.path.join(save_fig_dir, "{}_roc_{}".format(name, variant))
+        roc_path = None
+        precision_recall_path = None
 
-        roc_h.plot_roc(variant, title="{} ROC for {}".format(name, variant), save_fig_path=path)
+        if save_fig_dir:
+            roc_path = os.path.join(save_fig_dir, "{}_roc_{}".format(name, variant))
+            precision_recall_path = os.path.join(save_fig_dir, "{}_pr_{}".format(name, variant))
+
+        roc_h.plot_roc(variant, title="{} ROC for {}".format(name, variant), save_fig_path=roc_path)
+        roc_h.plot_precision_recall(variant, title="{} Precison Recall for {}".format(name, variant),
+                                    save_fig_path=precision_recall_path)
+
     print("{} confusion matrix".format(name))
     print(roc_h.confusion_matrix())
     # save pickle of classification metrics class
@@ -142,16 +141,16 @@ def plot_all_roc_curves(all_labels, variants, save_fig_dir, data_type_name, labe
     all_per_read_labels_template = all_labels[all_labels["strand"] == 't']
     all_per_read_labels_complement = all_labels[all_labels["strand"] == 'c']
 
-    names = ["{}_template".format(data_type_name), "{}_complement".format(data_type_name), "{}_total".format(data_type_name)]
+    names = ["{}_template".format(data_type_name), "{}_complement".format(data_type_name),
+             "{}_total".format(data_type_name)]
     for name, data in zip(names, [all_per_read_labels_template, all_per_read_labels_complement, all_labels]):
-
         per_read_labels_only = data[[x + "_label" for x in variants]]
         per_read_probs_only = data[list(variants)]
         label_ids = list(data[label_key])
         per_read_labels_only.columns = list(variants)
 
-        plot_roc_and_save_data(per_read_labels_only, per_read_probs_only, name, variants,
-                               save_fig_dir, label_ids=label_ids)
+        plot_roc_and_precision_and_save_data(per_read_labels_only, per_read_probs_only, name, variants,
+                                             save_fig_dir, label_ids=label_ids)
 
     if save_fig_dir is not None:
         all_labels.to_csv(os.path.join(save_fig_dir, data_type_name + ".tsv"), sep='\t', index=False)
@@ -192,6 +191,7 @@ def write_tp_fn_overlap_readdb(readdb, tp_pkl, fn_pkl, class_n, out_path, read_d
 
 
 def main(config=None):
+    start = timer()
     if config is None:
         args = parse_args()
         # load model files
@@ -199,6 +199,8 @@ def main(config=None):
         config = load_json(args.config)
 
     plot_roc_from_config(config)
+    stop = timer()
+    print("Running Time = {} seconds".format(stop - start), file=sys.stderr)
 
 
 if __name__ == '__main__':
