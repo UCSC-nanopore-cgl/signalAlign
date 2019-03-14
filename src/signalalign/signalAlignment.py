@@ -390,6 +390,8 @@ class SignalAlignment(object):
 
         # degenerate nucleotide information
         if self.degenerate is not None:
+            if type(self.degenerate) is str:
+                self.degenerate = getDegenerateEnum(self.degenerate)
             degenerate_flag = "-o {} ".format(self.degenerate)
         else:
             degenerate_flag = ""
