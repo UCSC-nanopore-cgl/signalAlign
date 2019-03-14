@@ -28,7 +28,9 @@ class TestVariantCaller(unittest.TestCase):
         cls.runSA_config = os.path.join(cls.HOME, "tests/test_variantCalled_files/runSignalAlign-config_tmp.json")
         cls.ecoli_positions = os.path.join(cls.HOME, "tests/test_position_files/CCWGG_ecoli_k12_mg1655_CC.positions")
         cls.variant_files = os.path.join(cls.HOME, "tests/test_variantCalled_files/canonical")
+        cls.rna_variant_files = os.path.join(cls.HOME, "tests/test_variantCalled_files/rna")
         cls.plot_variants_config = os.path.join(cls.HOME, "tests/test_variantCalled_files/plot_variants_config.json")
+        cls.rna_positions_file = os.path.join(cls.HOME, "tests/test_position_files/rna_atg_ftg_fake_ref.positions")
 
     def test_aggregate_all_variantcalls(self):
         aor_h = AggregateOverReadsFull(self.variant_files, "CE")
@@ -133,6 +135,12 @@ class TestVariantCaller(unittest.TestCase):
             config_dict["save_fig_dir"] = tempdir
             retcode = plot_roc_from_config(config_dict)
             self.assertEqual(retcode, 0)
+
+    def test_aggregate_variant_call_rna(self):
+        aor_h = AggregateOverReadsFull(self.rna_variant_files, "AF")
+        for i, data in aor_h.per_position_data.iterrows():
+            self.assertEqual(data["contig"], "rna_fake")
+            self.assertAlmostEqual(data["A"] + data["F"], 1)
 
 
 if __name__ == '__main__':

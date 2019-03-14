@@ -381,6 +381,29 @@ class SignalAlignmentTest(unittest.TestCase):
     #         # self.assertEqual(sam[0], "0")
     #         self.assertEqual(len(os.listdir(working_folder.path)), 2)
 
+    def test_variant_calling_with_multiple_paths_rna(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            new_dir = os.path.join(tempdir, "new_dir")
+            if os.path.exists(new_dir):
+                shutil.rmtree(new_dir)
+            working_folder = FolderHandler()
+            working_folder.open_folder(os.path.join(tempdir, "test_dir"))
+
+            shutil.copytree(self.test_dir_rna, new_dir)
+
+            args = create_signalAlignment_args(alignment_file=self.rna_bam, bwa_reference=self.rna_reference,
+                                               forward_reference=os.path.join(self.HOME, "tests/test_sequences/fake_rna_replace/forward.fake_rna_atg.fake_rna_ref.fa"),
+                                               backward_reference=os.path.join(self.HOME, "tests/test_sequences/fake_rna_replace/backward.fake_rna_atg.fake_rna_ref.fa"),
+                                               in_templateHmm=os.path.join(self.HOME, "models/fake_testModelR9p4_5mer_acfgt_RNA.model"),
+                                               path_to_bin=self.path_to_bin, destination=working_folder.path,
+                                               embed=False, output_format="full", filter_reads=0, twoD_chemistry=False,
+                                               delete_tmp=True, degenerate="m6a", check_for_temp_file_existance=False)
+
+            multithread_signal_alignment(args, list_dir(new_dir, ext="fast5"), worker_count=8,
+                                         forward_reference=None,
+                                         debug=True, filter_reads_to_string_wrapper=None)
+            self.assertEqual(len(os.listdir(working_folder.path)), 2)
+
 
 if __name__ == '__main__':
     unittest.main()
