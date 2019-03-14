@@ -124,7 +124,8 @@ def write_and_generate_build_alignments_positions(full_alignments_dirs, position
     """
     data = generate_build_alignments_positions(full_alignments_dirs, positions_file, min_probability=min_probability,
                                                max_assignments=max_assignments, verbose=verbose)
-    data.rename(index=str, columns={"path_kmer": "kmer", "event_mean": "level_mean", "posterior_probability": "prob"},
+    data.rename(index=str, columns={"path_kmer": "kmer", "descaled_event_mean": "level_mean",
+                                    "posterior_probability": "prob"},
                 inplace=True)
     data = data[["kmer", "strand", "level_mean", "prob"]]
     data.to_csv(outpath, sep='\t', header=False, index=False)
