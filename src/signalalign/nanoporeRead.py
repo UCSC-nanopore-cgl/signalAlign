@@ -274,7 +274,7 @@ class NanoporeRead(object):
             self.logError(
                 "[NanoporeRead:generate_new_event_table] INFO generated event table at {}".format(oned_root_address))
         else:
-            self.logError("[NanoporeRead:generate_new_event_table] ERROR failed to generat event table")
+            self.logError("[NanoporeRead:generate_new_event_table] ERROR failed to generate event table")
         return oned_root_address
 
     def has_valid_event_table_format(self, oned_root_address):
