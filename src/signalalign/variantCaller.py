@@ -18,12 +18,13 @@ class MarginalizeVariants(object):
     def __init__(self, variant_data, variants, read_name):
         """Marginalize over all posterior probabilities to give a per position read probability
         :param variants: bases to track probabilities
-        :param variant_tsv: path to variantCaller tsv file
+        :param variant_data: variant data
         """
         self.read_name = read_name
         self.variant_data = variant_data
         self.variants = sorted(variants)
-        self.columns = merge_lists([['read_name', 'contig', 'position', 'strand', 'forward_mapped'], list(self.variants)])
+        self.columns = merge_lists([['read_name', 'contig', 'position', 'strand', 'forward_mapped'],
+                                    list(self.variants)])
         self.contig = NanoporeRead.bytes_to_string(self.variant_data["contig"][0])
         self.position_probs = pd.DataFrame()
         self.has_data = False
@@ -45,7 +46,8 @@ class MarginalizeVariants(object):
                 mapping_strand = "-"
                 if forward_mapped == b"forward":
                     mapping_strand = "+"
-                strand_specifc_data = read_strand_specifc_data[read_strand_specifc_data["forward_mapped"] == forward_mapped]
+                strand_specifc_data = read_strand_specifc_data[read_strand_specifc_data["forward_mapped"] ==
+                                                               forward_mapped]
                 if len(strand_specifc_data) == 0:
                     continue
                 # get positions on strand
@@ -73,7 +75,8 @@ class MarginalizeVariants(object):
 
                     data.append(merge_lists([[self.read_name, self.contig, pos, read_strand, mapping_strand],
                                              nuc_data]))
-                per_read_data.append(merge_lists([[self.read_name, self.contig, read_strand, mapping_strand, n_positions],
+                per_read_data.append(merge_lists([[self.read_name, self.contig, read_strand, mapping_strand,
+                                                   n_positions],
                                                   [prob / n_positions for prob in strand_read_nuc_data]]))
 
             self.position_probs = pd.DataFrame(data, columns=self.columns)
@@ -104,12 +107,14 @@ class MarginalizeFullVariants(object):
         self.variant_data = self.full_data[["X" in kmer for kmer in self.full_data["reference_kmer"]]]
         self.variants = sorted(variants)
         self.forward_mapped = forward_mapped
-        self.columns = merge_lists([['read_name', 'contig', 'position', 'strand', 'forward_mapped'], list(self.variants)])
+        self.columns = merge_lists([['read_name', 'contig', 'position', 'strand', 'forward_mapped'],
+                                    list(self.variants)])
         self.contig = NanoporeRead.bytes_to_string(self.full_data["contig"][0])
         self.position_probs = pd.DataFrame()
         self.has_data = False
         self.per_read_calls = pd.DataFrame()
-        self.per_read_columns = merge_lists([['read_name', 'contig', 'strand', "forward_mapped", "n_sites"], list(self.variants)])
+        self.per_read_columns = merge_lists([['read_name', 'contig', 'strand', "forward_mapped", "n_sites"],
+                                             list(self.variants)])
 
     def get_data(self):
         """Calculate the normalized probability of variant for each nucleotide and across the read"""
@@ -160,8 +165,8 @@ class MarginalizeFullVariants(object):
                                            "variant characters"
                     nuc_data[index] = position_nuc_dict[nuc] / total_prob
                     strand_read_nuc_data[index] += nuc_data[index]
-                data.append(merge_lists([[self.read_name, self.contig, pos, read_strand, mapping_strands[mapping_index]],
-                                         nuc_data]))
+                data.append(merge_lists([[self.read_name, self.contig, pos, read_strand,
+                                          mapping_strands[mapping_index]], nuc_data]))
             per_read_data.append(merge_lists([[self.read_name, self.contig, read_strand, mapping_strands[mapping_index],
                                                n_positions], [prob / n_positions for prob in strand_read_nuc_data]]))
             mapping_index += 1
@@ -225,7 +230,8 @@ class AggregateOverReads(object):
                     for position in set(strand_mapped_data["position"]):
                         position_data = strand_mapped_data[strand_mapped_data["position"] == position]
                         sum_total = sum(sum(position_data.loc[:, base]) for base in self.variants)
-                        normalized_probs = [np.round(sum(position_data.loc[:, base]) / sum_total, 6) for base in self.variants]
+                        normalized_probs = [np.round(sum(position_data.loc[:, base]) / sum_total, 6) for base
+                                            in self.variants]
                         yield merge_lists([[contig, position, strand, mapped_strand], normalized_probs])
 
     def write_data(self, out_path):
@@ -245,7 +251,8 @@ class AggregateOverReads(object):
             position = predicted_data.loc[i]["position"]
             true_char = get_true_character(labelled_positions, contig, forward_mapped, position)
             if true_char is None:
-                print("No variant found in labelled data at chr:{} pos:{} forward_mapped:{}: Check positions file".format(contig, position, forward_mapped))
+                print("No variant found in labelled data at chr:{} pos:{} "
+                      "forward_mapped:{}: Check positions file".format(contig, position, forward_mapped))
                 predicted_data = predicted_data.drop([i])
             else:
                 predicted_data.loc[i, true_char+"_label"] = 1
@@ -333,7 +340,8 @@ class AggregateOverReadsFull(object):
                     for position in set(strand_mapped_data["position"]):
                         position_data = strand_mapped_data[strand_mapped_data["position"] == position]
                         sum_total = sum(sum(position_data.loc[:, base]) for base in self.variants)
-                        normalized_probs = [np.round(sum(position_data.loc[:, base]) / sum_total, 6) for base in self.variants]
+                        normalized_probs = [np.round(sum(position_data.loc[:, base]) / sum_total, 6) for base in
+                                            self.variants]
                         yield merge_lists([[contig, position, strand, mapped_strand], normalized_probs])
 
     def write_data(self, out_path):
@@ -353,7 +361,8 @@ class AggregateOverReadsFull(object):
             position = predicted_data.loc[i]["position"]
             true_char = get_true_character(labelled_positions, contig, forward_mapped, position)
             if true_char is None:
-                print("No variant found in labelled data at chr:{} pos:{} forward_mapped:{}: Check positions file".format(contig, position, forward_mapped))
+                print("No variant found in labelled data at chr:{} pos:{} forward_mapped:{}: "
+                      "Check positions file".format(contig, position, forward_mapped))
                 predicted_data = predicted_data.drop([i])
             else:
                 predicted_data.loc[i, true_char+"_label"] = 1
@@ -394,4 +403,3 @@ def create_labels_from_positions_file(positions_file_path, variants):
     for char in variants:
         data.loc[:, char] = pd.Series(data["change_to"] == char, index=data.index)
     return data
-
