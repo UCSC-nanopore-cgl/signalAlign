@@ -59,6 +59,7 @@ install:
 - alias gcc='gcc-5'
 - alias g++='g++-5'
 - gcc --version
+- pip3 install numpy
 - make
 #- if [[ "$TRAVIS_OS_NAME" != "osx" ]]; then
 #      "export DISPLAY=:99.0";
