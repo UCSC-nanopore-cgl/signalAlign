@@ -11,9 +11,46 @@ signalAlignLib = ${basicLibs}
 test_directory = ${rootPath}/src/signalalign/tests/
 scrappie_build = ${rootPath}/scrappie/build
 
-LIBS= -lhts -lhdf5
+LIBS=-lz -llzma -lbz2
 
-all : sL bD ${libPath}/signalAlignLib.a ${signalAlignBin}/signalAlignLibTests \
+HDF5 ?= install
+HTS ?= install
+
+HDF5_VERSION ?= 1.10.4
+tmp_LIBS =
+
+# Default to automatically installing hdf5
+ifeq ($(HDF5), install)
+    H5_LIB += ./lib/libhdf5.a
+    H5_INCLUDE = -I./include
+    LIBS += -ldl
+else
+    # Use system-wide hdf5
+    H5_LIB =
+    H5_INCLUDE ?=
+    LIBS += -lhdf5
+endif
+
+# Default to build and link the libhts submodule
+ifeq ($(HTS), install)
+    HTS_LIB += ./htslib/libhts.a
+    HTS_INCLUDE = -I./htslib
+else
+    # Use system-wide htslib
+    HTS_LIB =
+    HTS_INCLUDE =
+    LIBS += -lhts
+endif
+
+
+
+#
+#
+# If this library is a dependency the user wants HDF5 to be downloaded and built.
+#
+
+.PHONY: all
+all : lib/libhdf5.a htslib/libhts.a sL bD ${libPath}/signalAlignLib.a ${signalAlignBin}/signalAlignLibTests \
 	  ${signalAlignBin}/compareDistributions ${signalAlignBin}/kmerEventAlign \
 	  ${signalAlignBin}/signalMachine ${signalAlignBin}/runSignalAlign \
 	  ${signalAlignBin}/variantCallingLib.py ${signalAlignBin}/alignmentAnalysisLib.py \
@@ -23,11 +60,25 @@ all : sL bD ${libPath}/signalAlignLib.a ${signalAlignBin}/signalAlignLibTests \
 	  ${signalAlignBin}/plot_variant_accuracy ${signalAlignBin}/compare_trained_models \
 	  ${signalAlignBin}/remove_sa_analyses ${signalAlignBin}/plot_labelled_read
 
+lib/libhdf5.a:
+	if [ ! -e hdf5-$(HDF5_VERSION).tar.gz ]; then \
+		version_major_minor=`echo "$(HDF5_VERSION)" | sed -E 's/\.[0-9]+$$//'`; \
+		wget https://support.hdfgroup.org/ftp/HDF5/releases/hdf5-$${version_major_minor}/hdf5-$(HDF5_VERSION)/src/hdf5-$(HDF5_VERSION).tar.gz; \
+	fi
 
-#${rootPath}/lib/libhdf5.a:
-#	if [ ! -e hdf5-1.10.2.tar.gz ]; then wget https://support.hdfgroup.org/ftp/HDF5/releases/hdf5-1.10/hdf5-1.10.2/src/hdf5-1.10.2.tar.gz; fi
-#	tar -xzf hdf5-1.10.2.tar.gz || exit 255
-#	cd hdf5-1.10.2 && ./configure --enable-threadsafe --disable-hl --prefix=`pwd`/.. && make && make install
+	tar -xzf hdf5-$(HDF5_VERSION).tar.gz || exit 255
+	cd hdf5-$(HDF5_VERSION) && \
+		./configure --enable-threadsafe --disable-hl --libdir=`pwd`/../lib --includedir=`pwd`/../include --prefix=`pwd`/.. && \
+		make && make install
+
+# Build libhts
+#
+htslib/libhts.a:
+	cd htslib && make || exit 255
+
+
+cflags += $(H5_INCLUDE) $(HTS_INCLUDE)
+
 
 #
 #${scrappie_build}/scrappie :
@@ -83,7 +134,7 @@ test_files := $(shell find $(test_directory) -name '*.py')
 test :
 	export FAIL=0 ; \
 	for i in ${test_files}; do \
-		python $$i; \
+		python3 $$i; \
 		if [ $$? -ne 0 ]; then\
 			echo "\nTEST FAIL $$i\n";\
 			export FAIL=1;\
@@ -93,19 +144,19 @@ test :
 
 
 ${signalAlignBin}/compareDistributions : compareDistributions.c ${libPath}/signalAlignLib.a ${signalAlignDependencies}
-	${cxx} ${cflags}  -I inc -I${libPath} -o ${signalAlignBin}/compareDistributions compareDistributions.c ${libPath}/signalAlignLib.a ${signalAlignLib} ${LIBS}
+	${cxx} ${cflags}  -I inc -I${libPath} -o ${signalAlignBin}/compareDistributions compareDistributions.c ${libPath}/signalAlignLib.a ${signalAlignLib} ${HTS_LIB} ${H5_LIB} ${LIBS}
 
 ${signalAlignBin}/signalAlignLibTests : ${libTests} tests/*.h ${libPath}/signalAlignLib.a ${signalAlignDependencies} .FORCE
-	${cxx} ${cflags}  -I inc -I${libPath}   -Wno-error -o ${signalAlignBin}/signalAlignLibTests ${libTests} ${libPath}/signalAlignLib.a ${signalAlignLib}  ${LIBS}
+	${cxx} ${cflags}  -I inc -I${libPath}   -Wno-error -o ${signalAlignBin}/signalAlignLibTests ${libTests} ${libPath}/signalAlignLib.a ${signalAlignLib} ${HTS_LIB} ${H5_LIB} ${LIBS}
 
 ${signalAlignBin}/signalMachine : signalMachine.c ${libPath}/signalAlignLib.a ${signalAlignDependencies}
-	${cxx} ${cflags}  -I inc -I${libPath}   -o ${signalAlignBin}/signalMachine signalMachine.c ${libPath}/signalAlignLib.a ${signalAlignLib} ${LIBS}
+	${cxx} ${cflags}  -I inc -I${libPath}   -o ${signalAlignBin}/signalMachine signalMachine.c ${libPath}/signalAlignLib.a ${signalAlignLib}  ${HTS_LIB} ${H5_LIB} ${LIBS}
 
 ${signalAlignBin}/kmerEventAlign : kmerEventAlign.c ${libPath}/signalAlignLib.a ${signalAlignDependencies}
-	${cxx} ${cflags}  -I inc -I${libPath}   -o ${signalAlignBin}/kmerEventAlign kmerEventAlign.c ${libPath}/signalAlignLib.a ${signalAlignLib}    ${LIBS}
+	${cxx} ${cflags}  -I inc -I${libPath}   -o ${signalAlignBin}/kmerEventAlign kmerEventAlign.c ${libPath}/signalAlignLib.a ${signalAlignLib}  ${HTS_LIB} ${H5_LIB}  ${LIBS}
 
 ${signalAlignBin}/extract : extract.c ${libPath}/signalAlignLib.a ${signalAlignDependencies}
-	${cxx} ${cflags}  -I inc -I${libPath}   -o ${signalAlignBin}/extract extract.c ${libPath}/signalAlignLib.a ${signalAlignLib}    ${LIBS}
+	${cxx} ${cflags}  -I inc -I${libPath}   -o ${signalAlignBin}/extract extract.c ${libPath}/signalAlignLib.a ${signalAlignLib}   ${HTS_LIB} ${H5_LIB} ${LIBS}
 
 #nanoporeParams : estimateNanoporeParams.c ${libPath}/signalAlignLib.a ${signalAlignDependencies}
 #	${cxx} ${cflags}  -I inc -I${libPath} -o ${signalAlignBin}/estimateNanoporeParams estimateNanoporeParams.c ${libPath}/signalAlignLib.a ${signalAlignLib} ${LIBS}
@@ -113,7 +164,7 @@ ${signalAlignBin}/extract : extract.c ${libPath}/signalAlignLib.a ${signalAlignD
 #	chmod +x ${signalAlignBin}/nanoporeParamRunner
 
 ${signalAlignBin}/buildHdpUtil : buildHdpUtil.c ${libPath}/signalAlignLib.a ${signalAlignDependencies}
-	${cxx} ${cflags}   -I inc -I${libPath} -o ${signalAlignBin}/buildHdpUtil buildHdpUtil.c ${libPath}/signalAlignLib.a ${signalAlignLib} ${LIBS}
+	${cxx} ${cflags}   -I inc -I${libPath} -o ${signalAlignBin}/buildHdpUtil buildHdpUtil.c ${libPath}/signalAlignLib.a ${signalAlignLib} ${HTS_LIB} ${H5_LIB} ${LIBS}
 
 ${signalAlignBin}/runSignalAlign : ${rootPath}src/signalalign/scripts/runSignalAlign.py
 	cp ${rootPath}src/signalalign/scripts/runSignalAlign.py ${signalAlignBin}/runSignalAlign
@@ -171,7 +222,7 @@ ${signalAlignBin}/alignmentAnalysisLib.py : ${rootPath}src/signalalign/scripts/a
 	cp ${rootPath}src/signalalign/scripts/alignmentAnalysisLib.py ${signalAlignBin}/alignmentAnalysisLib.py
 
 ${libPath}/signalAlignLib.a : ${libSources} ${libHeaders} ${stBarDependencies}
-	${cxx} ${cflags} -fPIC -Iinc/ -I${libPath}/  -c ${libSources}  ${LIBS}
+	${cxx} ${cflags} -fPIC -Iinc/ -I${libPath}/  -c ${libSources} ${HTS_LIB} ${H5_LIB} ${LIBS}
 	ar rc signalAlignLib.a *.o
 	ranlib signalAlignLib.a
 	rm *.o
