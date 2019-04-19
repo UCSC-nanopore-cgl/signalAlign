@@ -31,7 +31,7 @@ before_install:
   else
 
     sudo apt-get update -qq;
-    sudo apt-get install autotools-dev autoconf cmake wget git make g++-5 gcc-5 zlib1g-dev libbz2-dev liblzma-dev;
+    sudo apt-get install autotools-dev autoconf cmake wget git make g++-5 gcc-5 zlib1g-dev libbz2-dev liblzma-dev samtools;
     sudo apt-get update;
 
   fi
