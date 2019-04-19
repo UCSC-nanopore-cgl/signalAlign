@@ -68,9 +68,11 @@ install:
 - make
 - make install
 - export PATH=$HOME/Python-3.6.8/:$PATH
+- which python
+- which python3
 - cd ..
 - wget https://bootstrap.pypa.io/get-pip.py
-- python get-pip.py --user
+- python3 get-pip.py --user
 - export PATH=$HOME/.local/bin/:$PATH
 - alias gcc='gcc-5'
 - alias g++='g++-5'
