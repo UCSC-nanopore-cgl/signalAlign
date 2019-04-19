@@ -71,6 +71,8 @@ install:
 - source ~/.bashrc
 - which python
 - which python3
+- alias python="/home/travis/build/UCSC-nanopore-cgl/Python-3.6.8/python"
+- which python3
 - cd ..
 - wget https://bootstrap.pypa.io/get-pip.py
 - python3 get-pip.py --user
@@ -80,13 +82,12 @@ install:
 - which pip
 - alias gcc=gcc-5
 - alias g++=g++-5
-- alias python=python3
-
+- alias python="/home/travis/build/UCSC-nanopore-cgl/Python-3.6.8/python"
 - gcc --version
 - pip3 install numpy
 - pip3 install setuptools
 - cd /home/travis/build/UCSC-nanopore-cgl/signalAlign
-- sudo make
+- make
 #- if [[ "$TRAVIS_OS_NAME" != "osx" ]]; then
 #      "export DISPLAY=:99.0";
 #      "sh -e /etc/init.d/xvfb start";
