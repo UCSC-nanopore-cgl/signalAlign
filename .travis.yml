@@ -59,9 +59,10 @@ install:
 - pwd
 - echo $HOME
 - ls
+- cd ..
 - wget https://www.python.org/ftp/python/3.6.8/Python-3.6.8.tgz
 - tar -xzf Python-3.6.8.tgz
-- find ~/ -type d | xargs chmod 0755
+- find /home/travis/build/UCSC-nanopore-cgl/  -type d | xargs chmod 0755
 - cd Python-3.6.8/
 - ./configure --prefix=$HOME/
 - make
@@ -71,11 +72,11 @@ install:
 - wget https://bootstrap.pypa.io/get-pip.py
 - python get-pip.py --user
 - export PATH=$HOME/.local/bin/:$PATH
-
 - alias gcc='gcc-5'
 - alias g++='g++-5'
 - gcc --version
 - pip install numpy
+- cd /home/travis/build/UCSC-nanopore-cgl/signalAlign
 - sudo make
 #- if [[ "$TRAVIS_OS_NAME" != "osx" ]]; then
 #      "export DISPLAY=:99.0";
