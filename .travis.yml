@@ -27,13 +27,12 @@ before_install:
   alias g++='g++-5';
 
   gcc --version;
-  wget https://repo.anaconda.com/archive/Anaconda2-5.3.1-MacOSX-x86_64.sh -O anaconda.sh;
 
   else
 
     sudo apt-get update -qq;
-    sudo apt-get install autotools-dev autoconf cmake wget git make g++ zlib1g-dev libbz2-dev liblzma-dev;
-    apt-get install python3-dev python3-setuptools python3-pip;
+    sudo apt-get install autotools-dev autoconf cmake wget git make g++-5 gcc-5 zlib1g-dev libbz2-dev liblzma-dev;
+    sudo apt-get install python3-dev python3-setuptools python3-pip;
     sudo apt-get update;
 
   fi
@@ -60,7 +59,7 @@ install:
 - alias gcc='gcc-5'
 - alias g++='g++-5'
 - gcc --version
-- pip3 install numpy
+- sudo pip3 install numpy
 - make
 #- if [[ "$TRAVIS_OS_NAME" != "osx" ]]; then
 #      "export DISPLAY=:99.0";
