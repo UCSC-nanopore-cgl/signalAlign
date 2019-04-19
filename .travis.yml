@@ -78,8 +78,10 @@ install:
 - source ~/.bashrc
 - which pip3
 - which pip
-- alias gcc='gcc-5'
-- alias g++='g++-5'
+- alias gcc=gcc-5
+- alias g++=g++-5
+- alias python=python3
+
 - gcc --version
 - pip3 install numpy
 - pip3 install setuptools
