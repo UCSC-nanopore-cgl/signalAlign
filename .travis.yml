@@ -78,6 +78,7 @@ install:
 - alias g++='g++-5'
 - gcc --version
 - pip install numpy
+- pip install setuptools
 - cd /home/travis/build/UCSC-nanopore-cgl/signalAlign
 - sudo make
 #- if [[ "$TRAVIS_OS_NAME" != "osx" ]]; then
