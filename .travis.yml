@@ -67,18 +67,22 @@ install:
 - ./configure --prefix=$HOME/
 - make
 - make install
-- export PATH=$HOME/Python-3.6.8/:$PATH
+- echo "PATH=$HOME/Python-3.6.8/:$PATH" >> ~/.bashrc
+- source ~/.bashrc
 - which python
 - which python3
 - cd ..
 - wget https://bootstrap.pypa.io/get-pip.py
 - python3 get-pip.py --user
-- export PATH=$HOME/.local/bin/:$PATH
+- echo "PATH=$HOME/.local/bin/:$PATH" >> ~/.bashrc
+- source ~/.bashrc
+- which pip3
+- which pip
 - alias gcc='gcc-5'
 - alias g++='g++-5'
 - gcc --version
-- pip install numpy
-- pip install setuptools
+- pip3 install numpy
+- pip3 install setuptools
 - cd /home/travis/build/UCSC-nanopore-cgl/signalAlign
 - sudo make
 #- if [[ "$TRAVIS_OS_NAME" != "osx" ]]; then
