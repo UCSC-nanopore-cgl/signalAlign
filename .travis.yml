@@ -67,7 +67,7 @@ install:
 - ./configure --prefix=$HOME/
 - make
 - make install
-- echo "PATH=$HOME/Python-3.6.8/:$PATH" >> ~/.bashrc
+- echo "PATH=/home/travis/build/UCSC-nanopore-cgl/Python-3.6.8/:$PATH" >> ~/.bashrc
 - source ~/.bashrc
 - which python
 - which python3
