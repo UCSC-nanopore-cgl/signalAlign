@@ -69,6 +69,7 @@ install:
 - make
 - make install
 - echo "PATH=/home/travis/build/UCSC-nanopore-cgl/bin/:$PATH" >> ~/.bashrc
+- source ~/.bashrc
 - cd ..
 - which samtools
   # bwa install
@@ -77,6 +78,7 @@ install:
 - make
 - echo "PATH=/home/travis/build/UCSC-nanopore-cgl/bwa/:$PATH" >> ~/.bashrc
 - cd ..
+- source ~/.bashrc
 - which bwa
   # python install
 - wget https://www.python.org/ftp/python/3.6.8/Python-3.6.8.tgz
