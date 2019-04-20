@@ -31,7 +31,7 @@ before_install:
   else
 
     sudo apt-get update -qq;
-    sudo apt-get install autotools-dev autoconf cmake wget git make g++-5 gcc-5 zlib1g-dev libbz2-dev liblzma-dev samtools bwa;
+    sudo apt-get install autotools-dev autoconf cmake wget git make g++-5 gcc-5 zlib1g-dev libbz2-dev liblzma-dev;
     sudo apt-get update;
 
   fi
@@ -59,7 +59,25 @@ install:
 - pwd
 - echo $HOME
 - ls
+# samtools install
+- cd /home/travis/build/UCSC-nanopore-cgl/
+- wget https://github.com/samtools/samtools/releases/download/1.9/samtools-1.9.tar.bz2
+- bzip2 -d samtools-1.9.tar.bz2
+- cd samtools-1.9
+- ./configure --prefix=/home/travis/build/UCSC-nanopore-cgl/
+- make
+- make install
+- echo "PATH=/home/travis/build/UCSC-nanopore-cgl/bin/:$PATH" >> ~/.bashrc
 - cd ..
+- which samtools
+  # bwa install
+- git clone https://github.com/lh3/bwa.git
+- cd bwa
+- make
+- echo "PATH=/home/travis/build/UCSC-nanopore-cgl/bwa/:$PATH" >> ~/.bashrc
+- cd ..
+- which bwa
+  # python install
 - wget https://www.python.org/ftp/python/3.6.8/Python-3.6.8.tgz
 - tar -xzf Python-3.6.8.tgz
 - find /home/travis/build/UCSC-nanopore-cgl/  -type d | xargs chmod 0755
@@ -73,6 +91,7 @@ install:
 - which python3
 - alias python="/home/travis/build/UCSC-nanopore-cgl/Python-3.6.8/python"
 - which python3
+# install pip
 - cd ..
 - wget https://bootstrap.pypa.io/get-pip.py
 - python3 get-pip.py --user
