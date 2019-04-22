@@ -60,15 +60,15 @@ install:
 - echo $HOME
 - ls
 # samtools install
-- cd /home/travis/build/UCSC-nanopore-cgl/
+- cd $HOME/build/UCSC-nanopore-cgl/
 - wget https://github.com/samtools/samtools/releases/download/1.9/samtools-1.9.tar.bz2
 - tar -vxjf samtools-1.9.tar.bz2
 - ls
 - cd samtools-1.9
-- ./configure --prefix=/home/travis/build/UCSC-nanopore-cgl/
+- ./configure --prefix=$HOME/build/UCSC-nanopore-cgl/
 - make
 - make install
-- echo "PATH=/home/travis/build/UCSC-nanopore-cgl/bin/:$PATH" >> ~/.bashrc
+- echo "PATH=$HOME/build/UCSC-nanopore-cgl/bin/:$PATH" >> ~/.bashrc
 - source ~/.bashrc
 - cd ..
 - which samtools
@@ -76,23 +76,23 @@ install:
 - git clone https://github.com/lh3/bwa.git
 - cd bwa
 - make
-- echo "PATH=/home/travis/build/UCSC-nanopore-cgl/bwa/:$PATH" >> ~/.bashrc
+- echo "PATH=$HOME/build/UCSC-nanopore-cgl/bwa/:$PATH" >> ~/.bashrc
 - cd ..
 - source ~/.bashrc
 - which bwa
   # python install
 - wget https://www.python.org/ftp/python/3.6.8/Python-3.6.8.tgz
 - tar -xzf Python-3.6.8.tgz
-- find /home/travis/build/UCSC-nanopore-cgl/  -type d | xargs chmod 0755
+- find $HOME/build/UCSC-nanopore-cgl/  -type d | xargs chmod 0755
 - cd Python-3.6.8/
 - ./configure --prefix=$HOME/
 - make
 - make install
-- echo "PATH=/home/travis/build/UCSC-nanopore-cgl/Python-3.6.8/:$PATH" >> ~/.bashrc
+- echo "PATH=$HOME/build/UCSC-nanopore-cgl/Python-3.6.8/:$PATH" >> ~/.bashrc
 - source ~/.bashrc
 - which python
 - which python3
-- alias python="/home/travis/build/UCSC-nanopore-cgl/Python-3.6.8/python"
+- alias python="$HOME/build/UCSC-nanopore-cgl/Python-3.6.8/python"
 - which python3
 # install pip
 - cd ..
@@ -104,11 +104,11 @@ install:
 - which pip
 - alias gcc=gcc-5
 - alias g++=g++-5
-- alias python="/home/travis/build/UCSC-nanopore-cgl/Python-3.6.8/python"
+- alias python="$HOME/build/UCSC-nanopore-cgl/Python-3.6.8/python"
 - gcc --version
 - pip3 install numpy
 - pip3 install setuptools
-- cd /home/travis/build/UCSC-nanopore-cgl/signalAlign
+- cd $HOME/build/UCSC-nanopore-cgl/signalAlign
 - make
 #- if [[ "$TRAVIS_OS_NAME" != "osx" ]]; then
 #      "export DISPLAY=:99.0";
