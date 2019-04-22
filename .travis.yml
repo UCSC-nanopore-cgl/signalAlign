@@ -10,7 +10,7 @@ notifications: # set notification options
 
 os:
 - linux
-#- osx
+- osx
 
 git:
   submodules: true
