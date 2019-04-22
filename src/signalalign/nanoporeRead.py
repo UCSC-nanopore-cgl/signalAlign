@@ -21,7 +21,7 @@ TWOD_BASECALL_KEY_0 = os.path.join(Fast5.__base_analysis__, TWOD_BASECALL_KEY + 
 METADATA_PATH_KEY = Fast5.__tracking_id_path__  # "/UniqueGlobalKey/tracking_id"
 READS_KEY = Fast5.__raw_path__  # "/Raw/Reads/"
 VERSION_KEY = ("version", "dragonet version", "nanotensor version", "signalAlign version")
-SUPPORTED_1D_VERSIONS = ("1.0.1", "1.2.1", "1.2.4", "1.23.0", "1.22.4", "2.1.0", "0.2.0", "0.1.7", "2.3.1")
+SUPPORTED_1D_VERSIONS = ("1.0.1", "1.2.1", "1.2.4", "1.23.0", "1.22.4", "2.1.0", "0.2.0", "0.1.7", "2.3.1", "1.22.2")
 SUPPORTED_2D_VERSIONS = ("1.15.0", "1.19.0", "1.20.0", "1.22.2", "1.22.4", "1.23.0")
 
 

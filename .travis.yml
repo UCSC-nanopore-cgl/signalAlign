@@ -10,7 +10,7 @@ notifications: # set notification options
 
 os:
 - linux
-- osx
+#- osx
 
 git:
   submodules: true
@@ -19,7 +19,7 @@ before_install:
 - git submodule update --init
 - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
   brew update;
-  brew install gcc@5 automake make open-mpi hdf5;
+  brew install gcc@5 automake make open-mpi;
   gcc --version;
   alias make='gmake';
   ln -s /usr/local/bin/gcc-5 /usr/local/bin/gcc;

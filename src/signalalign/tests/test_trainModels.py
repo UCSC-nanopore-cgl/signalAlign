@@ -12,6 +12,7 @@
 import os
 import unittest
 import tempfile
+import datetime
 from shutil import copyfile
 from signalalign.signalAlignment import create_sa_sample_args
 from signalalign.train.trainModels import *
@@ -48,7 +49,8 @@ class TrainSignalAlignTest(unittest.TestCase):
         cls.model = HmmModel(ont_model_file=cls.model_file)
         cls.expectation_file = os.path.join(cls.HOME,
                                             "tests/test_expectation_files/4f9a316c-8bb3-410a-8cfc-026061f7e8db.template.expectations.tsv")
-        cls.assignment_file = os.path.join(cls.HOME, "tests/test_assignment_files/d6160b0b-a35e-43b5-947f-adaa1abade28.sm.assignments.tsv")
+        cls.assignment_file = os.path.join(cls.HOME,
+                                           "tests/test_assignment_files/d6160b0b-a35e-43b5-947f-adaa1abade28.sm.assignments.tsv")
 
         cls.path_to_bin = os.path.join(cls.HOME, "bin")
         cls.hdp_types = {
@@ -85,6 +87,7 @@ class TrainSignalAlignTest(unittest.TestCase):
         cls.default_args.complement_hmm_model = cls.r9_complement_model_file_acgt
         cls.default_args.template_hmm_model = cls.r9_template_model_file_acgt
 
+
     def test_parse_assignment_file(self):
         assignments = parse_assignment_file(self.assignment_file)
         # "kmer", "strand", "level_mean", "prob"
@@ -96,6 +99,54 @@ class TrainSignalAlignTest(unittest.TestCase):
         pandas_table = make_master_assignment_table([self.assignment_file, self.assignment_file])
         assignments1 = parse_assignment_file(self.assignment_file)
         self.assertEqual(len(pandas_table), 2*len(assignments1))
+
+    def test_multiprocess_make_master_assignment_table(self):
+        data1, time1 = time_it(make_master_assignment_table, [self.assignment_file,
+                                                              self.assignment_file], 0.0)
+        data2, time2 = time_it(multiprocess_make_master_assignment_table, [self.assignment_file,
+                                                                           self.assignment_file], 0.0)
+        self.assertTrue(data1.equals(data2))
+        self.assertGreater(time2, time1)
+
+    def test_multiprocess_make_kmer_assignment_tables(self):
+        kmers = get_kmers(6, alphabet="ATGC")
+        data2, time2 = time_it(multiprocess_make_kmer_assignment_tables, [self.assignment_file,
+                                                                          self.assignment_file], kmers,
+                               set("t"), 0.0, False, False, 100000, 2)
+        for x in kmers:
+            kmer_data = data2.loc[data2['kmer'] == x]
+            self.assertSequenceEqual(list(kmer_data["prob"]), sorted(kmer_data["prob"], reverse=True))
+
+    def test_generate_buildAlignments3(self):
+        kmers = get_kmers(6, alphabet="ATGC")
+        data_files = [self.assignment_file] * 10
+
+        start = datetime.datetime.now()
+        sample_assignment_table = multiprocess_make_master_assignment_table(data_files,
+                                                                            min_probability=0.0, worker_count=2)
+        data1 = generate_buildAlignments(sample_assignment_table, kmers, 10, ["t", "c"], False)
+
+        end = datetime.datetime.now()
+        time1 = (end - start).total_seconds()
+
+        data2, time2 = time_it(multiprocess_make_kmer_assignment_tables,
+                               data_files, kmers,
+                               set("t"), 0.0, False, False, 10, 8)
+
+        # get kmers associated with each sample
+        print(time1, time2)
+        self.assertGreater(time1, time2)
+
+    def test_sort_dataframe_wrapper(self):
+        kmers = get_kmers(6, alphabet="ATGC")
+        kmers = list(kmers)
+        kmer = "ATTTTT"
+        index = kmers.index(kmer)
+        data_table = get_assignment_kmer_tables(self.assignment_file, kmers, 0, False)
+        kmer_data = data_table[index]
+        data = sort_dataframe_wrapper(kmer_data, kmer, max_assignments=10, verbose=False, strands=('t', 'c'))
+
+        self.assertSequenceEqual(list(data["prob"]), sorted(data["prob"], reverse=True))
 
     def test_make_alignment_line(self):
         make_alignment_line(strand='t', kmer="ATGC", prob=0.1, event=23.2)
@@ -131,7 +182,7 @@ class TrainSignalAlignTest(unittest.TestCase):
         self.assertRaises(AssertionError, generate_buildAlignments, assignments, kmer_list=["ATGC", "AAAA"],
                           max_assignments=2,
                           strands=[], verbose=False)
-
+    #
     def test_generate_buildAlignments2(self):
         sample_assignment_table = make_master_assignment_table([self.assignment_file], min_probability=0.0)
         # get kmers associated with each sample

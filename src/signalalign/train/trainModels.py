@@ -15,6 +15,7 @@ from subprocess import check_call
 
 from py3helpers.utils import create_dot_dict, merge_lists, all_string_permutations, save_json, load_json, \
     count_lines_in_file, merge_dicts, list_dir
+from py3helpers.multiprocess import *
 
 from signalalign.signalAlignment import multithread_signal_alignment_samples, create_signalAlignment_args, \
     SignalAlignSample
@@ -33,12 +34,100 @@ def make_master_assignment_table(list_of_assignment_paths, min_probability=0.0, 
     """
     assignment_dfs = []
     for f in list_of_assignment_paths:
-        if full:
-            data = parse_alignment_file(f)
-        else:
-            data = parse_assignment_file(f)
-        assignment_dfs.append(data.loc[data['prob'] >= min_probability])
+        assignment_dfs.append(get_assignment_table(f, min_probability, full))
     return pd.concat(assignment_dfs, ignore_index=True)
+
+
+def multiprocess_make_master_assignment_table(list_of_assignment_paths, min_probability=0.0, full=False,
+                                              worker_count=1):
+    """Create a master assignment table from a list of assignment paths
+
+    :param list_of_assignment_paths: list of all paths to assignment.tsv files to concat
+    :param min_probability: minimum probabilty to keep
+    :return: pandas DataFrame of all assignments
+    """
+    extra_args = {"min_probability": min_probability,
+                  "full": full}
+    service = BasicService(get_assignment_table)
+    total, failure, messages, output = run_service(service.run, list_of_assignment_paths,
+                                                   extra_args, ["file_path"], worker_count)
+    return pd.concat(output, ignore_index=True)
+
+
+def get_assignment_table(file_path, min_probability, full):
+    if full:
+        data = parse_alignment_file(file_path)
+    else:
+        data = parse_assignment_file(file_path)
+    return data.loc[data['prob'] >= min_probability]
+
+
+def multiprocess_make_kmer_assignment_tables(list_of_assignment_paths, kmers, strands, min_probability=0.0,
+                                             verbose=True, full=False, max_assignments=10,
+                                             worker_count=1):
+    """Create a master assignment tables from a list of assignment paths
+
+    :param kmers:
+    :param strands:
+    :param verbose:
+    :param full:
+    :param max_assignments:
+    :param worker_count:
+    :param list_of_assignment_paths: list of all paths to assignment.tsv files to concat
+    :param min_probability: minimum probabilty to keep
+    :return: pandas DataFrame of all assignments
+    """
+    # just in case we get a set
+    kmers = list(kmers)
+    # Multiprocess reading in files
+    extra_args = {"min_probability": min_probability,
+                  "full": full,
+                  "kmers": kmers}
+    service = BasicService(get_assignment_kmer_tables)
+    total, failure, messages, output = run_service(service.run, list_of_assignment_paths,
+                                                   extra_args, ["file_path"], worker_count)
+    kmer_tables = [(pd.concat(x, ignore_index=True), kmers[i]) for i, x in enumerate(zip(*output))]
+    # Multiprocess sorting each kmer table
+    extra_args = {"strands": strands,
+                  "verbose": verbose,
+                  "max_assignments": max_assignments}
+    service = BasicService(sort_dataframe_wrapper)
+    total, failure, messages, output = run_service(service.run, kmer_tables,
+                                                   extra_args, ["data_table", "kmer"], worker_count)
+
+    return pd.concat(output, ignore_index=True)
+
+
+def get_assignment_kmer_tables(file_path, kmers, min_probability, full):
+    if full:
+        data = parse_alignment_file(file_path)
+    else:
+        data = parse_assignment_file(file_path)
+    data = data.loc[data['prob'] >= min_probability]
+    all_kmers = []
+    for k in kmers:
+        all_kmers.append(data.loc[data.kmer == k])
+    return all_kmers
+
+
+def sort_dataframe_wrapper(data_table, kmer, max_assignments=10, verbose=False, strands=('t', 'c')):
+    assert len(strands) > 0, \
+        "strands must be a list and not be empty. strands: {}".format(strands)
+    final_output = []
+    if data_table.empty and verbose:
+        print("missing kmer {}, continuing".format(kmer))
+        final_output = data_table
+    else:
+        for strand in strands:
+            by_strand = data_table.loc[data_table['strand'] == strand]
+            kmer_assignments = by_strand.sort_values(['prob'], ascending=0)[:max_assignments]
+
+            if len(kmer_assignments) < max_assignments and verbose:
+                print("WARNING didn't find {max} requested assignments for {kmer} only found {found}"
+                      "".format(max=max_assignments, kmer=kmer, found=len(kmer_assignments)))
+            final_output.append(kmer_assignments)
+        final_output = pd.concat(final_output, ignore_index=True)
+    return final_output
 
 
 def get_kmers(kmer_len, alphabet="ATGC", motifs=None, reference=None):
@@ -64,39 +153,6 @@ def get_kmers(kmer_len, alphabet="ATGC", motifs=None, reference=None):
         kmers |= {x for x in all_string_permutations(alphabet, length=kmer_len)}
 
     return kmers
-
-
-def generate_buildAlignments(assignments_pd, kmer_list, max_assignments=10, strands=('t', 'c'), verbose=False):
-    """Convert assignments to alignment line format for HDP training.
-
-    Filter assignments on a minimum probability, read strand, and a max number of kmer assignments
-
-    :param assignments_pd: giant assignments pandas data table
-    :param verbose: option to print update statements
-    :param strands: 't' or 'c' representing template or complement strand of read
-    :param kmer_list: list of kmers to write to alignment file
-    :param max_assignments: max number of assignments to process for each kmer
-    :param min_probability: the minimum probability to use for assigning kmers
-    """
-    # loop through for each strand in the assignments
-    assert isinstance(strands, list) and len(strands) > 0, \
-        "strands must be a list and not be empty. strands: {}".format(strands)
-    final_output = []
-    for strand in strands:
-        by_strand = assignments_pd.loc[assignments_pd['strand'] == strand]
-        by_strand.sort_values(by='kmer', inplace=True)
-        by_strand.set_index(keys=['kmer'], drop=False, inplace=True)
-        for k in kmer_list:
-            kmer_assignments = by_strand.loc[by_strand.kmer == k]
-            if kmer_assignments.empty and verbose:
-                print("missing kmer {}, continuing".format(k))
-                continue
-            kmer_assignments = kmer_assignments.sort_values(['prob'], ascending=0)[:max_assignments]
-            final_output.append(kmer_assignments)
-            if len(kmer_assignments) < max_assignments and verbose:
-                print("WARNING didn't find {max} requested assignments for {kmer} only found {found}"
-                      "".format(max=max_assignments, kmer=k, found=len(kmer_assignments)))
-    return pd.concat(final_output, ignore_index=True)
 
 
 def make_master_full_alignments_table(files, min_probability=0.0):
@@ -227,6 +283,73 @@ def filter_top_n_kmers(kmer_data, max_n=10, verbose=True):
     return pd.concat(output, ignore_index=True)
 
 
+def generate_buildAlignments(assignments_pd, kmer_list, max_assignments=10, strands=('t', 'c'), verbose=False):
+    """Convert assignments to alignment line format for HDP training.
+
+    Filter assignments on a minimum probability, read strand, and a max number of kmer assignments
+
+    :param assignments_pd: giant assignments pandas data table
+    :param verbose: option to print update statements
+    :param strands: 't' or 'c' representing template or complement strand of read
+    :param kmer_list: list of kmers to write to alignment file
+    :param max_assignments: max number of assignments to process for each kmer
+    :param min_probability: the minimum probability to use for assigning kmers
+    """
+    # loop through for each strand in the assignments
+    assert len(strands) > 0, \
+        "strands must be a list and not be empty. strands: {}".format(strands)
+    final_output = []
+    for strand in strands:
+        by_strand = assignments_pd.loc[assignments_pd['strand'] == strand]
+        by_strand.sort_values(by='kmer', inplace=True)
+        by_strand.set_index(keys=['kmer'], drop=False, inplace=True)
+        for k in kmer_list:
+            final_output.append(kmer_assignments_wrapper(by_strand, k, max_assignments, verbose))
+    return pd.concat(final_output, ignore_index=True)
+
+
+def multiprocess_generate_buildAlignments(assignments_pd, kmer_list, max_assignments=10, strands=('t', 'c'),
+                                          verbose=False, worker_count=1):
+    """Convert assignments to alignment line format for HDP training.
+
+    Filter assignments on a minimum probability, read strand, and a max number of kmer assignments
+
+    :param assignments_pd: giant assignments pandas data table
+    :param verbose: option to print update statements
+    :param strands: 't' or 'c' representing template or complement strand of read
+    :param kmer_list: list of kmers to write to alignment file
+    :param max_assignments: max number of assignments to process for each kmer
+    :param min_probability: the minimum probability to use for assigning kmers
+    """
+    # loop through for each strand in the assignments
+    assert len(strands) > 0, \
+        "strands must be a list and not be empty. strands: {}".format(strands)
+    final_output = []
+    for strand in strands:
+        by_strand = assignments_pd.loc[assignments_pd['strand'] == strand]
+        by_strand.set_index(keys=['kmer'], drop=False, inplace=True)
+        extra_args = {"by_strand": by_strand,
+                      "max_assignments": max_assignments,
+                      "verbose": verbose}
+        service = BasicService(kmer_assignments_wrapper)
+        total, failure, messages, output = run_service(service.run, kmer_list,
+                                                       extra_args, ["k"], worker_count)
+
+        final_output.extend(output)
+    return pd.concat(final_output, ignore_index=True)
+
+
+def kmer_assignments_wrapper(by_strand, k, max_assignments=10, verbose=False):
+    kmer_assignments = by_strand.loc[by_strand.kmer == k]
+    if kmer_assignments.empty and verbose:
+        print("missing kmer {}, continuing".format(k))
+    kmer_assignments = kmer_assignments.sort_values(['prob'], ascending=0)[:max_assignments]
+    if len(kmer_assignments) < max_assignments and verbose:
+        print("WARNING didn't find {max} requested assignments for {kmer} only found {found}"
+              "".format(max=max_assignments, kmer=k, found=len(kmer_assignments)))
+    return kmer_assignments
+
+
 def generate_buildAlignments2(assignments_pd, kmer_list, max_assignments=10, strands=('t', 'c'), verbose=False):
     """Convert assignments to alignment line format for HDP training.
 
@@ -239,7 +362,7 @@ def generate_buildAlignments2(assignments_pd, kmer_list, max_assignments=10, str
     :param max_assignments: max number of assignments to process for each kmer
     """
     # loop through for each strand in the assignments
-    assert isinstance(strands, list) and len(strands) > 0, \
+    assert len(strands) > 0, \
         "strands must be a list and not be empty. strands: {}".format(strands)
     final_output = []
     for strand in strands:
@@ -261,19 +384,21 @@ def generate_buildAlignments2(assignments_pd, kmer_list, max_assignments=10, str
 class CreateHdpTrainingData(object):
     """Process the assignment files created from SignalAlign for the HDP distribution estimation"""
 
-    def __init__(self, samples, out_file_path, template=True, complement=False, verbose=True, alphabet="ATGC"):
+    def __init__(self, samples, out_file_path, template=True, complement=False, verbose=True, alphabet="ATGC",
+                 jobs=1):
         """
         Control how each kmer/event assignment is processed given a set of samples and the parameters associated with
         each sample
 
-        :param samples:
-        :param out_file:
+        :param out_file_path: path to ouptut file
+        :param jobs: number of jobs to multiprocess with
+        :param samples: SignalAlignSamples
         :param template: generate kmers for template read strand: default: True
         :param complement: generate kmers for complement read strand: default: True
-        :param min_probability: the minimum probability to use for assigning kmers
         :param verbose: option to print update statements
         :param alphabet: alphabet of sequencing experiment
         """
+        self.jobs = jobs
         self.strands = []
         if template:
             self.strands.append('t')
@@ -302,36 +427,80 @@ class CreateHdpTrainingData(object):
             if len(sample.analysis_files) == 0:
                 assert sample.assignments_dir is not None, \
                     "Received no assignments_dir or analysis files in sample {}".format(sample.name)
+                full = False
                 assignment_files = list_dir(sample.assignments_dir, ext="assignments.tsv")
-                if len(assignment_files) > 0:
-                    sample_assignment_table = make_master_assignment_table(assignment_files,
-                                                                           min_probability=sample.probability_threshold)
-                else:
+                # get assignments
+                if len(assignment_files) == 0:
                     print("[CreateHdpTrainingData] filtering 'full' output files")
                     assignment_files = list_dir(sample.assignments_dir, ext="ard.tsv")
-                    sample_assignment_table = \
-                        make_master_assignment_table(assignment_files, min_probability=sample.probability_threshold,
-                                                     full=True)
+                    full = True
             else:
+                full = False
+
                 if sample.assignments_dir is not None:
                     print("[CreateHdpTrainingData] WARNING: Using sample analysis files when "
                           "assignments_dir is also set: {}".format(sample.name))
                 assignment_files = [x for x in sample.analysis_files if x.endswith("assignments.tsv")]
-                sample_assignment_table = \
-                    make_master_assignment_table(assignment_files,
-                                                 min_probability=sample.probability_threshold)
 
+            # infer kmer length and get kmers
+            sample_assignment_table = get_assignment_table(assignment_files[0], 0, full)
             self.set_kmer_len(len(sample_assignment_table.iloc[0]['kmer']))
-            # get kmers associated with each sample
             kmers = self.get_sample_kmers(sample)
-            # write correctly formated output
-            final_output.append(generate_buildAlignments(sample_assignment_table, kmers,
+
+            final_output.append(
+                multiprocess_make_kmer_assignment_tables(assignment_files, kmers, self.strands,
+                                                         min_probability=sample.probability_threshold,
+                                                         verbose=verbose, full=full,
                                                          max_assignments=sample.number_of_kmer_assignments,
-                                                         strands=self.strands, verbose=verbose))
+                                                         worker_count=self.jobs))
+
         master_assignment_table = pd.concat(final_output, ignore_index=True)
         self.n_assignments = len(master_assignment_table)
         master_assignment_table.to_csv(self.out_file_path, sep='\t', header=False, index=False)
         return self.out_file_path
+
+    # def write_hdp_training_file2(self, verbose=False):
+    #     """Write a hdp training file to a specified location"""
+    #     final_output = []
+    #     for sample in self.samples:
+    #         print("Filtering and gathering {} assignment.tsv files".format(sample.name))
+    #         if len(sample.analysis_files) == 0:
+    #             assert sample.assignments_dir is not None, \
+    #                 "Received no assignments_dir or analysis files in sample {}".format(sample.name)
+    #             assignment_files = list_dir(sample.assignments_dir, ext="assignments.tsv")
+    #             if len(assignment_files) > 0:
+    #                 sample_assignment_table = \
+    #                     multiprocess_make_master_assignment_table(assignment_files,
+    #                                                               min_probability=sample.probability_threshold,
+    #                                                               worker_count=self.jobs)
+    #             else:
+    #                 print("[CreateHdpTrainingData] filtering 'full' output files")
+    #                 assignment_files = list_dir(sample.assignments_dir, ext="ard.tsv")
+    #                 sample_assignment_table = \
+    #                     multiprocess_make_master_assignment_table(assignment_files,
+    #                                                               min_probability=sample.probability_threshold,
+    #                                                               full=True, worker_count=self.jobs)
+    #         else:
+    #             if sample.assignments_dir is not None:
+    #                 print("[CreateHdpTrainingData] WARNING: Using sample analysis files when "
+    #                       "assignments_dir is also set: {}".format(sample.name))
+    #             assignment_files = [x for x in sample.analysis_files if x.endswith("assignments.tsv")]
+    #             sample_assignment_table = \
+    #                 multiprocess_make_master_assignment_table(assignment_files,
+    #                                                           min_probability=sample.probability_threshold,
+    #                                                           worker_count=self.jobs)
+    #
+    #         self.set_kmer_len(len(sample_assignment_table.iloc[0]['kmer']))
+    #         # get kmers associated with each sample
+    #         kmers = self.get_sample_kmers(sample)
+    #         # write correctly formated output
+    #         final_output.append(generate_buildAlignments(sample_assignment_table, kmers,
+    #                                                      max_assignments=sample.number_of_kmer_assignments,
+    #                                                      strands=self.strands, verbose=verbose))
+    #     master_assignment_table = pd.concat(final_output, ignore_index=True)
+    #     self.n_assignments = len(master_assignment_table)
+    #     master_assignment_table.to_csv(self.out_file_path, sep='\t', header=False, index=False)
+    #     return self.out_file_path
 
     def set_kmer_len(self, k):
         """Set the kmer length of the samples"""
@@ -535,7 +704,8 @@ class TrainSignalAlign(object):
                                              template=template,
                                              complement=complement,
                                              verbose=self.debug,
-                                             alphabet=self.template_model.alphabet)
+                                             alphabet=self.template_model.alphabet,
+                                             jobs=self.job_count)
             # write an hdp training file to path
             build_alignment_path = hdp_data.write_hdp_training_file(verbose=True)
             num_alignments = hdp_data.n_assignments
@@ -871,7 +1041,6 @@ class TrainSignalAlign(object):
 
         dont_run_sa_samples = []
         run_sa_samples = []
-        ran_sa_samples = []
         if check_samples:
             for sample in self.samples:
                 if sample.assignments_dir is not None:
@@ -911,7 +1080,7 @@ def main():
 
         # parsers for running the full pipeline
         run_parser = subparsers.add_parser("run", help="runs full workflow ")
-        run_parser.add_argument('--config', default='trainModels-config.yaml', type=str,
+        run_parser.add_argument('--config', '-c', type=str,
                                 help='Path to the (filled in) config file, generated with "generate".')
         return parser.parse_args()
 
