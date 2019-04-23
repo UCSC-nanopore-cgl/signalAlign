@@ -101,18 +101,9 @@ class TrainSignalAlignTest(unittest.TestCase):
         assignments1 = parse_assignment_file(self.assignment_file)
         self.assertEqual(len(pandas_table), 2 * len(assignments1))
 
-    def test_multiprocess_make_master_assignment_table(self):
-        data1, time1 = time_it(make_master_assignment_table, [self.assignment_file,
-                                                              self.assignment_file], 0.0)
-        data2, time2 = time_it(multiprocess_make_master_assignment_table, [self.assignment_file,
-                                                                           self.assignment_file], 0.0)
-        self.assertTrue(data1.equals(data2))
-        self.assertGreater(time2, time1)
-
     def test_multiprocess_make_kmer_assignment_tables(self):
         kmers = get_kmers(6, alphabet="ATGC")
-        data2, time2 = time_it(multiprocess_make_kmer_assignment_tables, [self.assignment_file,
-                                                                          self.assignment_file], kmers,
+        data2, time2 = time_it(multiprocess_make_kmer_assignment_tables, [self.assignment_file], kmers,
                                set("t"), 0.0, False, False, 100000, 2)
         for x in kmers:
             kmer_data = data2.loc[data2['kmer'] == x]
@@ -122,9 +113,8 @@ class TrainSignalAlignTest(unittest.TestCase):
         kmers = get_kmers(6, alphabet="ATGC")
         data_files = [self.assignment_file]
 
-        sample_assignment_table = multiprocess_make_master_assignment_table(data_files,
-                                                                            min_probability=0.0, worker_count=2)
-        data1 = generate_buildAlignments(sample_assignment_table, kmers, 10, ["t", "c"], False)
+        sample_assignment_table = get_assignment_table(data_files, 0.0, False)
+        data1 = generate_buildAlignments(sample_assignment_table, kmers, 10, ["t"], False)
 
         data2, _ = time_it(multiprocess_make_kmer_assignment_tables,
                            data_files, kmers,
@@ -179,15 +169,6 @@ class TrainSignalAlignTest(unittest.TestCase):
                           max_assignments=2,
                           strands=[], verbose=False)
 
-    #
-    def test_generate_buildAlignments2(self):
-        sample_assignment_table = make_master_assignment_table([self.assignment_file], min_probability=0.0)
-        # get kmers associated with each sample
-        kmers = get_kmers(6, alphabet="ATGC")
-        # write correctly formated output
-        data1, time1 = time_it(generate_buildAlignments, sample_assignment_table, kmers, 100000, ["t", "c"], False)
-        data2, time2 = time_it(generate_buildAlignments2, sample_assignment_table, kmers, 100000, ["t", "c"], False)
-        self.assertGreater(time2, time1)
 
     def test_CreateHdpTrainingData(self):
         with tempfile.TemporaryDirectory() as tempdir:
