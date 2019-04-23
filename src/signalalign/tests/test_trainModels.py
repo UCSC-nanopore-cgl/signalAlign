@@ -113,7 +113,7 @@ class TrainSignalAlignTest(unittest.TestCase):
         kmers = get_kmers(6, alphabet="ATGC")
         data_files = [self.assignment_file]
 
-        sample_assignment_table = get_assignment_table(data_files, 0.0, False)
+        sample_assignment_table = get_assignment_table(self.assignment_file, 0.0, False)
         data1 = generate_buildAlignments(sample_assignment_table, kmers, 10, ["t"], False)
 
         data2, _ = time_it(multiprocess_make_kmer_assignment_tables,
