@@ -48,7 +48,7 @@ def multiprocess_make_master_assignment_table(list_of_assignment_paths, min_prob
     """
     extra_args = {"min_probability": min_probability,
                   "full": full}
-    service = BasicService(get_assignment_table)
+    service = BasicService(get_assignment_table, service_name="multiprocess_make_master_assignment_table")
     total, failure, messages, output = run_service(service.run, list_of_assignment_paths,
                                                    extra_args, ["file_path"], worker_count)
     return pd.concat(output, ignore_index=True)
@@ -83,7 +83,7 @@ def multiprocess_make_kmer_assignment_tables(list_of_assignment_paths, kmers, st
     extra_args = {"min_probability": min_probability,
                   "full": full,
                   "kmers": kmers}
-    service = BasicService(get_assignment_kmer_tables)
+    service = BasicService(get_assignment_kmer_tables, service_name="get_assignment_kmer_tables")
     total, failure, messages, output = run_service(service.run, list_of_assignment_paths,
                                                    extra_args, ["file_path"], worker_count)
     kmer_tables = [(pd.concat(x, ignore_index=True), kmers[i]) for i, x in enumerate(zip(*output))]
@@ -91,7 +91,7 @@ def multiprocess_make_kmer_assignment_tables(list_of_assignment_paths, kmers, st
     extra_args = {"strands": strands,
                   "verbose": verbose,
                   "max_assignments": max_assignments}
-    service = BasicService(sort_dataframe_wrapper)
+    service = BasicService(sort_dataframe_wrapper, service_name="sort_dataframe_wrapper")
     total, failure, messages, output = run_service(service.run, kmer_tables,
                                                    extra_args, ["data_table", "kmer"], worker_count)
 
@@ -331,7 +331,7 @@ def multiprocess_generate_buildAlignments(assignments_pd, kmer_list, max_assignm
         extra_args = {"by_strand": by_strand,
                       "max_assignments": max_assignments,
                       "verbose": verbose}
-        service = BasicService(kmer_assignments_wrapper)
+        service = BasicService(kmer_assignments_wrapper, service_name="multiprocess_generate_buildAlignments")
         total, failure, messages, output = run_service(service.run, kmer_list,
                                                        extra_args, ["k"], worker_count)
 
