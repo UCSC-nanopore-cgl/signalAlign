@@ -493,7 +493,7 @@ class HmmModel(object):
         # calculate the new expected mean and standard deviation for the kmer normal distributions
         if update_emissions:
             # print(self.observed)
-            for k in range(self.symbol_set_size):  # TODO implement learning rate
+            for k in range(self.symbol_set_size):
                 # print(k)
                 if self.observed[k] is True:
                     u_k = self.mean_expectations[k] / self.posteriors[k]
@@ -1125,6 +1125,7 @@ def gaussian_param_to_inv_gaussian_param(mu, sigma):
     """
     return mu, ((mu**3) / (sigma**2))
 
+
 def load_nanopolish_model(model_file, as_dict=False):
     """Load HMM model from nanopolish model file
 
@@ -1137,6 +1138,7 @@ def load_nanopolish_model(model_file, as_dict=False):
     header line: kmer	level_mean	level_stdv	sd_mean	sd_stdv	weight
 
     :param model_file: path to model file
+    :param as_dict: boolean option to return as a dictionary with kmers as keys
     """
     assert os.path.exists(model_file), "[load_nanopolish_model] - didn't find model here: {}".format(model_file)
     nanopolish_event_model = {}

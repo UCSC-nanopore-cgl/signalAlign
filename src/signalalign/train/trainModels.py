@@ -863,11 +863,13 @@ class TrainSignalAlign(object):
                 print(self.complement_hmm_model_path)
                 print(self.complement_hdp_model_path)
                 # self.new_working_folder(append=str(i))
-        elif self.args.training.transitions or self.args.training.hdp_emissions:
-            if self.args.training.transitions:
+        elif self.args.training.transitions or self.args.training.hdp_emissions or self.args.training.normal_emissions:
+            if self.args.training.transitions or self.args.training.normal_emissions:
                 print("[trainModels] Training HMM transition distributions.")
                 # self.train_transitions()
-                self.train_normal_hmm(iteration="")
+                self.train_normal_hmm(iteration="",
+                                      transitions=self.args.training.transitions,
+                                      emissions=self.args.training.normal_emissions)
             if self.args.training.hdp_emissions:
                 print("[trainModels] Training HDP emission distributions.")
                 if not self.args.hdp_args.built_alignments:
@@ -877,9 +879,10 @@ class TrainSignalAlign(object):
             raise AssertionError("Must set one of the following to True. "
                                  "training.transitions: {}, training.hdp_emissions: {}, "
                                  "training.expectation_maximization: "
-                                 "{}.".format(self.args.training.transitions,
+                                 "{}, training.normal_emissions: {}".format(self.args.training.transitions,
                                               self.args.training.hdp_emissions,
-                                              self.args.training.expectation_maximization))
+                                              self.args.training.expectation_maximization,
+                                              self.args.training.normal_emissions))
 
         stop = timer()
         print("[trainModels] Complete")
