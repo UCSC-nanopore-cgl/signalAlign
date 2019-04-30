@@ -450,31 +450,31 @@ class HmmModel(object):
             self.likelihood += line[-1]
             self.transitions_expectations = [sum(x) for x in zip(self.transitions_expectations, line[0:-1])]
 
-            # # line 2: event model
-            # line = list(map(float, fH.readline().split()))
-            # assert len(line) == self.symbol_set_size * NB_MODEL_PARAMS, "HMM.add_expectations_file - problem with " \
-            #                                                             "event model in file {ef}".format(ef=expectations_file)
-            #
-            # # line 3 event expectations [E_mean, E_sd]
-            # line = list(map(float, fH.readline().split()))
-            # assert len(line) == self.symbol_set_size * NORM_DIST_PARAMS, \
-            #     'HMM: check_file - bad file (event expectations): {}'.format(expectations_file)
-            #
-            # self.event_assignments += line
-            # self.mean_expectations = [i + j for i, j in zip(self.mean_expectations, line[::NORM_DIST_PARAMS])]
-            # self.sd_expectations = [i + j for i, j in zip(self.sd_expectations, line[1::NORM_DIST_PARAMS])]
-            #
-            # # line 4, posteriors
-            # line = list(map(float, fH.readline().split()))
-            # assert len(line) == self.symbol_set_size, "HMM: check_file - bad file (posteriors): {}".format(expectations_file)
-            #
-            # self.kmer_assignments += line
-            #
-            # # line 5, probabilities
-            # self.posteriors = [sum(x) for x in zip(self.posteriors, line)]
-            # line = list(map(bool, fH.readline().split()))
-            # assert len(line) == self.symbol_set_size, "HMM: check_file - bad file (observations): {}".format(expectations_file)
-            # self.observed = [any(b) for b in zip(self.observed, line)]
+            # line 2: event model
+            line = list(map(float, fH.readline().split()))
+            assert len(line) == self.symbol_set_size * NB_MODEL_PARAMS, "HMM.add_expectations_file - problem with " \
+                                                                        "event model in file {ef}".format(ef=expectations_file)
+
+            # line 3 event expectations [E_mean, E_sd]
+            line = list(map(float, fH.readline().split()))
+            assert len(line) == self.symbol_set_size * NORM_DIST_PARAMS, \
+                'HMM: check_file - bad file (event expectations): {}'.format(expectations_file)
+
+            self.event_assignments += line
+            self.mean_expectations = [i + j for i, j in zip(self.mean_expectations, line[::NORM_DIST_PARAMS])]
+            self.sd_expectations = [i + j for i, j in zip(self.sd_expectations, line[1::NORM_DIST_PARAMS])]
+
+            # line 4, posteriors
+            line = list(map(float, fH.readline().split()))
+            assert len(line) == self.symbol_set_size, "HMM: check_file - bad file (posteriors): {}".format(expectations_file)
+
+            self.kmer_assignments += line
+
+            # line 5, probabilities
+            self.posteriors = [sum(x) for x in zip(self.posteriors, line)]
+            line = list(map(bool, fH.readline().split()))
+            assert len(line) == self.symbol_set_size, "HMM: check_file - bad file (observations): {}".format(expectations_file)
+            self.observed = [any(b) for b in zip(self.observed, line)]
             return True
 
     def normalize(self, update_transitions, update_emissions):
