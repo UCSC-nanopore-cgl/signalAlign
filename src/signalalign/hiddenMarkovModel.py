@@ -168,7 +168,7 @@ class HmmModel(object):
         if self.nanopolish_model_file:
             assert os.path.exists(self.nanopolish_model_file)
             self.nanopolish_event_model = {}
-            self.load_nanopolish_model(self.nanopolish_model_file)
+            self._load_nanopolish_model(self.nanopolish_model_file)
 
     def _load_nanopolish_model(self, model_file):
         """Load HMM model from nanopolish model file
@@ -1117,6 +1117,14 @@ def create_new_model(model_path, new_model_path, find_replace_set):
     return model_h
 
 
+def gaussian_param_to_inv_gaussian_param(mu, sigma):
+    """Take the gaussian parameters for mu and sigma and convert into inverse gaussian parameters
+    :param mu: mean
+    :param sigma: standard deviation
+    :return: mu, lambda
+    """
+    return mu, ((mu**3) / (sigma**2))
+
 def load_nanopolish_model(model_file, as_dict=False):
     """Load HMM model from nanopolish model file
 
@@ -1146,20 +1154,22 @@ def load_nanopolish_model(model_file, as_dict=False):
                 split_line = line.split()
                 if split_line[1] == "level_mean":
                     continue
+                noise_lambda = gaussian_param_to_inv_gaussian_param(float(split_line[3]),
+                                                                    float(split_line[4]))[1]
                 if as_dict:
                     kmers.append(split_line[0])
                     nanopolish_event_model[split_line[0]] = [float(split_line[1]),
                                                              float(split_line[2]),
                                                              float(split_line[3]),
                                                              float(split_line[4]),
-                                                             0]
+                                                             noise_lambda]
                 else:
                     kmers.append(split_line[0])
                     means.append(float(split_line[1]))
                     SDs.append(float(split_line[2]))
                     noise_means.append(float(split_line[3]))
                     noise_SDs.append(float(split_line[4]))
-                    noise_lambdas.append(float(0))
+                    noise_lambdas.append(noise_lambda)
 
     if not as_dict:
         nanopolish_event_model["means"] = np.asarray(means)
@@ -1226,6 +1236,7 @@ def convert_nanopolish_model_to_signalalign(nanopolish_model, transition_probs, 
 def convert_and_edit_nanopolish_model_to_signalalign(nanopolish_model, transition_probs, output_path,
                                                      find_replace=["M", "E"], state_number=3, likelihood=0):
     """Convert nanopolish model into signalalign model
+    :param find_replace: find character and replace it with another
     :param nanopolish_model: path to nanopolish model
     :param transition_probs: transition probabilities for hmm
     :param output_path: path to new signalalign model
@@ -1234,7 +1245,7 @@ def convert_and_edit_nanopolish_model_to_signalalign(nanopolish_model, transitio
     """
     nanopolish_event_model, alphabet, kmer_length = load_nanopolish_model(nanopolish_model, as_dict=True)
     alphabet = "".join(sorted(alphabet.upper()))
-    new_alphabet = alphabet.replace(find_replace[0], find_replace[1])
+    new_alphabet = "".join(sorted(alphabet.replace(find_replace[0], find_replace[1])))
     for base in new_alphabet:
         assert not is_non_canonical_iupac_base(base), \
             "You cannot use IUPAC character to represent multiple bases. {}".format(base)
@@ -1258,38 +1269,12 @@ def convert_and_edit_nanopolish_model_to_signalalign(nanopolish_model, transitio
             old_kmer = kmer.replace(find_replace[1], find_replace[0])
             kmer_data = nanopolish_event_model[old_kmer]
             f.write("{level_mean}\t{level_sd}\t{noise_mean}\t{noise_sd}\t{noise_lambda}\t"
-                    "".format(level_mean=kmer_data[0],
-                              level_sd=kmer_data[1],
-                              noise_mean=kmer_data[2],
-                              noise_sd=kmer_data[3],
-                              noise_lambda=kmer_data[4]))
+                    "".format(level_mean=float(kmer_data[0]),
+                              level_sd=float(kmer_data[1]),
+                              noise_mean=float(kmer_data[2]),
+                              noise_sd=float(kmer_data[3]),
+                              noise_lambda=float(kmer_data[4])))
         f.write("\n")
 
     return output_path
 
-
-def main():
-    rna_ont_model = "/Users/andrewbailey/CLionProjects/nanopore-RNN/submodules/signalAlign/models/testModelR9p4_5mer_acgt_RNA.model"
-    test_output_dir = "/Users/andrewbailey/CLionProjects/nanopore-RNN/submodules/signalAlign/test_plot_distributions"
-    rna_hdp_model = "/Users/andrewbailey/CLionProjects/nanopore-RNN/submodules/signalAlign/models/template.singleLevelFixedCanonical.nhdp"
-    savefig_dir = "/Users/andrewbailey/CLionProjects/nanopore-RNN/submodules/signalAlign/test_plot_distributions"
-    dna_ont_model = "/Users/andrewbailey/CLionProjects/nanopore-RNN/submodules/signalAlign/models/testModelR9_5mer_acegit_template.model"
-    dna_hdp_model = "/Users/andrewbailey/CLionProjects/nanopore-RNN/submodules/signalAlign/models/template.singleLevelPriorEcoli.nhdp"
-    # plot_rna_dna_ont_hdp_comparison(ont_model, hdp_model, dna_ont_model, dna_hdp_model)#, savefig_dir=savefig_dir)
-    alignment_file = "/Users/andrewbailey/CLionProjects/nanopore-RNN/submodules/signalAlign/test_plot_distributions/buildAlignment.tsv"
-    # dna_hmm_handle = HmmModel(dna_ont_model, dna_hdp_model)
-    #
-    # dna_hmm_handle.plot_kmer_distribution("TAAAA", alignment_file=alignment_file) #savefig_dir=savefig_dir
-
-    rna_hmm_handle = HmmModel(rna_ont_model, rna_hdp_model, rna=True)
-
-    # rna_hmm_handle.plot_kmer_distribution("GGACT", alignment_file=alignment_file, savefig_dir=savefig_dir)
-
-    # ﻿ RRACH
-    #     R= A/G
-    #     H = A/C/T
-
-
-if __name__ == "__main__":
-    main()
-    raise SystemExit
