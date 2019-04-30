@@ -140,6 +140,38 @@ class MultipleModelHandler(object):
                         handles1.append(hdp_handle)
                         legend_text1.append("{} HDP Distribution".format(name))
 
+                if model.has_nanopolish_model:
+                    # plot HDP predicted distribution
+                    normal_mean, normal_sd = model.get_event_mean_gaussian_parameters(kmer, nanopolish=True)
+
+                    tmp_min_x = normal_mean - (5 * normal_sd)
+                    tmp_max_x = normal_mean + (5 * normal_sd)
+                    if min_x > tmp_min_x:
+                        min_x = tmp_min_x
+                    if max_x < tmp_max_x:
+                        max_x = tmp_max_x
+
+                    # plot ont normal distribution
+                    x = np.linspace(normal_mean - 4 * normal_sd, normal_mean + 4 * normal_sd, 200)
+                    nanopolish_handle, = panel1.plot(x, norm.pdf(x, normal_mean, normal_sd), label=kmer, color=colors[color_index])
+                    color_index += 1
+                    if color_index > 6:
+                        color_index = 0
+                    # panel1.plot([normal_mean, normal_mean], [0, norm.pdf(normal_mean, normal_mean, normal_sd)], lw=2)
+                    nanopolish_model_name = os.path.basename(model.nanopolish_model_file)
+                    txt_handle1, = panel1.plot([], [], ' ')
+                    txt_handle2, = panel1.plot([], [], ' ')
+
+                    handles1.append(nanopolish_handle)
+                    legend_text1.append("{} Nanopolish Normal".format(name))
+
+                    handles2.extend([txt_handle1, txt_handle2])
+                    print("{} Nanopolish Model: {}".format(name, nanopolish_model_name))
+                    print("{} Nanopolish Event Mean: {}".format(name, normal_mean))
+                    print("{} Nanopolish Event SD: {}".format(name, normal_sd))
+                    legend_text2.extend(["{} Nanopolish Model: {}".format(name, nanopolish_model_name),
+                                         "{} Nanopolish Event Mean: {}".format(name, normal_mean)])
+
                 if model_assignment_data is not None:
                     kmer_assignments = model_assignment_data.loc[model_assignment_data['kmer'] == kmer]
                     kmer_assignments = kmer_assignments.loc[kmer_assignments['strand'] == strand]
@@ -460,7 +492,10 @@ def main(config=None):
     max_plots = 0
     # create models and grab kmer lists
     for model in args.models:
-        models.append(HmmModel(ont_model_file=model.ont_model, hdp_model_file=model.hdp_model, rna=model.rna,
+        models.append(HmmModel(ont_model_file=model.ont_model,
+                               hdp_model_file=model.hdp_model,
+                               nanopolish_model_file=model.nanopolish_model,
+                               rna=model.rna,
                                name=model.name))
         model_kmer_list = model.kmers
         n_kmers_to_plot = len(model_kmer_list)

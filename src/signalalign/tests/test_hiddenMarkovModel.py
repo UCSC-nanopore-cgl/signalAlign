@@ -13,13 +13,10 @@
 import unittest
 import os
 import numpy as np
-import threading
-import time
 import tempfile
 from shutil import copyfile
 
 from signalalign.hiddenMarkovModel import *
-from signalalign.fast5 import Fast5
 from py3helpers.utils import all_string_permutations, get_random_string, list_dir
 
 
@@ -35,6 +32,8 @@ class HiddenMarkovTests(unittest.TestCase):
         cls.model = HmmModel(ont_model_file=cls.model_file)
         cls.expectation_file = os.path.join(cls.HOME,
                                             "tests/test_expectation_files/4f9a316c-8bb3-410a-8cfc-026061f7e8db.template.expectations.tsv")
+        cls.nanopolish_model = os.path.join(cls.HOME, "models/r9.4_450bps.nucleotide.6mer.template.model")
+        cls.cpg_nanopolish_model = os.path.join(cls.HOME, "models/r9.4_450bps.cpg.6mer.template.model")
 
     def test_get_kmer_index(self):
         all_kmers = [x for x in all_string_permutations("ATGC", 5)]
@@ -274,6 +273,32 @@ class HiddenMarkovTests(unittest.TestCase):
         self.assertEqual(len(data["ont_model_mean"]), 16852)
         self.assertEqual(len(data["path_kmer"]), 16852)
         self.assertEqual(len(data), 16852)
+
+    def test_load_nanopolish_model(self):
+        # model = HmmModel(ont_model_file=self.model_file, nanopolish_model_file=nanopolish_model)
+        model, alphabet, k = load_nanopolish_model(self.nanopolish_model)
+        self.assertEqual(len(model["means"]), 4**6)
+        self.assertEqual(alphabet, "ACGT")
+        self.assertEqual(k, 6)
+
+    def test_convert_nanopolish_model_to_signalalign(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            sa_file = os.path.join(tempdir, "testModelr9.4_450bps.nucleotide.6mer.template.model")
+            convert_nanopolish_model_to_signalalign(self.nanopolish_model, self.model.transitions, sa_file)
+            sa_model = HmmModel(sa_file)
+            model_mean, model_sd = sa_model.get_event_mean_gaussian_parameters("AAAATG")
+            self.assertEqual(model_mean, 75.943873)
+            self.assertEqual(model_sd, 1.542528)
+
+    def test_convert_and_edit_nanopolish_model_to_signalalign(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            sa_file = os.path.join(tempdir, "testModelR9.4_450bps.cpg.6mer.template.model")
+            convert_and_edit_nanopolish_model_to_signalalign(self.cpg_nanopolish_model, self.model.transitions, sa_file)
+            sa_model = HmmModel(sa_file)
+            model_mean, model_sd = sa_model.get_event_mean_gaussian_parameters("AAAAEE")
+            self.assertEqual(model_mean, 75.7063)
+            self.assertEqual(model_sd, 2.70501)
+
 
 if __name__ == '__main__':
     unittest.main()

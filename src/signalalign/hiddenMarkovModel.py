@@ -97,7 +97,7 @@ def parse_alignment_file(file_path):
 
 
 class HmmModel(object):
-    def __init__(self, ont_model_file, hdp_model_file=None, rna=False, name=None):
+    def __init__(self, ont_model_file, hdp_model_file=None, nanopolish_model_file=None, rna=False, name=None):
         # TODO Need to create docs here
         assert os.path.exists(ont_model_file)
         self.name = name
@@ -113,6 +113,7 @@ class HmmModel(object):
         self.alphabet = ""
         self.kmer_length = 0
         self.has_ont_model = False
+        self.has_nanopolish_model = False
         self.normalized = False
         self.sorted_kmer_tuple = tuple()
         self.num_kmers = 0
@@ -162,6 +163,31 @@ class HmmModel(object):
             self.all_spline_slopes = []
 
             self._initialize_hdp_model()
+
+        self.nanopolish_model_file = nanopolish_model_file
+        if self.nanopolish_model_file:
+            assert os.path.exists(self.nanopolish_model_file)
+            self.nanopolish_event_model = {}
+            self.load_nanopolish_model(self.nanopolish_model_file)
+
+    def _load_nanopolish_model(self, model_file):
+        """Load HMM model from nanopolish model file
+
+        the model file has the format:
+        1st couple lines have # : #ont_model_name	r9.4_180mv_450bps_6mer
+                                  #kit	r9.4_450bps
+                                  #strand	template
+                                  #k	6
+                                  #original_file	r9.4_180mv_450bps_6mer/template_median68pA.model
+        header line: kmer	level_mean	level_stdv	sd_mean	sd_stdv	weight
+
+        :param model_file: path to model file
+        """
+        self.nanopolish_event_model, alphabet, k = load_nanopolish_model(model_file)
+        assert alphabet == self.alphabet, "Nanopolish model alphabet does not match signalalign model. sa {} != np {}".format(alphabet, self.alphabet)
+        assert k == self.kmer_length, "Nanopolish model kmer length does not match signalalign model: sa {} != np {}".format(k, self.kmer_length)
+
+        return self.nanopolish_event_model
 
     def normalize_transitions_expectations(self):
         """Normalize transitions from each state to the other states
@@ -346,18 +372,22 @@ class HmmModel(object):
             "The kmer index is out of bounds given the alphabet and kmer length. {} > {}".format(index, self.num_kmers)
         return self.sorted_kmer_tuple[index]
 
-    def get_event_mean_gaussian_parameters(self, kmer):
+    def get_event_mean_gaussian_parameters(self, kmer, nanopolish=False):
         """Get the model's Normal distribution parameters to model the mean of a specific kmer
 
         :param kmer: kmer that can fit in model
         """
         kmer_index = self.get_kmer_index(kmer)
-        normal_mean = self.event_model["means"][kmer_index]
-        normal_sd = self.event_model["SDs"][kmer_index]
+        if nanopolish:
+            normal_mean = self.nanopolish_event_model["means"][kmer_index]
+            normal_sd = self.nanopolish_event_model["SDs"][kmer_index]
+        else:
+            normal_mean = self.event_model["means"][kmer_index]
+            normal_sd = self.event_model["SDs"][kmer_index]
 
         return normal_mean, normal_sd
 
-    def get_event_sd_inv_gaussian_parameters(self, kmer):
+    def get_event_sd_inv_gaussian_parameters(self, kmer, nanopolish=False):
         """Get the model's inverse gaussian distribution parameters to model the mean of a specific kmer
 
         :param kmer: kmer that can fit in model
@@ -367,12 +397,12 @@ class HmmModel(object):
         inv_gauss_lambda = self.event_model["noise_lambdas"][kmer_index]
         return inv_gauss_mean, inv_gauss_lambda
 
-    def log_event_mean_gaussian_probability_match(self, event_mean, kmer):
+    def log_event_mean_gaussian_probability_match(self, event_mean, kmer, nanopolish=False):
         """Get the probability of the event_mean coming from the model's kmer gaussian/normal distribution
         :param event_mean: mean of event
         :param kmer: nucleotide sequence to check
         """
-        normal_mean, normal_sd = self.get_event_mean_gaussian_parameters(kmer)
+        normal_mean, normal_sd = self.get_event_mean_gaussian_parameters(kmer, nanopolish=nanopolish)
         return norm.logpdf(event_mean, normal_mean, normal_sd)
 
     def log_event_sd_inv_gaussian_probability_match(self, event_sd, kmer):
@@ -734,7 +764,7 @@ class HmmModel(object):
             plt.show()
         plt.close(fig)
 
-    def get_kl_divergence(self, kmer):
+    def get_kl_divergence(self, kmer, nanopolish=False):
         """Get Kullback–Leibler divergence between the HDP and ONT models for a specific kmer"""
         kmer_id = self.get_kmer_index(kmer)
         hdp_y = self.all_posterior_pred[kmer_id]
@@ -742,7 +772,7 @@ class HmmModel(object):
             # print("[Kullback–Leibler divergence] No HDP data for {}".format(kmer))
             return None
 
-        normal_mean, normal_sd = self.get_event_mean_gaussian_parameters(kmer)
+        normal_mean, normal_sd = self.get_event_mean_gaussian_parameters(kmer, nanopolish=nanopolish)
         ont_normal_dist = norm.pdf(self.linspace, normal_mean, normal_sd)
         kl_divergence = entropy(pk=hdp_y, qk=ont_normal_dist, base=2)
         if kl_divergence == np.inf:
@@ -751,26 +781,26 @@ class HmmModel(object):
 
         return kl_divergence
 
-    def get_hellinger_distance(self, kmer):
+    def get_hellinger_distance(self, kmer, nanopolish=False):
         """Get Hellinger distance between the HDP and ONT models for a specific kmer"""
         kmer_id = self.get_kmer_index(kmer)
         hdp_y = self.all_posterior_pred[kmer_id]
         if len(hdp_y) == 0:
             # print("[Hellinger Distance] No HDP data for {}".format(kmer))
             return None
-        normal_mean, normal_sd = self.get_event_mean_gaussian_parameters(kmer)
+        normal_mean, normal_sd = self.get_event_mean_gaussian_parameters(kmer, nanopolish=nanopolish)
         ont_normal_dist = norm.pdf(self.linspace, normal_mean, normal_sd)
         h_distance = hellinger2(p=hdp_y, q=ont_normal_dist)
         return h_distance
 
-    def get_median_delta(self, kmer):
+    def get_median_delta(self, kmer, nanopolish=False):
         """Calculate the difference between the max value of HDP and ONT kmer distributions"""
         kmer_id = self.get_kmer_index(kmer)
         hdp_y = self.all_posterior_pred[kmer_id]
         if len(hdp_y) == 0:
             # print("[Median Delta] No HDP data for {}".format(kmer))
             return None
-        normal_mean, normal_sd = self.get_event_mean_gaussian_parameters(kmer)
+        normal_mean, normal_sd = self.get_event_mean_gaussian_parameters(kmer, nanopolish=nanopolish)
         delta = self.linspace[hdp_y.index(max(hdp_y))] - normal_mean
         return abs(delta)
 
@@ -858,7 +888,7 @@ class HmmModel(object):
         self.event_model["means"][k] = event_mean
 
     def set_kmer_event_sd(self, kmer, event_sd):
-        """Set ont event mean for a given kmer
+        """Set ont event sd for a given kmer
         :param kmer: valid K-mer
         :param event_sd: value to set as new kmer mean sd
         """
@@ -866,7 +896,7 @@ class HmmModel(object):
         self.event_model["SDs"][k] = event_sd
 
     def set_kmer_noise_means(self, kmer, noise_means):
-        """Set ont event mean for a given kmer
+        """Set ont noise mean for a given kmer
         :param kmer: valid K-mer
         :param noise_means: value to set as new kmer noise_means
         """
@@ -874,7 +904,7 @@ class HmmModel(object):
         self.event_model["noise_means"][k] = noise_means
 
     def set_kmer_noise_SDs(self, kmer, noise_SDs):
-        """Set ont event mean for a given kmer
+        """Set ont noise sd for a given kmer
         :param kmer: valid K-mer
         :param noise_SDs: value to set as new kmer noise_SDs
         """
@@ -882,7 +912,7 @@ class HmmModel(object):
         self.event_model["noise_SDs"][k] = noise_SDs
 
     def set_kmer_noise_lambdas(self, kmer, noise_lambdas):
-        """Set ont event mean for a given kmer
+        """Set ont noise lambda for a given kmer
         :param kmer: valid K-mer
         :param noise_lambdas: value to set as new kmer noise_lambdas
         """
@@ -1085,6 +1115,157 @@ def create_new_model(model_path, new_model_path, find_replace_set):
             counter += 1
 
     return model_h
+
+
+def load_nanopolish_model(model_file, as_dict=False):
+    """Load HMM model from nanopolish model file
+
+    the model file has the format:
+    1st couple lines have # : #ont_model_name	r9.4_180mv_450bps_6mer
+                              #kit	r9.4_450bps
+                              #strand	template
+                              #k	6
+                              #original_file	r9.4_180mv_450bps_6mer/template_median68pA.model
+    header line: kmer	level_mean	level_stdv	sd_mean	sd_stdv	weight
+
+    :param model_file: path to model file
+    """
+    assert os.path.exists(model_file), "[load_nanopolish_model] - didn't find model here: {}".format(model_file)
+    nanopolish_event_model = {}
+
+    means = []
+    SDs = []
+    noise_means = []
+    noise_SDs = []
+    noise_lambdas = []
+    kmers = []
+
+    with open(model_file, 'r') as fH:
+        for line in fH:
+            if not line.startswith("#"):
+                split_line = line.split()
+                if split_line[1] == "level_mean":
+                    continue
+                if as_dict:
+                    kmers.append(split_line[0])
+                    nanopolish_event_model[split_line[0]] = [float(split_line[1]),
+                                                             float(split_line[2]),
+                                                             float(split_line[3]),
+                                                             float(split_line[4]),
+                                                             0]
+                else:
+                    kmers.append(split_line[0])
+                    means.append(float(split_line[1]))
+                    SDs.append(float(split_line[2]))
+                    noise_means.append(float(split_line[3]))
+                    noise_SDs.append(float(split_line[4]))
+                    noise_lambdas.append(float(0))
+
+    if not as_dict:
+        nanopolish_event_model["means"] = np.asarray(means)
+        nanopolish_event_model["SDs"] = np.asarray(SDs)
+        nanopolish_event_model["noise_means"] = np.asarray(noise_means)
+        nanopolish_event_model["noise_SDs"] = np.asarray(noise_SDs)
+        nanopolish_event_model["noise_lambdas"] = np.asarray(noise_lambdas)
+        assert not np.any(nanopolish_event_model["means"] == 0.0), "signalHmm.load_model, this model has 0 E_means"
+        assert not np.any(nanopolish_event_model["SDs"] == 0.0), "signalHmm.load_model, this model has 0 E_means"
+        assert not np.any(
+            nanopolish_event_model["noise_means"] == 0.0), "signalHmm.load_model, this model has 0 E_noise_means"
+        assert not np.any(
+            nanopolish_event_model["noise_SDs"] == 0.0), "signalHmm.load_model, this model has 0 E_noise_SDs"
+
+    k = len(kmers[0])
+    alphabet = "".join(sorted(list(set("".join(kmers)))))
+
+    return nanopolish_event_model, alphabet, k
+
+
+def convert_nanopolish_model_to_signalalign(nanopolish_model, transition_probs, output_path,
+                                            state_number=3, likelihood=0):
+    """Convert nanopolish model into signalalign model
+    :param nanopolish_model: path to nanopolish model
+    :param transition_probs: transition probabilities for hmm
+    :param output_path: path to new signalalign model
+    :param likelihood: likelihood of model (set to zero because we do not have this info from nanopolish)
+    :param state_number: type of hmm (3 state is default)
+    """
+    nanopolish_event_model, alphabet, kmer_length = load_nanopolish_model(nanopolish_model)
+    alphabet = "".join(sorted(alphabet.upper()))
+    for base in alphabet:
+        assert not is_non_canonical_iupac_base(base), \
+            "You cannot use IUPAC character to represent multiple bases. {}".format(base)
+
+    alphabet_size = len(alphabet)
+    new_kmers = all_string_permutations(alphabet, length=kmer_length)
+    with open(output_path, 'w') as f:
+
+        # line 0
+        f.write("{stateNumber}\t{alphabetSize}\t{alphabet}\t{kmerLength}\n"
+                "".format(stateNumber=state_number, alphabetSize=alphabet_size,
+                          alphabet=alphabet, kmerLength=kmer_length))
+        # line 1 transitions
+        for i in range(state_number * state_number):
+            f.write("{transition}\t".format(transition=str(transition_probs[i])))
+        # likelihood
+        f.write("{}\n".format(str(likelihood)))
+
+        # line 2 Event Model
+        for kmer in new_kmers:
+            k_index = HmmModel._get_kmer_index(kmer, alphabet, kmer_length, alphabet_size)
+            f.write("{level_mean}\t{level_sd}\t{noise_mean}\t{noise_sd}\t{noise_lambda}\t"
+                    "".format(level_mean=nanopolish_event_model["means"][k_index],
+                              level_sd=nanopolish_event_model["SDs"][k_index],
+                              noise_mean=nanopolish_event_model["noise_means"][k_index],
+                              noise_sd=nanopolish_event_model["noise_SDs"][k_index],
+                              noise_lambda=nanopolish_event_model["noise_lambdas"][k_index]))
+        f.write("\n")
+
+    return output_path
+
+
+def convert_and_edit_nanopolish_model_to_signalalign(nanopolish_model, transition_probs, output_path,
+                                                     find_replace=["M", "E"], state_number=3, likelihood=0):
+    """Convert nanopolish model into signalalign model
+    :param nanopolish_model: path to nanopolish model
+    :param transition_probs: transition probabilities for hmm
+    :param output_path: path to new signalalign model
+    :param likelihood: likelihood of model (set to zero because we do not have this info from nanopolish)
+    :param state_number: type of hmm (3 state is default)
+    """
+    nanopolish_event_model, alphabet, kmer_length = load_nanopolish_model(nanopolish_model, as_dict=True)
+    alphabet = "".join(sorted(alphabet.upper()))
+    new_alphabet = alphabet.replace(find_replace[0], find_replace[1])
+    for base in new_alphabet:
+        assert not is_non_canonical_iupac_base(base), \
+            "You cannot use IUPAC character to represent multiple bases. {}".format(base)
+
+    alphabet_size = len(alphabet)
+    new_kmers = all_string_permutations(new_alphabet, length=kmer_length)
+    with open(output_path, 'w') as f:
+
+        # line 0
+        f.write("{stateNumber}\t{alphabetSize}\t{alphabet}\t{kmerLength}\n"
+                "".format(stateNumber=state_number, alphabetSize=alphabet_size,
+                          alphabet=new_alphabet, kmerLength=kmer_length))
+        # line 1 transitions
+        for i in range(state_number * state_number):
+            f.write("{transition}\t".format(transition=str(transition_probs[i])))
+        # likelihood
+        f.write("{}\n".format(str(likelihood)))
+
+        # line 2 Event Model
+        for kmer in new_kmers:
+            old_kmer = kmer.replace(find_replace[1], find_replace[0])
+            kmer_data = nanopolish_event_model[old_kmer]
+            f.write("{level_mean}\t{level_sd}\t{noise_mean}\t{noise_sd}\t{noise_lambda}\t"
+                    "".format(level_mean=kmer_data[0],
+                              level_sd=kmer_data[1],
+                              noise_mean=kmer_data[2],
+                              noise_sd=kmer_data[3],
+                              noise_lambda=kmer_data[4]))
+        f.write("\n")
+
+    return output_path
 
 
 def main():
