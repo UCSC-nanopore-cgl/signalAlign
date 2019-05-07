@@ -223,15 +223,20 @@ def get_top_kmers_from_directory(kmer_dir, output_dir, n, random=False):
         data = [x.split() for x in fh.readlines()]
 
     # sort data
-    largest = heapq.nlargest(n, data, key=lambda e: e[3])
-    # write data
+    if len(data) < n:
+        print("Not enough events for kmer {}. {}".format(kmer, len(data)))
+        largest = data
+    else:
+        largest = heapq.nlargest(n, data, key=lambda e: e[3])
 
+    # write data
     output_file = os.path.join(output_dir, kmer+".tsv")
     with open(output_file, "w") as fh2:
         for line in largest:
             fh2.write("\t".join(line)+"\n")
 
     shutil.rmtree(kmer_dir)
+
 
 def multiprocess_get_top_kmers_from_directory(kmer_dirs, output_dir, n, random=False, worker_count=1):
     """Multiprocess get_top_kmers_from_directory"""

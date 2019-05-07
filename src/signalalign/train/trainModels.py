@@ -421,7 +421,7 @@ class CreateHdpTrainingData(object):
 
     def write_hdp_training_file(self, verbose=False):
         """Write a hdp training file to a specified location"""
-        final_output = []
+        # final_output = []
         for sample in self.samples:
             print("Filtering and gathering {} assignment.tsv files".format(sample.name))
             if len(sample.analysis_files) == 0:
