@@ -12,7 +12,7 @@ from timeit import default_timer as timer
 from argparse import ArgumentParser
 from shutil import copyfile
 from subprocess import check_call
-
+import tempfile
 from py3helpers.utils import create_dot_dict, merge_lists, all_string_permutations, save_json, load_json, \
     count_lines_in_file, merge_dicts, list_dir
 from py3helpers.multiprocess import *
@@ -23,7 +23,7 @@ from signalalign.hiddenMarkovModel import HmmModel, parse_assignment_file, parse
 from signalalign.utils.fileHandlers import FolderHandler
 from signalalign.utils.parsers import read_fasta
 from signalalign.utils.sequenceTools import get_motif_kmers, get_sequence_kmers, CustomAmbiguityPositions
-
+from signalalign.build_alignments import generate_top_n_kmers_from_sa_output
 
 def make_master_assignment_table(list_of_assignment_paths, min_probability=0.0, full=False):
     """Create a master assignment table from a list of assignment paths
@@ -445,18 +445,25 @@ class CreateHdpTrainingData(object):
             # infer kmer length and get kmers
             sample_assignment_table = get_assignment_table(assignment_files[0], 0, full)
             self.set_kmer_len(len(sample_assignment_table.iloc[0]['kmer']))
-            kmers = self.get_sample_kmers(sample)
+            # kmers = self.get_sample_kmers(sample)
+            with tempfile.TemporaryDirectory() as tempdir:
+                generate_top_n_kmers_from_sa_output(assignment_files, tempdir, self.out_file_path,
+                                                    sample.number_of_kmer_assignments, alphabet=self.alphabet,
+                                                    kmer_len=self.k, min_prob=sample.probability_threshold,
+                                                    worker_count=self.jobs, random=False,
+                                                    complement=True,
+                                                    remove=False, alignment=full)
 
-            final_output.append(
-                multiprocess_make_kmer_assignment_tables(assignment_files, kmers, self.strands,
-                                                         min_probability=sample.probability_threshold,
-                                                         verbose=verbose, full=full,
-                                                         max_assignments=sample.number_of_kmer_assignments,
-                                                         worker_count=self.jobs))
+            # final_output.append(
+            #     multiprocess_make_kmer_assignment_tables(assignment_files, kmers, self.strands,
+            #                                              min_probability=sample.probability_threshold,
+            #                                              verbose=verbose, full=full,
+            #                                              max_assignments=sample.number_of_kmer_assignments,
+            #                                              worker_count=self.jobs))
 
-        master_assignment_table = pd.concat(final_output, ignore_index=True)
-        self.n_assignments = len(master_assignment_table)
-        master_assignment_table.to_csv(self.out_file_path, sep='\t', header=False, index=False)
+        # master_assignment_table = pd.concat(final_output, ignore_index=True)
+        # self.n_assignments = len(master_assignment_table)
+        # master_assignment_table.to_csv(self.out_file_path, sep='\t', header=False, index=False)
         return self.out_file_path
 
     # def write_hdp_training_file2(self, verbose=False):
@@ -1051,9 +1058,9 @@ class TrainSignalAlign(object):
                 else:
                     run_sa_samples.append(sample)
             if len(run_sa_samples) > 0:
-                ran_sa_samples = multithread_signal_alignment_samples(run_sa_samples, alignment_args, self.job_count,
+                run_sa_samples = multithread_signal_alignment_samples(run_sa_samples, alignment_args, self.job_count,
                                                                       trim=trim, debug=self.debug)
-            self.samples = merge_lists([ran_sa_samples, dont_run_sa_samples])
+            self.samples = merge_lists([run_sa_samples, dont_run_sa_samples])
         else:
             self.samples = multithread_signal_alignment_samples(self.samples, alignment_args, self.job_count,
                                                                 trim=trim, debug=self.debug)
