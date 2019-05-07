@@ -11,7 +11,8 @@ signalAlignLib = ${basicLibs}
 test_directory = ${rootPath}/src/signalalign/tests/
 scrappie_build = ${rootPath}/scrappie/build
 
-LIBS=-lz -llzma -lbz2
+LIBS=-lz -llzma -lbz2 -lcurl -lpthread -lcrypto
+#-ldeflate
 
 HDF5 ?= install
 HTS ?= install
@@ -55,7 +56,7 @@ all : lib/libhdf5.a htslib/libhts.a sL bD ${libPath}/signalAlignLib.a ${signalAl
 	  ${signalAlignBin}/signalMachine ${signalAlignBin}/runSignalAlign \
 	  ${signalAlignBin}/variantCallingLib.py ${signalAlignBin}/alignmentAnalysisLib.py \
 	  ${signalAlignBin}/buildHdpUtil ${signalAlignBin}/trainModels all_tests \
-	  externals python_setup ${signalAlignBin}/filterReads ${signalAlignBin}/extract \
+	  externals python_install ${signalAlignBin}/filterReads ${signalAlignBin}/extract \
 	  ${signalAlignBin}/sequencing_summary ${signalAlignBin}/plot_kmer_distributions \
 	  ${signalAlignBin}/plot_variant_accuracy ${signalAlignBin}/compare_trained_models \
 	  ${signalAlignBin}/remove_sa_analyses ${signalAlignBin}/plot_labelled_read
@@ -111,9 +112,14 @@ clean :
 	cd externalTools && make clean
 	cd sonLib && make clean
 
-python_setup :
+python_develop :
+	which python3
+	python3 setup.py develop
+
+python_install :
 	which python3
 	python3 setup.py install
+
 
 pip_install : .FORCE
 	pip3 install -e .
@@ -230,4 +236,4 @@ ${libPath}/signalAlignLib.a : ${libSources} ${libHeaders} ${stBarDependencies}
 	cp ${libHeaders} ${libPath}/
 
 
-.FORCE: python_setup
+.FORCE: python_develop
