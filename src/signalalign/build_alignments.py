@@ -166,9 +166,10 @@ def split_assignment_file(assignment_file_path, my_dirs, alphabet, kmer_length, 
                     data[k_index].append(outline)
 
     for directory, kmer_data in zip(my_dirs, data):
-        with open(os.path.join(directory, basename), "w") as fh2:
-            for line in kmer_data:
-                fh2.write("\t".join(line)+"\n")
+        if len(kmer_data) > 0:
+            with open(os.path.join(directory, basename), "w") as fh2:
+                for line in kmer_data:
+                    fh2.write("\t".join(line)+"\n")
     if remove:
         os.remove(assignment_file_path)
     return True
