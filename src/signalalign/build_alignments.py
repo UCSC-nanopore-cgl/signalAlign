@@ -227,6 +227,8 @@ def get_top_kmers_from_directory(kmer_dir, output_dir, n, random=False):
         print("Not enough events for kmer {}. {}".format(kmer, len(data)))
         largest = data
     else:
+        print("Getting events for kmer {}. {}".format(kmer, n))
+
         largest = heapq.nlargest(n, data, key=lambda e: e[3])
 
     # write data
