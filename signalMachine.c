@@ -21,7 +21,7 @@ void usage() {
     fprintf(stderr, "--sm3Hdp, -d: Flag, enable HMM-HDP model\n");
     fprintf(stderr, "--twoD, -e: Flag, use 2D workflow (enables complement alignment)\n");
     fprintf(stderr, "-s: Output format, 0=full, 1=variantCaller, 2=assignments\n");
-    fprintf(stderr, "-o: Degernate, 0=C/E, 1=C/E/O, 2=A/I, 3=A/C/G/T\n, 5=A/F");
+    fprintf(stderr, "-o: Degernate, 0=C/E, 1=C/E/O, 2=A/I, 3=A/C/G/T, 4=J/T, 5=A/F");
     fprintf(stderr, "-T: Template HMM model\n");
     fprintf(stderr, "-C: Complement HMM model\n");
     fprintf(stderr, "-L: Read (output) label\n");

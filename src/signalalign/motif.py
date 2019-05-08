@@ -167,6 +167,7 @@ class DegenerateEnum(object):
             "cytosine3": 1,
             "adenosine": 2,
             "variant": 3,
+            "brdu": 4,
             "m6a": 5
         }
 
