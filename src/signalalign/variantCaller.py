@@ -75,9 +75,10 @@ class MarginalizeVariants(object):
 
                     data.append(merge_lists([[self.read_name, self.contig, pos, read_strand, mapping_strand],
                                              nuc_data]))
-                per_read_data.append(merge_lists([[self.read_name, self.contig, read_strand, mapping_strand,
-                                                   n_positions],
-                                                  [prob / n_positions for prob in strand_read_nuc_data]]))
+                if n_positions > 0:
+                    per_read_data.append(merge_lists([[self.read_name, self.contig, read_strand, mapping_strand,
+                                                       n_positions],
+                                                      [prob / n_positions for prob in strand_read_nuc_data]]))
 
             self.position_probs = pd.DataFrame(data, columns=self.columns)
             self.per_read_calls = pd.DataFrame(per_read_data, columns=self.per_read_columns)
@@ -126,54 +127,59 @@ class MarginalizeFullVariants(object):
         else:
             mapping_strands = ["-", "+"]
 
-        kmer_len_1 = len(self.variant_data["reference_kmer"].iloc[0]) - 1
-        mapping_index = 0
-        for read_strand in ("t", "c"):
-            read_strand_specifc_data = self.variant_data[self.variant_data["strand"] == read_strand]
-            # read_strand = read_strand.decode("utf-8")
-            if len(read_strand_specifc_data) == 0:
-                continue
-            # get positions on strand
-            positions = sorted(set(read_strand_specifc_data["reference_index"]))
-
-            if mapping_strands[mapping_index] == "-":
-                positions = positions[::-1]
-
-            strand_read_nuc_data = [0] * len(self.variants)
-
-            # marginalize probabilities for each position
-            n_positions = 0
-            for pos in positions:
-                pos_data = read_strand_specifc_data[read_strand_specifc_data["reference_index"] == pos]
-                if pos_data["aligned_kmer"].iloc[0][kmer_len_1] != "X":
+        if len(self.variant_data) > 0:
+            kmer_len_1 = len(self.variant_data["reference_kmer"].iloc[0]) - 1
+            mapping_index = 0
+            for read_strand in ("t", "c"):
+                read_strand_specifc_data = self.variant_data[self.variant_data["strand"] == read_strand]
+                # read_strand = read_strand.decode("utf-8")
+                if len(read_strand_specifc_data) == 0:
                     continue
-                n_positions += 1
-                total_prob = 0
-                position_nuc_dict = {x: 0.0 for x in self.variants}
-                # Get total probability for each nucleotide
-                for nuc in self.variants:
-                    # kmer_len_1 = pos_data["reference_kmer"].iloc[0].find("X")
-                    # print(pos_data["reference_kmer"].iloc[0])
-                    nuc_data = pos_data[[nuc == kmer[kmer_len_1] for kmer in pos_data["path_kmer"]]]
-                    nuc_prob = sum(nuc_data["posterior_probability"])
-                    total_prob += nuc_prob
-                    position_nuc_dict[NanoporeRead.bytes_to_string(nuc)] = nuc_prob
-                # normalize probabilities over each position
-                nuc_data = [0] * len(self.variants)
-                for index, nuc in enumerate(self.variants):
-                    assert total_prob > 0, "Check 'variants' parameter. There seems to be no kmers with those " \
-                                           "variant characters"
-                    nuc_data[index] = position_nuc_dict[nuc] / total_prob
-                    strand_read_nuc_data[index] += nuc_data[index]
-                data.append(merge_lists([[self.read_name, self.contig, pos, read_strand,
-                                          mapping_strands[mapping_index]], nuc_data]))
-            per_read_data.append(merge_lists([[self.read_name, self.contig, read_strand, mapping_strands[mapping_index],
-                                               n_positions], [prob / n_positions for prob in strand_read_nuc_data]]))
-            mapping_index += 1
+                # get positions on strand
+                positions = sorted(set(read_strand_specifc_data["reference_index"]))
 
-        self.position_probs = pd.DataFrame(data, columns=self.columns)
-        self.per_read_calls = pd.DataFrame(per_read_data, columns=self.per_read_columns)
-        self.has_data = True
+                if mapping_strands[mapping_index] == "-":
+                    positions = positions[::-1]
+
+                strand_read_nuc_data = [0] * len(self.variants)
+
+                # marginalize probabilities for each position
+                n_positions = 0
+                for pos in positions:
+                    pos_data = read_strand_specifc_data[read_strand_specifc_data["reference_index"] == pos]
+                    if pos_data["aligned_kmer"].iloc[0][kmer_len_1] != "X":
+                        continue
+                    n_positions += 1
+                    total_prob = 0
+                    position_nuc_dict = {x: 0.0 for x in self.variants}
+                    # Get total probability for each nucleotide
+                    for nuc in self.variants:
+                        # kmer_len_1 = pos_data["reference_kmer"].iloc[0].find("X")
+                        # print(pos_data["reference_kmer"].iloc[0])
+                        nuc_data = pos_data[[nuc == kmer[kmer_len_1] for kmer in pos_data["path_kmer"]]]
+                        nuc_prob = sum(nuc_data["posterior_probability"])
+                        total_prob += nuc_prob
+                        position_nuc_dict[NanoporeRead.bytes_to_string(nuc)] = nuc_prob
+                    # normalize probabilities over each position
+                    nuc_data = [0] * len(self.variants)
+                    for index, nuc in enumerate(self.variants):
+                        assert total_prob > 0, "Check 'variants' parameter. There seems to be no kmers with those " \
+                                               "variant characters"
+                        nuc_data[index] = position_nuc_dict[nuc] / total_prob
+                        strand_read_nuc_data[index] += nuc_data[index]
+                    data.append(merge_lists([[self.read_name, self.contig, pos, read_strand,
+                                              mapping_strands[mapping_index]], nuc_data]))
+                if n_positions > 0:
+                    per_read_data.append(merge_lists([[self.read_name, self.contig, read_strand,
+                                                       mapping_strands[mapping_index], n_positions],
+                                                      [prob / n_positions for prob in strand_read_nuc_data]]))
+                mapping_index += 1
+            self.position_probs = pd.DataFrame(data, columns=self.columns)
+            self.per_read_calls = pd.DataFrame(per_read_data, columns=self.per_read_columns)
+            self.has_data = True
+
+        else:
+            self.has_data = False
 
         return self.position_probs
 
@@ -301,9 +307,9 @@ class AggregateOverReadsFull(object):
             mv_h.get_data()
             if self.verbose:
                 print(v_tsv)
-
-            self.per_position_data = self.per_position_data.append(mv_h.position_probs, ignore_index=True)
-            self.per_read_data = self.per_read_data.append(mv_h.per_read_calls, ignore_index=True)
+            if mv_h.has_data:
+                self.per_position_data = self.per_position_data.append(mv_h.position_probs, ignore_index=True)
+                self.per_read_data = self.per_read_data.append(mv_h.per_read_calls, ignore_index=True)
 
         for v_tsv in self.backward_tsvs:
             if os.stat(v_tsv).st_size == 0:
@@ -315,9 +321,9 @@ class AggregateOverReadsFull(object):
             mv_h.get_data()
             if self.verbose:
                 print(v_tsv)
-
-            self.per_position_data = self.per_position_data.append(mv_h.position_probs, ignore_index=True)
-            self.per_read_data = self.per_read_data.append(mv_h.per_read_calls, ignore_index=True)
+            if mv_h.has_data:
+                self.per_position_data = self.per_position_data.append(mv_h.position_probs, ignore_index=True)
+                self.per_read_data = self.per_read_data.append(mv_h.per_read_calls, ignore_index=True)
 
         return True
 

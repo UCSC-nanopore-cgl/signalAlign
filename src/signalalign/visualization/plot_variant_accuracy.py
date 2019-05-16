@@ -47,7 +47,10 @@ def plot_roc_from_config(config):
 
     variants = config.variants
     samples = config.samples
-
+    if isinstance(config.threshold, float):
+        threshold = config.threshold
+    else:
+        threshold = 0.500000001
     save_fig_dir = config.save_fig_dir
 
     assert len(samples) > 0, "Must include samples in order to do comparison"
@@ -95,37 +98,42 @@ def plot_roc_from_config(config):
     if plot_per_read:
         all_per_read_labels = pd.concat([x.per_read_data for x in aor_handles], ignore_index=True)
         data_type_name = "per_read"
-        plot_all_roc_curves(all_per_read_labels, variants, save_fig_dir, data_type_name)
+        plot_all_roc_curves(all_per_read_labels, variants, save_fig_dir, data_type_name, threshold=threshold)
 
     # plot per call ROC curve
     if plot_per_call:
         all_site_labels = pd.concat([x.per_position_data for x in aor_handles], ignore_index=True)
         data_type_name = "per_site_per_read"
-        plot_all_roc_curves(all_site_labels, variants, save_fig_dir, data_type_name)
+        plot_all_roc_curves(all_site_labels, variants, save_fig_dir, data_type_name, threshold=threshold)
 
     # plot genome position calls
     if plot_genome_position_aggregate:
         all_genome_positions_labels = pd.concat([x.aggregate_position_probs for x in aor_handles], ignore_index=True)
         data_type_name = "per_genomic_site"
-        plot_all_roc_curves(all_genome_positions_labels, variants, save_fig_dir, data_type_name, label_key="contig")
+        plot_all_roc_curves(all_genome_positions_labels, variants, save_fig_dir, data_type_name, label_key="contig",
+                            threshold=threshold)
 
     return 0
 
 
 def plot_roc_and_precision_and_save_data(per_read_labels_only, per_read_probs_only, name, variants, save_fig_dir,
-                                         label_ids=None):
+                                         label_ids=None, threshold=0.5):
     roc_h = ClassificationMetrics(per_read_labels_only, per_read_probs_only, label_ids=label_ids)
     for variant in variants:
         roc_path = None
         precision_recall_path = None
+        confusion_recall_path = None
 
         if save_fig_dir:
             roc_path = os.path.join(save_fig_dir, "{}_roc_{}".format(name, variant))
             precision_recall_path = os.path.join(save_fig_dir, "{}_pr_{}".format(name, variant))
+            confusion_recall_path = os.path.join(save_fig_dir, "{}_confusion_{}".format(name, variant))
 
         roc_h.plot_roc(variant, title="{} ROC for {}".format(name, variant), save_fig_path=roc_path)
         roc_h.plot_precision_recall(variant, title="{} Precison Recall for {}".format(name, variant),
                                     save_fig_path=precision_recall_path)
+        roc_h.plot_confusion_matrix(title="{} Confusion Matrix for {}".format(name, variant),
+                                    save_fig_path=confusion_recall_path, threshold=threshold)
 
     print("{} confusion matrix".format(name))
     print(roc_h.confusion_matrix())
@@ -137,7 +145,7 @@ def plot_roc_and_precision_and_save_data(per_read_labels_only, per_read_probs_on
     return 0
 
 
-def plot_all_roc_curves(all_labels, variants, save_fig_dir, data_type_name, label_key="read_name"):
+def plot_all_roc_curves(all_labels, variants, save_fig_dir, data_type_name, label_key="read_name", threshold=0.5):
     all_per_read_labels_template = all_labels[all_labels["strand"] == 't']
     all_per_read_labels_complement = all_labels[all_labels["strand"] == 'c']
 
@@ -148,9 +156,9 @@ def plot_all_roc_curves(all_labels, variants, save_fig_dir, data_type_name, labe
         per_read_probs_only = data[list(variants)]
         label_ids = list(data[label_key])
         per_read_labels_only.columns = list(variants)
-
-        plot_roc_and_precision_and_save_data(per_read_labels_only, per_read_probs_only, name, variants,
-                                             save_fig_dir, label_ids=label_ids)
+        if len(per_read_labels_only) > 0 and len(per_read_probs_only) > 0:
+            plot_roc_and_precision_and_save_data(per_read_labels_only, per_read_probs_only, name, variants,
+                                                 save_fig_dir, label_ids=label_ids, threshold=threshold)
 
     if save_fig_dir is not None:
         all_labels.to_csv(os.path.join(save_fig_dir, data_type_name + ".tsv"), sep='\t', index=False)
