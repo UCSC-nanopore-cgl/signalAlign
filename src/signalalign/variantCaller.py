@@ -345,15 +345,13 @@ class AggregateOverReadsFull(object):
                 mv_h.get_data()
             return mv_h
 
-        worker_count = 2
-
         test_args = {"variants": self.variants,
                      "forward_mapped": True,
                      "verbose": self.verbose}
 
         service = BasicService(marginalize_wrapper, service_name="forward_multiprocess_aggregate_all_variantcalls")
         total, failure, messages, output = run_service(service.run, self.forward_tsvs,
-                                                       test_args, ["v_tsv"], worker_count=worker_count)
+                                                       test_args, ["v_tsv"], worker_count=self.worker_count)
 
         for mv_h in output:
             if mv_h is None:
@@ -368,7 +366,7 @@ class AggregateOverReadsFull(object):
 
         service = BasicService(marginalize_wrapper, service_name="backward_multiprocess_aggregate_all_variantcalls")
         total, failure, messages, output = run_service(service.run, self.backward_tsvs,
-                                                       test_args, ["v_tsv"], worker_count=worker_count)
+                                                       test_args, ["v_tsv"], worker_count=self.worker_count)
 
         for mv_h in output:
             if mv_h is None:
