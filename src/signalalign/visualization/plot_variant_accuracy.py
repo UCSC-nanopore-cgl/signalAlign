@@ -52,7 +52,7 @@ def plot_roc_from_config(config):
     else:
         threshold = 0.500000001
 
-    if isinstance(config.jobs, float):
+    if isinstance(config.jobs, int):
         n_processes = config.jobs
     else:
         n_processes = 2
