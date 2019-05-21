@@ -111,7 +111,7 @@ class TrainSignalAlignTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temdir:
             dirs = make_kmer_directories(temdir, "ACGT", 6, complement=False)
             split_assignment_file(self.alignments_path, dirs, "ACGT", 6, 4, min_prob=0.0, alignment=True)
-            self.assertTrue(os.path.exists(os.path.join(os.path.join(temdir, "TGAAAA"), os.path.basename(self.assignment_path))))
+            self.assertTrue(os.path.exists(os.path.join(os.path.join(temdir, "TGAAAA"), os.path.basename(self.alignments_path))))
 
     def test_multiprocess_split_assignment_file(self):
         with tempfile.TemporaryDirectory() as temdir:
@@ -123,7 +123,7 @@ class TrainSignalAlignTest(unittest.TestCase):
             dirs = make_kmer_directories(temdir, "ACGT", 6, complement=True)
             multiprocess_split_sa_tsv_file([self.alignments_path], dirs, "ACGT", 6, min_prob=0.0,
                                                worker_count=1, alignment=True)
-            self.assertTrue(os.path.exists(os.path.join(os.path.join(temdir, "TGAAAA"), os.path.basename(self.assignment_path))))
+            self.assertTrue(os.path.exists(os.path.join(os.path.join(temdir, "TGAAAA"), os.path.basename(self.alignments_path))))
 
     def test_get_top_kmers_from_directory(self):
         with tempfile.TemporaryDirectory() as temdir:

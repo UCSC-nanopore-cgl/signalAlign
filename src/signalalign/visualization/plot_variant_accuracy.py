@@ -51,6 +51,12 @@ def plot_roc_from_config(config):
         threshold = config.threshold
     else:
         threshold = 0.500000001
+
+    if isinstance(config.jobs, float):
+        n_processes = config.jobs
+    else:
+        n_processes = 2
+
     save_fig_dir = config.save_fig_dir
 
     assert len(samples) > 0, "Must include samples in order to do comparison"
@@ -66,7 +72,7 @@ def plot_roc_from_config(config):
         tsvs = sample.full_tsvs
         positions = sample.positions_file
         label = sample.label
-        aor_h = AggregateOverReadsFull(tsvs, variants, verbose=True)
+        aor_h = AggregateOverReadsFull(tsvs, variants, verbose=True, processes=n_processes)
         aor_h.marginalize_over_all_reads()
         aor_handles.append(aor_h)
         assert positions or label, "Must provide either a label: {} or a positions file: {}".format(label,
@@ -133,7 +139,7 @@ def plot_roc_and_precision_and_save_data(per_read_labels_only, per_read_probs_on
         roc_h.plot_precision_recall(variant, title="{} Precison Recall for {}".format(name, variant),
                                     save_fig_path=precision_recall_path)
         roc_h.plot_confusion_matrix(title="{} Confusion Matrix for {}".format(name, variant),
-                                    save_fig_path=confusion_recall_path, threshold=threshold)
+                                    save_fig_path=confusion_recall_path, threshold=threshold, class_n=variant)
 
     print("{} confusion matrix".format(name))
     print(roc_h.confusion_matrix())

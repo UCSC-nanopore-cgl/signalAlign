@@ -7,6 +7,7 @@ import os
 import numpy as np
 import pandas as pd
 from py3helpers.utils import list_dir, merge_lists
+from py3helpers.multiprocess import *
 from signalalign.nanoporeRead import NanoporeRead
 from signalalign.signalAlignment import SignalAlignment
 from signalalign.train.trainModels import read_in_alignment_file
@@ -278,7 +279,7 @@ class AggregateOverReads(object):
 
 class AggregateOverReadsFull(object):
 
-    def __init__(self, sa_full_tsv_dir, variants="ATGC", verbose=False):
+    def __init__(self, sa_full_tsv_dir, variants="ATGC", verbose=False, processes=2):
         """Marginalize over all posterior probabilities to give a per position read probability
         :param sa_full_tsv_dir: directory of full output from signalAlign
         :param variants: bases to track probabilities
@@ -289,11 +290,12 @@ class AggregateOverReadsFull(object):
         self.forward_tsvs = list_dir(self.sa_full_tsv_dir, ext=".forward.tsv")
         self.backward_tsvs = list_dir(self.sa_full_tsv_dir, ext=".backward.tsv")
         self.verbose = verbose
+        self.worker_count = processes
 
         self.aggregate_position_probs = pd.DataFrame()
         self.per_position_data = pd.DataFrame()
         self.per_read_data = pd.DataFrame()
-        self.has_data = self._aggregate_all_variantcalls()
+        self.has_data = self._multiprocess_aggregate_all_variantcalls()
 
     def _aggregate_all_variantcalls(self):
         """Aggregate all the variant calls"""
@@ -321,6 +323,56 @@ class AggregateOverReadsFull(object):
             mv_h.get_data()
             if self.verbose:
                 print(v_tsv)
+            if mv_h.has_data:
+                self.per_position_data = self.per_position_data.append(mv_h.position_probs, ignore_index=True)
+                self.per_read_data = self.per_read_data.append(mv_h.per_read_calls, ignore_index=True)
+
+        return True
+
+    def _multiprocess_aggregate_all_variantcalls(self):
+        """Aggregate all the variant calls"""
+
+        def marginalize_wrapper(v_tsv, variants, forward_mapped, verbose):
+            mv_h = None
+            if os.stat(v_tsv).st_size != 0:
+                if verbose:
+                    print(v_tsv)
+                read_name = os.path.basename(v_tsv)
+                variant_data = read_in_alignment_file(v_tsv)
+
+                mv_h = MarginalizeFullVariants(variant_data, variants=variants, read_name=read_name,
+                                               forward_mapped=forward_mapped)
+                mv_h.get_data()
+            return mv_h
+
+        worker_count = 2
+
+        test_args = {"variants": self.variants,
+                     "forward_mapped": True,
+                     "verbose": self.verbose}
+
+        service = BasicService(marginalize_wrapper, service_name="forward_multiprocess_aggregate_all_variantcalls")
+        total, failure, messages, output = run_service(service.run, self.forward_tsvs,
+                                                       test_args, ["v_tsv"], worker_count=worker_count)
+
+        for mv_h in output:
+            if mv_h is None:
+                continue
+            if mv_h.has_data:
+                self.per_position_data = self.per_position_data.append(mv_h.position_probs, ignore_index=True)
+                self.per_read_data = self.per_read_data.append(mv_h.per_read_calls, ignore_index=True)
+
+        test_args = {"variants": self.variants,
+                     "forward_mapped": False,
+                     "verbose": self.verbose}
+
+        service = BasicService(marginalize_wrapper, service_name="backward_multiprocess_aggregate_all_variantcalls")
+        total, failure, messages, output = run_service(service.run, self.backward_tsvs,
+                                                       test_args, ["v_tsv"], worker_count=worker_count)
+
+        for mv_h in output:
+            if mv_h is None:
+                continue
             if mv_h.has_data:
                 self.per_position_data = self.per_position_data.append(mv_h.position_probs, ignore_index=True)
                 self.per_read_data = self.per_read_data.append(mv_h.per_read_calls, ignore_index=True)
