@@ -273,6 +273,8 @@ char *sequence_getBaseOptions(DegenerateType type) {
             return F_ADENOSINES;
         case adenosineInosine:
             return ADENOSINES;
+        case brduIncorporation:
+            return BRDU_BASES;
         default:
             return CANONICAL_NUCLEOTIDES;
     }
@@ -290,6 +292,8 @@ int64_t sequence_nbBaseOptions(DegenerateType type) {
             return 2; // A, I
         case adenosineMethylation:
             return 2; // A, F
+        case brduIncorporation:
+            return 2; // J, T
         default:
             return 4; // A, C, G, T
     }

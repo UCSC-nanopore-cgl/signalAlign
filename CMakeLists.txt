@@ -7,22 +7,23 @@ add_custom_target(build_signalAlign
         COMMAND make
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
-link_directories(/usr/local/lib)
-
+include_directories($ENV{HOME}/anaconda3/envs/signalalign/include)
 include_directories(${CMAKE_SOURCE_DIR}/inc)
 include_directories(${CMAKE_SOURCE_DIR}/sonLib/C/inc/)
 include_directories(${CMAKE_SOURCE_DIR}/sonLib/externalTools/cutest/)
 include_directories(${CMAKE_SOURCE_DIR}/sonLib/externalTools/quicktree_1.1/include)
-include_directories(/usr/local/include)
 include_directories(/usr/include)
-
 include_directories(/System/Library/Frameworks/Python.framework/Headers)
+#include_directories(/usr/local/include)
+
+link_directories($ENV{HOME}/anaconda3/envs/signalalign/lib)
+#link_directories(/usr/local/lib)
 
 set(SA_LIBRARY -lz -lm -lhts -lhdf5
         ${CMAKE_CURRENT_SOURCE_DIR}/sonLib/lib/sonLib.a
         ${CMAKE_CURRENT_SOURCE_DIR}/sonLib/lib/signalAlignLib.a
         ${CMAKE_CURRENT_SOURCE_DIR}/sonLib/lib/cuTest.a
-        -lz -ldl -lpthread )
+        -lz -ldl -lpthread)
 
 set(SOURCE_FILES
         impl/stateMachine.c
@@ -64,11 +65,15 @@ set(DEBUGGING debugging.c)
 #set(EVENTDETECT eventdetection/filters.c)
 set(EVENTALIGNERTESTS tests/eventAlignerTests.c)
 set(EXTRACT extract.c)
+set(HDPUTIL buildHdpUtil.c)
 
 
 #add_executable(filters ${EVENTDETECT})
 
 add_executable(signalMachine ${SOURCE_FILES} ${SIGNAL_MACHINE})
+target_link_libraries(signalMachine ${SA_LIBRARY})
+
+add_executable(buildHdpUtil ${SOURCE_FILES} ${HDPUTIL})
 target_link_libraries(signalMachine ${SA_LIBRARY})
 
 add_executable(kmerEventAlign ${SOURCE_FILES} kmerEventAlign.c)

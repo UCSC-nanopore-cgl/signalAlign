@@ -111,7 +111,7 @@ class SignalAlignment(object):
         self.temp_folder = FolderHandler()  # object for holding temporary files (non-toil)
         self.read_name = self.in_fast5.split("/")[-1][:-6]  # get the name without the '.fast5'
         self.target_regions = target_regions
-        self.output_formats = {"full": 0, "variantCaller": 1, "assignments": 2}
+        self.output_formats = {"full": 0, "variantCaller": 1, "assignments": 2, "both": 3}
         self.embed = embed  # embed the output into the fast5 file
         self.event_table = event_table  # specify which event table to use to generate alignments
         self.backward_reference = backward_reference  # fasta path to backward reference if modified bases are used
@@ -129,6 +129,9 @@ class SignalAlignment(object):
         self.filter_reads = filter_reads  # filter reads out with average fastq quality scores less than 7
         self.traceBackDiagonals = traceBackDiagonals  # number of traceback diagonals to caluclate before calculating
         self.delete_tmp = delete_tmp
+
+        self.complement_expectations_file_path = None
+        self.template_expectations_file_path = None
 
         self.aligned_segment = None
         if cigar_string:
@@ -302,22 +305,28 @@ class SignalAlignment(object):
 
         # next section makes the output file name with the format: /directory/for/files/file.model.orientation.tsv
         # forward strand
+        posteriors_file_path2 = None
         if strand == "+":
             if self.output_format == "full":
                 posteriors_file_path = os.path.join(self.destination, read_label + model_label + ".forward.tsv")
             elif self.output_format == "variantCaller":
-                posteriors_file_path = os.path.join(self.destination, read_label + model_label + ".tsv")
+                posteriors_file_path = os.path.join(self.destination, read_label + model_label + ".vc.tsv")
+            elif self.output_format == "both":
+                posteriors_file_path = os.path.join(self.destination, read_label + model_label + ".forward.tsv")
+                posteriors_file_path2 = os.path.join(self.destination, read_label + model_label + ".vc.tsv")
             else:
                 posteriors_file_path = os.path.join(self.destination, read_label + model_label + ".assignments.tsv")
-
-        # backward strand
         elif strand == "-":
             if self.output_format == "full":
                 posteriors_file_path = os.path.join(self.destination, read_label + model_label + ".backward.tsv")
             elif self.output_format == "variantCaller":
-                posteriors_file_path = os.path.join(self.destination, read_label + model_label + ".tsv")
+                posteriors_file_path = os.path.join(self.destination, read_label + model_label + ".vc.tsv")
+            elif self.output_format == "both":
+                posteriors_file_path = os.path.join(self.destination, read_label + model_label + ".backward.tsv")
+                posteriors_file_path2 = os.path.join(self.destination, read_label + model_label + ".vc.tsv")
             else:
                 posteriors_file_path = os.path.join(self.destination, read_label + model_label + ".assignments.tsv")
+
         # sanity check
         else:
             self.failStop("[SignalAlignment.run] ERROR Unexpected strand {}".format(strand), npRead)
@@ -376,9 +385,13 @@ class SignalAlignment(object):
             self.failStop("[SignalAlignment.run] ERROR illegal output format selected %s" % self.output_format)
             return False
         out_fmt = "-s {fmt} ".format(fmt=self.output_formats[self.output_format])
+        if self.output_formats[self.output_format] == 3:
+            out_fmt += "-i {} ".format(posteriors_file_path2)
 
         # degenerate nucleotide information
         if self.degenerate is not None:
+            if type(self.degenerate) is str:
+                self.degenerate = getDegenerateEnum(self.degenerate)
             degenerate_flag = "-o {} ".format(self.degenerate)
         else:
             degenerate_flag = ""
@@ -397,8 +410,8 @@ class SignalAlignment(object):
 
         # commands
         if self.get_expectations:
-            template_expectations_file_path = os.path.join(self.destination, read_label + ".template.expectations.tsv")
-            complement_expectations_file_path = os.path.join(self.destination,
+            self.template_expectations_file_path = os.path.join(self.destination, read_label + ".template.expectations.tsv")
+            self.complement_expectations_file_path = os.path.join(self.destination,
                                                              read_label + ".complement.expectations.tsv")
             command = \
                 "{vA} {td} {degen}{sparse}{model} -q {npRead} " \
@@ -408,8 +421,8 @@ class SignalAlignment(object):
                     .format(vA=self.path_to_signalMachine, model=stateMachineType_flag,
                             cigarFile=cigar_file_,
                             npRead=npRead_, readLabel=read_label, td=twoD_flag,
-                            templateExpectations=template_expectations_file_path, hdp=hdp_flags,
-                            complementExpectations=complement_expectations_file_path, t_model=template_model_flag,
+                            templateExpectations=self.template_expectations_file_path, hdp=hdp_flags,
+                            complementExpectations=self.complement_expectations_file_path, t_model=template_model_flag,
                             c_model=complement_model_flag, thresh=threshold_flag, expansion=diag_expansion_flag,
                             trim=trim_flag, degen=degenerate_flag, sparse=out_fmt, seq_name=reference_name,
                             f_ref_fa=forward_ref_flag, b_ref_fa=backward_ref_flag, traceback=self.traceBackDiagonals,
@@ -462,57 +475,104 @@ class SignalAlignment(object):
 
         # save to fast5 file (if appropriate)
         if self.embed:
-            print("[SignalAlignment.run] embedding into Fast5 ")
-            # load output data and grab new analysis path
-            data = self.read_in_signal_align_tsv(posteriors_file_path, file_type=self.output_format)
-            events = npRead.get_template_events()
-            if events:
-                try:
-                    template_events = np.asanyarray(npRead.template_events)
-                    check_numpy_table(template_events, req_fields=('raw_start', 'raw_length'))
-                # if events do not have raw_start or raw_lengths
-                except KeyError as e:
-                    template_events = add_raw_start_and_raw_length_to_events(
-                        template_events, sampling_freq=npRead.fastFive.sample_rate,
-                        start_time=npRead.fastFive.raw_attributes["start_time"])
-                    check_numpy_table(template_events, req_fields=('raw_start', 'raw_length'))
+            self.embed_file(npRead, posteriors_file_path, posteriors_file_path2, read_label, temp_samfile_)
 
-                sa_events = add_events_to_signalalign(sa_events=data, event_detections=template_events)
-
-            signal_align_path = npRead.fastFive.get_analysis_new("SignalAlign")
-            assert signal_align_path, "There is no path in Fast5 file with identifier: SignalAlign"
-
-            output_path = npRead._join_path(signal_align_path, self.output_format)
-            npRead.write_data(sa_events, output_path)
-            attributes = dict(basecall_events=npRead.template_event_table_address)
-            npRead.fastFive._add_attrs(attributes, signal_align_path)
-
-            if self.output_format == "full":
-                print("[SignalAlignment.run] getting maximum expected alignment")
-                alignment = mea_alignment_from_signal_align(None, events=sa_events)
-                mae_path = npRead._join_path(signal_align_path, "MEA_alignment_labels")
-                labels = create_label_from_events(alignment)
-                npRead.write_data(labels, mae_path)
-                # write SAM alignment
-                if self.aligned_segment is None:
-                    if self.alignment_file:
-                        self.aligned_segment, _, _ = get_aligned_segment_from_alignment_file(self.alignment_file,
-                                                                                             read_label)
-                    else:
-                        self.aligned_segment, _, _ = get_aligned_segment_from_alignment_file(temp_samfile_, read_label)
-
-                sam_string = self.aligned_segment.tostring()
-                sam_path = npRead._join_path(signal_align_path, "sam")
-                npRead.write_data(data=sam_string, location=sam_path, compression=None)
-            else:
-                print("[SignalAlignment.run] ERROR:  maximum expected alignment")
         npRead.close()
         if self.delete_tmp:
             self.temp_folder.remove_folder()
         if self.get_expectations:
-            return template_expectations_file_path, complement_expectations_file_path
+            return self.template_expectations_file_path, self.complement_expectations_file_path
         else:
             return posteriors_file_path, ""
+
+    def embed_file(self, npRead, posteriors_file_path, posteriors_file_path2, read_label, temp_samfile_):
+        print("[SignalAlignment.run] embedding into Fast5 ")
+        # load output data and grab new analysis path
+        if self.output_format == "both":
+            data = self.read_in_signal_align_tsv(posteriors_file_path, file_type="full")
+            data2 = self.read_in_signal_align_tsv(posteriors_file_path2, file_type="variantCaller")
+        else:
+            data = self.read_in_signal_align_tsv(posteriors_file_path, file_type=self.output_format)
+        template_events = self.get_template_events(npRead)
+        complement_events = None
+        if self.twoD_chemistry:
+            complement_events = self.get_complement_events(npRead)
+
+        sa_events = add_events_to_signalalign(sa_events=data, event_detections=template_events,
+                                              complement_event_detections=complement_events)
+
+        signal_align_path = npRead.fastFive.get_analysis_new("SignalAlign")
+        assert signal_align_path, "There is no path in Fast5 file with identifier: SignalAlign"
+
+        if self.output_format == "both":
+            output_path = npRead._join_path(signal_align_path, "full")
+            npRead.write_data(sa_events, output_path)
+            sa_events2 = add_events_to_signalalign(sa_events=data2, event_detections=template_events,
+                                                   complement_event_detections=complement_events)
+
+            output_path = npRead._join_path(signal_align_path, "variantCaller")
+            npRead.write_data(sa_events2, output_path)
+        else:
+            output_path = npRead._join_path(signal_align_path, self.output_format)
+            npRead.write_data(sa_events, output_path)
+
+        attributes = dict(basecall_events=npRead.template_event_table_address)
+        npRead.fastFive._add_attrs(attributes, signal_align_path)
+
+        if self.output_format == "full" or self.output_format == "both":
+            print("[SignalAlignment.run] getting maximum expected alignment")
+            alignment = mea_alignment_from_signal_align(None, events=sa_events[sa_events["strand"]==b't'])
+            mae_path = npRead._join_path(signal_align_path, "MEA_alignment_labels")
+            labels = create_label_from_events(alignment)
+            npRead.write_data(labels, mae_path)
+            if self.twoD_chemistry:
+                alignment = mea_alignment_from_signal_align(None, events=sa_events[sa_events["strand"]==b'c'])
+                mae_path = npRead._join_path(signal_align_path, "MEA_alignment_labels_complement")
+                labels = create_label_from_events(alignment)
+                npRead.write_data(labels, mae_path)
+
+            # write SAM alignment
+            if self.aligned_segment is None:
+                if self.alignment_file:
+                    self.aligned_segment, _, _ = get_aligned_segment_from_alignment_file(self.alignment_file,
+                                                                                         read_label)
+                else:
+                    self.aligned_segment, _, _ = get_aligned_segment_from_alignment_file(temp_samfile_, read_label)
+
+            sam_string = self.aligned_segment.tostring()
+            sam_path = npRead._join_path(signal_align_path, "sam")
+            npRead.write_data(data=sam_string, location=sam_path, compression=None)
+
+
+    @staticmethod
+    def get_complement_events(npRead):
+        npRead.get_complement_events()
+        try:
+            complement_events = np.asanyarray(npRead.complement_events)
+            check_numpy_table(complement_events, req_fields=('raw_start', 'raw_length'))
+            # if events do not have raw_start or raw_lengths
+        except KeyError as e:
+            complement_events = add_raw_start_and_raw_length_to_events(
+                complement_events, sampling_freq=npRead.fastFive.sample_rate,
+                start_time=npRead.fastFive.raw_attributes["start_time"])
+            check_numpy_table(complement_events, req_fields=('raw_start', 'raw_length'))
+
+        return complement_events
+
+    @staticmethod
+    def get_template_events(npRead):
+        npRead.get_template_events()
+        try:
+            template_events = np.asanyarray(npRead.template_events)
+            check_numpy_table(template_events, req_fields=('raw_start', 'raw_length'))
+        # if events do not have raw_start or raw_lengths
+        except KeyError as e:
+            template_events = add_raw_start_and_raw_length_to_events(
+                template_events, sampling_freq=npRead.fastFive.sample_rate,
+                start_time=npRead.fastFive.raw_attributes["start_time"])
+            check_numpy_table(template_events, req_fields=('raw_start', 'raw_length'))
+
+        return template_events
 
     def write_nucleotide_read(self, nanopore_read, file_path):
         try:
@@ -556,7 +616,7 @@ class SignalAlignment(object):
         assert file_type in ("full", "assignments", "variantCaller")
         with open(tsv_path, 'r') as tsvin:
             if file_type == "full":
-                dtype = [('contig', 'S10'), ('reference_index', int),
+                dtype = [('contig', 'S100'), ('reference_index', int),
                          ('reference_kmer', 'S5'), ('read_file', 'S57'),
                          ('strand', 'S1'), ('event_index', int),
                          ('event_mean', float), ('event_noise', float),
@@ -571,9 +631,9 @@ class SignalAlignment(object):
             else:
                 dtype = [('event_index', int), ('reference_position', int),
                          ('base', 'S6'), ('posterior_probability', float), ('strand', 'S1'),
-                         ('forward_mapped', int), ('read_file', 'S57')]
+                         ('forward_mapped', "S8"), ('read_file', 'S57'), ('posterior_score', float), ('contig', 'S100')]
 
-            event_table = np.loadtxt(tsvin, dtype=dtype)
+            event_table = np.loadtxt(tsvin, dtype=dtype, ndmin=1)
 
             def remove_field_name(a, name):
                 names = list(a.dtype.names)
@@ -894,9 +954,10 @@ class SignalAlignSample(object):
     def process_references(self):
         """Process a set of Fast5 files. Creates edited reference sequences if needed"""
         if self.fw_fasta_path is None:
-            assert os.path.isfile(
-                self.bwa_reference), "Must specify a bwa_reference in order to create signalAlignments. {}" \
-                                     "".format(self.bwa_reference)
+            if not self.alignment_file:
+                assert os.path.isfile(
+                    self.bwa_reference), "Must specify a bwa_reference in order to create signalAlignments. {}" \
+                                         "".format(self.bwa_reference)
             self.fw_fasta_path, self.bw_fasta_path = processReferenceFasta(fasta=self.bwa_reference,
                                                                            work_folder=self.working_folder,
                                                                            motifs=self.motifs,
@@ -937,6 +998,7 @@ def multithread_signal_alignment_samples(samples, signal_align_arguments, worker
                                           "".format(names)
     for sample in samples:
         # correct signal align arguments
+        print("[multithread_signal_alignment_samples] Running SignalAlign on sample: {}".format(sample.name))
         sample.process_reads(trim=trim)
         signal_align_arguments["degenerate"] = sample.degenerate
         signal_align_arguments["alignment_file"] = sample.alignment_file
@@ -950,6 +1012,7 @@ def multithread_signal_alignment_samples(samples, signal_align_arguments, worker
         assert sample.filter_read_generator is not None, \
             "Sample {} does not have a filter read generator. " \
             "Must pass in alignment_file and readdb and quality_threshold".format(sample.name)
+
         output_files = multithread_signal_alignment(signal_align_arguments, [], worker_count, debug=debug,
                                                     filter_reads_to_string_wrapper=sample.filter_read_generator)
         sample.analysis_files = output_files

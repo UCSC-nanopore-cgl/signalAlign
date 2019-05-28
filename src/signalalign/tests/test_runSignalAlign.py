@@ -65,8 +65,8 @@ class SignalAlignAlignmentTest(unittest.TestCase):
             shutil.rmtree("./signalAlign_unittest/")
         os.chdir(self.current_wd)
 
-    def check_alignments(self, true_alignments, reads, reference, kmer_length, contig_name, extra_args=None):
-        #TODO remove this from the framework and code
+    def check_alignments(self, true_alignments, reads, reference, kmer_length, contig_name, extra_args=None, rna=False):
+        # TODO remove this from the framework and code
         true_alignments = lambda x: 1 / 0
 
         def get_kmer(start):
@@ -117,7 +117,6 @@ class SignalAlignAlignmentTest(unittest.TestCase):
                                             fast5, read_id))
                         alignment2events[alignment] = event_count
 
-
         for alignment in test_alignments:
             alignment_file = alignment.split("/")[-1]
             # expected = parse_alignment_full(os.path.join(true_alignments, alignment_file))
@@ -127,12 +126,14 @@ class SignalAlignAlignmentTest(unittest.TestCase):
                 obs_kmer = row[2]
                 strand = row[3]
                 exp_kmer = get_kmer(ref_pos)
-                self.assertEqual(obs_kmer, exp_kmer, msg="kmer at index {idx} on strand {strand} is {obs} should be "
-                                                         "{exp}, file {f}".format(idx=ref_pos,
-                                                                                  strand=strand,
-                                                                                  obs=obs_kmer,
-                                                                                  exp=exp_kmer,
-                                                                                  f=alignment))
+                if rna:
+                    exp_kmer = exp_kmer[::-1]
+                self.assertEqual(obs_kmer, exp_kmer, msg="kmer at index {idx} on strand {strand} is {obs} "
+                                                               "should be {exp}, file {f}".format(idx=ref_pos,
+                                                                                                  strand=strand,
+                                                                                                  obs=obs_kmer,
+                                                                                                  exp=exp_kmer,
+                                                                                                  f=alignment))
             signal_align_event_count = len(obs)
             intial_event_count = alignment2events[alignment]
             self.assertTrue(signal_align_event_count >= intial_event_count,
@@ -178,20 +179,22 @@ class SignalAlignAlignmentTest(unittest.TestCase):
                               contig_name="gi_ecoli",
                               extra_args="-T=../models/testModelR9p4_5mer_acegt_template.model ")
 
-    # todo readd this once RNA basecalling works
-    # def test_RNA_edge_alignments_reads_5mer(self):
-    #     edge_case_true_alignments = os.path.join(SIGNALALIGN_ROOT,
-    #                                              "tests/test_alignments/RNA_edge_case_tempFiles_alignment/")
-    #     edge_case_reads = os.path.join(SIGNALALIGN_ROOT, "tests/minion_test_reads/RNA_edge_cases/")
-    #     edge_case_reference = os.path.join(SIGNALALIGN_ROOT, "tests/test_sequences/fake_rna_reversed.fa")
-    #     rna_alignments = os.path.join(SIGNALALIGN_ROOT, "tests/minion_test_reads/RNA_edge_cases/rna_edges_reversed.sam")
-    #     self.check_alignments(true_alignments=edge_case_true_alignments,
-    #                           reads=edge_case_reads,
-    #                           reference=edge_case_reference,
-    #                           kmer_length=5,
-    #                           contig_name="rna_fake_reversed",
-    #                           extra_args="-T=../models/testModelR9p4_5mer_acgt_RNA.model "
-    #                                      "--alignment_file {}".format(rna_alignments))
+    def test_RNA_edge_alignments_reads_5mer(self):
+        edge_case_true_alignments = os.path.join(SIGNALALIGN_ROOT,
+                                                 "tests/test_alignments/RNA_edge_case_tempFiles_alignment/")
+        edge_case_reads = os.path.join(SIGNALALIGN_ROOT, "tests/minion_test_reads/RNA_edge_cases/")
+        with tempfile.TemporaryDirectory() as tempdir:
+            new_dir = os.path.join(tempdir, "new_dir")
+            shutil.copytree(edge_case_reads, new_dir)
+            edge_case_reference = os.path.join(SIGNALALIGN_ROOT, "tests/test_sequences/fake_rna_ref.fa")
+            rna_alignments = os.path.join(SIGNALALIGN_ROOT, "tests/minion_test_reads/RNA_edge_cases/rna_reads.sam")
+            self.check_alignments(true_alignments=edge_case_true_alignments,
+                                  reads=new_dir,
+                                  reference=edge_case_reference,
+                                  kmer_length=5,
+                                  contig_name="rna_fake",
+                                  extra_args="-T=../models/testModelR9p4_5mer_acgt_RNA.model "
+                                             "--alignment_file {}".format(rna_alignments), rna=True)
 
     def test_signal_files_without_events(self):
         """Test if signalAlign can handle signal files without event information"""
@@ -234,8 +237,7 @@ def main():
     testSuite.addTest(SignalAlignAlignmentTest('test_pUC_r9_reads_5mer'))
     testSuite.addTest(SignalAlignAlignmentTest('test_pUC_r9_reads_6mer'))
     testSuite.addTest(SignalAlignAlignmentTest('test_Ecoli1D_reads_5mer'))
-    # # TODO add this back in after fixing RNA
-    # testSuite.addTest(SignalAlignAlignmentTest('test_RNA_edge_alignments_reads_5mer'))
+    testSuite.addTest(SignalAlignAlignmentTest('test_RNA_edge_alignments_reads_5mer'))
     testSuite.addTest(SignalAlignAlignmentTest('test_signal_files_without_events'))
 
     # deprecated

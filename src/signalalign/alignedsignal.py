@@ -12,23 +12,14 @@ import sys
 import os
 import subprocess
 import numpy as np
-from timeit import default_timer as timer
-from collections import defaultdict, namedtuple
-from py3helpers.utils import check_numpy_table
-from py3helpers.seq_tools import ReferenceHandler, ReverseComplement, get_minimap_alignment, \
-    initialize_aligned_segment_wrapper
+import pandas as pd
+from collections import defaultdict
+from py3helpers.utils import check_numpy_table, merge_lists
+from py3helpers.seq_tools import ReverseComplement, initialize_aligned_segment_wrapper
 from signalalign.fast5 import Fast5
-from signalalign.mea_algorithm import maximum_expected_accuracy_alignment, mea_slow, \
-    mea_slower, create_random_prob_matrix, get_mea_params_from_events, match_events_with_signalalign, \
-    create_label_from_events
+from signalalign.mea_algorithm import create_label_from_events
 from signalalign.event_detection import add_raw_start_and_raw_length_to_events
-from itertools import islice
-
-#TODO see if these get used, and if not remove them.  otherwise, fix them
-def time_to_index(event_table, sampling_freq=0, start_time=0):
-    raise Exception("This function is deprecated; you should find a better way to assert raw_start and raw_length fields")
-def index_to_time(event_table, sampling_freq=0, start_time=0):
-    raise Exception("This function is deprecated; you should find a better way to assert start and length fields")
+from signalalign.variantCaller import MarginalizeVariants
 
 
 class AlignedSignal(object):
@@ -52,6 +43,7 @@ class AlignedSignal(object):
         self.guide = defaultdict(defaultdict)
         # place to store event starts
         self.raw_starts = None
+        self.variant_calls = defaultdict()
         self.rna = rna
 
     def add_raw_signal(self, signal):
@@ -78,7 +70,7 @@ class AlignedSignal(object):
         """Add event start indices to the class"""
         self.raw_starts = np.asarray(raw_starts)
 
-    def add_label(self, label, name, label_type, guide_name=None):
+    def add_label(self, label, name, label_type, guide_name=None, check_strand=True):
         """Add labels to class.
 
         :param label: label numpy array with required fields ['raw_start', 'raw_length', 'reference_index',
@@ -106,8 +98,8 @@ class AlignedSignal(object):
             raise IndexError("labels are longer than signal")
 
         label1 = np.sort(label, order=['raw_start'], kind='mergesort')
-
-        self.check_strand_mapping(label1)
+        if check_strand:
+            self.check_strand_mapping(label1)
         # set label with the specified name
         if label_type == 'label':
             self.label[name] = label1
@@ -160,6 +152,11 @@ class AlignedSignal(object):
         else:
             self.minus_strand = minus_strand
 
+    def add_variant_call(self, variants, name):
+        """Add variant call data to the class"""
+        self.variant_calls[name] = variants
+        return 0
+
 
 class CreateLabels(Fast5):
     """Create an Aligned Signal object from a fast5 file with """
@@ -175,6 +172,7 @@ class CreateLabels(Fast5):
         self.kmer_index = kmer_index
         self.rna = self.is_read_rna()
         self.aligned_signal = self._initialize()
+        self.has_guide_alignment = False
 
     def _initialize(self):
         """Initialize AlignedSignal class by adding the raw and scaled signal"""
@@ -184,6 +182,31 @@ class CreateLabels(Fast5):
         aligned_signal = AlignedSignal(scaled_signal, rna=self.rna)
         aligned_signal.add_raw_signal(raw_signal)
         return aligned_signal
+
+    def add_variant_data(self, number=None, complement=False):
+        """Add variant data to aligned signal"""
+        if number is not None:
+            assert type(number) is int, "Number must be an integer"
+            path = self.__default_signalalign_events__.format(number)
+            variant_data = self.get_signalalign_events(variant=True, override_path=path, complement=complement)
+            # print("mea_alignment path: {}".format(path))
+            name = "variantCaller_{}_{}".format(number, "complement" if complement else "template")
+        else:
+            variant_data = self.get_signalalign_events(variant=True)
+            name = "variantCaller"
+
+        mv_h = MarginalizeVariants(variant_data, variants=[x.decode() for x in set(variant_data["base"])],
+                                   read_name=self.get_read_id())
+        data = mv_h.get_data()
+        if complement:
+            data = data[data["strand"] == "c"]
+        else:
+            data = data[data["strand"] == "t"]
+
+        final_data = match_ref_position_with_raw_start_band(data, variant_data)
+
+        self.aligned_signal.add_variant_call(final_data, name=name)
+        return final_data
 
     def fix_sa_reference_indexes(self, data):
         """Fix reference indexes based on kmer length and kmer index"""
@@ -196,16 +219,18 @@ class CreateLabels(Fast5):
             data["reference_index"] += self.kmer_index
         return data
 
-    def add_mea_labels(self, number=None):
+    def add_mea_labels(self, number=None, complement=False):
         """Gather mea_alignment labels information from fast5 file.
-        :param number: integer representing which signal align predictions to plot"""
+        :param number: integer representing which signal align predictions to plot
+        :param complement: option to look for mea_complement data
+        """
         if number is not None:
             assert type(number) is int, "Number must be an integer"
             path = self.__default_signalalign_events__.format(number)
-            mea_alignment = self.get_signalalign_events(mea=True, override_path=path)
+            mea_alignment = self.get_signalalign_events(mea=True, override_path=path, complement=complement)
             # print("mea_alignment path: {}".format(path))
 
-            name = "mea_signalalign_{}".format(number)
+            name = "mea_signalalign_{}_{}".format(number, "complement" if complement else "template")
         else:
             mea_alignment = self.get_signalalign_events(mea=True)
             name = "mea_signalalign"
@@ -215,13 +240,15 @@ class CreateLabels(Fast5):
 
         mea_alignment = self.fix_sa_reference_indexes(mea_alignment)
 
-        self.aligned_signal.add_label(mea_alignment, name=name, label_type='label')
+        self.aligned_signal.add_label(mea_alignment, name=name, label_type='label', check_strand=not complement)
         return mea_alignment
 
-    def add_signal_align_predictions(self, number=None, add_basecall=False):
+    def add_signal_align_predictions(self, number=None, add_basecall=False, two_d=False):
         """Create prediction using probabilities from full output format from signalAlign
         :param number: integer representing which signal align predictions to plot
-        :param add_basecall: if set to true, will add basecalled event table"""
+        :param add_basecall: if set to true, will add basecalled event table
+        :param two_d: boolean option to visualize 2d reads
+        """
         if number is not None:
             assert type(number) is int, "Number must be an integer"
             path = self.__default_signalalign_events__.format(number)
@@ -245,11 +272,13 @@ class CreateLabels(Fast5):
             self.add_basecall_alignment_prediction(my_events=events,
                                                    number=basecall_events_path[24],
                                                    sam=sam)
+        if not two_d:
+            sa_events = sa_events[sa_events["strand"] == b"t"]
         predictions = create_label_from_events(sa_events)
 
         predictions = self.fix_sa_reference_indexes(predictions)
 
-        self.aligned_signal.add_label(predictions, name=name, label_type='prediction')
+        self.aligned_signal.add_label(predictions, name=name, label_type='prediction', check_strand=not two_d)
         return predictions
 
     def add_basecall_alignment_prediction(self, sam=None, number=None, add_mismatches=False, my_events=None, trim=None):
@@ -296,7 +325,7 @@ class CreateLabels(Fast5):
         if add_mismatches:
             self.aligned_signal.add_label(mismatches, name=mismatches_name, label_type='prediction')
         self.aligned_signal.add_raw_starts(raw_starts)
-
+        self.has_guide_alignment = True
         return matches, mismatches
 
     def get_basecalled_data_by_number(self, number):
@@ -334,21 +363,80 @@ class CreateLabels(Fast5):
         self.aligned_signal.add_label(cigar_label, name="tombo_{}".format(number), label_type='label')
         return cigar_label
 
-    def add_eventalign_labels(self):
-        """Add eventalign labels"""
-        section = "template"
-        ea_events = self.get_eventalign_events(section=section)
-        events = self.get_basecall_data(section=section)
-        sampling_freq = self.sample_rate
-        start_time = self.raw_attributes['start_time']
-        events = time_to_index(events, sampling_freq=sampling_freq, start_time=start_time)
-        lables = match_events_with_eventalign(events=ea_events, event_detections=events)
-        if self.rna:
-            lables["reference_index"] -= self.kmer_index
-        else:
-            lables["reference_index"] += self.kmer_index
+    # def add_eventalign_labels(self):
+    #     """Add eventalign labels"""
+    #     section = "template"
+    #     ea_events = self.get_eventalign_events(section=section)
+    #     events = self.get_basecall_data(section=section)
+    #     sampling_freq = self.sample_rate
+    #     start_time = self.raw_attributes['start_time']
+    # TODO fix time to index
+    #     events = time_to_index(events, sampling_freq=sampling_freq, start_time=start_time)
 
-        self.aligned_signal.add_label(lables, name='eventAlign', label_type='label')
+    #     lables = match_events_with_eventalign(events=ea_events, event_detections=events)
+    #     if self.rna:
+    #         lables["reference_index"] -= self.kmer_index
+    #     else:
+    #         lables["reference_index"] += self.kmer_index
+    #
+    #     self.aligned_signal.add_label(lables, name='eventAlign', label_type='label')
+
+
+def get_distance_from_guide_alignment(data, guide_data, reference_index_key="position", minus_strand=False):
+    """Calculate the distance of input data alignment to the guide alignment.
+    :param data: input data with at least "raw_start", "raw_length", and reference_index_key fields
+    :param guide_data: guide alignmnet data
+    :param reference_index_key: key to grab reference index from data
+    :param minus_strand: boolean option if data is aligned to minus strand
+    :return: modified data with "guide_delta" field
+    """
+    variant_data = data.sort_values(by=reference_index_key)
+    if minus_strand:
+        guide_data = guide_data[::-1]
+
+    distance_to_guide = []
+    variant_index = 0
+    len_variant_data = len(variant_data)
+    v_position = variant_data.iloc[variant_index][reference_index_key]
+    for i, guide in enumerate(guide_data.itertuples()):
+        if getattr(guide, "reference_index") >= v_position:
+            if getattr(guide, "reference_index") == v_position:
+                guide_index = i
+            else:
+                guide_index = i-1
+
+            v_position_middle = (variant_data.iloc[variant_index]["raw_start"] +
+                                 (variant_data.iloc[variant_index]["raw_length"] / 2))
+            guide_middle_position = np.round((guide_data.iloc[guide_index]["raw_start"] + (guide_data.iloc[guide_index]["raw_length"] / 2)))
+
+            distance_to_guide.append(v_position_middle - guide_middle_position)
+            variant_index += 1
+            if variant_index < len_variant_data:
+                v_position = variant_data.iloc[variant_index][reference_index_key]
+            else:
+                break
+
+    distance = pd.DataFrame(distance_to_guide, columns=['guide_delta'])
+    final_data = pd.concat([variant_data, distance], axis=1)
+    return final_data
+
+
+def match_ref_position_with_raw_start_band(aggregate_reference_position, per_event_data):
+    """Match up the reference position from aggregated probability table and the per event data"""
+    final_data = []
+    for position in aggregate_reference_position["position"]:
+
+        # get the start and length of total number of events which had bases aligned to this position
+        pos_data = per_event_data[per_event_data["reference_position"] == position]
+        min_raw_start = min(pos_data["raw_start"])
+        last_event_length = pos_data[pos_data["raw_start"] == max(pos_data["raw_start"])]["raw_length"][0]
+        total_length = max(pos_data["raw_start"]) - min(pos_data["raw_start"]) + last_event_length
+        final_data.append(
+            merge_lists([aggregate_reference_position[aggregate_reference_position["position"] == position].values.tolist()[0],
+                         [min_raw_start, total_length]]))
+    final_data = pd.DataFrame(final_data, columns=merge_lists([aggregate_reference_position.columns,
+                                                               ["raw_start", "raw_length"]]))
+    return final_data
 
 
 def trim_matches(matches, trim):

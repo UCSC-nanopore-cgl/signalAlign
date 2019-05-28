@@ -12,8 +12,8 @@ event_detect = 'eventdetection'
 pkg_path = os.path.join(os.path.dirname(__file__), event_detect)
 
 son_Lib = "sonLib/lib"
-
-include_dirs = [event_detect, son_Lib]
+hdf_5 = "./include"
+include_dirs = [event_detect, son_Lib, hdf_5]
 
 extensions = []
 
@@ -44,11 +44,11 @@ signalAlign_a = os.path.join(HOME, "sonLib/lib/signalAlignLib.a")
 son_Lib_a = os.path.join(HOME, "sonLib/lib/sonLib.a")
 cu_test_a = os.path.join(HOME, "sonLib/lib/cuTest.a")
 
-libraries = ['dl', 'z', 'm', 'pthread', 'gomp', 'hdf5']
+libraries = ['dl', 'z', 'm', 'pthread', 'gomp']
 extra_objects = [signalAlign_a, son_Lib_a]
-include_dirs = [sa_include, sonlib_include]
+include_dirs = [sa_include, sonlib_include, hdf_5]
 c_compile_args = ['-pedantic', '-Wall', '-std=c99', '-DNDEBUG', '-fstrict-aliasing', '-fopenmp',
-                  '-L{}'.format(os.path.join(HOME, 'lib'))]
+                  '-L{}'.format(os.path.join(HOME, 'lib'), "./lib/libhdf5.a")]
 
 extensions.append(Extension('kmeralign',
                             sources=[os.path.join(pkg_path, 'event_align_wrapper.c')],
@@ -74,7 +74,8 @@ setup(name="signalAlign",
                         "sonLib>=1.1.0",
                         "PyYAML>=3.12",
                         "Cython>=0.26",
-                        "scikit-learn==0.19.0",
-                        "matplotlib==2.0.2",
-                        "pathos==0.2.1"]
+                        "scikit-learn>=0.19.0,<=0.20.3",
+                        "matplotlib>=2.0.2",
+                        "pathos==0.2.1",
+                        "py3helpers[seq_tools]>=0.3.0"]
       )

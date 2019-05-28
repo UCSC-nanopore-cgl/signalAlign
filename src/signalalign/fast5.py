@@ -375,11 +375,12 @@ class Fast5(h5py.File):
             raise IndexError('File does not contain analysis with name: {}'.format(name))
         return events
 
-    def get_signalalign_events(self, mea=False, sam=False, override_path=None):
+    def get_signalalign_events(self, mea=False, sam=False, override_path=None, complement=False, variant=False):
         """Get signal align events, sam or mea alignment
         :param mea: boolean option to grab the MEA_alignment_labels
         :param sam: boolean option to grab sam file
         :param override_path: if passed, will look for alignment events at that path
+        :param complement: get mea complement
         """
         assert (not mea or not sam), "Both mea and sam cannot be set to True"
         try:
@@ -390,11 +391,18 @@ class Fast5(h5py.File):
                 path = self.check_path(self.__default_signalalign_events__, latest=True)
             reads = self[path]
             if mea:
-                field = "MEA_alignment_labels"
-                events = np.asarray(reads[field])
+                if complement:
+                    field = "MEA_alignment_labels_complement"
+                    events = np.asarray(reads[field])
+                else:
+                    field = "MEA_alignment_labels"
+                    events = np.asarray(reads[field])
             elif sam:
                 field = "sam"
                 events = str(np.asarray(reads[field]))
+            elif variant:
+                field = "variantCaller"
+                events = np.asarray(reads[field])
             else:
                 field = "full"
                 events = np.asarray(reads[field])
@@ -704,6 +712,14 @@ class Fast5(h5py.File):
         self[data_path] = raw
 
         ###
+
+    def get_read_id(self):
+        reads = list(self[self.__raw_path__])
+        if len(reads) != 1:
+            return False
+        read_loc = os.path.join(self.__raw_path__, reads[0])
+        read_label = self.bytes_to_string(self[read_loc].attrs.get('read_id'))
+        return read_label
     # Analysis path resolution
 
     def get_analysis_latest(self, name):

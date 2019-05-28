@@ -50,14 +50,11 @@ class EventDetectTests(unittest.TestCase):
 
         # create handles
         cls.dna_handle = Fast5(cls.tmp_dna_file, 'r+')
-        cls.rna_handle = Fast5(cls.tmp_rna_file1, 'r+')
         cls.rna_handle2 = Fast5(cls.tmp_rna_file2, 'r+')
-        cls.rna_handle3 = Fast5(cls.tmp_rna_file3, 'r+')
 
         # clear line for output
         print("")
         print("", file=sys.stderr)
-
 
     def test_sequence_from_events(self):
         # """Test sequence from events method"""
@@ -76,7 +73,6 @@ class EventDetectTests(unittest.TestCase):
         with self.assertRaises(KeyError):
             events = np.empty(9, dtype=[('model_state', 'S5')])
             sequence_from_events(events)
-
 
     def test_add_start_and_length_modifications(self):
         """test add_raw_start_and_raw_length_to_events and add_start_and_length_to_events methods"""
@@ -125,7 +121,6 @@ class EventDetectTests(unittest.TestCase):
 
     def test_load_from_raw(self):
         path_to_bin = os.path.join(self.HOME, "bin")
-        self.rna_handle3.close()
         np_handle = NanoporeRead(os.path.abspath(self.tmp_rna_file3))
         np_handle._initialize_metadata()
         alignment_file = os.path.join(self.HOME, "tests/minion_test_reads/RNA_edge_cases/rna_reads.sam")

@@ -5,6 +5,7 @@
 from __future__ import print_function
 import sys
 import os
+from timeit import default_timer as timer
 from argparse import ArgumentParser
 from random import shuffle
 from shutil import copyfile
@@ -93,11 +94,6 @@ def parse_args():
                              required=False, default=None, help='amount to remove from an anchor constraint')
     run_parser2.add_argument('--target_regions', '-q', action='store', dest='target_regions', type=str,
                              required=False, default=None, help="tab separated table with regions to align to")
-    run_parser2.add_argument("--motifs", action="store", dest="motifs", default=None, help="Motif find and replace "
-                                                                                           "must be in specific list within "
-                                                                                           "a list format. eg: "
-                                                                                           "[['CCAGG', 'CEAGG'], "
-                                                                                           "['CCTGG', 'CETGG']]")
     run_parser2.add_argument('--ambiguity_positions', '-p', action='store', required=False, default=None,
                              dest='ambiguity_positions', help="Ambiguity positions")
     run_parser2.add_argument('--jobs', '-j', action='store', dest='nb_jobs', required=False,
@@ -141,6 +137,8 @@ def concat_variant_call_files(path):
 
 def main(args):
     # parse args
+    start = timer()
+
     args = parse_args()
     if args.command == "run":
         if not os.path.exists(args.config):
@@ -194,7 +192,7 @@ def main(args):
 
         print("\n#  signalAlign - finished alignments\n", file=sys.stderr)
         print("\n#  signalAlign - finished alignments\n", file=sys.stdout)
-
+        stop = timer()
     else:
         command_line = " ".join(sys.argv[:])
         print(os.getcwd())
@@ -254,7 +252,6 @@ def main(args):
         # generate reference sequence if not specified
         if not args.forward_reference or not args.backward_reference:
             args.forward_reference, args.backward_reference = processReferenceFasta(fasta=args.bwa_reference,
-                                                                                    motifs=args.motifs,
                                                                                     work_folder=temp_folder,
                                                                                     positions_file=args.ambiguity_positions,
                                                                                     name="")
@@ -312,9 +309,13 @@ def main(args):
         # setup workers for multiprocessing
         multithread_signal_alignment(alignment_args, fast5s, args.nb_jobs, debug=args.DEBUG,
                                      filter_reads_to_string_wrapper=filter_read_generator)
+        stop = timer()
 
         print("\n#  signalAlign - finished alignments\n", file=sys.stderr)
         print("\n#  signalAlign - finished alignments\n", file=sys.stdout)
+
+    print("[signalAlign] Complete")
+    print("Running Time = {} seconds".format(stop - start))
 
 
 if __name__ == "__main__":

@@ -13,14 +13,11 @@
 import unittest
 import os
 import numpy as np
-import threading
-import time
 import tempfile
 from shutil import copyfile
 
 from signalalign.hiddenMarkovModel import *
-from signalalign.fast5 import Fast5
-from py3helpers.utils import all_string_permutations, get_random_string
+from py3helpers.utils import all_string_permutations, get_random_string, list_dir
 
 
 class HiddenMarkovTests(unittest.TestCase):
@@ -35,6 +32,8 @@ class HiddenMarkovTests(unittest.TestCase):
         cls.model = HmmModel(ont_model_file=cls.model_file)
         cls.expectation_file = os.path.join(cls.HOME,
                                             "tests/test_expectation_files/4f9a316c-8bb3-410a-8cfc-026061f7e8db.template.expectations.tsv")
+        cls.nanopolish_model = os.path.join(cls.HOME, "models/r9.4_450bps.nucleotide.6mer.template.model")
+        cls.cpg_nanopolish_model = os.path.join(cls.HOME, "models/r9.4_450bps.cpg.6mer.template.model")
 
     def test_get_kmer_index(self):
         all_kmers = [x for x in all_string_permutations("ATGC", 5)]
@@ -175,6 +174,29 @@ class HiddenMarkovTests(unittest.TestCase):
         prob = hdp_handle.grid_spline_interp(query_x, x, y, slope, length)
         self.assertEqual(prob, 0.12328410496683605)
 
+    def test_get_hdp_probability(self):
+        hdp_model = os.path.join(self.HOME, "models/template_RNA.singleLevelFixedCanonical.nhdp")
+        hdp_handle = HmmModel(ont_model_file=self.model_file, hdp_model_file=hdp_model)
+        query_x = 83.674161662792542
+        prob = hdp_handle.get_hdp_probability("AACAT", query_x)
+        self.assertEqual(prob, 0.29228949476718646)
+        query_x = 81.55860779063407
+        prob = hdp_handle.get_hdp_probability("AACAT", query_x)
+        self.assertEqual(prob, 0.12927539337648492)
+        query_x = 80.605230545769458
+        prob = hdp_handle.get_hdp_probability("CATTT", query_x)
+        self.assertEqual(prob, 0.12328410496683605)
+
+    def test_get_new_linspace_hdp_probability_distribution(self):
+        hdp_model = os.path.join(self.HOME, "models/template_RNA.singleLevelFixedCanonical.nhdp")
+        hdp_handle = HmmModel(ont_model_file=self.model_file, hdp_model_file=hdp_model)
+        kmer = "AACAT"
+        linspace = hdp_handle.linspace
+        kmer_id = hdp_handle.get_kmer_index(kmer)
+        y = hdp_handle.all_posterior_pred[kmer_id]
+        new_y = hdp_handle.get_new_linspace_hdp_probability_distribution(kmer, linspace)
+        self.assertSequenceEqual(new_y, y)
+
     def test_write_new_model(self):
         with tempfile.TemporaryDirectory() as tempdir:
             test_model_file = os.path.join(tempdir, "fake.hmm")
@@ -186,6 +208,96 @@ class HiddenMarkovTests(unittest.TestCase):
             self.assertEqual(hmm_handle2.alphabet, "ACFGT")
             self.assertEqual(hmm_handle2.alphabet_size, 5)
             self.assertRaises(AssertionError, hmm_handle.write_new_model, test_model_file, "ATGCW", "A")
+
+    def test_create_new_model(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            test_model_file = os.path.join(tempdir, "fake.hmm")
+            new_model = create_new_model(self.model_file, test_model_file, (("A", "F"), ("A", "J")))
+            self.assertEqual(new_model.kmer_length, 5)
+            self.assertEqual(new_model.alphabet, "ACFGJT")
+            self.assertEqual(new_model.alphabet_size, 6)
+            mean1 = new_model.get_event_mean_gaussian_parameters("AAAAA")
+            mean2 = new_model.get_event_mean_gaussian_parameters("AAAJA")
+            mean3 = new_model.get_event_mean_gaussian_parameters("AAAFA")
+            mean4 = new_model.get_event_mean_gaussian_parameters("AAJFA")
+            mean5 = new_model.get_event_mean_gaussian_parameters("AAJJJ")
+            mean6 = new_model.get_event_mean_gaussian_parameters("FFJJJ")
+            self.assertEqual(mean1, mean2)
+            self.assertEqual(mean2, mean3)
+            self.assertEqual(mean3, mean4)
+            self.assertEqual(mean4, mean5)
+            self.assertEqual(mean5, mean6)
+            new_model = create_new_model(self.model_file, test_model_file, [("A", "J")])
+
+    def test_set_kmer_event_mean(self):
+        hmm_handle = HmmModel(ont_model_file=self.model_file)
+        hmm_handle.set_kmer_event_mean("AAAAA", 1000)
+        mean, sd = hmm_handle.get_event_mean_gaussian_parameters("AAAAA")
+        self.assertEqual(mean, 1000)
+
+    def test_set_kmer_event_sd(self):
+        hmm_handle = HmmModel(ont_model_file=self.model_file)
+        hmm_handle.set_kmer_event_sd("AAAAA", 1000)
+        mean, sd = hmm_handle.get_event_mean_gaussian_parameters("AAAAA")
+        self.assertEqual(sd, 1000)
+
+    def test_set_kmer_noise_means(self):
+        hmm_handle = HmmModel(ont_model_file=self.model_file)
+        hmm_handle.set_kmer_noise_means("AAAAA", 1000)
+        mean, sd = hmm_handle.get_event_sd_inv_gaussian_parameters("AAAAA")
+        self.assertEqual(mean, 1000)
+
+    def test_set_kmer_noise_lambdas(self):
+        hmm_handle = HmmModel(ont_model_file=self.model_file)
+        hmm_handle.set_kmer_noise_lambdas("AAAAA", 1000)
+        mean, sd = hmm_handle.get_event_sd_inv_gaussian_parameters("AAAAA")
+        self.assertEqual(sd, 1000)
+
+    def test_read_in_alignment_file(self):
+        assignments_dir = os.path.join(self.HOME, "tests/test_alignments/ecoli1D_test_alignments_sm3")
+        data = read_in_alignment_file(list_dir(assignments_dir)[0])
+        self.assertEqual(len(data["contig"]), 16852)
+        self.assertEqual(len(data["reference_index"]), 16852)
+        self.assertEqual(len(data["reference_kmer"]), 16852)
+        self.assertEqual(len(data["read_file"]), 16852)
+        self.assertEqual(len(data["strand"]), 16852)
+        self.assertEqual(len(data["event_index"]), 16852)
+        self.assertEqual(len(data["event_mean"]), 16852)
+        self.assertEqual(len(data["event_noise"]), 16852)
+        self.assertEqual(len(data["event_duration"]), 16852)
+        self.assertEqual(len(data["aligned_kmer"]), 16852)
+        self.assertEqual(len(data["scaled_mean_current"]), 16852)
+        self.assertEqual(len(data["scaled_noise"]), 16852)
+        self.assertEqual(len(data["posterior_probability"]), 16852)
+        self.assertEqual(len(data["descaled_event_mean"]), 16852)
+        self.assertEqual(len(data["ont_model_mean"]), 16852)
+        self.assertEqual(len(data["path_kmer"]), 16852)
+        self.assertEqual(len(data), 16852)
+
+    def test_load_nanopolish_model(self):
+        # model = HmmModel(ont_model_file=self.model_file, nanopolish_model_file=nanopolish_model)
+        model, alphabet, k = load_nanopolish_model(self.nanopolish_model)
+        self.assertEqual(len(model["means"]), 4**6)
+        self.assertEqual(alphabet, "ACGT")
+        self.assertEqual(k, 6)
+
+    def test_convert_nanopolish_model_to_signalalign(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            sa_file = os.path.join(tempdir, "testModelr9.4_450bps.nucleotide.6mer.template.model")
+            convert_nanopolish_model_to_signalalign(self.nanopolish_model, self.model.transitions, sa_file)
+            sa_model = HmmModel(sa_file)
+            model_mean, model_sd = sa_model.get_event_mean_gaussian_parameters("AAAATG")
+            self.assertEqual(model_mean, 75.943873)
+            self.assertEqual(model_sd, 1.542528)
+
+    def test_convert_and_edit_nanopolish_model_to_signalalign(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            sa_file = os.path.join(tempdir, "testModelR9.4_450bps.cpg.6mer.template.model")
+            convert_and_edit_nanopolish_model_to_signalalign(self.cpg_nanopolish_model, self.model.transitions, sa_file)
+            sa_model = HmmModel(sa_file)
+            model_mean, model_sd = sa_model.get_event_mean_gaussian_parameters("AAAAEE")
+            self.assertEqual(model_mean, 75.7063)
+            self.assertEqual(model_sd, 2.70501)
 
 
 if __name__ == '__main__':

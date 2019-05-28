@@ -36,6 +36,7 @@ extern const char *PAIRWISE_ALIGNMENT_EXCEPTION_ID;
 #define F_ADENOSINES "AF"
 #define CANONICAL_NUCLEOTIDES "ACGT"
 #define ALL_BASES "ACEGOT"
+#define BRDU_BASES "JT"
 
 // TODO depreciate these things
 #define KMER_LENGTH 6
@@ -54,7 +55,8 @@ typedef enum {
     cytosineMethylation3 = 1,
     adenosineInosine = 2,
     canonicalVariants = 3,
-    adenosineMethylation = 5
+    brduIncorporation = 4,
+    adenosineMethylation = 5,
 } DegenerateType;
 
 typedef struct _sequence Sequence;

@@ -1,8 +1,8 @@
 #!/usr/bin/env python
-"""Plot speeds of maximum expected accuracy methods"""
+"""Plot labelled read"""
 ########################################################################
-# File: plot_mea_speeds.py
-#  executable: plot_mea_speeds.py
+# File: plot_labelled_read.py
+#  executable: plot_labelled_read.py
 #
 # Author: Andrew Bailey
 # History: Created 02/24/18
@@ -11,19 +11,28 @@
 from __future__ import print_function
 import sys
 import os
+import platform
 import colorsys
+import matplotlib as mpl
+
+if os.environ.get('DISPLAY', '') == '':
+    print('no display found. Using non-interactive Agg backend')
+    mpl.use('Agg')
+if platform.system() == "Darwin":
+    mpl.use("macosx")
 import matplotlib.pyplot as plt
 import matplotlib.patches as mplpatches
 from matplotlib.collections import LineCollection
 
 import numpy as np
-
+import pandas as pd
 from collections import defaultdict
 from timeit import default_timer as timer
 from argparse import ArgumentParser
 from signalalign.alignedsignal import AlignedSignal, CreateLabels
 from signalalign.nanoporeRead import NanoporeRead
-from py3helpers.utils import list_dir
+from py3helpers.utils import list_dir, find_substring_indices
+from py3helpers.seq_tools import initialize_aligned_segment_wrapper, ReverseComplement
 
 MEA = 'm'
 SA_FULL = 's'
@@ -66,6 +75,10 @@ def parse_args():
                         dest='sa_full', required=False,
                         help="Option to plot all of the posterior probabilities from the signalalign output")
 
+    parser.add_argument('--variant', nargs='+',
+                        dest='variant', required=False,
+                        help="Path to variant data tsv file")
+
     parser.add_argument('--output_dir', action='store',
                         dest='output_dir', required=False, type=str,
                         help="If set, will write out to output directory otherwise the graph is just shown")
@@ -73,9 +86,14 @@ def parse_args():
     parser.add_argument('--plot_alpha', action='store_true', default=False, dest="plot_alpha", required=False,
                         help="If set, will plot probability information as the alpha associated with each data point")
 
+    parser.add_argument('--two_d', action='store_true', default=False, dest="two_d", required=False,
+                        help="Plot's complement mea")
+
     parser.add_argument('--trim', action='store', default=0, dest="trim", required=False, type=int,
                         help="If set, will trim runs of matches")
 
+    parser.add_argument('--kmers', action='store', nargs='+', default=None, dest="kmers", required=False, type=str,
+                        help="Highlight kmers in reference sequence")
 
     args = parser.parse_args()
     return args
@@ -94,6 +112,7 @@ class PlotSignal(object):
         self.names = []
         self.alignments = []
         self.predictions = []
+        self.variant_calls = []
         self.event_starts = None
         self.guide_alignments = defaultdict(list)
 
@@ -114,12 +133,23 @@ class PlotSignal(object):
                 self.guide_alignments[whole_guide_name].append([sub_guide['raw_start'], sub_guide['reference_index']])
             # gather tail ends of alignments
             self.names.append(whole_guide_name)
+
+        # variant calling data
+        for name, v_c in self.signal_h.variant_calls.items():
+            self.names.append(name)
+            self.variant_calls.append(v_c)
+
+
         # add raw starts
         if self.signal_h.raw_starts is not None:
             self.event_starts = self.signal_h.raw_starts
 
-    def plot_alignment(self, save_fig_path=None, plot_alpha=False, plot_lines=False):
+    def plot_alignment(self, save_fig_path=None, plot_alpha=False, plot_lines=False, kmer_info=None):
         """Plot the alignment between events and reference with the guide alignment and mea alignment
+        :param kmer_info: plot kmer data if provided.
+
+                    data structure : [[[ref_start, length], [ref_start2, length2] ], {pos: base, pos2: base2}]]
+
         :param plot_lines: boolean option, if set to true, lines will be plotted instead of points
         :param save_fig_path: if set, will write image to path
         :param plot_alpha: boolean:
@@ -142,7 +172,7 @@ class PlotSignal(object):
         panel1.grid(color='black', linestyle='-', linewidth=1)
 
         handles = list()
-        # colors = ['blue', 'green', 'red', 'yellow', 'magenta', 'deepskyblue', 'purple', 'lime']
+        colors2 = ['blue', 'green', 'red', 'yellow', 'magenta', 'deepskyblue', 'purple', 'lime']
         colors = [[0.0, 0.0, 1.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0],
                   [1.0, 0.0, 1.0], [1.0, 0.5, 0.0], [0.0, 1.0, 1.0], [0.0, 0.0, 0.0]]
 
@@ -150,14 +180,14 @@ class PlotSignal(object):
         color_selection = 0
         # plot signal alignments
         for i, alignment in enumerate(self.alignments):
-            handle, = panel1.plot(alignment[0], alignment[1]-(i*0.5), color=colors[color_selection], alpha=1)
+            handle, = panel1.plot(alignment[0], alignment[1] - (i * 0.5), color=colors[color_selection], alpha=1)
             color_selection += 1
             handles.append(handle)
 
         # plot predictions (signal align outputs)
         for i, prediction in enumerate(self.predictions):
             rgba_colors = np.tile(np.array(colors[color_selection]), (len(prediction[0]), 1))
-            if plot_alpha or "full_signalalign" in self.names[color_selection] or False:
+            if plot_alpha and "full_signalalign" in self.names[color_selection]:
                 rgba_colors = np.insert(rgba_colors, 3, prediction[3].tolist(), axis=1)
             else:
                 rgba_colors = np.insert(rgba_colors, 3, [1 for _ in range(len(prediction[3].tolist()))], axis=1)
@@ -185,6 +215,47 @@ class PlotSignal(object):
                     handle, = panel1.plot(sub_guide[0], sub_guide[1], c=colors[color_selection])
                 handles.append(handle)
                 color_selection += 1
+
+        colors2_index = -1
+        if self.variant_calls is not []:
+            for i, data in enumerate(self.variant_calls):
+                variants = set(data.columns) - {'forward_mapped', 'raw_start', 'position', 'raw_length', 'read_name', 'contig', 'strand'}
+                colors2_index += 1
+                color = colors2[colors2_index]
+                for j, position in data.iterrows():
+                    rectangle = plt.Rectangle((position["raw_start"], position["position"]-5), position["raw_length"],
+                                              11, alpha=0.4, color=color)
+
+                    panel1.add_patch(rectangle)
+                    variant_string = ""
+                    for variant_base in variants:
+                        variant_string += "p({} = {}) = {}\n".format(position["position"], variant_base,
+                                                                     np.round(position[variant_base], 3))
+
+                    panel1.text(position["raw_start"] + 10, position["position"]-6, "{}".format(variant_string))
+
+        # if kmers provided plot them
+        if kmer_info:
+            kmer_blocks = kmer_info[0]
+            positions = kmer_info[1]
+            for i, kmer_block in enumerate(kmer_blocks):
+                color = colors2[colors2_index]
+                colors2_index += 1
+                for ref_start, length in kmer_block:
+                    rectangle = plt.Rectangle((0, ref_start), len(self.signal_h.scaled_signal), length,
+                                              alpha=0.4, color=color)
+                    panel1.add_patch(rectangle)
+
+            def format_func(value, tick_number):
+                # find number of multiples of pi/2
+                if positions[value] != 0:
+                    return positions[value]
+                else:
+                    return value
+
+            panel1.yaxis.set_major_formatter(plt.FuncFormatter(format_func))
+
+
 
         panel2.set_xlabel('Time')
         panel2.set_ylabel('Current (pA)')
@@ -384,13 +455,31 @@ def analyze_event_skips(mea_events, sa_full_events, basecall_events,
     return summaries
 
 
+def generate_kmer_info_for_plotting(kmers, aligned_segment):
+    """Create the correct data structure to bed fed into the plot_alignment function"""
+    ref_seq = aligned_segment.get_reference_sequence()
+    ref_start = aligned_segment.alignment_segment.reference_start
+    almost_final_dict = defaultdict(int)
+    all_blocks = []
+    for kmer in kmers:
+        blocks = [[x + ref_start, len(kmer)] for x in
+                  find_substring_indices(ref_seq,
+                                         kmer,
+                                         offset=0)]
+        all_blocks.append(blocks)
+        for block in blocks:
+            for i, base in enumerate(kmer):
+                almost_final_dict[block[0] + i] = base
+
+    kmer_info = [all_blocks, almost_final_dict]
+    return kmer_info
+
+
 def main(args=None):
     """Plot event to reference labelled ONT nanopore reads """
     start = timer()
 
     args = args if args is not None else parse_args()
-
-    main_plot = True
 
     if args.dir:
         f5_locations = list_dir(args.dir, ext="fast5")
@@ -399,6 +488,7 @@ def main(args=None):
 
     for f5_path in f5_locations:
         try:
+            main_plot = True
             save_fig_path = None
             cl_handle = CreateLabels(f5_path, kmer_index=2)
             if args.output_dir:
@@ -410,24 +500,28 @@ def main(args=None):
                 for number in args.mea:
                     mea = cl_handle.add_mea_labels(number=int(number))
                     mea_list.append(mea)
+                    if args.two_d:
+                        mea = cl_handle.add_mea_labels(number=int(number), complement=True)
+                        mea_list.append(mea)
 
             sa_full_list = list()
             if args.sa_full:
                 for number in args.sa_full:
-                    sa_full = cl_handle.add_signal_align_predictions(number=int(number), add_basecall=True)
+                    sa_full = cl_handle.add_signal_align_predictions(number=int(number),
+                                                                     add_basecall=True,
+                                                                     two_d=args.two_d)
                     sa_full_list.append(sa_full)
 
-            tombo_full_list = list()
             if args.tombo:
                 for number in args.tombo:
                     tombo_full = cl_handle.add_tombo_labels(number=int(number))
-                    tombo_full_list.append(tombo_full)
 
             basecall_list = list()
             if args.basecall:
                 events_list = []
                 for number in args.basecall:
-                    matches, mismatches = cl_handle.add_basecall_alignment_prediction(number=int(number), trim=args.trim)
+                    matches, mismatches = cl_handle.add_basecall_alignment_prediction(number=int(number),
+                                                                                      trim=args.trim)
                     basecall = list()
                     basecall.extend(matches)
                     basecall.extend(mismatches)
@@ -441,15 +535,27 @@ def main(args=None):
                     plot_basecalled_sequences(events_list[0], events2=events_list[1],
                                               signal=cl_handle.aligned_signal.scaled_signal)
 
+            if args.variant is not None:
+                for number in args.variant:
+                    cl_handle.add_variant_data(number=int(number), complement=False)
+                    if args.two_d:
+                        cl_handle.add_variant_data(number=int(number), complement=True)
+
             max_analysis_index = min(map(lambda x: len(x), [mea_list, sa_full_list])) if args.basecall else 0
             for i in range(max_analysis_index):
                 print("Analyzing events for index {}".format(i))
                 analyze_event_skips(mea_list[i], sa_full_list[i], basecall_list[i])
 
+            kmer_info = None
+            if args.kmers:
+                aligned_segment = initialize_aligned_segment_wrapper(cl_handle.get_signalalign_events(sam=True))
+                kmer_info = generate_kmer_info_for_plotting(args.kmers, aligned_segment)
+
             if main_plot:
+                print(args.kmers)
                 print("Plotting {}".format(f5_path))
                 ps = PlotSignal(cl_handle.aligned_signal)
-                ps.plot_alignment(save_fig_path=save_fig_path, plot_alpha=args.plot_alpha)
+                ps.plot_alignment(save_fig_path=save_fig_path, plot_alpha=args.plot_alpha, kmer_info=kmer_info)
         except KeyError as e:
             print("FAILED: {}: {}".format(e, f5_path))
 

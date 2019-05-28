@@ -1,26 +1,20 @@
+[![Build Status](https://travis-ci.org/UCSC-nanopore-cgl/signalAlign.svg?branch=master)](https://github.com/UCSC-nanopore-cgl/signalAlign)
+
+
 ## SignalAlign Manual
 
 ### Introduction
 SignalAlign is a hidden Markov model (HMM) software package for aligning the ionic current signal from the Oxford Nanopore Technologies (ONT) MinION to a reference sequence and inferring properties of the reference sequence.
 
 ### Installation:
-Make sure you are using gcc and not clang. Check out .travis.yml for specific Macos and Linux Install
-1. Recursively clone this repo `git clone --recursive -b update_manual https://github.com/UCSC-nanopore-cgl/signalAlign.git`
-2. Set required environment variables. Use path to local anaconda or miniconda. `$HOME/anaconda3` is just a common install location for anaconda.  
-   `export PATH="$HOME/anaconda3/bin:$PATH"`  
-   `export C_INCLUDE_PATH="$HOME/anaconda3/envs/signalalign/include:$C_INCLUDE_PATH"`  
-   `export LD_LIBRARY_PATH="$HOME/anaconda3/envs/signalalign/lib:$LD_LIBRARY_PATH"`  
-   `export LIBRARY_PATH="$HOME/anaconda3/envs/signalalign/lib:$LIBRARY_PATH"`  
-3. Create conda environment (requirements.yml for linux and requirements2.yml for macos)   
-`conda env create -f requirements.yml python=3.6`
-4. Activate conda environment  
-`source activate signalalign`
-5. Make project  
+1. Recursively clone this repo `git clone --recursive https://github.com/UCSC-nanopore-cgl/signalAlign.git`
+2. Make project  
 `make`
-6. Add bin to path  
+3. Add bin to path  
 `export PATH=$PATH:$PWD/bin`
-7. Test install   
+4. Test install   
 `make test`
+
 
 ### Recommened Workflow
 1. Install
@@ -95,7 +89,7 @@ _Optional_
 * `--in_complement_hmm`, `-C` complement HMM parameters file 
 * `--template_hdp`, `-tH` template HDP model file
 * `--complement_hdp`, `-cH` complement HDP model file 
-* `--degenerate`, `-x` nucleotide options for degenerate or _ambiguous_ positions. `m6a` = {AF}, `variant` = {A,C,G,T} `cytosine2` = {CE} `cytosine3` = {CEO} `adenosine` = {AI}. **n.b.** E = 5-methylcytosine, O = 5-hydroxymethylcytosine, F = 6-methyladenine, I = Inosine
+* `--degenerate`, `-x` nucleotide options for degenerate or _ambiguous_ positions. `m6a` = {AF}, `variant` = {A,C,G,T} `cytosine2` = {CE} `cytosine3` = {CEO} `adenosine` = {AI}. **n.b.** E = 5-methylcytosine, O = 5-hydroxymethylcytosine, I = 6-methyladenine
 * `--stateMachineType`, `-smt` HMM to use. Options: `threeState` and `threeStateHdp`. Default: `threeState`.
 * `--file_of_files`, `-fofn` a file containing the absolute path to files to align with, one file path per line
 * `--threshold`, `-t`. Minimum posterior match probability threshold (matches below this threshold will not be tabulated). Default: 0.01.

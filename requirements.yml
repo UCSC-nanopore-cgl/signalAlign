@@ -1,12 +1,14 @@
 name: signalalign
 channels:
+  - conda-forge
   - bioconda
   - anaconda
+  - adbailey4
+  - intel
   - defaults
 dependencies:
   - bzip2=1.0.6
   - curl=7.62.0
-  - hdf5=1.10.2
   - pip=18.1=py36_0
   - py=1.7.0=py36_0
   - python=3.6.7
@@ -24,8 +26,8 @@ dependencies:
   - setuptools=40.6.2=py36_0
   - wheel=0.32.3=py36_0
   - pysam=0.15.0
+  - biopython=1.72
   - pip:
-    - biopython==1.68
     - cycler==0.10.0
     - cython==0.29
     - h5py==2.8.0

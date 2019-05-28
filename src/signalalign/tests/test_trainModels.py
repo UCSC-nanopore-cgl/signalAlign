@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Test BuildModels.py"""
+"""Test trainModels.py"""
 ########################################################################
 # File: test_trainModels.py
 #  executable: test_trainModels.py
@@ -9,19 +9,16 @@
 ########################################################################
 
 
-import sys
-import os
-import numpy as np
 import unittest
 import tempfile
-from collections import defaultdict
-from shutil import copyfile
-from scipy import sparse
+import os
 from signalalign.signalAlignment import create_sa_sample_args
 from signalalign.train.trainModels import *
 from signalalign.utils.fileHandlers import FolderHandler
 from signalalign.hiddenMarkovModel import HmmModel
-from py3helpers.utils import captured_output, load_json, save_json, count_lines_in_file
+from signalalign.mixture_model import get_motif_kmer_pairs
+from py3helpers.utils import captured_output, load_json, time_it
+from py3helpers.seq_tools import ReferenceHandler, ReverseComplement
 
 
 class TrainSignalAlignTest(unittest.TestCase):
@@ -36,10 +33,14 @@ class TrainSignalAlignTest(unittest.TestCase):
         cls.ecoli_readdb = os.path.join(cls.HOME, "tests/minion_test_reads/canonical_ecoli_R9/canonical_ecoli.readdb")
         cls.fast5_dir = os.path.join(cls.HOME, "tests/minion_test_reads/canonical_ecoli_R9")
         cls.files = [
-            "miten_PC_20160820_FNFAD20259_MN17223_mux_scan_AMS_158_R9_WGA_Ecoli_08_20_16_83098_ch138_read23_strand.fast5",
-            "miten_PC_20160820_FNFAD20259_MN17223_sequencing_run_AMS_158_R9_WGA_Ecoli_08_20_16_43623_ch101_read456_strand.fast5",
-            "miten_PC_20160820_FNFAD20259_MN17223_sequencing_run_AMS_158_R9_WGA_Ecoli_08_20_16_43623_ch101_read544_strand1.fast5",
-            "miten_PC_20160820_FNFAD20259_MN17223_sequencing_run_AMS_158_R9_WGA_Ecoli_08_20_16_43623_ch103_read333_strand1.fast5"]
+            "miten_PC_20160820_FNFAD20259_MN17223_mux_scan_AMS_158_R9_WGA_Ecoli_08_20_16_83098_ch138_read23_"
+            "strand.fast5",
+            "miten_PC_20160820_FNFAD20259_MN17223_sequencing_run_AMS_158_R9_WGA_Ecoli_08_20_16_43623_ch101_"
+            "read456_strand.fast5",
+            "miten_PC_20160820_FNFAD20259_MN17223_sequencing_run_AMS_158_R9_WGA_Ecoli_08_20_16_43623_ch101_"
+            "read544_strand1.fast5",
+            "miten_PC_20160820_FNFAD20259_MN17223_sequencing_run_AMS_158_R9_WGA_Ecoli_08_20_16_43623_ch103_"
+            "read333_strand1.fast5"]
         cls.fast5_paths = [os.path.join(cls.fast5_dir, f) for f in os.listdir(cls.fast5_dir)
                            if os.path.isfile(os.path.join(cls.fast5_dir, f))]
         cls.model_file = os.path.join(cls.HOME, "models/testModelR9p4_5mer_acgt_RNA.model")
@@ -47,9 +48,12 @@ class TrainSignalAlignTest(unittest.TestCase):
         cls.r9_template_model_file = os.path.join(cls.HOME, "models/testModelR9_acegt_template.model")
 
         cls.model = HmmModel(ont_model_file=cls.model_file)
-        cls.expectation_file = os.path.join(cls.HOME,
-                                            "tests/test_expectation_files/4f9a316c-8bb3-410a-8cfc-026061f7e8db.template.expectations.tsv")
-        cls.assignment_file = os.path.join(cls.HOME, "tests/test_assignment_files/d6160b0b-a35e-43b5-947f-adaa1abade28.sm.assignments.tsv")
+        cls.expectation_file = \
+            os.path.join(cls.HOME,
+                         "tests/test_expectation_files/4f9a316c-8bb3-410a-8cfc-026061f7e8db.template.expectations.tsv")
+        cls.assignment_file = \
+            os.path.join(cls.HOME,
+                         "tests/test_assignment_files/d6160b0b-a35e-43b5-947f-adaa1abade28.sm.assignments.tsv")
 
         cls.path_to_bin = os.path.join(cls.HOME, "bin")
         cls.hdp_types = {
@@ -96,7 +100,40 @@ class TrainSignalAlignTest(unittest.TestCase):
     def test_make_master_assignment_table(self):
         pandas_table = make_master_assignment_table([self.assignment_file, self.assignment_file])
         assignments1 = parse_assignment_file(self.assignment_file)
-        self.assertEqual(len(pandas_table), 2*len(assignments1))
+        self.assertEqual(len(pandas_table), 2 * len(assignments1))
+
+    def test_multiprocess_make_kmer_assignment_tables(self):
+        kmers = get_kmers(6, alphabet="ATGC")
+        data2, time2 = time_it(multiprocess_make_kmer_assignment_tables, [self.assignment_file], kmers,
+                               set("t"), 0.0, False, False, 100000, 2)
+        for x in kmers:
+            kmer_data = data2.loc[data2['kmer'] == x]
+            self.assertSequenceEqual(list(kmer_data["prob"]), sorted(kmer_data["prob"], reverse=True))
+
+    def test_generate_buildAlignments3(self):
+        kmers = get_kmers(6, alphabet="ATGC")
+        data_files = [self.assignment_file]
+
+        sample_assignment_table = get_assignment_table(self.assignment_file, 0.0, False)
+        data1 = generate_buildAlignments(sample_assignment_table, kmers, 10, ["t"], False)
+
+        data2, _ = time_it(multiprocess_make_kmer_assignment_tables,
+                           data_files, kmers,
+                           set("t"), 0.0, False, False, 10, 8)
+
+        # get kmers associated with each sample
+        self.assertEqual(len(data2), len(data1))
+
+    def test_sort_dataframe_wrapper(self):
+        kmers = get_kmers(6, alphabet="ATGC")
+        kmers = list(kmers)
+        kmer = "ATTTTT"
+        index = kmers.index(kmer)
+        data_table = get_assignment_kmer_tables(self.assignment_file, kmers, 0, False)
+        kmer_data = data_table[index]
+        data = sort_dataframe_wrapper(kmer_data, kmer, max_assignments=10, verbose=False, strands=('t', 'c'))
+
+        self.assertSequenceEqual(list(data["prob"]), sorted(data["prob"], reverse=True))
 
     def test_make_alignment_line(self):
         make_alignment_line(strand='t', kmer="ATGC", prob=0.1, event=23.2)
@@ -111,27 +148,28 @@ class TrainSignalAlignTest(unittest.TestCase):
         assignments = pd.DataFrame(d)
 
         line_generator = generate_buildAlignments(assignments, kmer_list=["ATGC", "AAAA"], max_assignments=2,
-                                                     strands=['t', 'c'], verbose=False)
+                                                  strands=['t', 'c'], verbose=False)
         self.assertEqual(4, len(line_generator))
         line_generator = generate_buildAlignments(assignments, kmer_list=["ATGC"], max_assignments=2,
-                                                                            strands=['t', 'c'], verbose=False)
+                                                  strands=['t', 'c'], verbose=False)
         self.assertEqual(2, len(line_generator))
 
         line_generator = generate_buildAlignments(assignments, kmer_list=["ATGC", "AAAA"], max_assignments=1,
-                                                                            strands=['t', 'c'], verbose=False)
+                                                  strands=['t', 'c'], verbose=False)
         self.assertEqual(2, len(line_generator))
         line_generator = generate_buildAlignments(assignments, kmer_list=["ATGC", "AAAA"], max_assignments=2,
-                                                                            strands=['t'], verbose=False)
+                                                  strands=['t'], verbose=False)
         self.assertEqual(2, len(line_generator))
         line_generator = generate_buildAlignments(assignments, kmer_list=["ATGC", "AAAA"], max_assignments=2,
-                                                                            strands=['c'], verbose=False)
+                                                  strands=['c'], verbose=False)
         self.assertEqual(2, len(line_generator))
         line_generator = generate_buildAlignments(assignments, kmer_list=["ATGC", "AAAA"], max_assignments=2,
-                                                                            strands=['t', 'c'], verbose=False)
+                                                  strands=['t', 'c'], verbose=False)
         self.assertEqual(4, len(line_generator))
         self.assertRaises(AssertionError, generate_buildAlignments, assignments, kmer_list=["ATGC", "AAAA"],
                           max_assignments=2,
                           strands=[], verbose=False)
+
 
     def test_CreateHdpTrainingData(self):
         with tempfile.TemporaryDirectory() as tempdir:
@@ -151,7 +189,8 @@ class TrainSignalAlignTest(unittest.TestCase):
             working_folder.open_folder(os.path.join(tempdir, "test_dir"))
             sample = SignalAlignSample(working_folder=working_folder, **test_args)
             sample.analysis_files = [self.assignment_file, self.assignment_file]
-            out_path = CreateHdpTrainingData([sample], test_out, template=True, complement=False, verbose=False).write_hdp_training_file(verbose=False)
+            out_path = CreateHdpTrainingData([sample], test_out, template=True, complement=False,
+                                             verbose=False).write_hdp_training_file(verbose=False)
             n_lines = count_lines_in_file(out_path)
             self.assertEqual(n_lines, 3182)
 
@@ -213,8 +252,8 @@ class TrainSignalAlignTest(unittest.TestCase):
             self.assertEqual(kmers, get_motif_kmers(["ATGC", "ETGC"], 6, alphabet="ATGC") | expected_kmers)
 
     def test_get_hdp_type(self):
-        for type, integer in self.hdp_types.items():
-            self.assertEqual(get_hdp_type(type), integer)
+        for hdp_type, integer in self.hdp_types.items():
+            self.assertEqual(get_hdp_type(hdp_type), integer)
 
     def test_check_config(self):
         fake_args = create_dot_dict(self.default_args.copy())
@@ -313,41 +352,41 @@ class TrainSignalAlignTest(unittest.TestCase):
         fake_args.training.transitions = True
         self.assertRaises(AssertionError, TrainSignalAlign, fake_args)
 
-    def test_canonical_expectation_maximization_training(self):
-        with captured_output() as (out, err):
-            with tempfile.TemporaryDirectory() as tempdir:
-                fake_args = create_dot_dict(self.default_args.copy())
-                fake_args.output_dir = tempdir
-                fake_args.job_count = 1
-                fake_args.training.transitions = True
-                fake_args.training.normal_emissions = True
-                fake_args.training.hdp_emissions = True
-                fake_args.training.expectation_maximization = True
-                fake_args.training.em_iterations = 3
-                fake_args.hdp_args.gibbs_samples = 100
-                fake_args.hdp_args.burnin_multiplier = 0
-                fake_args.hdp_args.number_of_assignments = 1
-                # Test EM training 3 rounds
-                TrainSignalAlign(fake_args).expectation_maximization_training()
+    # def test_canonical_expectation_maximization_training(self):
+    #     with captured_output() as (_, _):
+    #         with tempfile.TemporaryDirectory() as tempdir:
+    #             fake_args = create_dot_dict(self.default_args.copy())
+    #             fake_args.output_dir = tempdir
+    #             fake_args.job_count = 1
+    #             fake_args.training.transitions = True
+    #             fake_args.training.normal_emissions = True
+    #             fake_args.training.hdp_emissions = True
+    #             fake_args.training.expectation_maximization = True
+    #             fake_args.training.em_iterations = 3
+    #             fake_args.hdp_args.gibbs_samples = 100
+    #             fake_args.hdp_args.burnin_multiplier = 0
+    #             fake_args.hdp_args.number_of_assignments = 1
+    #             # Test EM training 3 rounds
+    #             TrainSignalAlign(fake_args).expectation_maximization_training()
+    #
+    # def test_hdp_and_transition_training(self):
+    #     with captured_output() as (_, _):
+    #         with tempfile.TemporaryDirectory() as tempdir:
+    #             fake_args = create_dot_dict(self.default_args.copy())
+    #             fake_args.output_dir = tempdir
+    #             fake_args.training.transitions = True
+    #             fake_args.training.normal_emissions = True
+    #             fake_args.training.hdp_emissions = True
+    #             fake_args.training.expectation_maximization = False
+    #             fake_args.training.em_iterations = 3
+    #             fake_args.hdp_args.gibbs_samples = 100
+    #             fake_args.hdp_args.burnin_multiplier = 0
+    #             fake_args.hdp_args.number_of_assignments = 1
+    #             # Test hdp AND transition training worked
+    #             TrainSignalAlign(fake_args).expectation_maximization_training()
 
-    def test_hdp_and_transition_training(self):
-        with captured_output() as (out, err):
-            with tempfile.TemporaryDirectory() as tempdir:
-                fake_args = create_dot_dict(self.default_args.copy())
-                fake_args.output_dir = tempdir
-                fake_args.training.transitions = True
-                fake_args.training.normal_emissions = True
-                fake_args.training.hdp_emissions = True
-                fake_args.training.expectation_maximization = False
-                fake_args.training.em_iterations = 3
-                fake_args.hdp_args.gibbs_samples = 100
-                fake_args.hdp_args.burnin_multiplier = 0
-                fake_args.hdp_args.number_of_assignments = 1
-                # Test hdp AND transition training worked
-                TrainSignalAlign(fake_args).expectation_maximization_training()
-
-    def test_transition_training(self):
-        with captured_output() as (out, err):
+    def test_transition_and_normal_emissions_training(self):
+        with captured_output() as (_, _):
             with tempfile.TemporaryDirectory() as tempdir:
                 fake_args = create_dot_dict(self.default_args.copy())
                 fake_args.output_dir = tempdir
@@ -355,54 +394,53 @@ class TrainSignalAlignTest(unittest.TestCase):
                 fake_args.training.normal_emissions = True
                 fake_args.training.hdp_emissions = False
                 fake_args.training.expectation_maximization = False
-                # with captured_output() as (out, err):
+                # with captured_output() as (_, _):
                 # Test transitions training worked
                 training_h = TrainSignalAlign(fake_args)
                 training_h.expectation_maximization_training()
                 self.assertTrue(len(training_h.samples[0].analysis_files) == 1)
-
-    def test_hdp_training(self):
-        with captured_output() as (out, err):
-            with tempfile.TemporaryDirectory() as tempdir:
-                fake_args = create_dot_dict(self.default_args.copy())
-                fake_args.output_dir = tempdir
-                fake_args.training.transitions = False
-                fake_args.training.normal_emissions = True
-                fake_args.training.hdp_emissions = True
-                fake_args.training.expectation_maximization = False
-                fake_args.training.em_iterations = 3
-                fake_args.hdp_args.gibbs_samples = 100
-                fake_args.hdp_args.burnin_multiplier = 0
-                fake_args.hdp_args.number_of_assignments = 1
-                # Test hdp training worked
-                TrainSignalAlign(fake_args).expectation_maximization_training()
-
-                fake_args.training.hdp_emissions = False
-                # raise error when no training is selected
-                self.assertRaises(AssertionError, TrainSignalAlign(fake_args).expectation_maximization_training)
-
-    def test_methylated_transitions_training(self):
-        with captured_output() as (out, err):
-            with tempfile.TemporaryDirectory() as tempdir:
-                fake_args = create_dot_dict(self.default_args.copy())
-                fake_args.output_dir = tempdir
-                fake_args.samples.append(create_dot_dict(fake_args.samples[0]))
-                fake_args.samples[1].motifs = [["CCAGG", "CEAGG"], ["CCTGG", "CETGG"]]
-                fake_args.samples[1].name = "methylated"
-                fake_args.complement_hmm_model = self.r9_complement_model_file
-                fake_args.template_hmm_model = self.r9_template_model_file
-
-                fake_args.job_count = 1
-                fake_args.training.transitions = True
-                fake_args.training.normal_emissions = False
-                fake_args.training.hdp_emissions = False
-                fake_args.training.expectation_maximization = False
-                # Test EM training 3 rounds
-                template_hmm_model_path, complement_hmm_model_path, template_hdp_model_path, complement_hdp_model_path = \
-                    TrainSignalAlign(fake_args).expectation_maximization_training()
+    #
+    # def test_hdp_training(self):
+    #     with captured_output() as (_, _):
+    #         with tempfile.TemporaryDirectory() as tempdir:
+    #             fake_args = create_dot_dict(self.default_args.copy())
+    #             fake_args.output_dir = tempdir
+    #             fake_args.training.transitions = False
+    #             fake_args.training.normal_emissions = True
+    #             fake_args.training.hdp_emissions = True
+    #             fake_args.training.expectation_maximization = False
+    #             fake_args.training.em_iterations = 3
+    #             fake_args.hdp_args.gibbs_samples = 100
+    #             fake_args.hdp_args.burnin_multiplier = 0
+    #             fake_args.hdp_args.number_of_assignments = 1
+    #             # Test hdp training worked
+    #             TrainSignalAlign(fake_args).expectation_maximization_training()
+    #
+    #             fake_args.training.hdp_emissions = False
+    #             # raise error when no training is selected
+    #             self.assertRaises(AssertionError, TrainSignalAlign(fake_args).expectation_maximization_training)
+    #
+    # def test_methylated_transitions_training(self):
+    #     with captured_output() as (_, _):
+    #         with tempfile.TemporaryDirectory() as tempdir:
+    #             fake_args = create_dot_dict(self.default_args.copy())
+    #             fake_args.output_dir = tempdir
+    #             fake_args.samples.append(create_dot_dict(fake_args.samples[0]))
+    #             fake_args.samples[1].motifs = [["CCAGG", "CEAGG"], ["CCTGG", "CETGG"]]
+    #             fake_args.samples[1].name = "methylated"
+    #             fake_args.complement_hmm_model = self.r9_complement_model_file
+    #             fake_args.template_hmm_model = self.r9_template_model_file
+    #
+    #             fake_args.job_count = 1
+    #             fake_args.training.transitions = True
+    #             fake_args.training.normal_emissions = False
+    #             fake_args.training.hdp_emissions = False
+    #             fake_args.training.expectation_maximization = False
+    #             # Test EM training 3 rounds
+    #             TrainSignalAlign(fake_args).expectation_maximization_training()
 
     def test_methylated_hdp_training(self):
-        with captured_output() as (out, err):
+        with captured_output() as (_, _):
             with tempfile.TemporaryDirectory() as tempdir:
                 fake_args = create_dot_dict(self.default_args.copy())
                 fake_args.output_dir = tempdir
@@ -425,8 +463,39 @@ class TrainSignalAlignTest(unittest.TestCase):
                 fake_args.two_d = True
 
                 # Test EM training 3 rounds
-                template_hmm_model_path, complement_hmm_model_path, template_hdp_model_path, complement_hdp_model_path = \
-                    TrainSignalAlign(fake_args).expectation_maximization_training()
+                TrainSignalAlign(fake_args).expectation_maximization_training()
+    #
+    def test_generate_buildAlignments_given_motifs(self):
+        assignments_dir = os.path.join(self.HOME, "tests/test_alignments/ecoli1D_test_alignments_sm3")
+        positions_file = os.path.join(self.HOME, "tests/test_position_files/CCWGG_ecoli_k12_mg1655.positions")
+        all_data = generate_build_alignments_positions([assignments_dir, assignments_dir], positions_file,
+                                                       verbose=False)
+        rh = ReferenceHandler(self.ecoli_reference)
+        #
+        # all_data = r
+        # ead_in_alignment_file("/Users/andrewbailey/data/ccwgg_new_em_trained_model/
+        # mixture_models/high_sd_models/built_alignments_wide_sd_02_28_19.tsv")
+        # rh = ReferenceHandler("/Users/andrewbailey/data/references/ecoli/ecoli_k12_mg1655.fa")
+        # positions_file =
+        # os.path.join("/Users/andrewbailey/data/references/ecoli/CCWGG_ecoli_k12_mg1655_C_C.positions")
+        # positions_data = CustomAmbiguityPositions.parseAmbiguityFile(positions_file)
+        # data_dir = "/Users/andrewbailey/data/ccwgg_new_em_trained_model/mixture_models/test_output/canonical"
+        # # stranded_positions = positions_data[positions_data["strand"] == "t"]
+        # all_data = generate_build_alignments_positions([data_dir], positions_file, verbose=True)
+        all_kmer_pairs = set()
+        motifs = [["CCAGG", "CEAGG"], ["CCTGG", "CETGG"]]
+        for motif in motifs:
+            all_kmer_pairs |= set(tuple(row) for row in get_motif_kmer_pairs(motif_pair=motif, k=5))
+        all_possible_kmers = set([x[0] for x in all_kmer_pairs])
+
+        rc = ReverseComplement()
+        for i, row in all_data.iterrows():
+            seq = rh.get_sequence(row["contig"], row["reference_index"] - 9, row["reference_index"] + 9)
+            self.assertTrue(row["path_kmer"] in all_possible_kmers)
+            if row["path_kmer"] == row["reference_kmer"]:
+                self.assertTrue("CCAGG" in seq or "CCTGG" in seq)
+            else:
+                self.assertTrue("CCAGG" in rc.reverse_complement(seq) or "CCTGG" in rc.reverse_complement(seq))
 
 
 if __name__ == '__main__':

@@ -113,21 +113,29 @@ def parse_read_name_map_file(read_map, directories, recursive=False):
     else:
         name_index = 1
         path_index = 0
+    for dir_path in directories:
+        assert os.path.isdir(dir_path), "Path provided does not exist or is not a directory: {}".format(dir_path)
 
     with open(read_map, 'r') as fh:
         for line in fh:
             split_line = line.split()
             for dir_path in directories:
                 if recursive:
-                    directories2 = get_all_sub_directories(dir_path)
-                    for dir_path2 in directories2:
-                        full_path = os.path.join(dir_path2, split_line[path_index])
-                        if os.path.exists(full_path):
-                            yield split_line[name_index], full_path
+                    if os.path.exists(split_line[path_index]):
+                        yield split_line[name_index], os.path.abspath(split_line[path_index])
+                    else:
+                        directories2 = get_all_sub_directories(dir_path)
+                        for dir_path2 in directories2:
+                            full_path = os.path.join(dir_path2, split_line[path_index])
+                            if os.path.exists(full_path):
+                                yield split_line[name_index], os.path.abspath(full_path)
                 else:
-                    full_path = os.path.join(dir_path, split_line[path_index])
-                    if os.path.exists(full_path):
-                        yield split_line[name_index], full_path
+                    if os.path.exists(split_line[path_index]):
+                        yield split_line[name_index], os.path.abspath(split_line[path_index])
+                    else:
+                        full_path = os.path.join(dir_path, split_line[path_index])
+                        if os.path.exists(full_path):
+                            yield split_line[name_index], os.path.abspath(full_path)
 
 
 def filter_reads(alignment_file, readdb, read_dirs, quality_threshold=7, recursive=False, trim=False):
@@ -373,6 +381,37 @@ def multiprocess_filter_reads(in_dir, alignment_file, readdb, trim=False,
             filter_reads_args, ["in_dir"], worker_count)
         best_files = merge_lists(output)
     return best_files
+
+
+def find_fast5s_from_ids_readdb(readdb, read_ids, read_dirs, recursive=False):
+    """Find the corresponding fast5 files given readids"""
+    for name, fast5 in parse_read_name_map_file(readdb, read_dirs, recursive=recursive):
+        if name.split("_")[0] in read_ids:
+            yield name, fast5
+
+
+def write_readdb(list_of_names_and_fast5s, out_path):
+    """Write a readdb file given a list of pairs of names and fast5 files"""
+    with open(out_path, "w") as fh:
+        for pair in list_of_names_and_fast5s:
+            fh.write(pair[0]+"\t"+os.path.basename(pair[1])+"\n")
+    return 0
+
+
+def copy_files_from_readdb(readdb, directories, new_dir, recursive=False):
+    """Copy files from a readdb file to another location
+    :param readdb: readdb file
+    :param directories: directories to search for fast5 files
+    :param new_dir: new directory to copy files into
+    :param recursive: recursive option for looking for files
+    """
+    assert os.path.isdir(new_dir), "New directory must exist already"
+    n_files_copied = 0
+    for name, path in parse_read_name_map_file(readdb, directories, recursive=recursive):
+        new_path = os.path.join(new_dir, os.path.basename(path))
+        shutil.copy(path, new_path)
+        n_files_copied +=1
+    return n_files_copied
 
 
 def main():

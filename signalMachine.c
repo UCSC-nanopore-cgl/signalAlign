@@ -11,7 +11,8 @@
 typedef enum {
     full = 0,
     variantCaller = 1,
-    assignments = 2
+    assignments = 2,
+    both = 3
 } OutputFormat;
 
 void usage() {
@@ -20,7 +21,7 @@ void usage() {
     fprintf(stderr, "--sm3Hdp, -d: Flag, enable HMM-HDP model\n");
     fprintf(stderr, "--twoD, -e: Flag, use 2D workflow (enables complement alignment)\n");
     fprintf(stderr, "-s: Output format, 0=full, 1=variantCaller, 2=assignments\n");
-    fprintf(stderr, "-o: Degernate, 0=C/E, 1=C/E/O, 2=A/I, 3=A/C/G/T\n, 5=A/F");
+    fprintf(stderr, "-o: Degernate, 0=C/E, 1=C/E/O, 2=A/I, 3=A/C/G/T, 4=J/T, 5=A/F");
     fprintf(stderr, "-T: Template HMM model\n");
     fprintf(stderr, "-C: Complement HMM model\n");
     fprintf(stderr, "-L: Read (output) label\n");
@@ -162,14 +163,14 @@ void writePosteriorProbsFull(char *posteriorProbsFile, char *readLabel, StateMac
 
 void writePosteriorProbsVC(char *posteriorProbsFile, char *readLabel, StateMachine *sM, char *target, bool forward,
                            int64_t eventSequenceOffset, int64_t referenceSequenceOffset, stList *alignedPairs,
-                           Strand strand, double posteriorScore, bool rna) {
+                           Strand strand, double posteriorScore, bool rna, char *contig) {
     // label for tsv output
     char *strandLabel = strand == template ? "t" : "c";
-    if (rna){
+    if (rna || strand != template){
         forward = !forward;
     }
     char *forwardLabel = forward ? "forward" : "backward";
-    if (rna){
+    if (rna || strand != template){
         forward = !forward;
     }
 
@@ -223,8 +224,8 @@ void writePosteriorProbsVC(char *posteriorProbsFile, char *readLabel, StateMachi
             char base = pathKmer[queryPosition];
             // position in the reference we're reporting on
             int64_t reportPosition = x_adj + unadjustedQueryPosition;
-            fprintf(fH, "%"PRId64"\t%"PRId64"\t%c\t%f\t%s\t%s\t%s\t%f\n", y, reportPosition, base, p,
-                    strandLabel, forwardLabel, readLabel, posteriorScore);
+            fprintf(fH, "%"PRId64"\t%"PRId64"\t%c\t%f\t%s\t%s\t%s\t%f\t%s\n", y, reportPosition, base, p,
+                    strandLabel, forwardLabel, readLabel, posteriorScore, contig);
         }
         free(k_i);
         free(refKmer);
@@ -286,7 +287,8 @@ void outputAlignment(
         stList *alignedPairs, 
         double posteriorScore,
         Strand strand,
-        bool rna) {
+        bool rna,
+        char *posteriorProbsFile2) {
     switch (fmt) {
         case full:
             writePosteriorProbsFull(posteriorProbsFile, readLabel, sM, npp, events, target, forward, contig,
@@ -294,10 +296,17 @@ void outputAlignment(
             break;
         case variantCaller:
             writePosteriorProbsVC(posteriorProbsFile, readLabel, sM, target, forward, eventSequenceOffset,
-                                  referenceSequenceOffset, alignedPairs, strand, posteriorScore, rna);
+                                  referenceSequenceOffset, alignedPairs, strand, posteriorScore, rna, contig);
             break;
         case assignments:
             writeAssignments(posteriorProbsFile, sM, events, eventSequenceOffset, npp, alignedPairs, strand);
+            break;
+        case both:
+            writePosteriorProbsFull(posteriorProbsFile, readLabel, sM, npp, events, target, forward, contig,
+                                    eventSequenceOffset, referenceSequenceOffset, alignedPairs, strand, rna);
+
+            writePosteriorProbsVC(posteriorProbsFile2, readLabel, sM, target, forward, eventSequenceOffset,
+                                  referenceSequenceOffset, alignedPairs, strand, posteriorScore, rna, contig);
             break;
         default:
             fprintf(stderr, "signalAlign - No valid output format provided\n");
@@ -461,7 +470,7 @@ int main(int argc, char *argv[]) {
     char *complementHdp = NULL;
     char *forward_reference_path = NULL;
     char *backward_reference_path = NULL;
-
+    char *posteriorProbsFile2 = NULL;
     const char *sequence_name = NULL;
 
 
@@ -491,11 +500,12 @@ int main(int argc, char *argv[]) {
                 {"backward_reference_path", optional_argument,  0,  'b'},
                 {"sequence_name",           required_argument,  0,  'n'},
                 {"traceBackDiagonals",      optional_argument,  0,  'g'},
+                {"posteriorProbsFile2",     optional_argument,  0,  'i'},
                 {0, 0, 0, 0} };
 
         int option_index = 0;
 
-        key = getopt_long(argc, argv, "h:d:e:s:r:o:a:T:C:L:q:f:b:g:p:u:v:w:t:c:x:D:m:n:",
+        key = getopt_long(argc, argv, "h:d:e:s:r:o:a:T:C:L:q:f:b:g:i:p:u:v:w:t:c:x:D:m:n:",
                           long_options, &option_index);
 
         if (key == -1) {
@@ -585,6 +595,9 @@ int main(int argc, char *argv[]) {
                 assert (traceBackDiagonals >= 0);
                 traceBackDiagonals = (int64_t)traceBackDiagonals;
                 break;
+            case 'i':
+                posteriorProbsFile2 = stString_copy(optarg);
+                break;
             default:
                 usage();
                 return 1;
@@ -595,6 +608,10 @@ int main(int argc, char *argv[]) {
     // check for models
     if ((templateModelFile == NULL) || (complementModelFile == NULL && twoD)) {
         st_errAbort("Missing model files, exiting\n");
+        return 1;
+    }
+    if ((outFmt == 3) & (posteriorProbsFile2 == NULL)) {
+        st_errAbort("Must pass in posteriorProbsFile2 if using 'both' outFmt\n");
         return 1;
     }
 
@@ -805,7 +822,7 @@ int main(int argc, char *argv[]) {
         if (posteriorProbsFile != NULL) {
             outputAlignment(outFmt, posteriorProbsFile, readLabel, sMt, npRead->templateParams, npRead->templateEvents,
                             R->getTemplateTargetSequence(R), forward, pA->contig1, tCoordinateShift, rCoordinateShift_t,
-                            templateAlignedPairs, templatePosteriorScore,template, rna);
+                            templateAlignedPairs, templatePosteriorScore,template, rna, posteriorProbsFile2);
         }
 
         stList *complementAlignedPairs;
@@ -841,7 +858,7 @@ int main(int argc, char *argv[]) {
                 outputAlignment(outFmt, posteriorProbsFile, readLabel, sMc, npRead->complementParams,
                                 npRead->complementEvents, R->getComplementTargetSequence(R), forward, pA->contig1,
                                 cCoordinateShift, rCoordinateShift_c, complementAlignedPairs, complementPosteriorScore,
-                                complement, rna);
+                                complement, rna, posteriorProbsFile2);
             }
 
         }

@@ -26,3 +26,6 @@ lib
 share
 /test_plot_distributions/
 /test_train_hdp_model_output/
+cmake_build
+hdf5-1.10.4.tar.gz
+hdf5-1.10.4/

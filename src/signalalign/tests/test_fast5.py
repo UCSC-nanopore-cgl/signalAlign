@@ -59,9 +59,9 @@ class Fast5Test(unittest.TestCase):
             self.fast5handle.delete("UniqueGlobalKey/fakedata")
         self.fast5handle._add_attrs(channel_id, "UniqueGlobalKey/channel_id", convert=None)
 
-    def test_test_event_table(self):
-        # """Test the method test_event_table"""
-        pass
+    def test_get_read_id(self):
+        some_id = self.fast5handle.get_read_id()
+        self.assertEqual(some_id, "5048dffc-a463-4d84-bd3b-90ca183f488a")
 
     @classmethod
     def tearDownClass(cls):

@@ -13,7 +13,7 @@ os:
 #- osx
 
 git:
-  submodules: false
+  submodules: true
 
 before_install:
 - git submodule update --init
@@ -21,53 +21,117 @@ before_install:
   brew update;
   brew install gcc@5 automake make open-mpi;
   gcc --version;
+  alias make='gmake';
   ln -s /usr/local/bin/gcc-5 /usr/local/bin/gcc;
   alias gcc='gcc-5';
   alias g++='g++-5';
 
   gcc --version;
-  wget https://repo.anaconda.com/archive/Anaconda2-5.3.1-MacOSX-x86_64.sh -O anaconda.sh;
 
   else
 
     sudo apt-get update -qq;
-    sudo apt-get install autotools-dev autoconf cmake make;
+    sudo apt-get install autotools-dev autoconf cmake wget git make g++-5 gcc-5 zlib1g-dev libbz2-dev liblzma-dev;
     sudo apt-get update;
-    wget https://repo.anaconda.com/archive/Anaconda3-5.3.0-Linux-x86_64.sh -O anaconda.sh;
 
   fi
-- bash anaconda.sh -b -p $HOME/anaconda3
 
+#- bash anaconda.sh -b -p $HOME/anaconda3
+#    wget https://repo.anaconda.com/archive/Anaconda3-5.3.0-Linux-x86_64.sh -O anaconda.sh;
+#    sudo apt-get install python3-dev python3-setuptools python3-pip;
 
 install:
-- export PATH="$HOME/anaconda3/bin:$PATH"
-- export C_INCLUDE_PATH="$HOME/anaconda3/envs/signalalign/include:$C_INCLUDE_PATH"
-- export LD_LIBRARY_PATH="$HOME/anaconda3/envs/signalalign/lib:$LD_LIBRARY_PATH"
-- export LIBRARY_PATH="$LIBRARY_PATH:$HOME/anaconda3/envs/signalalign/lib"
+#- export PATH="$PATH:$HOME/anaconda3/bin"
+#- export C_INCLUDE_PATH="$C_INCLUDE_PATH:/usr/local/Cellar/gcc@5/5.5.0_2/include:/usr/include:/usr/local/include:$HOME/anaconda3/envs/signalalign/include"
+#- export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/usr/local/Cellar/gcc@5/5.5.0_2/lib/gcc/5:/usr/lib:/usr/local/lib:$HOME/anaconda3/envs/signalalign/lib"
+#- export LIBRARY_PATH="$LIBRARY_PATH:/usr/local/Cellar/gcc@5/5.5.0_2/lib/gcc/5:/usr/local/lib:/usr/lib:$HOME/anaconda3/envs/signalalign/lib"
+#- export C_INCLUDE_PATH="$C_INCLUDE_PATH:$HOME/anaconda3/envs/signalalign/include"
+#- export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/usr/local/Cellar/gcc@5/5.5.0_2/lib/gcc/5:$HOME/anaconda3/envs/signalalign/lib"
+#- export LIBRARY_PATH="$LIBRARY_PATH:/usr/local/Cellar/gcc@5/5.5.0_2/lib/gcc/5:$HOME/anaconda3/envs/signalalign/lib"
 
-- hash -r
-- conda config --set always_yes yes --set changeps1 no
-- conda update -q conda
+#- hash -r
+#- conda config --set always_yes yes --set changeps1 no
+#- conda update -q conda
 # Useful for debugging any issues with conda
-- conda info -a
-- if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
-  conda env create -f requirements2.yml python=3.6;
-  else
-  conda env create -f requirements.yml python=3.6;
-  fi
-
-- source activate signalalign
-- alias gcc='gcc-5'
-- alias g++='g++-5'
-- gcc --version
+#- conda info -a
+#- conda env create -f requirements.yml python=3.6
+#- source activate signalalign
+- pwd
+- echo $HOME
+- ls
+# samtools install
+- cd $HOME/build/UCSC-nanopore-cgl/
+- wget https://github.com/samtools/samtools/releases/download/1.9/samtools-1.9.tar.bz2
+- tar -vxjf samtools-1.9.tar.bz2
+- ls
+- cd samtools-1.9
+- ./configure --prefix=$HOME/build/UCSC-nanopore-cgl/
 - make
+- make install
+- echo "PATH=$HOME/build/UCSC-nanopore-cgl/bin/:$PATH" >> ~/.bashrc
+- source ~/.bashrc
+- cd ..
+- which samtools
+  # bwa install
+- git clone https://github.com/lh3/bwa.git
+- cd bwa
+- make
+- echo "PATH=$HOME/build/UCSC-nanopore-cgl/bwa/:$PATH" >> ~/.bashrc
+- cd ..
+- source ~/.bashrc
+- which bwa
+  # python install
+- wget https://www.python.org/ftp/python/3.6.8/Python-3.6.8.tgz
+- tar -xzf Python-3.6.8.tgz
+- find $HOME/build/UCSC-nanopore-cgl/  -type d | xargs chmod 0755
+- cd Python-3.6.8/
+- ./configure --prefix=$HOME/
+- make
+- make install
+- echo "PATH=$HOME/build/UCSC-nanopore-cgl/Python-3.6.8/:$PATH" >> ~/.bashrc
+- source ~/.bashrc
+- which python
+- which python3
+- alias python="$HOME/build/UCSC-nanopore-cgl/Python-3.6.8/python"
+- which python3
+# install pip
+- cd ..
+- wget https://bootstrap.pypa.io/get-pip.py
+- python3 get-pip.py --user
+- echo "PATH=$HOME/.local/bin/:$PATH" >> ~/.bashrc
+- source ~/.bashrc
+- which pip3
+- which pip
+- alias gcc=gcc-5
+- alias g++=g++-5
+- alias python="$HOME/build/UCSC-nanopore-cgl/Python-3.6.8/python"
+- gcc --version
+- pip3 install numpy
+- pip3 install setuptools
+- cd $HOME/build/UCSC-nanopore-cgl/signalAlign
+- make
+#- if [[ "$TRAVIS_OS_NAME" != "osx" ]]; then
+#      "export DISPLAY=:99.0";
+#      "sh -e /etc/init.d/xvfb start";
+#      sleep 3; # give xvfb some time to start
+#  fi
 
-before_script: # configure a headless display to test plot generation
+before_script:
 - "export DISPLAY=:99.0"
 - "sh -e /etc/init.d/xvfb start"
 - sleep 3 # give xvfb some time to start
 
+
+
 script:
 - export PATH=$PATH:$PWD/bin
 - make test
+
+#export PATH="$HOME/anaconda3/bin:$PATH"
+#export C_INCLUDE_PATH="$HOME/anaconda3/envs/signalalign/include:$C_INCLUDE_PATH"
+#export LD_LIBRARY_PATH="$HOME/anaconda3/envs/test_test2/lib:$LD_LIBRARY_PATH"
+#export LIBRARY_PATH="$HOME/anaconda3/envs/test_test2/lib:$LIBRARY_PATH"
+
+#export LIBRARY_PATH="$LIBRARY_PATH:$HOME/anaconda3/envs/signalalign/lib"
+#export CPLUS_INCLUDE_PATH="$HOME/anaconda3/envs/signalalign/include:$CPLUS_INCLUDE_PATH"
 

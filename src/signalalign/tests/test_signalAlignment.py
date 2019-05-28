@@ -299,33 +299,110 @@ class SignalAlignmentTest(unittest.TestCase):
                 self.assertEqual(event["path_kmer"].decode(), rev_kmer)
                 self.assertEqual(event["reference_kmer"].decode(), kmer)
 
-    def test_runSa_with_config(self):
+    def test_read_in_signal_align_tsv(self):
+        example = os.path.join(self.HOME, "tests/test_assignment_files/d6160b0b-a35e-43b5-947f-adaa1abade28.sm.assignments.tsv")
+        data = SignalAlignment.read_in_signal_align_tsv(example, "assignments")
+        self.assertEqual(NanoporeRead.bytes_to_string(data["k-mer"][0]), "GCCTTA")
         with tempfile.TemporaryDirectory() as tempdir:
+            file1 = os.path.join(tempdir, "test.txt")
+            with open(file1, "w") as f:
+                subprocess.call(["head", "-1", example], stdout=f)
+            data = SignalAlignment.read_in_signal_align_tsv(file1, "assignments")
+            self.assertEqual(NanoporeRead.bytes_to_string(data["k-mer"][0]), "GCCTTA")
 
-            r9_complement_model_file_acgt = os.path.join(self.HOME, "models/testModelR9_5mer_acgt_complement.model")
-            r9_template_model_file_acgt = os.path.join(self.HOME, "models/testModelR9_5mer_acgt_template.model")
-            self.default_args.path_to_bin = self.path_to_bin
-            self.default_args.output_dir = self.path_to_bin
-            one_file_dir = os.path.join(self.HOME, "tests/minion_test_reads/one_R9_canonical_ecoli")
-            ecoli_bam = os.path.join(self.HOME, "tests/minion_test_reads/canonical_ecoli_R9/canonical_ecoli.bam")
-            ecoli_readdb = os.path.join(self.HOME, "tests/minion_test_reads/canonical_ecoli_R9/canonical_ecoli.readdb")
+    def test_embed_with_both(self):
+        signal_file_reads = os.path.join(self.HOME, "tests/minion_test_reads/pUC/")
+        template_model = os.path.join(self.HOME, "models/testModelR9_5mer_acegt_template.model")
+        complement_model = os.path.join(self.HOME, "models/testModelR9_5mer_acegt_complement.model")
 
-            self.default_args.samples[0].fast5_dirs = [one_file_dir]
-            self.default_args.samples[0].bwa_reference = self.ecoli_reference
-            self.default_args.samples[0].alignment_file = ecoli_bam
-            self.default_args.samples[0].readdb = ecoli_readdb
-            self.default_args.complement_hmm_model = r9_complement_model_file_acgt
-            self.default_args.template_hmm_model = r9_template_model_file_acgt
+        puc_reference = os.path.join(self.HOME, "tests/test_sequences/pUC19_SspI.fa")
+        signal_file_guide_alignment = os.path.join(self.HOME, "tests/minion_test_reads/pUC/puc.bam")
+        with tempfile.TemporaryDirectory() as tempdir:
+            new_dir = os.path.join(tempdir, "new_dir")
+            if os.path.exists(new_dir):
+                shutil.rmtree(new_dir)
+            working_folder = FolderHandler()
+            working_folder.open_folder(os.path.join(tempdir, "test_dir"))
 
-            tmp_json_path = os.path.join(tempdir, "test.json")
-            save_json(self.default_args, tmp_json_path)
-            run_signal_align = os.path.join(self.path_to_bin, "runSignalAlign")
-            alignment_command = "{runsignalalign} run --config {config} " \
-                                "".format(runsignalalign=run_signal_align, config=tmp_json_path)
+            shutil.copytree(signal_file_reads, new_dir)
 
-            # run signalAlign
-            result = call(alignment_command, shell=True, bufsize=-1)
+            args = create_signalAlignment_args(alignment_file=signal_file_guide_alignment, bwa_reference=puc_reference,
+                                               forward_reference=puc_reference, in_templateHmm=template_model,
+                                               path_to_bin=self.path_to_bin, destination=working_folder.path,
+                                               embed=True, output_format="both", filter_reads=0, twoD_chemistry=True,
+                                               in_complementHmm=complement_model, delete_tmp=True)
+            final_args = merge_dicts([args, dict(in_fast5=os.path.join(new_dir, "makeson_PC_20160807_FNFAD20242_MN17284_sequencing_run_MA_470_R9_pUC_g_PCR_BC_08_07_16_93165_ch1_read176_strand.fast5"))])
+            handle = SignalAlignment(**final_args)
+            handle.run()
+            f5fh = Fast5(os.path.join(new_dir, "makeson_PC_20160807_FNFAD20242_MN17284_sequencing_run_MA_470_R9_pUC_g_PCR_BC_08_07_16_93165_ch1_read176_strand.fast5"))
+            mea = f5fh.get_signalalign_events(mea=True)
+            sam = f5fh.get_signalalign_events(sam=True)
+            self.assertEqual(mea[0]["raw_start"], 2879)
+            self.assertEqual(sam[0], "0")
+            self.assertEqual(len(os.listdir(working_folder.path)), 2)
 
+    # def test_variant_calling_with_multiple_paths(self):
+    #     signal_file_reads = os.path.join(self.HOME, "tests/minion_test_reads/canonical_ecoli_R9/")
+    #     template_model = os.path.join(self.HOME, "models/test_testModelR9_acegt_template.model")
+    #     complement_model = os.path.join(self.HOME, "models/testModelR9_acegt_complement.model")
+    #
+    #     ecoli_reference = "/Users/andrewbailey/CLionProjects/nanopore-RNN/submodules/signalAlign/tests/test_sequences/E.coli_K12.fasta"
+    #     positions_file="/Users/andrewbailey/CLionProjects/nanopore-RNN/submodules/signalAlign/tests/test_position_files/CCWGG_ecoli_k12_mg1655_CX.positions"
+    #     signal_file_guide_alignment = "/Users/andrewbailey/CLionProjects/nanopore-RNN/submodules/signalAlign/tests/minion_test_reads/canonical_ecoli_R9/canonical_ecoli.bam"
+    #     with tempfile.TemporaryDirectory() as tempdir:
+    #         new_dir = os.path.join(tempdir, "new_dir")
+    #         if os.path.exists(new_dir):
+    #             shutil.rmtree(new_dir)
+    #         working_folder = FolderHandler()
+    #         working_folder.open_folder(os.path.join(tempdir, "test_dir"))
+    #
+    #         shutil.copytree(signal_file_reads, new_dir)
+    #         args = create_signalAlignment_args(alignment_file=signal_file_guide_alignment, bwa_reference=ecoli_reference,
+    #                                            forward_reference="/Users/andrewbailey/CLionProjects/nanopore-RNN/submodules/signalAlign/tests/test_test_variant_caller/test_dir/forward.test_test.E.coli_K12.fasta",
+    #                                            backward_reference="/Users/andrewbailey/CLionProjects/nanopore-RNN/submodules/signalAlign/tests/test_test_variant_caller/test_dir/backward.test_test.E.coli_K12.fasta",
+    #                                            in_templateHmm=template_model,
+    #                                            path_to_bin=self.path_to_bin, destination="/Users/andrewbailey/CLionProjects/nanopore-RNN/submodules/signalAlign/tests/test_test_variant_caller/test_test",
+    #                                            embed=False, output_format="full", filter_reads=0, twoD_chemistry=True,
+    #                                            in_complementHmm=complement_model, delete_tmp=True,
+    #                                            degenerate="cytosine2")
+    #
+    #         multithread_signal_alignment(args, list_dir(new_dir, ext="fast5"), worker_count=8,
+    #                                      forward_reference=None,
+    #                                      debug=False, filter_reads_to_string_wrapper=None)
+    #         # handle = SignalAlignment(**final_args)
+    #         # handle.run()
+    #         # f5fh = Fast5(os.path.join(new_dir, "makeson_PC_20160807_FNFAD20242_MN17284_sequencing_run_MA_470_R9_pUC_g_PCR_BC_08_07_16_93165_ch1_read176_strand.fast5"))
+    #         # mea = f5fh.get_signalalign_events(mea=True)
+    #         # sam = f5fh.get_signalalign_events(sam=True)
+    #         # variant_calls = f5fh.get_signalalign_events(variant=True)
+    #         # full_output = f5fh.get_signalalign_events()
+    #         # f5fh.get_read()
+    #         # self.assertEqual(mea[0]["raw_start"], 2879)
+    #         # self.assertEqual(sam[0], "0")
+    #         self.assertEqual(len(os.listdir(working_folder.path)), 2)
+
+    def test_variant_calling_with_multiple_paths_rna(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            new_dir = os.path.join(tempdir, "new_dir")
+            if os.path.exists(new_dir):
+                shutil.rmtree(new_dir)
+            working_folder = FolderHandler()
+            working_folder.open_folder(os.path.join(tempdir, "test_dir"))
+
+            shutil.copytree(self.test_dir_rna, new_dir)
+
+            args = create_signalAlignment_args(alignment_file=self.rna_bam, bwa_reference=self.rna_reference,
+                                               forward_reference=os.path.join(self.HOME, "tests/test_sequences/fake_rna_replace/forward.fake_rna_atg.fake_rna_ref.fa"),
+                                               backward_reference=os.path.join(self.HOME, "tests/test_sequences/fake_rna_replace/backward.fake_rna_atg.fake_rna_ref.fa"),
+                                               in_templateHmm=os.path.join(self.HOME, "models/fake_testModelR9p4_5mer_acfgt_RNA.model"),
+                                               path_to_bin=self.path_to_bin, destination=working_folder.path,
+                                               embed=False, output_format="full", filter_reads=0, twoD_chemistry=False,
+                                               delete_tmp=True, degenerate="m6a", check_for_temp_file_existance=False)
+
+            multithread_signal_alignment(args, list_dir(new_dir, ext="fast5"), worker_count=8,
+                                         forward_reference=None,
+                                         debug=True, filter_reads_to_string_wrapper=None)
+            self.assertEqual(len(os.listdir(working_folder.path)), 2)
 
 
 if __name__ == '__main__':
