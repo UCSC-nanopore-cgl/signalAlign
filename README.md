@@ -18,14 +18,19 @@ directory and set the config up so that it points to the data correctly once you
 * Needed in the path
     * [samtools](https://www.biostars.org/p/328831/)
     * [bwa](https://github.com/lh3/bwa)
+* If for some reason your server does not have pip3 associated with python3.5 you can make your own local pip
+    * `wget https://bootstrap.pypa.io/get-pip.py`
+    * `python3 get-pip.py --user`
 
 ### Installation:
 1. Recursively clone this repo `git clone --recursive https://github.com/UCSC-nanopore-cgl/signalAlign.git`
 2. Make project  
 `make`
-3. Add bin to path  
+3. Install all required python packages.  
+`pip install -e . --user` 
+4. Add bin to path  
 `export PATH=$PATH:$PWD/bin`
-4. Test install   
+5. Test install   
 `make test`
 
 ### Introduction
