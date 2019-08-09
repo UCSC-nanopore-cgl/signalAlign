@@ -14,7 +14,8 @@ directory and set the config up so that it points to the data correctly once you
 
 
 ### Requirements
-* git, gcc, g++, make, zlib, libbz2, liblzma, numpy, setuptools, python 3.5, wget
+* git-2.17.1, gcc-5, g++-5, make-4.1, zlib-1:1.2.11.dfsg-0ubuntu2, libbz2-1.0.6-8.1ubuntu0.2, liblzma-5.2.2-1.3, numpy-1.16.4, setuptools-41.0.1, python-3.5, wget-1.19.4-1ubuntu2.2
+* Note: If you have newer versions of any of these installed and it does not work please file an issue. 
 * Needed in the path
     * [samtools](https://www.biostars.org/p/328831/)
     * [bwa](https://github.com/lh3/bwa)
