@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 from setuptools import setup, find_packages, Extension
+from Cython.Build import cythonize
 import os
 import numpy as np
 
@@ -30,7 +31,7 @@ extensions.append(Extension(
 ### cparsers ###
 
 extensions.append(
-    Extension("signalalign.cparsers", sources=[os.path.join(pkg_path, 'cparsers.c')], include_dirs=[np.get_include()]))
+    Extension("signalalign.cparsers", [os.path.join(pkg_path, 'cparsers.pyx')], include_dirs=[np.get_include()]))
 
 
 ### kmer align ###
@@ -58,14 +59,14 @@ extensions.append(Extension('kmeralign',
                             extra_objects=extra_objects))
 
 setup(name="signalAlign",
-      version="0.2.0",
+      version="0.2.1",
       description="A library for signal-level analysis of ONT data",
       author="Art Rand / Andrew Bailey / Trevor Pesout",
       author_email="andbaile@ucsc.edu",
       url="https://github.com/UCSC-nanopore-cgl/signalAlign",
       package_dir={"": "src"},
       # library_dirs=[os.path.join(HOME, "lib")],
-      ext_modules=extensions,
+      ext_modules=cythonize(extensions),
       packages=find_packages("src"),
       install_requires=["numpy>=1.9.2",
                         "h5py>=2.2.1",
