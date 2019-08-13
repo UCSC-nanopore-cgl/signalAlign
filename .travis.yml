@@ -108,6 +108,7 @@ install:
 - gcc --version
 - pip3 install numpy
 - pip3 install setuptools
+- pip3 install pysam
 - pip3 install Cython
 - cd $HOME/build/UCSC-nanopore-cgl/signalAlign
 - make
