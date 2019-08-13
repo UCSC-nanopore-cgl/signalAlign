@@ -23,6 +23,9 @@ directory and set the config up so that it points to the data correctly once you
     * `python3 get-pip.py --user`
 
 ### Installation:
+0. Sometimes it is necessary to install pysam and cython before running the pip install command so before installing  
+    * `pip install pysam`
+    * `pip install cython`
 1. Recursively clone this repo `git clone --recursive https://github.com/UCSC-nanopore-cgl/signalAlign.git`
 2. Make project  
 `make`
