@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 
 from setuptools import setup, find_packages, Extension
-from Cython.Build import cythonize
+# from Cython.Build import cythonize
 import os
-import numpy as np
+# import numpy as np
 
 c_compile_args = ['-pedantic', '-Wall', '-std=c99']
 optimisation = ['-DNDEBUG', '-fstrict-aliasing']
@@ -66,7 +66,7 @@ setup(name="signalAlign",
       url="https://github.com/UCSC-nanopore-cgl/signalAlign",
       package_dir={"": "src"},
       # library_dirs=[os.path.join(HOME, "lib")],
-      ext_modules=cythonize(extensions),
+      ext_modules=extensions,
       packages=find_packages("src"),
       install_requires=["numpy>=1.9.2",
                         "h5py>=2.2.1",
