@@ -129,7 +129,14 @@ class NanoporeRead(object):
         if not self.open():
             return False
 
-        ok = self._initialize_metadata()
+        # Initialize is broken into _intialize_metadata and _initialize so that we can quickly get the read_label
+        #   from the fast5 without getting all the rest of the data.  2D reads don't (or don't always) have the
+        #   necessary data to do this, so we don't invoke initialize_metadata on it during Initialize.  we still allow
+        #   _initialize_metadata() to be invoked on 2d reads, but it just invokes _initialize (because it will be
+        #   invoked separately when indexing fast5s for their read_labels)
+        ok = True
+        if not self.twoD:
+            ok = self._initialize_metadata()
         ok &= self._initialize()
         self.initialize_success = ok
 
@@ -574,6 +581,15 @@ class NanoporeRead(object):
 
 class NanoporeRead2D(NanoporeRead):
 
+    def _initialize_metadata(self):
+        """
+        This is invoked to (quickly) fetch read_labels from the fast5 without loading the event table.  Because
+        2D reads don't (always) let us do this, we just invoke _initialize from here.
+        :return:
+        """
+        self._initialize()
+
+
     def _initialize(self):
         """
         Separate initialization routine for 2D reads
@@ -625,6 +641,14 @@ class NanoporeRead2D(NanoporeRead):
         if twoD_read_sequence_address in self.fastFive:
             self.has2D = True
             self.twoD_read_sequence = bytes.decode(self.fastFive[twoD_read_sequence_address][()].split()[2])
+            self.read_label = self.bytes_to_string(self.fastFive[twoD_read_sequence_address][()].split()[0][1:])
+        else:
+            self.read_label = None
+
+        if METADATA_PATH_KEY in self.fastFive:
+            self.run_id = self.bytes_to_string(self.fastFive[METADATA_PATH_KEY].attrs.get('run_id'))
+        else:
+            self.run_id = None
 
         # initialize version-specific paths
         if self.version == "1.15.0":
