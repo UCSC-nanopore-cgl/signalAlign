@@ -29,3 +29,4 @@ share
 cmake_build
 hdf5-1.10.4.tar.gz
 hdf5-1.10.4/
+eventdetection/cparsers.c

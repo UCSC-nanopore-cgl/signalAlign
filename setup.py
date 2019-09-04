@@ -30,8 +30,8 @@ extensions.append(Extension(
 
 ### cparsers ###
 
-extensions.append(
-    Extension("signalalign.cparsers", [os.path.join(pkg_path, 'cparsers.pyx')], include_dirs=[np.get_include()]))
+# extensions.append(
+#     Extension("signalalign.cparsers", [os.path.join(pkg_path, 'cparsers.pyx')], include_dirs=[np.get_include()]))
 
 
 ### kmer align ###
