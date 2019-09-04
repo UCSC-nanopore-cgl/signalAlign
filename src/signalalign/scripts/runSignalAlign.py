@@ -77,9 +77,6 @@ def parse_args():
                              help="template serialized HDP file")
     run_parser2.add_argument('--complement_hdp', '-cH', action='store', dest='complementHDP', default=None,
                              help="complement serialized HDP file")
-    run_parser2.add_argument('--degenerate', '-x', action='store', dest='degenerate', default="variant",
-                             help="Specify degenerate nucleotide options: "
-                                  "variant -> {ACGT}, cytosine2 -> {CE} cytosine3 -> {CEO} adenosine -> {AI}")
     run_parser2.add_argument('--stateMachineType', '-smt', action='store', dest='stateMachineType', type=str,
                              default="threeState", help="decide which model to use, threeState by default")
     run_parser2.add_argument('--file_of_files', '-fofn', action='store', dest='fofn', required=False, type=str,
@@ -176,6 +173,7 @@ def main(args):
             constraint_trim=config_args.constraint_trim,
             traceBackDiagonals=config_args.traceBackDiagonals,
             twoD_chemistry=config_args.two_d,
+            perform_kmer_event_alignment=config_args.perform_kmer_event_alignment,
             get_expectations=False,
             path_to_bin=resolvePath(config_args.path_to_bin),
             check_for_temp_file_existance=True,
@@ -185,7 +183,8 @@ def main(args):
             event_table=config_args.signal_alignment_args.event_table,
             output_format=config_args.signal_alignment_args.output_format,
             filter_reads=config_args.filter_reads,
-            delete_tmp=config_args.signal_alignment_args.delete_tmp)
+            delete_tmp=config_args.signal_alignment_args.delete_tmp,
+            rna=config_args.rna)
 
         multithread_signal_alignment_samples(samples, alignment_args, config_args.job_count, trim=None,
                                              debug=config_args.debug)
@@ -280,7 +279,6 @@ def main(args):
             "threshold": args.threshold,
             "diagonal_expansion": args.diag_expansion,
             "constraint_trim": args.constraint_trim,
-            "degenerate": getDegenerateEnum(args.degenerate),
             "twoD_chemistry": args.twoD,
             "target_regions": args.target_regions,
             "embed": args.embed,

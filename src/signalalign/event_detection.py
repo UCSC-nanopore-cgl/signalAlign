@@ -155,7 +155,7 @@ def add_start_and_length_to_events(basecall_events, sampling_freq, start_time):
 
 
 def load_from_raw(np_handle, alignment_file, model_file_location, path_to_bin="./",
-                  nucleotide_sequence=None, analysis_identifier=None, write_failed_alignments=False):
+                  nucleotide_sequence=None, analysis_identifier=None, write_failed_alignments=False, rna=False):
     """Load a nanopore read from raw signal and an alignment file. Need a model to create banded alignment.
     :param np_handle: NanoporeRead class object
     :param alignment_file: sam/bam file
@@ -164,6 +164,7 @@ def load_from_raw(np_handle, alignment_file, model_file_location, path_to_bin=".
     :param nucleotide_sequence: nucleotide sequence (needed if no alignment file is available)
     :param analysis_identifier: identifier for storage of event table and fastq
     :param write_failed_alignments: still write alignments that failed quality checks
+    :param rna: boolean option to assume rna read
     :return: path to events in fast5 file or -1 if the task fails
     """
     assert os.path.isfile(model_file_location), \
@@ -207,7 +208,8 @@ def load_from_raw(np_handle, alignment_file, model_file_location, path_to_bin=".
     tmp_directory = tempfile.mkdtemp()
     # run the c code which does the required stuff
     status = run_kmeralign_exe(file_name, nucleotide_sequence, model_file_location, tmp_dest, path_to_bin,
-                               write_failed_alignments=write_failed_alignments, tmp_directory=tmp_directory)
+                               write_failed_alignments=write_failed_alignments, tmp_directory=tmp_directory,
+                               rna=rna)
     os.removedirs(tmp_directory)
     # alignment succeeded, save it to the appropriate location
     if status:
@@ -234,7 +236,7 @@ def load_from_raw(np_handle, alignment_file, model_file_location, path_to_bin=".
 
 
 def load_from_raw2(np_handle, aligned_segment, model_file_location, path_to_bin="./",
-                   analysis_identifier=None, write_failed_alignments=False):
+                   analysis_identifier=None, write_failed_alignments=False, rna=False):
     """Load a nanopore read from raw signal and an alignment file. Need a model to create banded alignment.
     :param np_handle: NanoporeRead class object
     :param aligned_segment: pysam aligned_segment object
@@ -242,6 +244,7 @@ def load_from_raw2(np_handle, aligned_segment, model_file_location, path_to_bin=
     :param path_to_bin: bath to signalAlign bin where executables are stored
     :param analysis_identifier: identifier for storage of event table and fastq
     :param write_failed_alignments: still write alignments that failed quality checks
+    :param rna: boolean option for rna reads
     :return: path to events in fast5 file or -1 if the task fails
     """
     assert os.path.isfile(model_file_location), \
@@ -279,7 +282,8 @@ def load_from_raw2(np_handle, aligned_segment, model_file_location, path_to_bin=
     tmp_directory = tempfile.mkdtemp()
     # run the c code which does the required stuff
     status = run_kmeralign_exe(file_name, nucleotide_sequence, model_file_location, tmp_dest, path_to_bin,
-                               write_failed_alignments=write_failed_alignments, tmp_directory=tmp_directory)
+                               write_failed_alignments=write_failed_alignments, tmp_directory=tmp_directory,
+                               rna=rna)
     os.removedirs(tmp_directory)
     # alignment succeeded, save it to the appropriate location
     if status:
@@ -306,7 +310,7 @@ def load_from_raw2(np_handle, aligned_segment, model_file_location, path_to_bin=
 
 
 def run_kmeralign_exe(fast5_path, nuc_sequence, model_file, dest, path_to_bin="./", tmp_directory=None,
-                      delete_tmp_fasta=True, write_failed_alignments=False):
+                      delete_tmp_fasta=True, write_failed_alignments=False, rna=False):
     """Run kmerEventAlign. Generates alignment file
     :param fast5_path: path to fast5
     :param nuc_sequence: nucleotide sequence to align
@@ -314,8 +318,10 @@ def run_kmeralign_exe(fast5_path, nuc_sequence, model_file, dest, path_to_bin=".
     :param dest: location to place events.
                     ex.  passing "Analyses/Basecalled_1D_template" will create "Analyses/Basecalled_1D_template/Events"
     :param path_to_bin: path to SignalAlign bin with executables
+    :param write_failed_alignments: write failed alignments
     :param tmp_directory: if set, a fasta will be written here and used in kmerEventAlign invocation
     :param delete_tmp_fasta: if set and fasta is written, fasta will be deleted afterwards
+    :param rna: if set assume is rna read
     :return:
     """
     executable = os.path.join(path_to_bin, "kmerEventAlign")
@@ -333,6 +339,8 @@ def run_kmeralign_exe(fast5_path, nuc_sequence, model_file, dest, path_to_bin=".
                 fa_out.write(">{}\n".format(os.path.basename(fast5_path)))
                 fa_out.write("{}\n".format(nuc_sequence))
             cmd.extend(['-n', fasta_location])
+        if rna:
+            cmd.append('--rna')
         subprocess.check_call(cmd)
         status = True
     except Exception as e:

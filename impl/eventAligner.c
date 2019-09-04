@@ -1227,11 +1227,11 @@ for(int col = 0; col <= 10; ++col) {
 }
 
 // embed event table from fast5 path, template model path and nucleotide sequence
-herr_t load_from_raw(char* fast5_file_path, char* templateModelFile, char* sequence, char* path_to_embed) {
-    return load_from_raw2(fast5_file_path, templateModelFile, sequence, path_to_embed, false);
+herr_t load_from_raw(char* fast5_file_path, char* templateModelFile, char* sequence, char* path_to_embed, bool rna) {
+    return load_from_raw2(fast5_file_path, templateModelFile, sequence, path_to_embed, false, rna);
 }
 herr_t load_from_raw2(char* fast5_file_path, char* templateModelFile, char* sequence, char* path_to_embed,
-                      bool writeFailedAlignment) {
+                      bool writeFailedAlignment, bool rna) {
     // prep
     StateMachine *sM = stateMachine3_loadFromFile(templateModelFile, threeState, emissions_kmer_getGapProb,
                                                   emissions_signal_strawManGetKmerEventMatchProbWithDescaling_MeanOnly,
@@ -1239,13 +1239,14 @@ herr_t load_from_raw2(char* fast5_file_path, char* templateModelFile, char* sequ
     hid_t hdf5_file = fast5_open(fast5_file_path);
     float start_time = fast5_get_start_time(hdf5_file);
     const detector_param *ed_params = &event_detection_defaults;
-    // if experiment is RNA, change defaults and nucleotide sequence
-    char *experiment_type = fast5_get_experiment_type(hdf5_file);
     // get kmers we want to align to the events
-    stList* kmer_list = build_kmer_list(sequence, sM->kmerLength, strcmp(experiment_type, "rna") == 0);
+    stList* kmer_list = build_kmer_list(sequence, sM->kmerLength, rna);
 
-    if (strcmp(experiment_type, "rna") == 0) {
+    if (rna) {
         ed_params = &event_detection_rna;
+        fprintf(stderr, "THIS READ IS: RNA\n");
+    } else {
+      fprintf(stderr, "THIS READ IS: DNA \n");
     }
 
     // get channel parameters and scale raw ADC counts to get pA raw current
@@ -1264,7 +1265,7 @@ herr_t load_from_raw2(char* fast5_file_path, char* templateModelFile, char* sequ
     event_table et = detect_events(rt, *ed_params);
     assert(rt.n > 0);
     assert(et.n > 0);
-    if (strcmp(experiment_type, "rna") == 0) {
+    if (rna) {
         event_table et2 = reverse_events(et);
         et = et2;
     }
@@ -1279,19 +1280,16 @@ herr_t load_from_raw2(char* fast5_file_path, char* templateModelFile, char* sequ
     // create new event table with our own data structure
     basecalled_event_table* b_et = event_table_to_basecalled_table(&et, channel_params, start_time);
 
-    if (strcmp(experiment_type, "rna")==0){
+    if (rna){
         rna_alignment_to_base_event_map(event_alignment, b_et, kmer_list, sM);
         basecalled_event_table *bet2 = reverse_basecalled_events(b_et);
         free(b_et);
         b_et = bet2;
-
     } else {
         alignment_to_base_event_map(event_alignment, b_et, kmer_list, sM);
-
     }
 
     herr_t write_success = fast5_set_basecall_event_table(hdf5_file, path_to_embed, b_et);
-
     // cleanup
     free(b_et->event);
     free(b_et);

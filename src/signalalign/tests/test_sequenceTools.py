@@ -401,7 +401,7 @@ class SignalAlignUtilsTest(unittest.TestCase):
     def test_parse_full_alignment_file(self):
         data = parse_full_alignment_file(self.alignment_file)
         self.assertEqual(len(data), 16852)
-        self.assertRaises(pd.errors.ParserError, parse_full_alignment_file, self.ambiguity_positions_file)
+        self.assertRaises(ValueError, parse_full_alignment_file, self.ambiguity_positions_file)
 
 
 class CustomAmbiguityPositionsTest(unittest.TestCase):
@@ -425,7 +425,7 @@ class CustomAmbiguityPositionsTest(unittest.TestCase):
 
     def test_parseAmbiguityFile(self):
         handle = CustomAmbiguityPositions.parseAmbiguityFile(self.ambiguity_positions_file)
-        self.assertRaises(pd.errors.ParserError, CustomAmbiguityPositions.parseAmbiguityFile, self.reference)
+        self.assertRaises(ValueError, CustomAmbiguityPositions.parseAmbiguityFile, self.reference)
         self.assertSequenceEqual(list(handle["position"]), [1, 1, 1, 1])
 
     def test__get_contig_positions(self):

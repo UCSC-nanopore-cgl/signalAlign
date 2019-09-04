@@ -59,6 +59,10 @@ def parse_args():
                         dest='basecall', required=False,
                         help="Option to plot the most recent basecalled data aligned to reference")
 
+    parser.add_argument('--rna', action='store_true', default=False,
+                        dest='rna', required=False,
+                        help="Option store true if RNA reads")
+
     parser.add_argument('--basecall_scatter', action='store_true', default=False,
                         dest='basecall_scatter', required=False,
                         help="Plot basecalled segments as scatter plot")
@@ -490,7 +494,7 @@ def main(args=None):
         try:
             main_plot = True
             save_fig_path = None
-            cl_handle = CreateLabels(f5_path, kmer_index=2)
+            cl_handle = CreateLabels(f5_path, kmer_index=2, rna=args.rna)
             if args.output_dir:
                 save_fig_path = "{}.png".format(os.path.join(args.output_dir,
                                                              os.path.splitext(os.path.basename(f5_path))[0]))
@@ -556,7 +560,7 @@ def main(args=None):
                 print("Plotting {}".format(f5_path))
                 ps = PlotSignal(cl_handle.aligned_signal)
                 ps.plot_alignment(save_fig_path=save_fig_path, plot_alpha=args.plot_alpha, kmer_info=kmer_info)
-        except KeyError as e:
+        except Exception as e:
             print("FAILED: {}: {}".format(e, f5_path))
 
     stop = timer()

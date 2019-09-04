@@ -124,7 +124,8 @@ class EventDetectTests(unittest.TestCase):
         np_handle = NanoporeRead(os.path.abspath(self.tmp_rna_file3))
         np_handle._initialize_metadata()
         alignment_file = os.path.join(self.HOME, "tests/minion_test_reads/RNA_edge_cases/rna_reads.sam")
-        saved_location = load_from_raw(np_handle, alignment_file, self.rna_model_file, path_to_bin)
+        saved_location = load_from_raw(np_handle, alignment_file, self.rna_model_file, path_to_bin,
+                                       write_failed_alignments=True, rna=True)
         # close and reopen
         np_handle.close()
         np_handle = NanoporeRead(os.path.abspath(self.tmp_rna_file3))
@@ -145,7 +146,8 @@ class EventDetectTests(unittest.TestCase):
         dest = "/Analyses/SignalAlign_Basecall_1D_001/BaseCalled_template"
         self.rna_handle2.close()
 
-        status = run_kmeralign_exe(rna_fast5_path, nuc_sequence, rna_model_file, dest, path_to_bin)
+        status = run_kmeralign_exe(rna_fast5_path, nuc_sequence, rna_model_file, dest, path_to_bin,
+                                   write_failed_alignments=True, rna=True)
         rna_handle = Fast5(self.tmp_rna_file2, 'r+')
 
         events = np.array(rna_handle[dest])

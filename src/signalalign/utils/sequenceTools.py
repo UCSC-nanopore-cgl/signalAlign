@@ -22,6 +22,71 @@ from signalalign.utils.parsers import read_fasta
 from py3helpers.utils import find_substring_indices, all_string_permutations
 
 
+AMBIG_BASES = {
+    "AG": "R",
+    "CT": "Y",
+    "CG": "S",
+    "AT": "W",
+    "GT": "K",
+    "AC": "M",
+    "CGT": "B",
+    "AGT": "D",
+    "ACT": "H",
+    "ACG": "V",
+    "ACGT": "X",
+    "CEO": "L",
+    "CE": "P",
+    "AI": "Q",
+    "AF": "f",
+    "ACEGOT": "U",
+    "JT": "Z",
+    "A": "A",
+    "T": "T",
+    "C": "C",
+    "G": "G",
+    "E": "E",
+    "O": "O",
+    "F": "F",
+    "J": "J",
+    "I": "I",
+    "R": "R",
+    "Y": "Y",
+    "S": "S",
+    "W": "W",
+    "K": "K",
+    "M": "M",
+    "B": "B",
+    "D": "D",
+    "H": "H",
+    "V": "V",
+    "X": "X",
+    "L": "L",
+    "P": "P",
+    "Q": "Q",
+    "f": "f",
+    "U": "U",
+    "Z": "Z",
+    "p": "p",
+    "b": "b",
+    "d": "d",
+    "e": "e",
+    "h": "h",
+    "i": "i",
+    "j": "j",
+    "k": "k",
+    "l": "l",
+    "m": "m",
+    "n": "n",
+    "o": "o",
+    "Tp": "j",
+    "Gb": "k",
+    "Gd": "l",
+    "Ce": "m",
+    "Th": "n",
+    "Ai": "o"
+}
+
+
 def find_gatc_motifs(sequence):
     """Generate index of 'A' within the 'GATC' motifs in a nucleotide sequence
 
@@ -471,7 +536,7 @@ def count_kmers(dna, k):
 
 
 def parse_full_alignment_file(alignment_file):
-    data = pd.read_table(alignment_file, usecols=(1, 4, 5, 9, 12, 13),
+    data = pd.read_csv(alignment_file, usecols=(1, 4, 5, 9, 12, 13), sep="\t",
                          dtype={'ref_pos': np.int64,
                                 'strand': np.str,
                                 'event_index': np.int64,
@@ -501,7 +566,7 @@ class CustomAmbiguityPositions(object):
 
         :param ambig_filepath: path to ambiguity position file
         """
-        return pd.read_table(ambig_filepath,
+        return pd.read_csv(ambig_filepath, sep="\t",
                              usecols=(0, 1, 2, 3, 4),
                              names=["contig", "position", "strand", "change_from", "change_to"],
                              dtype={"contig": np.str,
@@ -541,7 +606,7 @@ class CustomAmbiguityPositions(object):
                 raise RuntimeError(
                     "[CustomAmbiguityPositions._get_substituted_sequence]Illegal substitution requesting "
                     "change from %s to %s, row: %s" % (raw_sequence[row["position"]], row["change_to"], row))
-            raw_sequence[row["position"]] = row["change_to"]
+            raw_sequence[row["position"]] = AMBIG_BASES["".join(sorted(row["change_to"]))]
         return "".join(raw_sequence)
 
     def _get_contig_positions(self, contig, strand):

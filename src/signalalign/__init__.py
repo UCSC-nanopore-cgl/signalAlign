@@ -29,7 +29,7 @@ def _parseCigar(cigar_string, ref_start, forward=True):
     cigar_tuples = re.findall(r'([0-9]+)([MIDNSHPX=])', cigar_string)
 
     clipping = {"S", "H"}
-    alignment_operations = {"M", "I", "D"}
+    alignment_operations = {"M", "I", "D", "X", "="}
 
     # make some counters
     query_start = 0

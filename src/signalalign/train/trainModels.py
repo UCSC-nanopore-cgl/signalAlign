@@ -442,7 +442,7 @@ class CreateHdpTrainingData(object):
                     print("[CreateHdpTrainingData] WARNING: Using sample analysis files when "
                           "assignments_dir is also set: {}".format(sample.name))
                 assignment_files = [x for x in sample.analysis_files if x.endswith("assignments.tsv")]
-
+            # TODO need to get this to infer type before reading in
             # infer kmer length and get kmers
             sample_assignment_table = get_assignment_table(assignment_files[0], 0, full)
             self.set_kmer_len(len(sample_assignment_table.iloc[0]['kmer']))
@@ -1050,7 +1050,8 @@ class TrainSignalAlign(object):
             event_table=self.args.signal_alignment_args.event_table,
             output_format=output_format,
             filter_reads=self.args.filter_reads,
-            delete_tmp=self.args.signal_alignment_args.delete_tmp)
+            delete_tmp=self.args.signal_alignment_args.delete_tmp,
+            rna=self.args.rna)
 
         dont_run_sa_samples = []
         run_sa_samples = []

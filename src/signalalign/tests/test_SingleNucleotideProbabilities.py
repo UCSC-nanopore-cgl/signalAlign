@@ -58,8 +58,8 @@ class SingleNuclProbsTest(unittest.TestCase):
                 '--alignment_file', alignment_file,
                 '--step_size', '5']
 
-        with captured_output() as (err, out):
-            singleNuclProb.main(args)
+        # with captured_output() as (err, out):
+        singleNuclProb.main(args)
 
         in_file_count = len(glob.glob(fast5_glob))
         output_files = glob.glob(os.path.join(output_tmp_dir, "*.tsv"))

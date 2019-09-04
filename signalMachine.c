@@ -399,7 +399,7 @@ stList *performSignalAlignment(StateMachine *sM, Sequence *eventSequence, int64_
 
     // make sequences
     Sequence *sX = sequence_constructReferenceKmerSequence(lX, target, sequence_getKmer,
-                                                           sequence_sliceNucleotideSequence, degenerate, kmer);
+                                                           sequence_sliceNucleotideSequence, kmer);
 
     // do alignment
     stList *alignedPairs = getAlignedPairsUsingAnchors(sM, sX, eventSequence, filteredRemappedAnchors, p,
@@ -436,10 +436,6 @@ void getSignalExpectations(StateMachine *sM, Hmm *hmmExpectations, Sequence *eve
 
     Sequence *target = sequence_constructKmerSequence(
             lX, trainingTarget, sequence_getKmer, sequence_sliceNucleotideSequence,
-            (degenerate == canonicalVariants ? CANONICAL_NUCLEOTIDES :
-             (degenerate == cytosineMethylation2 ? TWO_CYTOSINES : THREE_CYTOSINES)),
-            (degenerate == canonicalVariants ? NB_CANONICAL_BASES :
-             (degenerate == cytosineMethylation2 ? (NB_CYTOSINE_OPTIONS - 1) : NB_CYTOSINE_OPTIONS)),
             kmer);
 
     getExpectationsUsingAnchors(sM, hmmExpectations, target, eventSequence, filteredRemappedAnchors, p,
@@ -454,7 +450,7 @@ int main(int argc, char *argv[]) {
     double threshold = 0.01;
     int64_t constraintTrim = 14;
     int64_t traceBackDiagonals = 50;
-    int64_t degenerate;
+    int64_t degenerate = 0;
     int64_t outFmt;
     bool twoD = FALSE;
     bool rna = FALSE;
@@ -482,7 +478,6 @@ int main(int argc, char *argv[]) {
                 {"sparse_output",           no_argument,        0,  's'},
                 {"twoD",                    no_argument,        0,  'e'},
                 {"rna",                     no_argument,        0,  'r'},
-                {"degenerate",              required_argument,  0,  'o'},
                 {"templateModel",           required_argument,  0,  'T'},
                 {"complementModel",         required_argument,  0,  'C'},
                 {"readLabel",               required_argument,  0,  'L'},
@@ -525,10 +520,6 @@ int main(int argc, char *argv[]) {
                 break;
             case 'r':
                 rna = TRUE;
-                break;
-            case 'o':
-                j = sscanf(optarg, "%" PRIi64 "", &degenerate);
-                assert (j == 1);
                 break;
             case 'd':
                 sMtype = threeStateHdp;
@@ -657,8 +648,8 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    #pragma omp parallel sections
-    {
+    #pragma omp parallel sections default(none) shared(nHdpT, nHdpC, templateHdp, complementHdp)
+  {
         {
             nHdpT = (templateHdp == NULL) ? NULL : deserialize_nhdp(templateHdp);
         }

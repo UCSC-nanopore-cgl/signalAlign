@@ -250,8 +250,6 @@ class MeaTest(unittest.TestCase):
         self.assertSequenceEqual(new_data["raw_start"].tolist(), [10, 11, 10, 11])
         self.assertSequenceEqual(new_data["raw_length"].tolist(), [1, 1, 1, 1])
 
-
-
     def test_create_label_from_events(self):
         events = np.zeros(4, dtype=[('reference_index', '<i8'), ('path_kmer', 'S5'),
                                     ('strand', 'S1'),

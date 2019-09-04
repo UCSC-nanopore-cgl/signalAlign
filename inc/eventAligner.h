@@ -146,8 +146,8 @@ void alignment_to_base_event_map(stList *event_alignment, basecalled_event_table
 void rna_alignment_to_base_event_map(stList *event_alignment, basecalled_event_table* b_et,
                                      stList *kmer_list, StateMachine *pore_model);
 
-herr_t load_from_raw(char* fast5_file_path, char* templateModelFile, char* sequence, char* path_to_embed);
-herr_t load_from_raw2(char* fast5_file_path, char* templateModelFile, char* sequence, char* path_to_embed, bool writeFailedAlignment);
+herr_t load_from_raw(char* fast5_file_path, char* templateModelFile, char* sequence, char* path_to_embed, bool rna);
+herr_t load_from_raw2(char* fast5_file_path, char* templateModelFile, char* sequence, char* path_to_embed, bool writeFailedAlignment, bool rna);
 
 event_table reverse_events(event_table et);
 

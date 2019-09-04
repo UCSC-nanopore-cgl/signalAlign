@@ -1408,7 +1408,7 @@ StateMachine *stateMachine3_loadFromFile(const char *modelFile, StateMachineType
 
     j = sscanf(stList_get(tokens, 0), "%"SCNd64, &stateNumber);
     if (j != 1) {
-        st_errAbort("stateMachine3_loadFromFile: error parsing alphabet size\n");
+        st_errAbort("stateMachine3_loadFromFile: error parsing state number\n");
     }
     j = sscanf(stList_get(tokens, 1), "%"SCNd64, &alphabetSize);
     if (j != 1) {
@@ -1422,7 +1422,7 @@ StateMachine *stateMachine3_loadFromFile(const char *modelFile, StateMachineType
 
     // check for correct number of states for given stateMachineType
     if (!stateMachine3_checkStateNumber(stateNumber, type)) {
-        st_errAbort("stateMachine3_loadFromFile: Got invalid stateNumber for this stateMachine. Got stateNumber %s"
+        st_errAbort("stateMachine3_loadFromFile: Got invalid stateNumber for this stateMachine. Got stateNumber %i"
                             " and StateMachineType %i\n", stateNumber, type);
     };
 

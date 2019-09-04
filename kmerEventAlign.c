@@ -11,6 +11,7 @@ void usage() {
     fprintf(stderr, "-p: path to save events in Fast5\n");
     fprintf(stderr, "-N: raw nucleotide string\n");
     fprintf(stderr, "-n: file with nucleotide string\n");
+    fprintf(stderr, "-r: set read as rna \n");
     fprintf(stderr, "    (exactly one of -N or -n must be set)\n");
     fprintf(stderr, "-w: write failed alignments\n");
 }
@@ -23,6 +24,7 @@ int main(int argc, char *argv[]) {
     char *nucleotides = NULL;
     char *nucleotideFile = NULL;
     bool writeFailedAlignment = false;
+    bool rna = false;
 
     int key;
     while (1) {
@@ -34,11 +36,12 @@ int main(int argc, char *argv[]) {
                 {"nucleotides",             required_argument,  0,  'N'},
                 {"nucleotide_file",         required_argument,  0,  'n'},
                 {"force_write",             no_argument,        0,  'w'},
+                {"rna",                     no_argument,        0,  'r'},
                 {0, 0, 0, 0} };
 
         int option_index = 0;
 
-        key = getopt_long(argc, argv, "h:f:m:p:N:n:w",
+        key = getopt_long(argc, argv, "h:f:m:p:N:n:wr",
                           long_options, &option_index);
 
         if (key == -1) {
@@ -64,6 +67,9 @@ int main(int argc, char *argv[]) {
             case 'n':
                 nucleotideFile = stString_copy(optarg);
                 break;
+            case 'r':
+                rna = true;
+                break;
             case 'w':
                 writeFailedAlignment = true;
                 break;
@@ -77,9 +83,9 @@ int main(int argc, char *argv[]) {
     if (fast5File == NULL) st_errAbort("--fast5/-f parameter is required\n");
     if (modelFile == NULL) st_errAbort("--model/-m parameter is required\n");
     if (savePath == NULL)  st_errAbort("--save_path/-p parameter is required\n");
-    if ((nucleotides == NULL ? 1 : 0) + (nucleotideFile == NULL ? 1 : 0) != 1)
-        st_errAbort("exactly one of --nucleotides/-N and --nucleotide_file/-n parameter is required\n");
-
+    if ((nucleotides == NULL ? 1 : 0) + (nucleotideFile == NULL ? 1 : 0) != 1) {
+      st_errAbort("exactly one of --nucleotides/-N and --nucleotide_file/-n parameter is required\n");
+    }
     // do we need to get this from the fasta file?  it better just be one entry
     if (nucleotides == NULL) {
         FILE* fastaFile = fopen(nucleotideFile, "r");
@@ -94,5 +100,5 @@ int main(int argc, char *argv[]) {
     }
 
     // do the alignment and return the status code
-    return load_from_raw2(fast5File, modelFile, nucleotides, savePath, writeFailedAlignment);
+    return load_from_raw2(fast5File, modelFile, nucleotides, savePath, writeFailedAlignment, rna);
 }

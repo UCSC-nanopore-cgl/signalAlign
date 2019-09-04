@@ -40,7 +40,7 @@ extern const char *PAIRWISE_ALIGNMENT_EXCEPTION_ID;
 
 // TODO depreciate these things
 #define KMER_LENGTH 6
-#define NUM_OF_KMERS 46656
+#define NUM_OF_KMERS 262144
 
 // Sequence types
 typedef enum {
@@ -64,11 +64,17 @@ struct _sequence {
     int64_t length;
     SequenceType type;
     void *elements;
-    char *degenerateBases;
-    int64_t nbDegenerateBases;
+    stHash* ambigBases;
     void *(*get)(void *elements, int64_t index);
     Sequence *(*sliceFcn)(Sequence *, int64_t, int64_t);
 };
+
+
+void path_permutePattern(stList *listOfPositions, int64_t currentLength, int64_t nbPositions, char *arr,
+                                int64_t nbOptions, char *baseOptions);
+
+//char* get_ambig_chars(char* ambig_char);
+stHash *create_ambig_bases();
 
 char *sequence_prepareAlphabet(const char *alphabet, int64_t alphabet_size);
 
@@ -84,16 +90,15 @@ Sequence *sequence_construct2(int64_t length, void *elements, void *(*getFcn)(vo
 
 Sequence *sequence_constructReferenceKmerSequence(int64_t length, void *elements, void *(*getFcn)(void *, int64_t),
                                                   Sequence *(*sliceFcn)(Sequence *, int64_t, int64_t),
-                                                  DegenerateType dType, SequenceType type);
+                                                  SequenceType type);
 
 Sequence *sequence_constructKmerSequence(int64_t length, void *elements, void *(*getFcn)(void *, int64_t),
-                                         Sequence *(*sliceFcn)(Sequence *, int64_t, int64_t),
-                                         char *nucleotideOptions, int64_t nbOptions, SequenceType type);
+                                         Sequence *(*sliceFcn)(Sequence *, int64_t, int64_t), SequenceType type);
 
 Sequence *sequence_constructReferenceKmerSequence2(int64_t length, void *elements,
                                                    void *(*getFcn)(void *, int64_t),
                                                    Sequence *(*sliceFcn)(Sequence *, int64_t, int64_t),
-                                                   DegenerateType dType, SequenceType type);
+                                                   SequenceType type);
 
 Sequence *sequence_deepCopyNucleotideSequence(const Sequence *toCopy);
 
@@ -278,6 +283,8 @@ typedef struct _hdcell {
 
 HDCell *hdCell_construct(void *nucleotideSequence, int64_t stateNumber, int64_t nbBaseOptions, char *baseOptions,
                          int64_t kmerLength);
+
+HDCell *hdCell_construct2(void *nucleotideSequence, int64_t stateNumber, stHash* ambigBases, int64_t kmerLength);
 
 double hdCell_totalProbability(HDCell *cell1, HDCell *cell2);
 

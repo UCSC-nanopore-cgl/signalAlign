@@ -161,16 +161,16 @@ class AlignedSignal(object):
 class CreateLabels(Fast5):
     """Create an Aligned Signal object from a fast5 file with """
 
-    def __init__(self, fast5_path, kmer_index=2):
+    def __init__(self, fast5_path, kmer_index=2, rna=False):
         """Initialize fast5 object and keep track of AlignedSignal object
         :param fast5_path: path to fast5 file
-        :param reference: path to reference so we can run signalAlign
-        :param alignment_file: alignment file to run signalAlign or for alignment info
+        :param kmer_index: nuc index of kmer for mapping
+        :param rna: boolean option
         """
         self.fast5_path = fast5_path
         super(CreateLabels, self).__init__(fast5_path)
         self.kmer_index = kmer_index
-        self.rna = self.is_read_rna()
+        self.rna = self.is_read_rna() or rna
         self.aligned_signal = self._initialize()
         self.has_guide_alignment = False
 

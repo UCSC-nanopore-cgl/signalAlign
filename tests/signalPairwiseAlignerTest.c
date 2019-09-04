@@ -46,8 +46,6 @@ Sequence *makeTestKmerSequence() {
     char *s = "ATGXAXA"; // has 2 6mers
     int64_t lX = sequence_correctSeqLength(strlen(s), kmer, KMER_LENGTH);
     Sequence *seq = sequence_construct(lX, s, sequence_getKmer, kmer);
-    seq->degenerateBases = "CEO";
-    seq->nbDegenerateBases = 3;
     return seq;
 }
 
@@ -55,7 +53,7 @@ Sequence *makeKmerSequence(char *nucleotides) {
     int64_t lX = sequence_correctSeqLength(strlen(nucleotides), kmer, KMER_LENGTH);
     Sequence *seq = sequence_constructKmerSequence(lX, nucleotides,
                                                    sequence_getKmer, sequence_sliceNucleotideSequence,
-                                                   THREE_CYTOSINES, NB_CYTOSINE_OPTIONS, kmer);
+                                                   kmer);
     return seq;
 }
 
@@ -140,18 +138,12 @@ static void test_genericSequenceTests(CuTest *testCase, Sequence *testSequence, 
     }
 }
 
-static void test_referenceSequenceTests(CuTest *testCase, Sequence *testSequence) {
-    CuAssertStrEquals(testCase, testSequence->degenerateBases, THREE_CYTOSINES);
-    CuAssertIntEquals(testCase, testSequence->nbDegenerateBases, NB_CYTOSINE_OPTIONS);
-}
 
 static void test_Sequence(CuTest *testCase) {
     int64_t length = 1000;
     char *tS = getRandomSequence(length);
     Sequence* testSequence = sequence_construct(length, tS, sequence_getKmer, nucleotide);
     test_genericSequenceTests(testCase, testSequence, length, tS);
-    CuAssertPtrEquals(testCase, testSequence->degenerateBases, NULL);
-    CuAssertIntEquals(testCase, testSequence->nbDegenerateBases, 0);
     testSequence = sequence_construct2(length, tS, sequence_getKmer, sequence_sliceNucleotideSequence,
                                        nucleotide);
     sequence_destruct(testSequence);
@@ -164,15 +156,14 @@ static void test_referenceSequence(CuTest *testCase) {
     // test construct Kmer sequence
     Sequence *testSequence = sequence_constructKmerSequence(length, tS, sequence_getKmer,
                                                             sequence_sliceNucleotideSequence,
-                                                            THREE_CYTOSINES, NB_CYTOSINE_OPTIONS,
                                                             kmer);
     test_genericSequenceTests(testCase, testSequence, length, tS);
-    test_referenceSequenceTests(testCase, testSequence);
+//    test_referenceSequenceTests(testCase, testSequence);
 
     // test copy
     Sequence *copy = sequence_deepCopyNucleotideSequence(testSequence);
     test_genericSequenceTests(testCase, copy, length, tS);
-    test_referenceSequenceTests(testCase, copy);
+//    test_referenceSequenceTests(testCase, copy);
     CuAssertStrEquals(testCase, testSequence->elements, copy->elements);
     free(copy);
 
@@ -180,7 +171,6 @@ static void test_referenceSequence(CuTest *testCase) {
     int64_t r = st_randomInt(0, length);
     Sequence *slice = testSequence->sliceFcn(testSequence, 10, length - r);
     CuAssertStrEquals(testCase, ((char *)testSequence->elements + 10), slice->elements);
-    CuAssertStrEquals(testCase, testSequence->degenerateBases, slice->degenerateBases);
     CuAssert(testCase, "slice sequence type fail",testSequence->type == slice->type);
 
     sequence_deepDestruct(testSequence);
@@ -791,29 +781,64 @@ static void test_getBlastPairsWithRecursion(CuTest *testCase) {
     }
 }
 
-CuSuite *signalPairwiseAlignerTestSuite(void) {
-    CuSuite *suite = CuSuiteNew();
+static void test_create_ambig_bases(CuTest *testCase) {
+  stHash* something = create_ambig_bases();
+  char* ambig_1 = "X";
+  char* jt = stHash_search(something, ambig_1);
+  CuAssertStrEquals(testCase, "ACGT", jt);
+  stHash_destruct(something);
+}
 
-    SUITE_ADD_TEST(suite, test_bands);
-    SUITE_ADD_TEST(suite, test_diagonal);
-    SUITE_ADD_TEST(suite, test_logAdd);
-    SUITE_ADD_TEST(suite, test_Sequence);
-    SUITE_ADD_TEST(suite, test_referenceSequence);
-    SUITE_ADD_TEST(suite, test_eventSequence);
-    SUITE_ADD_TEST(suite, test_loadNanoporeRead);
-    SUITE_ADD_TEST(suite, test_1dNanoporeRead);
-    SUITE_ADD_TEST(suite, test_getSplitPoints);
-    SUITE_ADD_TEST(suite, test_hdCellConstruct);
-    SUITE_ADD_TEST(suite, test_hdCellConstructWorstCase);
-    SUITE_ADD_TEST(suite, test_dpDiagonal);
-    SUITE_ADD_TEST(suite, test_dpMatrix);
-    SUITE_ADD_TEST(suite, test_getBlastPairs);
-    SUITE_ADD_TEST(suite, test_getBlastPairsWithRecursion);
+
+static void test_stList_construct(CuTest *testCase) {
+  stList *methyls = stList_construct();
+  char* ambig_1 = "X";
+  stList_append(methyls, ambig_1);
+
+  char* kmer = stList_remove(methyls, 0);
+
+  CuAssertStrEquals(testCase, "X", kmer);
+  stList_destruct(methyls);
+}
+
+
+static void test_path_permutePattern(CuTest *testCase){
+  stList *methylPatterns = stList_construct3(0, &free);
+  char *arr = (char *) malloc(sizeof(char) * 2);
+  path_permutePattern(methylPatterns, 0, 2, arr, 2, "AB");
+  char *pattern = stList_get(methylPatterns, 0);
+  char *pattern2 = stList_get(methylPatterns, 1);
+  CuAssertStrEquals(testCase, "AA", pattern);
+  CuAssertStrEquals(testCase, "AB", pattern2);
+}
+
+CuSuite *signalPairwiseAlignerTestSuite(void) {
+  CuSuite *suite = CuSuiteNew();
+
+  SUITE_ADD_TEST(suite, test_create_ambig_bases);
+  SUITE_ADD_TEST(suite, test_path_permutePattern);
+  SUITE_ADD_TEST(suite, test_stList_construct);
+
+  SUITE_ADD_TEST(suite, test_bands);
+  SUITE_ADD_TEST(suite, test_diagonal);
+  SUITE_ADD_TEST(suite, test_logAdd);
+  SUITE_ADD_TEST(suite, test_Sequence);
+  SUITE_ADD_TEST(suite, test_referenceSequence);
+  SUITE_ADD_TEST(suite, test_eventSequence);
+  SUITE_ADD_TEST(suite, test_loadNanoporeRead);
+  SUITE_ADD_TEST(suite, test_1dNanoporeRead);
+  SUITE_ADD_TEST(suite, test_getSplitPoints);
+  SUITE_ADD_TEST(suite, test_hdCellConstruct);
+  SUITE_ADD_TEST(suite, test_hdCellConstructWorstCase);
+  SUITE_ADD_TEST(suite, test_dpDiagonal);
+  SUITE_ADD_TEST(suite, test_dpMatrix);
+  SUITE_ADD_TEST(suite, test_getBlastPairs);
+  SUITE_ADD_TEST(suite, test_getBlastPairsWithRecursion);
+  SUITE_ADD_TEST(suite, test_stateMachine3EmissionsPdfs);
 
     //SUITE_ADD_TEST(suite, test_filterToRemoveOverlap);  // wonky
     
-    SUITE_ADD_TEST(suite, test_stateMachine3EmissionsPdfs);
-    
+
     //SUITE_ADD_TEST(suite, test_poissonPosteriorProb);
     return suite;
 }

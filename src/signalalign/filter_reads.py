@@ -119,6 +119,8 @@ def parse_read_name_map_file(read_map, directories, recursive=False):
     with open(read_map, 'r') as fh:
         for line in fh:
             split_line = line.split()
+            if len(split_line) < 2:
+                continue
             for dir_path in directories:
                 if recursive:
                     if os.path.exists(split_line[path_index]):

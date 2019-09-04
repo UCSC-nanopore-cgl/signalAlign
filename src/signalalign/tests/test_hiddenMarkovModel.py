@@ -299,6 +299,14 @@ class HiddenMarkovTests(unittest.TestCase):
             self.assertEqual(model_mean, 75.7063)
             self.assertEqual(model_sd, 2.70501)
 
+    def test_parse_alignment_file(self):
+        test_path = "tests/test_alignments/ecoli1D_test_alignments_RAW/5cc86bac-79fd-4897-8631-8f1c55954a45.sm.backward.tsv"
+        full_path = os.path.join(self.HOME, test_path)
+        data = parse_alignment_file(full_path)
+        self.assertTrue(data["kmer"][0], "AGGTG")
+        self.assertTrue(data["strand"][0], "t")
+        self.assertTrue(data["level_mean"][0], 63.674513)
+        self.assertTrue(data["prob"][0], 1)
 
 if __name__ == '__main__':
     unittest.main()

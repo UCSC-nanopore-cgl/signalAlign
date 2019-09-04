@@ -549,7 +549,7 @@ def event_detection(work_queue, done_queue, alignment_file, model_file_location,
 
 
 def discover_single_nucleotide_probabilities(args, working_folder, kmer_length, reference_location,
-                                             list_of_fast5s, alignment_args, workers, step_size,
+                                             list_of_fast5s, alignment_args, workers, step_size, degenerate_type,
                                              output_directory=None, use_saved_alignments=True, save_alignments=True):
 
     # read fast5s and extract read ids
@@ -631,7 +631,7 @@ def discover_single_nucleotide_probabilities(args, working_folder, kmer_length, 
             "out_file_prefix": marginal_probability_prefix,
             "step_size": step_size,
             "step_offset": s,
-            "degenerate_type": alignment_args["degenerate"],
+            "degenerate_type": degenerate_type,
             "kmer_length": kmer_length
         }
 
@@ -815,16 +815,16 @@ def main(args):
         "diagonal_expansion": args.diag_expansion,
         "constraint_trim": args.constraint_trim,
         "target_regions": None,
-        "degenerate": getDegenerateEnum("variant"),
         "alignment_file": args.alignment_file,
         'track_memory_usage': False,
         'get_expectations': False
     }
-
+    degenerate_type = getDegenerateEnum("variant")
     # get the sites that have proposed edits
     print("\n\n[singleNucleotideProbabilities] scanning for proposals with %d fast5s" % len(fast5s))
     output_files = discover_single_nucleotide_probabilities(args, temp_folder, args.kmer_size, args.ref, fast5s, alignment_args,
-                                                            args.nb_jobs, args.step_size, output_directory=args.out)
+                                                            args.nb_jobs, args.step_size, degenerate_type,
+                                                            output_directory=args.out)
     print("\n[singleNucleotideProbabilities] got {} output files:".format(len(output_files)))
     i = 0
     for output_file in output_files:

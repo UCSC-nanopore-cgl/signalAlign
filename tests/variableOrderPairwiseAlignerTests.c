@@ -46,7 +46,7 @@ static void test_getKmerWithBoundsCheck(CuTest *testCase) {
     char *nucleotides = stString_print("ATGCATAGC");
     Sequence *sX = sequence_constructKmerSequence(sequence_correctSeqLength(strlen(nucleotides), kmer, KMER_LENGTH),
                                                   nucleotides, sequence_getKmer, sequence_sliceNucleotideSequence,
-                                                  THREE_CYTOSINES, NB_CYTOSINE_OPTIONS, kmer);
+                                                  kmer);
     //ATGCAT
     // TGCATA
     //  GCATAG

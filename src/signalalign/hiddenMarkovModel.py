@@ -21,7 +21,6 @@ from scipy.stats import norm, invgauss, entropy
 from scipy.spatial.distance import euclidean
 from sklearn.neighbors import KernelDensity
 from py3helpers.utils import all_string_permutations
-from py3helpers.seq_tools import is_non_canonical_iupac_base
 
 import matplotlib as mpl
 
@@ -36,6 +35,16 @@ import matplotlib.ticker as ticker
 NORM_DIST_PARAMS = 2
 NB_MODEL_PARAMS = 5
 _SQRT2 = np.sqrt(2)
+
+IUPAC_BASES = ("A", "C", "T", "G", "W", "R", "Y", "S", "K", "M", "B", "D", "H", "V", "N")
+
+
+def is_non_canonical_iupac_base(nuc):
+    """Return True if base is one of teh IUPAC bases but not ATGC"""
+    if nuc in IUPAC_BASES and nuc not in "ATGC":
+        return True
+    else:
+        return False
 
 
 def parse_assignment_file(file_path):
@@ -89,7 +98,7 @@ def parse_alignment_file(file_path):
     """
     assert os.path.exists(file_path), "File path does not exist: {}".format(file_path)
     data = pd.read_csv(file_path, delimiter="\t",
-                       usecols=(4, 9, 13, 12),
+                       usecols=(4, 15, 13, 12),
                        names=["strand", "kmer", "prob", "level_mean"],
                        dtype={"kmer": np.str, "strand": np.str, "level_mean": np.float64, "prob": np.float64},
                        header=None)[["kmer", "strand", "level_mean", "prob"]]
@@ -846,12 +855,11 @@ class HmmModel(object):
         if not self.normalized:
             self.normalize_transitions_expectations()
 
-        alphabet = "".join(sorted(alphabet.upper()))
+        alphabet = "".join(sorted(alphabet))
         for base in alphabet:
             assert not is_non_canonical_iupac_base(base), \
                 "You cannot use IUPAC character to represent multiple bases. {}".format(base)
 
-        replacement_base = replacement_base.upper()
         new_base = (set(alphabet) - set(self.alphabet)).pop()
 
         alphabet_size = len(alphabet)

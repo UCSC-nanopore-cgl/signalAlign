@@ -67,7 +67,7 @@ class SignalAlignmentTest(unittest.TestCase):
     def test_create_signalAlignment_args(self):
         expected_args = {"backward_reference", "forward_reference", "destination", "stateMachineType", "in_templateHmm",
                          "in_complementHmm", "in_templateHdp", "in_complementHdp", "threshold", "diagonal_expansion",
-                         "constraint_trim", "target_regions", "degenerate", "twoD_chemistry", "alignment_file",
+                         "constraint_trim", "target_regions", "twoD_chemistry", "alignment_file",
                          "bwa_reference",
                          'track_memory_usage', 'get_expectations', 'output_format', 'embed', 'event_table',
                          'check_for_temp_file_existance', 'path_to_bin', 'perform_kmer_event_alignment', 'filter_reads',
@@ -79,7 +79,7 @@ class SignalAlignmentTest(unittest.TestCase):
         expected_args = {"fofns", "fast5_dirs", "positions_file", "motifs", "bwa_reference", "fw_reference",
                          "bw_reference", "name", "number_of_kmer_assignments", "probability_threshold",
                          "kmers_from_reference", 'alignment_file', "quality_threshold", "recursive",
-                         "workers", "assignments_dir", "readdb", "degenerate"}
+                         "workers", "assignments_dir", "readdb"}
         args = create_sa_sample_args()
         self.assertSetEqual(set(args.keys()), expected_args)
 
@@ -341,45 +341,37 @@ class SignalAlignmentTest(unittest.TestCase):
             self.assertEqual(sam[0], "0")
             self.assertEqual(len(os.listdir(working_folder.path)), 2)
 
-    # def test_variant_calling_with_multiple_paths(self):
-    #     signal_file_reads = os.path.join(self.HOME, "tests/minion_test_reads/canonical_ecoli_R9/")
-    #     template_model = os.path.join(self.HOME, "models/test_testModelR9_acegt_template.model")
-    #     complement_model = os.path.join(self.HOME, "models/testModelR9_acegt_complement.model")
-    #
-    #     ecoli_reference = "/Users/andrewbailey/CLionProjects/nanopore-RNN/submodules/signalAlign/tests/test_sequences/E.coli_K12.fasta"
-    #     positions_file="/Users/andrewbailey/CLionProjects/nanopore-RNN/submodules/signalAlign/tests/test_position_files/CCWGG_ecoli_k12_mg1655_CX.positions"
-    #     signal_file_guide_alignment = "/Users/andrewbailey/CLionProjects/nanopore-RNN/submodules/signalAlign/tests/minion_test_reads/canonical_ecoli_R9/canonical_ecoli.bam"
-    #     with tempfile.TemporaryDirectory() as tempdir:
-    #         new_dir = os.path.join(tempdir, "new_dir")
-    #         if os.path.exists(new_dir):
-    #             shutil.rmtree(new_dir)
-    #         working_folder = FolderHandler()
-    #         working_folder.open_folder(os.path.join(tempdir, "test_dir"))
-    #
-    #         shutil.copytree(signal_file_reads, new_dir)
-    #         args = create_signalAlignment_args(alignment_file=signal_file_guide_alignment, bwa_reference=ecoli_reference,
-    #                                            forward_reference="/Users/andrewbailey/CLionProjects/nanopore-RNN/submodules/signalAlign/tests/test_test_variant_caller/test_dir/forward.test_test.E.coli_K12.fasta",
-    #                                            backward_reference="/Users/andrewbailey/CLionProjects/nanopore-RNN/submodules/signalAlign/tests/test_test_variant_caller/test_dir/backward.test_test.E.coli_K12.fasta",
-    #                                            in_templateHmm=template_model,
-    #                                            path_to_bin=self.path_to_bin, destination="/Users/andrewbailey/CLionProjects/nanopore-RNN/submodules/signalAlign/tests/test_test_variant_caller/test_test",
-    #                                            embed=False, output_format="full", filter_reads=0, twoD_chemistry=True,
-    #                                            in_complementHmm=complement_model, delete_tmp=True,
-    #                                            degenerate="cytosine2")
-    #
-    #         multithread_signal_alignment(args, list_dir(new_dir, ext="fast5"), worker_count=8,
-    #                                      forward_reference=None,
-    #                                      debug=False, filter_reads_to_string_wrapper=None)
-    #         # handle = SignalAlignment(**final_args)
-    #         # handle.run()
-    #         # f5fh = Fast5(os.path.join(new_dir, "makeson_PC_20160807_FNFAD20242_MN17284_sequencing_run_MA_470_R9_pUC_g_PCR_BC_08_07_16_93165_ch1_read176_strand.fast5"))
-    #         # mea = f5fh.get_signalalign_events(mea=True)
-    #         # sam = f5fh.get_signalalign_events(sam=True)
-    #         # variant_calls = f5fh.get_signalalign_events(variant=True)
-    #         # full_output = f5fh.get_signalalign_events()
-    #         # f5fh.get_read()
-    #         # self.assertEqual(mea[0]["raw_start"], 2879)
-    #         # self.assertEqual(sam[0], "0")
-    #         self.assertEqual(len(os.listdir(working_folder.path)), 2)
+    def test_multithread_signal_alignment_samples(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            # tempdir = "/Users/andrewbailey/CLionProjects/nanopore-RNN/submodules/signalAlign/1testing"
+            working_folder = FolderHandler()
+            test_fast5 = os.path.join(tempdir, "miten_PC_20160820_FNFAD20259_MN17223_mux_scan_AMS_158_R9_WGA_Ecoli_08_20_16_83098_ch138_read23_strand.fast5")
+            num_files = 1
+            copyfile(self.fast5_paths[0], test_fast5)
+            working_folder.open_folder(os.path.join(tempdir, "test_dir"))
+            # create signalalign args
+            brdu_template_model = os.path.join(self.HOME, "models/BrdU_sa_model_threshold2.0.model")
+
+            signal_align_arguments = create_signalAlignment_args(in_templateHmm=brdu_template_model,
+                                                                 destination=working_folder.path,
+                                                                 path_to_bin=self.path_to_bin,
+                                                                 delete_tmp=False)
+            # create samples
+            samples = []
+            options = create_sa_sample_args(fast5_dirs=[tempdir], name="some_name",
+                                            motifs=[["T", "Z"]],
+                                            # motifs=[["GATAAT", "GAXAAT"], ["GATAAT", "GATAAX"]],
+                                            bwa_reference=self.ecoli_reference,
+                                            readdb=self.fast5_readdb,
+                                            alignment_file=self.fast5_bam)
+            samples.append(SignalAlignSample(working_folder=working_folder, **options))
+            # with captured_output() as (out, err):
+            samples = multithread_signal_alignment_samples(samples, signal_align_arguments, 2)
+            for sample in samples:
+                if sample.name == "some_name":
+                    self.assertEqual(len(sample.analysis_files), num_files)
+                for file_path in sample.analysis_files:
+                    self.assertTrue(os.path.isfile(file_path))
 
     def test_variant_calling_with_multiple_paths_rna(self):
         with tempfile.TemporaryDirectory() as tempdir:
@@ -397,7 +389,7 @@ class SignalAlignmentTest(unittest.TestCase):
                                                in_templateHmm=os.path.join(self.HOME, "models/fake_testModelR9p4_5mer_acfgt_RNA.model"),
                                                path_to_bin=self.path_to_bin, destination=working_folder.path,
                                                embed=False, output_format="full", filter_reads=0, twoD_chemistry=False,
-                                               delete_tmp=True, degenerate="m6a", check_for_temp_file_existance=False)
+                                               delete_tmp=True, check_for_temp_file_existance=False)
 
             multithread_signal_alignment(args, list_dir(new_dir, ext="fast5"), worker_count=8,
                                          forward_reference=None,

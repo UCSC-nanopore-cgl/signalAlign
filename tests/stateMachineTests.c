@@ -16,7 +16,7 @@ Sequence *getZymoReferenceSequence(int64_t kmerLength) {
     int64_t lX = sequence_correctSeqLength(strlen(ZymoReferenceSeq), event, kmerLength);
     Sequence *refSeq = sequence_constructKmerSequence(lX, ZymoReferenceSeq,
                                                       sequence_getKmer, sequence_sliceNucleotideSequence,
-                                                      "CEO", 3, kmer);
+                                                      kmer);
     free(ZymoReferenceFilePath);
     return refSeq;
 }
@@ -28,7 +28,7 @@ Sequence *getEcoliReferenceSequence(int64_t kmerLength) {
     int64_t lX = sequence_correctSeqLength(strlen(referenceSeq), event, kmerLength);
     Sequence *refSeq = sequence_constructKmerSequence(lX, referenceSeq,
                                                       sequence_getKmer, sequence_sliceNucleotideSequence,
-                                                      "CEO", 3, kmer);
+                                                      kmer);
     free(ecoliReferencePath);
     return refSeq;
 }
@@ -442,7 +442,7 @@ static void test_adjustForDrift(CuTest *testCase) {
 
 static void test_sm3_diagonalDPCalculations(CuTest *testCase) {
     // make some DNA sequences and fake nanopore read data
-    char *sX = "ACGATAXGGACAT";
+    char *sX = "ACGATALGGACAT";
     double sY[28] = {
             58.743435, 0.887833, 0.0571, 0.0, //ACGATA 0
             53.604965, 0.816836, 0.0571, 0.1,//CGATAC 1
@@ -464,8 +464,7 @@ static void test_sm3_diagonalDPCalculations(CuTest *testCase) {
 
     // make Sequence objects
     //Sequence *SsX = makeKmerSequence(sX);
-    Sequence *SsX = sequence_constructKmerSequence(lX, sX, sequence_getKmer, sequence_sliceNucleotideSequence,
-                                                   THREE_CYTOSINES, NB_CYTOSINE_OPTIONS, kmer);
+    Sequence *SsX = sequence_constructKmerSequence(lX, sX, sequence_getKmer, sequence_sliceNucleotideSequence, kmer);
     Sequence *SsY = sequence_construct(lY, sY, sequence_getEvent, event);
 
     DpMatrix *dpMatrixForward = dpMatrix_construct(lX + lY, sM->stateNumber, sM->kmerLength);
@@ -594,8 +593,7 @@ static void test_sm3_5merDiagonalDPCalculations(CuTest *testCase) {
 
     // make Sequence objects
     //Sequence *SsX = makeKmerSequence(sX);
-    Sequence *SsX = sequence_constructKmerSequence(lX, sX, sequence_getKmer, sequence_sliceNucleotideSequence,
-                                                   THREE_CYTOSINES, NB_CYTOSINE_OPTIONS, kmer);
+    Sequence *SsX = sequence_constructKmerSequence(lX, sX, sequence_getKmer, sequence_sliceNucleotideSequence, kmer);
     Sequence *SsY = sequence_construct(lY, sY, sequence_getEvent, event);
 
     DpMatrix *dpMatrixForward = dpMatrix_construct(lX + lY, sM->stateNumber, sM->kmerLength);
@@ -953,7 +951,7 @@ static void test_DegenerateNucleotides(CuTest *testCase) {
 
 
     sequence_destruct(degenerateSequence);
-    degenerateSequence = replaceBasesInSequence(refSeq, "C", "X");
+    degenerateSequence = replaceBasesInSequence(refSeq, "C", "L");
     stList *alignedPairs_degenerate = getAlignedPairsUsingAnchors(sM, degenerateSequence,
                                                                   eventSequence, filteredRemappedAnchors, p,
                                                                   diagonalCalculationPosteriorMatchProbs,
@@ -961,7 +959,7 @@ static void test_DegenerateNucleotides(CuTest *testCase) {
     checkAlignedPairsWithOverlap(testCase, alignedPairs_degenerate,
                                  degenerateSequence->length, npRead->nbTemplateEvents);
     //st_uglyf("got %lld degenerate alignedPairs with anchors\n", stList_length(alignedPairs_degenerate));
-    CuAssertTrue(testCase, stList_length(alignedPairs_degenerate) == 7349);
+    CuAssertIntEquals(testCase, 7349, stList_length(alignedPairs_degenerate));
 
     // clean
     pairwiseAlignmentBandingParameters_destruct(p);
