@@ -26,21 +26,22 @@ extern const char *PAIRWISE_ALIGNMENT_EXCEPTION_ID;
 //Constant that gives the integer value equal to probability 1. Integer probability zero is always 0.
 #define PAIR_ALIGNMENT_PROB_1 10000000
 
-#define NB_CYTOSINE_OPTIONS 3
-#define NB_CANONICAL_BASES 4
+//#define NB_CYTOSINE_OPTIONS 3
+//#define NB_CANONICAL_BASES 4
 
 #define AMBIG_BASE "X"  // internal ambigious base
 #define THREE_CYTOSINES "CEO"
 #define TWO_CYTOSINES "CE"
-#define ADENOSINES "AI"
-#define F_ADENOSINES "AF"
+//#define ADENOSINES "AI"
+//#define F_ADENOSINES "AF"
 #define CANONICAL_NUCLEOTIDES "ACGT"
-#define ALL_BASES "ACEGOT"
-#define BRDU_BASES "JT"
+//#define ALL_BASES "ACEGOT"
+//#define BRDU_BASES "JT"
 
 // TODO depreciate these things
 #define KMER_LENGTH 6
-#define NUM_OF_KMERS 262144
+//#define NUM_OF_KMERS 262144
+//#define NUM_OF_KMERS 46656
 
 // Sequence types
 typedef enum {
@@ -50,14 +51,14 @@ typedef enum {
 } SequenceType;
 
 // degenerate types, for flagging ambiguous bases
-typedef enum {
-    cytosineMethylation2 = 0,
-    cytosineMethylation3 = 1,
-    adenosineInosine = 2,
-    canonicalVariants = 3,
-    brduIncorporation = 4,
-    adenosineMethylation = 5,
-} DegenerateType;
+//typedef enum {
+//    cytosineMethylation2 = 0,
+//    cytosineMethylation3 = 1,
+//    adenosineInosine = 2,
+//    canonicalVariants = 3,
+//    brduIncorporation = 4,
+//    adenosineMethylation = 5,
+//} DegenerateType;
 
 typedef struct _sequence Sequence;
 struct _sequence {
@@ -78,9 +79,9 @@ stHash *create_ambig_bases();
 
 char *sequence_prepareAlphabet(const char *alphabet, int64_t alphabet_size);
 
-int64_t sequence_nbBaseOptions(DegenerateType type);
-
-char *sequence_getBaseOptions(DegenerateType type);
+//int64_t sequence_nbBaseOptions(DegenerateType type);
+//
+//char *sequence_getBaseOptions(DegenerateType type);
 
 Sequence *sequence_construct(int64_t length, void *elements, void *(*getFcn)(void *, int64_t), SequenceType type);
 
@@ -169,8 +170,8 @@ stList *convertPairwiseForwardStrandAlignmentToAnchorPairs(PairwiseAlignment *pA
 /*
  * Expectation calculation functions for EM algorithms.
  */
-void cell_updateExpectations(double *fromCells, double *toCells, int64_t from, int64_t to, double eP, double tP,
-                             void *extraArgs);
+//void cell_updateExpectations(double *fromCells, double *toCells, int64_t from, int64_t to, double eP, double tP,
+//                             void *extraArgs);
 
 void cell_signal_updateExpectations(double *fromCells, double *toCells, int64_t from, int64_t to,
                                     double eP, double tP, void *extraArgs);

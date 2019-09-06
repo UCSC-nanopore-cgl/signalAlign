@@ -298,43 +298,43 @@ double logAdd(double x, double y) {
 static double _NULLEVENT[] = {LOG_ZERO, 0};
 static double *NULLEVENT = _NULLEVENT;
 
-char *sequence_getBaseOptions(DegenerateType type) {
-    switch (type) {
-        case cytosineMethylation2:
-            return TWO_CYTOSINES;
-        case cytosineMethylation3:
-            return THREE_CYTOSINES;
-        case canonicalVariants:
-            return CANONICAL_NUCLEOTIDES;
-        case adenosineMethylation:
-            return F_ADENOSINES;
-        case adenosineInosine:
-            return ADENOSINES;
-        case brduIncorporation:
-            return BRDU_BASES;
-        default:
-            return CANONICAL_NUCLEOTIDES;
-    }
-}
+//char *sequence_getBaseOptions(DegenerateType type) {
+//    switch (type) {
+//        case cytosineMethylation2:
+//            return TWO_CYTOSINES;
+//        case cytosineMethylation3:
+//            return THREE_CYTOSINES;
+//        case canonicalVariants:
+//            return CANONICAL_NUCLEOTIDES;
+//        case adenosineMethylation:
+//            return F_ADENOSINES;
+//        case adenosineInosine:
+//            return ADENOSINES;
+//        case brduIncorporation:
+//            return BRDU_BASES;
+//        default:
+//            return CANONICAL_NUCLEOTIDES;
+//    }
+//}
 
-int64_t sequence_nbBaseOptions(DegenerateType type) {
-    switch (type) {
-        case cytosineMethylation2:
-            return 2; // C, E
-        case cytosineMethylation3:
-            return 3; // C, E, O
-        case canonicalVariants:
-            return 4; // A, C, G, T
-        case adenosineInosine:
-            return 2; // A, I
-        case adenosineMethylation:
-            return 2; // A, F
-        case brduIncorporation:
-            return 2; // J, T
-        default:
-            return 4; // A, C, G, T
-    }
-}
+//int64_t sequence_nbBaseOptions(DegenerateType type) {
+//    switch (type) {
+//        case cytosineMethylation2:
+//            return 2; // C, E
+//        case cytosineMethylation3:
+//            return 3; // C, E, O
+//        case canonicalVariants:
+//            return 4; // A, C, G, T
+//        case adenosineInosine:
+//            return 2; // A, I
+//        case adenosineMethylation:
+//            return 2; // A, F
+//        case brduIncorporation:
+//            return 2; // J, T
+//        default:
+//            return 4; // A, C, G, T
+//    }
+//}
 
 char *sequence_prepareAlphabet(const char *alphabet, int64_t alphabet_size) {
     // copy and sort alphabet
@@ -871,24 +871,24 @@ double cell_dotProduct2(double *cell, StateMachine *sM, double (*getStateValue)(
     return totalProb;
 }
 
-void cell_updateExpectations(double *fromCells, double *toCells, int64_t from, int64_t to, double eP, double tP,
-                             void *extraArgs) {
-
-    //void *extraArgs2[2] = { &totalProbability, hmmExpectations };
-    double totalProbability = *((double *) ((void **) extraArgs)[0]);
-    HmmDiscrete *hmmExpectations = ((void **) extraArgs)[1];
-
-    int64_t x = hmmExpectations->getElementIndexFcn(((void **) extraArgs)[2]); // this gives you the base/kmer index
-    int64_t y = hmmExpectations->getElementIndexFcn(((void **) extraArgs)[3]);
-
-    //Calculate posterior probability of the transition/emission pair
-    double p = exp(fromCells[from] + toCells[to] + (eP + tP) - totalProbability);
-    hmmExpectations->baseHmm.addToTransitionExpectationFcn((Hmm *)hmmExpectations, from, to, p);
-
-    if(x < hmmExpectations->baseHmm.parameterSetSize && y < hmmExpectations->baseHmm.parameterSetSize) { //Ignore gaps involving Ns.
-        hmmExpectations->addToEmissionExpectationFcn((Hmm *)hmmExpectations, to, x, y, p);
-    }
-}
+//void cell_updateExpectations(double *fromCells, double *toCells, int64_t from, int64_t to, double eP, double tP,
+//                             void *extraArgs) {
+//
+//    //void *extraArgs2[2] = { &totalProbability, hmmExpectations };
+//    double totalProbability = *((double *) ((void **) extraArgs)[0]);
+//    HmmDiscrete *hmmExpectations = ((void **) extraArgs)[1];
+//
+//    int64_t x = hmmExpectations->getElementIndexFcn(((void **) extraArgs)[2]); // this gives you the base/kmer index
+//    int64_t y = hmmExpectations->getElementIndexFcn(((void **) extraArgs)[3]);
+//
+//    //Calculate posterior probability of the transition/emission pair
+//    double p = exp(fromCells[from] + toCells[to] + (eP + tP) - totalProbability);
+//    hmmExpectations->baseHmm.addToTransitionExpectationFcn((Hmm *)hmmExpectations, from, to, p);
+//
+//    if(x < hmmExpectations->baseHmm.parameterSetSize && y < hmmExpectations->baseHmm.parameterSetSize) { //Ignore gaps involving Ns.
+//        hmmExpectations->addToEmissionExpectationFcn((Hmm *)hmmExpectations, to, x, y, p);
+//    }
+//}
 
 void cell_signal_updateExpectations(double *fromCells, double *toCells, int64_t from, int64_t to,
                                     double eP, double tP, void *extraArgs) {

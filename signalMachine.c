@@ -1,12 +1,9 @@
 #include <getopt.h>
 #include <string.h>
-#include "signalMachineUtils.h"
-#include "pairwiseAligner.h"
 #include "fasta_handler.h"
 
 #define ESTIMATE_PARAMS 1
 #define ASSIGNMENT_THRESHOLD 0.1
-
 
 typedef enum {
     full = 0,
@@ -337,6 +334,35 @@ StateMachine *buildStateMachine(const char *modelFile, NanoporeReadAdjustmentPar
     return 0;
 }
 
+StateMachine *buildStateMachine2(const char *modelFile, StateMachineType type,
+                                NanoporeHDP *nHdp) {
+  if ((type != threeState) && (type != threeStateHdp)) {
+    st_errAbort("signalAlign - incompatible stateMachine type request");
+  }
+  if (!stFile_exists(modelFile)) {
+    st_errAbort("signalAlign - ERROR: couldn't find model file here: %s\n", modelFile);
+  }
+
+  if (type == threeState) {
+    StateMachine *sM = stateMachine3_loadFromFile(modelFile, threeState, emissions_kmer_getGapProb,
+                                                  emissions_signal_strawManGetKmerEventMatchProbWithDescaling,
+                                                  stateMachine3_loadTransitionsFromFile, NULL);
+
+    return sM;
+  }
+  if (type == threeStateHdp) {
+    StateMachine *sM = stateMachine3_loadFromFile(modelFile, threeStateHdp, NULL, emissions_signal_getHdpKmerDensity,
+                                                  stateMachine3_loadTransitionsFromFile, nHdp);
+    return sM;
+  }
+  else {
+    st_errAbort("signalAlign - ERROR: buildStateMachine, didn't get correct input\n");
+  }
+  return 0;
+}
+
+
+
 inline void loadHmmRoutine(const char *hmmFile, StateMachine *sM, StateMachineType type, Hmm *expectations) {
     if ((type != threeState) && (type != threeStateHdp)) {
         st_errAbort("LoadSignalHmm : unupported stateMachineType");
@@ -387,7 +413,7 @@ double scoreByPosteriorProbabilityIgnoringGaps(stList *alignedPairs) {
 
 stList *performSignalAlignment(StateMachine *sM, Sequence *eventSequence, int64_t *eventMap,
                                int64_t mapOffset, char *target, PairwiseAlignmentParameters *p,
-                               stList *unmappedAnchors, DegenerateType degenerate) {
+                               stList *unmappedAnchors) {
     if ((sM->type != threeState) && (sM->type != threeStateHdp)) {
         st_errAbort("signalAlign - You're trying to do the wrong king of alignment");
     }
@@ -427,7 +453,7 @@ Sequence *makeEventSequenceFromPairwiseAlignment(double *events, int64_t querySt
 
 void getSignalExpectations(StateMachine *sM, Hmm *hmmExpectations, Sequence *eventSequence,
                            int64_t *eventMap, int64_t mapOffset, char *trainingTarget, PairwiseAlignmentParameters *p,
-                           stList *unmappedAnchors, DegenerateType degenerate) {
+                           stList *unmappedAnchors) {
     // correct sequence length
     int64_t lX = sequence_correctSeqLength(strlen(trainingTarget), event, sM->kmerLength);
 
@@ -450,7 +476,6 @@ int main(int argc, char *argv[]) {
     double threshold = 0.01;
     int64_t constraintTrim = 14;
     int64_t traceBackDiagonals = 50;
-    int64_t degenerate = 0;
     int64_t outFmt;
     bool twoD = FALSE;
     bool rna = FALSE;
@@ -660,14 +685,23 @@ int main(int argc, char *argv[]) {
         }
     }
 
+
+    StateMachine *sMt = buildStateMachine2(templateModelFile, sMtype, nHdpT);
+    StateMachine *sMc;
+    if (twoD){
+      sMc = buildStateMachine2(complementModelFile, sMtype, nHdpC);
+    }
+
     // Nanopore Read //
     // load nanopore read
-    NanoporeRead *npRead = nanopore_loadNanoporeReadFromFile(npReadFile);
+    NanoporeRead *npRead = nanopore_loadNanoporeReadFromFile(npReadFile, sMt->alphabet, sMt->alphabetSize, sMt->kmerLength);
+
     if (rna){
         int64_t tmp = pA->start2;
         pA->start2 = npRead->templateReadLength - pA->end2;
         pA->end2 = npRead->templateReadLength - tmp;
     }
+
     ReferenceSequence *R;
     R = fastaHandler_ReferenceSequenceConstructFull(forward_reference_path, backward_reference_path, pA,
                                                     sequence_name, rna);
@@ -701,10 +735,28 @@ int main(int argc, char *argv[]) {
     stList *anchorPairs = signalUtils_guideAlignmentToRebasedAnchorPairs(pA, p);  // pA gets modified here, no turning back
 
 
+    sMt->scale = npRead->templateParams.scale;
+    sMt->shift = npRead->templateParams.shift;
+    sMt->var   = npRead->templateParams.var;
+
+    if (!ESTIMATE_PARAMS && sMtype == threeState) {
+      emissions_signal_scaleNoise(sMt, npRead->templateParams);
+    }
+    if (twoD) {
+      sMc->scale = npRead->complementParams.scale;
+      sMc->shift = npRead->complementParams.shift;
+      sMc->var = npRead->complementParams.var;
+      if (!ESTIMATE_PARAMS && sMtype == threeState) {
+        emissions_signal_scaleNoise(sMc, npRead->templateParams);
+      }
+    }
+
+
     if ((templateExpectationsFile != NULL) || (complementExpectationsFile != NULL)) {
         st_uglyf("Starting expectations routine\n");
         // Expectation Routine //
-        StateMachine *sMt = buildStateMachine(templateModelFile, npRead->templateParams, sMtype, nHdpT);
+//        KMER_LENGTH = sMt->kmerLength;
+//        NUM_OF_KMERS = pow(sMt->kmerLength, sMt->alphabetSize);
 
         // temporary way to 'turn off' estimates if I want to
         if (ESTIMATE_PARAMS) {                                                     //todo remove threshold, not used
@@ -721,7 +773,7 @@ int main(int argc, char *argv[]) {
                               (twoD ? npRead->templateEventMap : npRead->templateStrandEventMap),
                               pA->start2,
                               R->getTemplateTargetSequence(R),
-                              p, anchorPairs, degenerate);
+                              p, anchorPairs);
 
 
         if (sMtype == threeStateHdp) {
@@ -735,12 +787,9 @@ int main(int argc, char *argv[]) {
         hmmContinuous_writeToFile(templateExpectationsFile, templateExpectations, sMtype);
 
         // get expectations for the complement
-        StateMachine *sMc;
         Hmm *complementExpectations = NULL;
         if (twoD) {
             fprintf(stderr, "signalAlign - getting expectations for complement\n");
-
-            sMc = buildStateMachine(complementModelFile, npRead->complementParams, sMtype, nHdpC);
 
             if (ESTIMATE_PARAMS) {
                 signalUtils_estimateNanoporeParams(sMc, npRead, &npRead->complementParams, ASSIGNMENT_THRESHOLD,
@@ -753,7 +802,7 @@ int main(int argc, char *argv[]) {
             getSignalExpectations(sMc, complementExpectations, cEventSequence, npRead->complementEventMap,
                                   pA->start2,
                                   R->getComplementTargetSequence(R),
-                                  p, anchorPairs, degenerate);
+                                  p, anchorPairs);
 
             if (sMtype == threeStateHdp) {
                 fprintf(stderr, "signalAlign - got %"PRId64"complement HDP assignments\n",
@@ -784,10 +833,6 @@ int main(int argc, char *argv[]) {
         // Alignment Procedure //
         // Template alignment
         fprintf(stderr, "signalAlign - starting template alignment\n");
-
-        // make template stateMachine
-        StateMachine *sMt = buildStateMachine(templateModelFile, npRead->templateParams, sMtype, nHdpT);
-
         // re-estimate the nanoporeAdjustment parameters
         if (ESTIMATE_PARAMS) {
             signalUtils_estimateNanoporeParams(sMt, npRead, &npRead->templateParams, ASSIGNMENT_THRESHOLD,
@@ -801,8 +846,7 @@ int main(int argc, char *argv[]) {
         stList *templateAlignedPairs = performSignalAlignment(sMt, tEventSequence,
                                                               (twoD ? npRead->templateEventMap : npRead->templateStrandEventMap),
                                                               pA->start2, R->getTemplateTargetSequence(R),
-                                                              p, anchorPairs,
-                                                              degenerate);
+                                                              p, anchorPairs);
 
         double templatePosteriorScore = scoreByPosteriorProbabilityIgnoringGaps(templateAlignedPairs);
 
@@ -822,7 +866,6 @@ int main(int argc, char *argv[]) {
         if (twoD) {
             // Complement alignment
             fprintf(stderr, "signalAlign - starting complement alignment\n");
-            sMc = buildStateMachine(complementModelFile, npRead->complementParams, sMtype, nHdpC);
 
             if (ESTIMATE_PARAMS) {
                 signalUtils_estimateNanoporeParams(sMc, npRead, &npRead->complementParams, ASSIGNMENT_THRESHOLD,
@@ -837,7 +880,7 @@ int main(int argc, char *argv[]) {
             complementAlignedPairs = performSignalAlignment(sMc, cEventSequence,
                                                             npRead->complementEventMap, pA->start2,
                                                             R->getComplementTargetSequence(R),
-                                                            p, anchorPairs, degenerate);
+                                                            p, anchorPairs);
 
             complementPosteriorScore = scoreByPosteriorProbabilityIgnoringGaps(complementAlignedPairs);
 

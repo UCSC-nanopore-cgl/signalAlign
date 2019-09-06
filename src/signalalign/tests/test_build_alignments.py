@@ -11,13 +11,11 @@
 
 import unittest
 import tempfile
-import os
 import numpy as np
-import pandas as pd
-from multiprocessing import Manager, Process, current_process
 from signalalign.build_alignments import *
-from signalalign.train.trainModels import get_kmers, get_assignment_table, multiprocess_make_kmer_assignment_tables
+from signalalign.train.trainModels import get_kmers, multiprocess_make_kmer_assignment_tables
 from py3helpers.utils import time_it
+
 
 class TrainSignalAlignTest(unittest.TestCase):
 
@@ -53,11 +51,11 @@ class TrainSignalAlignTest(unittest.TestCase):
         work_queue = Manager().Queue()
         worker_count = 2
         for w in range(worker_count):
-            p = Process(target=add_to_queue, args=(work_queue, ), daemon=True)
+            p = Process(target=add_to_queue, args=(work_queue,), daemon=True)
             p.start()
         data = get_from_queue(work_queue, worker_count)
         # print(data)
-        self.assertSequenceEqual(sorted(list(range(10))+list(range(10))), sorted(data))
+        self.assertSequenceEqual(sorted(list(range(10)) + list(range(10))), sorted(data))
 
     def test_alignment_file_to_queues(self):
         max_size = 10
@@ -74,7 +72,7 @@ class TrainSignalAlignTest(unittest.TestCase):
         assignment_file_to_queues(self.assignment_path, work_queues, min_prob=0.9)
 
         first_one = work_queues[0].get()
-        self.assertSequenceEqual(first_one, ["GCCTTA", "t",	83.709275, 1.000000])
+        self.assertSequenceEqual(first_one, ["GCCTTA", "t", 83.709275, 1.000000])
 
     def test_get_nlargest_queue(self):
         work_queue = Manager().Queue()
@@ -90,7 +88,7 @@ class TrainSignalAlignTest(unittest.TestCase):
         work_queue = Manager().Queue()
         all_data = []
         for x in np.random.randint(100, size=100):
-            data = ["GCCTTA", "t",	"83.709275", x]
+            data = ["GCCTTA", "t", "83.709275", x]
             work_queue.put(data)
             all_data.append(data)
 
@@ -107,23 +105,27 @@ class TrainSignalAlignTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temdir:
             dirs = make_kmer_directories(temdir, "ACGT", 6, complement=False)
             split_assignment_file(self.assignment_path, dirs, "ACGT", 6, 4, min_prob=0.0)
-            self.assertTrue(os.path.exists(os.path.join(os.path.join(temdir, "GCCTTA"), os.path.basename(self.assignment_path))))
+            self.assertTrue(
+                os.path.exists(os.path.join(os.path.join(temdir, "GCCTTA"), os.path.basename(self.assignment_path))))
         with tempfile.TemporaryDirectory() as temdir:
             dirs = make_kmer_directories(temdir, "ACGT", 6, complement=False)
             split_assignment_file(self.alignments_path, dirs, "ACGT", 6, 4, min_prob=0.0, alignment=True)
-            self.assertTrue(os.path.exists(os.path.join(os.path.join(temdir, "TGAAAA"), os.path.basename(self.alignments_path))))
+            self.assertTrue(
+                os.path.exists(os.path.join(os.path.join(temdir, "TGAAAA"), os.path.basename(self.alignments_path))))
 
     def test_multiprocess_split_assignment_file(self):
         with tempfile.TemporaryDirectory() as temdir:
             dirs = make_kmer_directories(temdir, "ACGT", 6, complement=False)
             multiprocess_split_sa_tsv_file([self.assignment_path], dirs, "ACGT", 6, min_prob=0.0, worker_count=1)
-            self.assertTrue(os.path.exists(os.path.join(os.path.join(temdir, "GCCTTA"), os.path.basename(self.assignment_path))))
+            self.assertTrue(
+                os.path.exists(os.path.join(os.path.join(temdir, "GCCTTA"), os.path.basename(self.assignment_path))))
 
         with tempfile.TemporaryDirectory() as temdir:
             dirs = make_kmer_directories(temdir, "ACGT", 6, complement=True)
             multiprocess_split_sa_tsv_file([self.alignments_path], dirs, "ACGT", 6, min_prob=0.0,
-                                               worker_count=1, alignment=True)
-            self.assertTrue(os.path.exists(os.path.join(os.path.join(temdir, "TGAAAA"), os.path.basename(self.alignments_path))))
+                                           worker_count=1, alignment=True)
+            self.assertTrue(
+                os.path.exists(os.path.join(os.path.join(temdir, "TGAAAA"), os.path.basename(self.alignments_path))))
 
     def test_get_top_kmers_from_directory(self):
         with tempfile.TemporaryDirectory() as temdir:
@@ -158,21 +160,20 @@ class TrainSignalAlignTest(unittest.TestCase):
     def test_generate_buildAlignments4(self):
         kmers = get_kmers(6, alphabet="ATGC")
         data_files = [self.alignments_path]
-
-        data, time = time_it(multiprocess_make_kmer_assignment_tables,
-                          data_files, kmers,
-                             {"t", "c"}, 0.0, False, True, 10, 8)
+        data, time1 = time_it(multiprocess_make_kmer_assignment_tables,
+                              data_files, kmers,
+                              {"t", "c"}, 0.0, True, True, 10, 2)
 
         with tempfile.TemporaryDirectory() as temdir:
             output_file = os.path.join(temdir, "built_alignment.tsv")
             data2, time2 = time_it(generate_top_n_kmers_from_sa_output,
-                               data_files, temdir, output_file, 10, "ACGT", 6, 0.0, 8, False, True, False, True)
+                                   data_files, temdir, output_file, 10, "ACGT", 6, 0.0, 8, False, True, False, True)
 
-        # get kmers associated with each sample
+            # get kmers associated with each sample
             num_lines = len(list(open(output_file)))
-        print(time2, time)
+        print(time2, time1)
         self.assertEqual(len(data.index), num_lines)
-        self.assertLess(time2, time)
+        self.assertLess(time2, time1)
 
 
 if __name__ == '__main__':

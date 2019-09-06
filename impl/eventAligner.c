@@ -808,7 +808,7 @@ NanoporeReadAdjustmentParameters estimate_scalings_using_mom(stList* kmer_list, 
         char* kmer = stList_get(kmer_list, i);
         int64_t kmerIndex = kmer_id(kmer, alphabet, alphabet_size, k);
         // get the µ for level and noise for the model
-        double levelMean = emissions_signal_getModelLevelMean(eventModel, kmerIndex);
+        double levelMean = emissions_signal_getModelLevelMean(eventModel, kmerIndex, pore_model.parameterSetSize);
         kmer_level_sum += levelMean;
         kmer_level_sq_sum += pow(levelMean, 2.0f);
     }

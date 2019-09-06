@@ -98,8 +98,8 @@ def parse_alignment_file(file_path):
     """
     assert os.path.exists(file_path), "File path does not exist: {}".format(file_path)
     data = pd.read_csv(file_path, delimiter="\t",
-                       usecols=(4, 15, 13, 12),
-                       names=["strand", "kmer", "prob", "level_mean"],
+                       usecols=(4, 12, 13, 15),
+                       names=["strand", "prob", "level_mean", "kmer"],
                        dtype={"kmer": np.str, "strand": np.str, "level_mean": np.float64, "prob": np.float64},
                        header=None)[["kmer", "strand", "level_mean", "prob"]]
     return data

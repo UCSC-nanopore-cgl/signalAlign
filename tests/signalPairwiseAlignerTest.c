@@ -3,15 +3,11 @@
 #include <math.h>
 #include <inttypes.h>
 #include <stdbool.h>
-#include <assert.h>
 #include <nanopore.h>
 #include "stateMachine.h"
 #include "CuTest.h"
 #include "sonLib.h"
 #include "pairwiseAligner.h"
-//#include "continuousHmm.h"
-//#include "discreteHmm.h"
-//#include "multipleAligner.h"
 #include "randomSequences.h"
 
 
@@ -213,7 +209,8 @@ static void test_eventSequence(CuTest *testCase) {
 static void test_1dNanoporeRead(CuTest *testCase) {
     char *tempFile = stString_print("../tests/test_npReads/r9p4_oneD.npRead");
     CuAssertTrue(testCase, stFile_exists(tempFile));
-    NanoporeRead *npRead = nanopore_loadNanoporeReadFromFile(tempFile);
+
+    NanoporeRead *npRead = nanopore_loadNanoporeReadFromFile(tempFile, "ACGT", 4, 5);
     CuAssertTrue(testCase, npRead->twoD == FALSE);
 
 }
@@ -310,7 +307,7 @@ static void test_loadNanoporeRead(CuTest *testCase) {
 
     fclose(fH);
 
-    NanoporeRead *npRead = nanopore_loadNanoporeReadFromFile(tempFile);
+    NanoporeRead *npRead = nanopore_loadNanoporeReadFromFile(tempFile, "ACGT", 4, KMER_LENGTH);
     CuAssertTrue(testCase, npRead->readLength == length);
     CuAssertTrue(testCase, npRead->templateReadLength == length);
     CuAssertTrue(testCase, npRead->complementReadLength == length);
@@ -347,7 +344,7 @@ static void test_loadNanoporeRead(CuTest *testCase) {
 
     for (int64_t i = 0; i < length; i++) {
         kmer = (char *)stList_get(kmers, i);
-        int64_t index = emissions_discrete_getKmerIndexFromPtr(kmer);
+        int64_t index = kmer_id(kmer, CANONICAL_NUCLEOTIDES, 4, KMER_LENGTH);
         CuAssertIntEquals(testCase, index, npRead->templateModelState[i]);
         CuAssertIntEquals(testCase, index, npRead->complementModelState[i]);
     }
@@ -547,7 +544,7 @@ static void test_hdCellConstruct(CuTest *testCase) {
     char *ambigKmer = "ATGXAXAAAAAA";
     int64_t nbCytosines = 3;
     char *cytosines = "CEO";
-    HDCell *cell = hdCell_construct(ambigKmer, 3, nbCytosines, cytosines, KMER_LENGTH);
+    HDCell *cell = hdCell_construct(ambigKmer, 3, nbCytosines, cytosines, 6);
     Path *path = hdCell_getPath(cell, 0);
     Path *path2 = hdCell_getPath(cell, 8);
     CuAssertTrue(testCase, hdCell_getPath(cell, 9) == NULL);
@@ -561,7 +558,7 @@ static void test_hdCellConstructWorstCase(CuTest *testCase) {
     char *ambigKmer = "XXXXXX";
     int64_t nbCytosines = 3;
     char *cytosines = "CEO";
-    HDCell *cell = hdCell_construct(ambigKmer, 3, nbCytosines, cytosines, KMER_LENGTH);
+    HDCell *cell = hdCell_construct(ambigKmer, 3, nbCytosines, cytosines, 6);
     Path *path = hdCell_getPath(cell, 0);
     Path *path2 = hdCell_getPath(cell, 728);
     CuAssertIntEquals(testCase, 729, (int )cell->numberOfPaths);

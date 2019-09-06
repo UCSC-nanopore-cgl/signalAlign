@@ -57,19 +57,19 @@ static void hmmContinuous_loadEventModel(double *stateMachineEventModel, double 
 
 ///////////////////////////////////////////// Continuous Pair HMM /////////////////////////////////////////////////////
 static double continuousPairHmm_getEventModelMean(ContinuousPairHmm *hmm, int64_t kmerIndex) {
-    stateMachine_index_check(kmerIndex);
+    stateMachine_index_check2(kmerIndex, hmm->baseHmm.parameterSetSize);
     int64_t tableIndex = kmerIndex * MODEL_PARAMS;
     return hmm->eventModel[tableIndex];
 }
 
 static double continuousPairHmm_getEventModelSD(ContinuousPairHmm *hmm, int64_t kmerIndex) {
-    stateMachine_index_check(kmerIndex);
+    stateMachine_index_check2(kmerIndex, hmm->baseHmm.parameterSetSize);
     int64_t tableIndex = (kmerIndex * MODEL_PARAMS) + 1;
     return hmm->eventModel[tableIndex];
 }
 
 static double *continuousPairHmm_getEventModelEntry(Hmm *hmm, int64_t kmerIndex) {
-    stateMachine_index_check(kmerIndex);
+    stateMachine_index_check2(kmerIndex, hmm->parameterSetSize);
     ContinuousPairHmm *cpHmm = (ContinuousPairHmm *)hmm;
     return &(cpHmm->eventModel[kmerIndex * MODEL_PARAMS]);
 }
@@ -158,7 +158,7 @@ double hmm_getTransitionExpectation(Hmm *hmm, int64_t from, int64_t to) {
 // TODO double check that this is right
 void continuousPairHmm_addToEmissionExpectation(Hmm *hmm, int64_t kmerIndex, double meanCurrent, double p) {
     ContinuousPairHmm *cpHmm = (ContinuousPairHmm *) hmm;
-    stateMachine_index_check(kmerIndex);
+    stateMachine_index_check2(kmerIndex, cpHmm->baseHmm.parameterSetSize);
     int64_t tableIndex = kmerIndex * NORMAL_DISTRIBUTION_PARAMS;
     cpHmm->eventExpectations[tableIndex] += (p * meanCurrent);  // μ_k
     cpHmm->posteriors[kmerIndex] += p;

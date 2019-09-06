@@ -51,7 +51,7 @@ endif
 #
 
 .PHONY: all
-all : lib/libhdf5.a htslib/libhts.a sL bD ${libPath}/signalAlignLib.a ${signalAlignBin}/signalAlignLibTests \
+all : bD lib/libhdf5.a htslib/libhts.a sL ${libPath}/signalAlignLib.a ${signalAlignBin}/signalAlignLibTests \
 	  ${signalAlignBin}/compareDistributions ${signalAlignBin}/kmerEventAlign \
 	  ${signalAlignBin}/signalMachine ${signalAlignBin}/runSignalAlign \
 	  ${signalAlignBin}/variantCallingLib.py ${signalAlignBin}/alignmentAnalysisLib.py \

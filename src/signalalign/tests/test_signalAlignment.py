@@ -71,7 +71,7 @@ class SignalAlignmentTest(unittest.TestCase):
                          "bwa_reference",
                          'track_memory_usage', 'get_expectations', 'output_format', 'embed', 'event_table',
                          'check_for_temp_file_existance', 'path_to_bin', 'perform_kmer_event_alignment', 'filter_reads',
-                         'traceBackDiagonals', 'delete_tmp'}
+                         'traceBackDiagonals', 'delete_tmp', 'rna'}
         args = create_signalAlignment_args()
         self.assertSetEqual(set(args.keys()), expected_args)
 

@@ -1,8 +1,9 @@
 cmake_minimum_required(VERSION 3.7)
 project(signalAlign)
 
+set(CMAKE_VERBOSE_MAKEFILE ON)
 
-set(CMAKE_C_FLAGS_DEBUG  "${CMAKE_C_FLAGS_DEBUG} -O3 -g -Wall --pedantic -fopenmp -funroll-loops  -DNDEBUG")
+set(CMAKE_C_FLAGS_DEBUG  "${CMAKE_C_FLAGS_DEBUG} -O0 -g -Wall --pedantic -fopenmp -funroll-loops  -DNDEBUG")
 
 #if(APPLE)
 #    set(CMAKE_SHARED_LIBRARY_CREATE_C_FLAGS "${CMAKE_SHARED_LIBRARY_CREATE_C_FLAGS} -undefined dynamic_lookup")
@@ -56,10 +57,20 @@ include_directories(${CMAKE_SOURCE_DIR}/sonLib/externalTools/quicktree_1.1/inclu
 #include_directories(/usr/local/include)
 include_directories(/System/Library/Frameworks/Python.framework/Headers)
 
+set(sonLib_LIB
+        "${CMAKE_SOURCE_DIR}/sonLib/lib/sonLib.a"
+        "${CMAKE_SOURCE_DIR}/sonLib/lib/cuTest.a"
+        )
 
-set(SA_LIBRARY
-        ${CMAKE_CURRENT_SOURCE_DIR}/sonLib/lib/sonLib.a
-        ${CMAKE_CURRENT_SOURCE_DIR}/sonLib/lib/cuTest.a ${HTSLIB_LIBRARY} ${HDF5_LIBRARIES} -lm -lz -llzma -lbz2 -lcurl -lpthread -ldl)
+add_custom_command(
+        OUTPUT ${sonLib_LIB}
+        COMMAND make
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+#
+add_custom_target(sonLib_make DEPENDS ${sonLib_LIB})
+
+set(SA_LIBRARY ${sonLib_LIB} ${HTSLIB_LIBRARY} ${HDF5_LIBRARIES} -lm -lz -llzma -lbz2 -lcurl -lpthread -ldl)
 
 set(SOURCE_FILES
         impl/stateMachine.c
@@ -116,21 +127,18 @@ target_link_libraries(buildHdpUtil ${SA_LIBRARY})
 add_executable(kmerEventAlign ${SOURCE_FILES} kmerEventAlign.c)
 target_link_libraries(kmerEventAlign ${SA_LIBRARY})
 
-add_executable(eventAlignerTests ${SOURCE_FILES} ${EVENTALIGNERTESTS})
-target_link_libraries(eventAlignerTests ${SA_LIBRARY})
 
 add_executable(signalAlignLibTests ${SOURCE_FILES} ${SIGNALMACHINE_TEST})
 target_link_libraries(signalAlignLibTests  ${SA_LIBRARY})
+add_dependencies(signalAlignLibTests sonLib_make)
 
-#add_executable(extract ${SOURCE_FILES} ${EXTRACT})
-#target_link_libraries(extract ${SA_LIBRARY})
-
-#/usr/local/bin/gcc  -I/usr/local/include -I/Users/andrewbailey/CLionProjects/nanopore-RNN/submodules/signalAlign/inc -I/Users/andrewbailey/CLionProjects/nanopore-RNN/submodules/signalAlign/sonLib/lib -I/Users/andrewbailey/CLionProjects/nanopore-RNN/submodules/signalAlign/sonLib/externalTools/cutest -I/Users/andrewbailey/CLionProjects/nanopore-RNN/submodules/signalAlign/sonLib/externalTools/quicktree_1.1/include -I/System/Library/Frameworks/Python.framework/Headers  -g -O3 -g -Wall --pedantic -fopenmp -funroll-loops -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.14.sdk   -o CMakeFiles/signalMachine.dir/impl/hdp_math_utils.c.o   -c /Users/andrewbailey/CLionProjects/nanopore-RNN/submodules/signalAlign/impl/hdp_math_utils.c
-#gcc-5 -O3 -g -Wall --pedantic -fopenmp -funroll-loops -DNDEBUG   -I./include -I./htslib -fPIC -Iinc/ -I././sonLib/lib/  -c impl/*.c ./htslib/libhts.a ./lib/libhdf5.a -lz -llzma -lbz2 -lcurl -lpthread -lcrypto -ldl
-
-#gcc-5 -O3 -g -Wall --pedantic -fopenmp -funroll-loops -DNDEBUG   -I./include -I./htslib -fPIC    -c impl/*.c ./htslib/libhts.a ./lib/libhdf5.a -lz -llzma -lbz2 -ldl
-#/usr/local/bin/gcc  -I/usr/local/include  -I/Users/andrewbailey/CLionProjects/nanopore-RNN/submodules/signalAlign/sonLib/externalTools/cutest -I/Users/andrewbailey/CLionProjects/nanopore-RNN/submodules/signalAlign/sonLib/externalTools/quicktree_1.1/include -I/System/Library/Frameworks/Python.framework/Headers  -O3 -g -Wall --pedantic -fopenmp -funroll-loops -DNDEBUG -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.14.sdk   -o CMakeFiles/buildHdpUtil.dir/impl/hdp_math_utils.c.o   -c /Users/andrewbailey/CLionProjects/nanopore-RNN/submodules/signalAlign/impl/hdp_math_utils.c
-#/r9_ecoli/small_batch_sa_output/tempFiles_trainModels/template_trained.hmm None /r9_ecoli/small_batch_sa_output/tempFiles_trainModels/template.singleLevelPrior2.nhdp None
-#/usr/local/bin/gcc  -I/usr/local/include -I/Users/andrewbailey/CLionProjects/nanopore-RNN/submodules/signalAlign/inc -I/Users/andrewbailey/CLionProjects/nanopore-RNN/submodules/signalAlign/sonLib/lib -I/Users/andrewbailey/CLionProjects/nanopore-RNN/submodules/signalAlign/sonLib/externalTools/cutest -I/Users/andrewbailey/CLionProjects/nanopore-RNN/submodules/signalAlign/sonLib/externalTools/quicktree_1.1/include -I/System/Library/Frameworks/Python.framework/Headers  -g -O3 -g -Wall --pedantic -fopenmp -funroll-loops  -DNDEBUG -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.14.sdk   -o CMakeFiles/signalMachine.dir/impl/hdp_math_utils.c.o   -c /Users/andrewbailey/CLionProjects/nanopore-RNN/submodules/signalAlign/impl/hdp_math_utils.c
-#/usr/local/bin/gcc   -I/Users/andrewbailey/CLionProjects/nanopore-RNN/submodules/signalAlign/inc -I/Users/andrewbailey/CLionProjects/nanopore-RNN/submodules/signalAlign/sonLib/lib -I/Users/andrewbailey/CLionProjects/nanopore-RNN/submodules/signalAlign/sonLib/externalTools/cutest -I/Users/andrewbailey/CLionProjects/nanopore-RNN/submodules/signalAlign/sonLib/externalTools/quicktree_1.1/include -I/System/Library/Frameworks/Python.framework/Headers  -g -O3 -g -Wall --pedantic -fopenmp -funroll-loops  -DNDEBUG -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.14.sdk   -o CMakeFiles/signalMachine.dir/impl/hdp_math_utils.c.o   -c /Users/andrewbailey/CLionProjects/nanopore-RNN/submodules/signalAlign/impl/hdp_math_utils.c
-#/usr/local/bin/gcc  -I/Users/andrewbailey/CLionProjects/nanopore-RNN/submodules/signalAlign/htslib -I/Users/andrewbailey/CLionProjects/nanopore-RNN/submodules/signalAlign/include -I/Users/andrewbailey/CLionProjects/nanopore-RNN/submodules/signalAlign/inc -I/Users/andrewbailey/CLionProjects/nanopore-RNN/submodules/signalAlign/sonLib/lib -I/Users/andrewbailey/CLionProjects/nanopore-RNN/submodules/signalAlign/sonLib/externalTools/cutest -I/Users/andrewbailey/CLionProjects/nanopore-RNN/submodules/signalAlign/sonLib/externalTools/quicktree_1.1/include -I/usr/local/include -I/System/Library/Frameworks/Python.framework/Headers  -g -O3 -g -Wall --pedantic -fopenmp -funroll-loops  -DNDEBUG -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.14.sdk   -o CMakeFiles/signalMachine.dir/impl/hdp_math_utils.c.o   -c /Users/andrewbailey/CLionProjects/nanopore-RNN/submodules/signalAlign/impl/hdp_math_utils.c
+add_custom_command(
+        TARGET signalAlignLibTests POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy
+        ${CMAKE_SOURCE_DIR}/bin/cPecanLastz_D
+        ${CMAKE_CURRENT_BINARY_DIR}/cPecanLastz_D)
+add_custom_command(
+        TARGET signalAlignLibTests POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy
+        ${CMAKE_SOURCE_DIR}/bin/cPecanLastz
+        ${CMAKE_CURRENT_BINARY_DIR}/cPecanLastz)
