@@ -61,8 +61,8 @@ class SignalAlignAlignmentTest(unittest.TestCase):
         os.makedirs("./signalAlign_unittest/")
 
     def tearDown(self):
-        if os.path.exists("./signalAlign_unittest/"):
-            shutil.rmtree("./signalAlign_unittest/")
+        # if os.path.exists("./signalAlign_unittest/"):
+        #     shutil.rmtree("./signalAlign_unittest/")
         os.chdir(self.current_wd)
 
     def check_alignments(self, true_alignments, reads, reference, kmer_length, contig_name, extra_args=None, rna=False):
@@ -87,8 +87,10 @@ class SignalAlignAlignmentTest(unittest.TestCase):
         run_signal_align = os.path.join(BIN_PATH, "runSignalAlign")
         # removed: --debug
         alignment_command = "{runsignalalign} run2 -d={reads} --bwa_reference={ref} -smt=threeState -o={testDir} " \
-                            "".format(runsignalalign=run_signal_align, reads=reads, ref=reference,
-                                      testDir="./signalAlign_unittest/")
+                            "--keep_tmp_folder ".format(runsignalalign=run_signal_align,
+                                                        reads=reads,
+                                                        ref=reference,
+                                                        testDir="./signalAlign_unittest/")
         if extra_args is not None:
             alignment_command += extra_args
 
@@ -233,12 +235,12 @@ def add_all_tests_to_Suite(test_suite, test_class):
 
 def main():
     testSuite = unittest.TestSuite()
-    testSuite.addTest(LibTest('test_signalAlign_library'))
+    # testSuite.addTest(LibTest('test_signalAlign_library'))
     testSuite.addTest(SignalAlignAlignmentTest('test_pUC_r9_reads_5mer'))
-    testSuite.addTest(SignalAlignAlignmentTest('test_pUC_r9_reads_6mer'))
-    testSuite.addTest(SignalAlignAlignmentTest('test_Ecoli1D_reads_5mer'))
-    testSuite.addTest(SignalAlignAlignmentTest('test_RNA_edge_alignments_reads_5mer'))
-    testSuite.addTest(SignalAlignAlignmentTest('test_signal_files_without_events'))
+    # testSuite.addTest(SignalAlignAlignmentTest('test_pUC_r9_reads_6mer'))
+    # testSuite.addTest(SignalAlignAlignmentTest('test_Ecoli1D_reads_5mer'))
+    # testSuite.addTest(SignalAlignAlignmentTest('test_RNA_edge_alignments_reads_5mer'))
+    # testSuite.addTest(SignalAlignAlignmentTest('test_signal_files_without_events'))
 
     # deprecated
     # testSuite.addTest(SignalAlignAlignmentTest('test_zymo_reads'))

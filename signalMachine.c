@@ -862,7 +862,6 @@ int main(int argc, char *argv[]) {
 
         stList *complementAlignedPairs;
         double complementPosteriorScore = 0.0;
-        StateMachine *sMc;
         if (twoD) {
             // Complement alignment
             fprintf(stderr, "signalAlign - starting complement alignment\n");
