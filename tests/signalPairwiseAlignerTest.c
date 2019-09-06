@@ -210,7 +210,7 @@ static void test_1dNanoporeRead(CuTest *testCase) {
     char *tempFile = stString_print("../tests/test_npReads/r9p4_oneD.npRead");
     CuAssertTrue(testCase, stFile_exists(tempFile));
 
-    NanoporeRead *npRead = nanopore_loadNanoporeReadFromFile(tempFile, "ACGT", 4, 5);
+    NanoporeRead *npRead = nanopore_loadNanoporeReadFromFile(tempFile, "ACGT", 4);
     CuAssertTrue(testCase, npRead->twoD == FALSE);
 
 }
@@ -307,7 +307,7 @@ static void test_loadNanoporeRead(CuTest *testCase) {
 
     fclose(fH);
 
-    NanoporeRead *npRead = nanopore_loadNanoporeReadFromFile(tempFile, "ACGT", 4, KMER_LENGTH);
+    NanoporeRead *npRead = nanopore_loadNanoporeReadFromFile(tempFile, "ACGT", 4);
     CuAssertTrue(testCase, npRead->readLength == length);
     CuAssertTrue(testCase, npRead->templateReadLength == length);
     CuAssertTrue(testCase, npRead->complementReadLength == length);
