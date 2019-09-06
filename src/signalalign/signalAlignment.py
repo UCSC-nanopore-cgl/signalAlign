@@ -135,10 +135,11 @@ class SignalAlignment(object):
         self.aligned_segment = None
         if cigar_string:
             self.aligned_segment = sam_string_to_aligned_segment(cigar_string)  # pysam aligned segment
-        if shutil.which("signalMachine") is None:
-            assert os.path.exists(self.path_to_signalMachine), "Path to signalMachine does not exist"
-        else:
-            self.path_to_signalMachine = shutil.which("signalMachine")
+        if not os.path.exists(self.path_to_signalMachine):
+            if shutil.which("signalMachine") is None:
+                self.failStop("Path to signalMachine does not exist and is not in PATH: {}".format(self.path_to_signalMachine))
+            else:
+                self.path_to_signalMachine = shutil.which("signalMachine")
         assert self.bwa_reference is not None or self.alignment_file is not None or self.aligned_segment is not None, \
             "either 'bwa_reference' or 'alignment_file' or 'cigar_string' " \
             "argument is needed to generate cigar strings"
