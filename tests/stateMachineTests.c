@@ -42,7 +42,7 @@ NanoporeRead *loadTestNanoporeRead() {
     if (!stFile_exists(npReadFile)) {
         st_errAbort("Could not find test npRead file\n");
     }
-    NanoporeRead *npRead = nanopore_loadNanoporeReadFromFile(npReadFile, "ACEGOT", 6, 6);
+    NanoporeRead *npRead = nanopore_loadNanoporeReadFromFile(npReadFile, "ACEGOT", 6);
     free(npReadFile);
     return npRead;
 }
@@ -52,7 +52,7 @@ NanoporeRead *loadTestR9NanoporeRead() {
     if (!stFile_exists(npReadFile)) {
         st_errAbort("Could not find test npRead file\n");
     }
-    NanoporeRead *npRead = nanopore_loadNanoporeReadFromFile(npReadFile, "ACGT", 4, 5);
+    NanoporeRead *npRead = nanopore_loadNanoporeReadFromFile(npReadFile, "ACGT", 4);
     free(npReadFile);
     return npRead;
 }
@@ -61,7 +61,7 @@ NanoporeRead *loadTestR94NanopreRead(CuTest *testCase) {
     char *npReadFile = stString_print("../tests/test_npReads/r9p4_oneD.npRead");
     CuAssertTrue(testCase, stFile_exists(npReadFile));
 
-    NanoporeRead *npRead = nanopore_loadNanoporeReadFromFile(npReadFile, "ACGT", 4, 5);
+    NanoporeRead *npRead = nanopore_loadNanoporeReadFromFile(npReadFile, "ACGT", 4);
     free(npReadFile);
     return npRead;
 }

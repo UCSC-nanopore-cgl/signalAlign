@@ -694,7 +694,7 @@ int main(int argc, char *argv[]) {
 
     // Nanopore Read //
     // load nanopore read
-    NanoporeRead *npRead = nanopore_loadNanoporeReadFromFile(npReadFile, sMt->alphabet, sMt->alphabetSize, sMt->kmerLength);
+    NanoporeRead *npRead = nanopore_loadNanoporeReadFromFile(npReadFile, sMt->alphabet, sMt->alphabetSize);
 
     if (rna){
         int64_t tmp = pA->start2;

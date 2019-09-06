@@ -142,7 +142,7 @@ NanoporeReadAdjustmentParameters set4_NanoporeReadAdjustmentParameters(double _s
 
 
 
-NanoporeRead *nanopore_loadNanoporeReadFromFile(const char *nanoporeReadFile, char* alphabet, int64_t alphabetSize, int64_t kmerLength) {
+NanoporeRead *nanopore_loadNanoporeReadFromFile(const char *nanoporeReadFile, char *alphabet, int64_t alphabetSize) {
     FILE *fH = fopen(nanoporeReadFile, "r");
     // line 1: all tab-seperated
     // 0 alignment read length
@@ -408,13 +408,15 @@ NanoporeRead *nanopore_loadNanoporeReadFromFile(const char *nanoporeReadFile, ch
     string = stFile_getLineFromFile(fH);
     tokens = stString_split(string);
     char *modelState;
-    // check
+    int64_t kmer_len = strlen((char *)stList_get(tokens, 0));
+
+  // check
     if (stList_length(tokens) != (npRead->nbTemplateEvents)) {
         st_errAbort("Got incorrect number of model states (kmers) got %"PRId64"\n");
     }
     for (int64_t i = 0; i < npRead->nbTemplateEvents; i++) {
         modelState = (char *)stList_get(tokens, i);
-        npRead->templateModelState[i] = kmer_id(modelState, alphabet, alphabetSize, kmerLength);
+        npRead->templateModelState[i] = kmer_id(modelState, alphabet, alphabetSize, kmer_len);
       }
     free(string);
     stList_destruct(tokens);
@@ -444,7 +446,7 @@ NanoporeRead *nanopore_loadNanoporeReadFromFile(const char *nanoporeReadFile, ch
     }
     for (int64_t i = 0; i < npRead->nbComplementEvents; i++) {
         modelState = (char *)stList_get(tokens, i);
-        npRead->complementModelState[i] = kmer_id(modelState, alphabet, alphabetSize, kmerLength);
+        npRead->complementModelState[i] = kmer_id(modelState, alphabet, alphabetSize, kmer_len);
     }
     free(string);
     stList_destruct(tokens);
