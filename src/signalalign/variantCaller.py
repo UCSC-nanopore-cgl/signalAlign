@@ -387,6 +387,7 @@ class AggregateOverReadsFull(object):
 
     def _normalize_all_data(self, all_data):
         """Helper function to normalize all probability data"""
+        assert not all_data.empty, "Check your input. 'all_data' is empty"
         for strand in set(all_data["strand"]):
             strand_data = all_data[all_data["strand"] == strand]
             for contig in set(strand_data["contig"]):
