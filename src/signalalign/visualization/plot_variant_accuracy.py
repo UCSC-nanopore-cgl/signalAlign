@@ -47,10 +47,7 @@ def plot_roc_from_config(config):
 
     variants = config.variants
     samples = config.samples
-    if isinstance(config.threshold, float):
-        threshold = config.threshold
-    else:
-        threshold = 0.500000001
+    threshold = 0.500000001
 
     if isinstance(config.jobs, int):
         n_processes = config.jobs

@@ -3,6 +3,7 @@
 """
 
 import os
+import itertools
 
 import numpy as np
 import pandas as pd
@@ -11,7 +12,7 @@ from py3helpers.multiprocess import *
 from signalalign.nanoporeRead import NanoporeRead
 from signalalign.signalAlignment import SignalAlignment
 from signalalign.train.trainModels import read_in_alignment_file
-from signalalign.utils.sequenceTools import CustomAmbiguityPositions
+from signalalign.utils.sequenceTools import CustomAmbiguityPositions, AMBIG_BASES
 
 
 class MarginalizeVariants(object):
@@ -106,8 +107,9 @@ class MarginalizeFullVariants(object):
         """
         self.read_name = read_name
         self.full_data = full_data
-        self.variant_data = self.full_data[["X" in kmer for kmer in self.full_data["reference_kmer"]]]
         self.variants = sorted(variants)
+        self.ambig_char = AMBIG_BASES["".join(self.variants)]
+        self.variant_data = self.full_data[[self.ambig_char in kmer or "X" in kmer for kmer in self.full_data["reference_kmer"]]]
         self.forward_mapped = forward_mapped
         self.columns = merge_lists([['read_name', 'contig', 'position', 'strand', 'forward_mapped'],
                                     list(self.variants)])
@@ -127,7 +129,6 @@ class MarginalizeFullVariants(object):
             mapping_strands = ["+", "-"]
         else:
             mapping_strands = ["-", "+"]
-
         if len(self.variant_data) > 0:
             kmer_len_1 = len(self.variant_data["reference_kmer"].iloc[0]) - 1
             mapping_index = 0
@@ -148,7 +149,8 @@ class MarginalizeFullVariants(object):
                 n_positions = 0
                 for pos in positions:
                     pos_data = read_strand_specifc_data[read_strand_specifc_data["reference_index"] == pos]
-                    if pos_data["aligned_kmer"].iloc[0][kmer_len_1] != "X":
+                    base = pos_data["aligned_kmer"].iloc[0][kmer_len_1]
+                    if base != self.ambig_char and base != "X":
                         continue
                     n_positions += 1
                     total_prob = 0
@@ -279,16 +281,19 @@ class AggregateOverReads(object):
 
 class AggregateOverReadsFull(object):
 
-    def __init__(self, sa_full_tsv_dir, variants="ATGC", verbose=False, processes=2):
+    def __init__(self, sa_full_tsv_dirs, variants="ATGC", verbose=False, processes=2):
         """Marginalize over all posterior probabilities to give a per position read probability
-        :param sa_full_tsv_dir: directory of full output from signalAlign
+        :param sa_full_tsv_dirs: list of directories of full output from signalAlign
         :param variants: bases to track probabilities
         """
-        self.sa_full_tsv_dir = sa_full_tsv_dir
+        self.sa_full_tsv_dirs = sa_full_tsv_dirs
         self.variants = sorted(variants)
         self.columns = merge_lists([['contig', 'position', 'strand', 'forward_mapped'], list(self.variants)])
-        self.forward_tsvs = list_dir(self.sa_full_tsv_dir, ext=".forward.tsv")
-        self.backward_tsvs = list_dir(self.sa_full_tsv_dir, ext=".backward.tsv")
+        self.forward_tsvs = list(itertools.chain.from_iterable([list_dir(x, ext=".forward.tsv") for x
+                                                                in self.sa_full_tsv_dirs]))
+        self.backward_tsvs = list(itertools.chain.from_iterable([list_dir(x, ext=".backward.tsv") for x
+                                                                 in self.sa_full_tsv_dirs]))
+
         self.verbose = verbose
         self.worker_count = processes
 
