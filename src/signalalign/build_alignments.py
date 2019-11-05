@@ -201,7 +201,7 @@ def concatenate_files(file_paths, output_file_path, remove_files=False):
     :return: None
     From Ryan Lorig-Roach
     """
-    with open(output_file_path, 'wb') as out_file:
+    with open(output_file_path, 'ab') as out_file:
         for file_path in file_paths:
             with open(file_path, 'rb') as in_file:
                 # 100MB per writing chunk to avoid reading big file into memory.

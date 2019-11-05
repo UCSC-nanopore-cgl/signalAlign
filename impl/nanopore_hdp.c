@@ -1175,7 +1175,19 @@ static NanoporeHDP *loadNanoporeHdpFromScratch(NanoporeHdpType nHdpType, const c
 
         return nHdp;
     }
-    if (nHdpType == singleLevelFixed) {
+    if (nHdpType == singleLevelFixedrRNA) {
+      if ((baseGamma == NULL_HYPERPARAMETER) || (leafGamma == NULL_HYPERPARAMETER)) {
+        st_errAbort("loadNanoporeHdpFromScratch: You need to provide a base gamma and leaf gamma "
+                    "for this NanoporeHdpType\n");
+      }
+
+      NanoporeHDP *nHdp = flat_hdp_model(M7G_PSI_RRNA, SYMBOL_NUMBER_NO_N, kmerLength,
+                                         baseGamma, leafGamma,
+                                         samplingGridStart, samplingGridEnd, samplingGridLength, modelFile);
+
+      return nHdp;
+    }
+  if (nHdpType == singleLevelFixed) {
         if ((baseGamma == NULL_HYPERPARAMETER) || (leafGamma == NULL_HYPERPARAMETER)) {
             st_errAbort("loadNanoporeHdpFromScratch: You need to provide a base gamma and leaf gamma "
                                 "for this NanoporeHdpType\n");

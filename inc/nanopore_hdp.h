@@ -38,6 +38,7 @@ typedef enum _nanoporeHdpType {
     singleLevelPriorEcoli = 13,
     singleLevelFixedCanonical = 14,
     singleLevelFixedM6A = 15,
+    singleLevelFixedrRNA = 16
 } NanoporeHdpType;
 
 typedef struct _nanoporeDistributionMetricMemo {

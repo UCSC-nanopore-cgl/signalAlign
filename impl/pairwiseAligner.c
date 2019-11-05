@@ -900,15 +900,15 @@ void cell_signal_updateExpectations(double *fromCells, double *toCells, int64_t 
     }
     // this gives you the kmer index
 
-    int64_t kmerIndex = hmmExpectations->getElementIndexFcn(((void **) extraArgs)[2],
-                                                            hmmExpectations->baseHmm.alphabet,
-                                                            hmmExpectations->baseHmm.alphabetSize,
-                                                            hmmExpectations->baseHmm.kmerLength);
+//    int64_t kmerIndex = hmmExpectations->getElementIndexFcn(((void **) extraArgs)[2],
+//                                                            hmmExpectations->baseHmm.alphabet,
+//                                                            hmmExpectations->baseHmm.alphabetSize,
+//                                                            hmmExpectations->baseHmm.kmerLength);
 
-    double eventMean = *(double *)((void **) extraArgs)[3];
-    double descaledEventMean = hmmExpectations->getDescaledEvent(
-            eventMean, *(hmmExpectations->getEventModelEntry((Hmm *)hmmExpectations, kmerIndex)),
-            hmmExpectations->scale, hmmExpectations->shift, hmmExpectations->var);
+//    double eventMean = *(double *)((void **) extraArgs)[3];
+//    double descaledEventMean = hmmExpectations->getDescaledEvent(
+//            eventMean, *(hmmExpectations->getEventModelEntry((Hmm *)hmmExpectations, kmerIndex)),
+//            hmmExpectations->scale, hmmExpectations->shift, hmmExpectations->var);
 
     // Calculate posterior probability of the transition/emission pair
     double p = exp(fromCells[from] + toCells[to] + (eP + tP) - totalProbability);
@@ -916,10 +916,10 @@ void cell_signal_updateExpectations(double *fromCells, double *toCells, int64_t 
     // update transitions expectation
     hmmExpectations->baseHmm.addToTransitionExpectationFcn((Hmm *)hmmExpectations, from, to, p);
     //
-    if (to == match) {
-        //st_uglyf("adding to expectations kmerIndex %lld, event mean %f, p %f\n", kmerIndex, descaledEventMean, p);
-        hmmExpectations->addToEmissionExpectationFcn((Hmm *)hmmExpectations, kmerIndex, descaledEventMean, p);
-    }
+//    if (to == match) {
+//        //st_uglyf("adding to expectations kmerIndex %lld, event mean %f, p %f\n", kmerIndex, descaledEventMean, p);
+//        hmmExpectations->addToEmissionExpectationFcn((Hmm *)hmmExpectations, kmerIndex, descaledEventMean, p);
+//    }
 }
 
 void cell_signal_updateExpectationsAndAssignments(double *fromCells, double *toCells, int64_t from, int64_t to,

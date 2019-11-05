@@ -399,7 +399,7 @@ class TrainSignalAlignTest(unittest.TestCase):
                 training_h = TrainSignalAlign(fake_args)
                 training_h.expectation_maximization_training()
                 self.assertTrue(len(training_h.samples[0].analysis_files) == 1)
-    #
+
     # def test_hdp_training(self):
     #     with captured_output() as (_, _):
     #         with tempfile.TemporaryDirectory() as tempdir:

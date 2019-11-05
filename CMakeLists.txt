@@ -1,9 +1,9 @@
 cmake_minimum_required(VERSION 3.7)
-project(signalAlign)
-
+SET(CMAKE_CXX_FLAGS "-g -Wall -std=c++11 -fopenmp -fsigned-char -DBOOST_NO_CXX11_SCOPED_ENUMS")
 set(CMAKE_VERBOSE_MAKEFILE ON)
-
 set(CMAKE_C_FLAGS_DEBUG  "${CMAKE_C_FLAGS_DEBUG} -O0 -g -Wall --pedantic -fopenmp -funroll-loops  -DNDEBUG")
+
+project(signalAlign)
 
 #if(APPLE)
 #    set(CMAKE_SHARED_LIBRARY_CREATE_C_FLAGS "${CMAKE_SHARED_LIBRARY_CREATE_C_FLAGS} -undefined dynamic_lookup")
@@ -25,7 +25,7 @@ message(HDF5_INCLUDE_DIRS: "${HDF5_INCLUDE_DIRS}")
 message(HDF5_LIBRARIES: "${HDF5_LIBRARIES}")
 
 find_library(HTSLIB_LIBRARY NAMES libhts.a
-        HINTS ${CMAKE_SOURCE_DIR}/htslib
+        HINTS ${CMAKE_SOURCE_DIR}/htsl
         ${CMAKE_INSTALL_PREFIX}/include)
 
 find_path(HTSLIB_INCLUDE_DIR htslib/hts.h

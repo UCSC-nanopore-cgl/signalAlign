@@ -13,6 +13,8 @@ from argparse import ArgumentParser
 from shutil import copyfile
 from subprocess import check_call
 import shutil
+from scipy.stats import median_absolute_deviation
+import subprocess
 import tempfile
 from py3helpers.utils import create_dot_dict, merge_lists, all_string_permutations, save_json, load_json, \
     count_lines_in_file, merge_dicts, list_dir
@@ -423,6 +425,8 @@ class CreateHdpTrainingData(object):
     def write_hdp_training_file(self, verbose=False):
         """Write a hdp training file to a specified location"""
         # final_output = []
+        if os.path.exists(self.out_file_path):
+            os.remove(self.out_file_path)
         for sample in self.samples:
             print("Filtering and gathering {} assignment.tsv files".format(sample.name))
             if len(sample.analysis_files) == 0:
@@ -558,7 +562,8 @@ def get_hdp_type(requested_type):
         "multisetPriorEcoli": 12,
         "singleLevelPriorEcoli": 13,
         "singleLevelFixedCanonical": 14,
-        "singleLevelFixedM6A": 15
+        "singleLevelFixedM6A": 15,
+        "singleLevelFixedrRNA": 16
     }
     assert (requested_type in list(hdp_types.keys())), "Requested HDP type is invalid, got {}".format(requested_type)
     return hdp_types[requested_type]
@@ -587,6 +592,7 @@ class TrainSignalAlign(object):
         ("multisetPrior2", 11),
         ("singleLevelFixedCanonical", 14),
         ("singleLevelFixedM6A", 15),
+        ("singleLevelFixedrRNA", 16)
     ]
 
     HDP_TYPES_ACEGT = [
@@ -605,6 +611,9 @@ class TrainSignalAlign(object):
     HDP_TYPES_ACFGT = [
         ("singleLevelFixedM6A", 15),
     ]
+    HDP_TYPES_ACGTbp = [
+        ("singleLevelFixedrRNA", 16),
+    ]
 
     def __init__(self, args):
         # TODO Need to create docs here
@@ -615,6 +624,7 @@ class TrainSignalAlign(object):
         self.int_hdp_type = None
         # load json and create dot dictionary of all the parameters
         self.args = args
+        self.rna = self.args.rna
         # check output directory
         self.args.output_dir = os.path.abspath(self.args.output_dir)
         assert os.path.exists(self.args.output_dir), "Output directory does not exist. " \
@@ -646,6 +656,7 @@ class TrainSignalAlign(object):
         self.alphabet = None
         # check config file
         self._check_config()
+        self.og_model_weight = 100
 
     def _create_samples(self):
         """Create SignalAlignSample for each sample"""
@@ -660,47 +671,80 @@ class TrainSignalAlign(object):
         self.working_path = self.working_folder.open_folder(os.path.join(self.args.output_dir,
                                                                          "tempFiles_trainModels_" + str(append)))
 
+    def train_normal_emmissions(self, iteration=""):
+        """Generate a gaussian model from signalalign output"""
+        if self.args.built_alignments:
+            assert os.path.isfile(self.args.built_alignments), \
+                "Build alignment file does not exist. {}".format(self.args.built_alignments)
+            built_alignments = self.args.built_alignments
+        else:
+            # set strands which will built
+            template = True
+            complement = False
+            if self.two_d:
+                complement = True
+            # create instance
+            hdp_data = CreateHdpTrainingData(self.samples, os.path.join(self.working_path,
+                                                                        "buildAlignment" + iteration + ".tsv"),
+                                             template=template,
+                                             complement=complement,
+                                             verbose=self.debug,
+                                             alphabet=self.alphabet,
+                                             jobs=self.job_count)
+            # write an hdp training file to path
+            built_alignments = hdp_data.write_hdp_training_file(verbose=True)
+
+        #     parse output and process for template
+        print("[trainModels.train_normal_emmissions] Updating template gaussian model parameters")
+        data = parse_assignment_file(built_alignments)
+        t_data = data[data["strand"] == "t"]
+        template_hmm_model_path = os.path.join(self.working_path, "template_hmm" + iteration + ".model")
+        complement_hmm_model_path = None
+        template_model = HmmModel(self.template_hmm_model_path, rna=self.rna)
+        for kmer in set(t_data["kmer"]):
+            kmer_data = t_data[t_data["kmer"] == kmer]["level_mean"]
+            n_data = len(kmer_data)
+            med = np.median(kmer_data) * n_data
+            mad = median_absolute_deviation(kmer_data) * n_data
+            normal_mean, normal_sd = template_model.get_event_mean_gaussian_parameters(kmer)
+            normal_mean *= self.og_model_weight
+            normal_sd *= self.og_model_weight
+            template_model.set_kmer_event_mean(kmer, (med+normal_mean)/(n_data+self.og_model_weight))
+            template_model.set_kmer_event_sd(kmer, (mad+normal_sd)/(n_data+self.og_model_weight))
+
+        template_model.normalized = True
+        template_model.write(template_hmm_model_path)
+        # complement data if 2d
+        if self.two_d:
+            print("[trainModels.train_normal_emmissions] Updating complement gaussian model parameters")
+            c_data = data[data["strand"] == "c"]
+            complement_model = HmmModel(self.complement_hmm_model_path, rna=self.rna)
+            complement_hmm_model_path = os.path.join(self.working_path, "complement_hmm" + iteration + ".model")
+            for kmer in set(c_data["kmer"]):
+                kmer_data = c_data[c_data["kmer"] == kmer]["level_mean"]
+                n_data = len(kmer_data)
+                med = np.median(kmer_data) * n_data
+                mad = median_absolute_deviation(kmer_data) * n_data
+                normal_mean, normal_sd = complement_model.get_event_mean_gaussian_parameters(kmer)
+                normal_mean *= self.og_model_weight
+                normal_sd *= self.og_model_weight
+                complement_model.set_kmer_event_mean(kmer, (med+normal_mean)/(n_data+self.og_model_weight))
+                complement_model.set_kmer_event_sd(kmer, (mad+normal_sd)/(n_data+self.og_model_weight))
+            complement_model.normalized = True
+            complement_model.write(complement_hmm_model_path)
+
+        self.template_hmm_model_path = template_hmm_model_path
+        self.complement_hmm_model_path = complement_hmm_model_path
+        return self.template_hmm_model_path, self.complement_hmm_model_path
+
     def train_hdp(self, iteration=""):
         """Train hdp.... duh?
-        :param outpath: output file path
-        :param build_alignment: path to alignment file
-        :param num_alignments: number of alignments in alignment file
-        :param threshold:
-        :param verbose:
-        :param path_to_bin
-        :param twoD:
-        :param hdp_type: Build Hdp, specify type, options: "Prior, Fixed, twoWay. twoWay is a Prior-type model (recommended)"
-        # initial HDP
-        :param template_model: Input template lookup table
-        :param complement_model: Input complement lookup table
-        # fixed concentration models
-        :param base_gamma:
-        :param middle_gamma:
-        :param leaf_gamma:
-        # gamma prior models
-        :param base_alpha:
-        :param base_beta:
-        :param middle_alpha:
-        :param middle_beta:
-        :param leaf_alpha:
-        :param leaf_beta:
-        # gibbs sampling
-        :param gibbs_samples: number of gibbs samples
-        :param thinning: how many thinning draws?
-        # sample grid
-        :param grid_start:
-        :param grid_end:
-        :param grid_length:
-        :param kmer_length: length of kmer
-        :return: dictionary of hdp training options
+        :return: self.template_hdp_model_path, self.complement_hdp_model_path
         """
-        if iteration:
-            iteration = iteration + "."
-
-        if self.args.hdp_args.built_alignments:
-            assert os.path.isfile(self.args.hdp_args.built_alignments), \
-                "Build alignment file does not exist. {}".format(self.args.hdp_args.built_alignments)
-            build_alignment_path = self.args.hdp_args.built_alignments
+        if self.args.built_alignments:
+            assert os.path.isfile(self.args.built_alignments), \
+                "Build alignment file does not exist. {}".format(self.args.built_alignments)
+            build_alignment_path = self.args.built_alignments
             num_alignments = count_lines_in_file(build_alignment_path)
         else:
             # set strands which will built
@@ -714,7 +758,7 @@ class TrainSignalAlign(object):
                                              template=template,
                                              complement=complement,
                                              verbose=self.debug,
-                                             alphabet=self.template_model.alphabet,
+                                             alphabet=self.alphabet,
                                              jobs=self.job_count)
             # write an hdp training file to path
             build_alignment_path = hdp_data.write_hdp_training_file(verbose=True)
@@ -782,11 +826,11 @@ class TrainSignalAlign(object):
         self.state_machine_type = "threeStateHdp"
         return self.template_hdp_model_path, self.complement_hdp_model_path
 
-    def train_normal_hmm(self, transitions=True, emissions=False, iteration=""):
+    def train_transitions(self, iteration=""):
         """Train model transitions"""
         i = 0
         if iteration:
-            iteration = "_" + iteration
+            iteration = iteration + "_"
         # start iterating
         while i < self.args.transitions_args.iterations:
             # align all the samples
@@ -798,16 +842,16 @@ class TrainSignalAlign(object):
                                            if x.endswith(".template.expectations.tsv")]
 
             if len(template_expectations_files) > 0:
-                new_template_hmm = self.working_folder.add_file_path("template_trained_{}{}.hmm".format(i, iteration))
+                new_template_hmm = self.working_folder.add_file_path("template_trained_{}{}.hmm".format(iteration, i))
                 copyfile(self.template_hmm_model_path, new_template_hmm)
                 self.template_hmm_model_path = new_template_hmm
                 self.template_model.add_and_normalize_expectations(files=template_expectations_files,
                                                                    hmm_file=self.template_hmm_model_path,
-                                                                   update_transitions=transitions,
-                                                                   update_emissions=emissions)
+                                                                   update_transitions=True,
+                                                                   update_emissions=False)
             if self.two_d:
                 new_complement_hmm = self.working_folder.add_file_path(
-                    "complement_trained_{}{}.hmm".format(i, iteration))
+                    "complement_trained_{}{}.hmm".format(iteration, i))
                 copyfile(self.complement_hmm_model_path, new_complement_hmm)
                 self.complement_hmm_model_path = new_complement_hmm
 
@@ -816,8 +860,8 @@ class TrainSignalAlign(object):
                 if len(complement_expectations_files) > 0:
                     self.complement_model.add_and_normalize_expectations(files=complement_expectations_files,
                                                                          hmm_file=self.complement_hmm_model_path,
-                                                                         update_transitions=transitions,
-                                                                         update_emissions=emissions)
+                                                                         update_transitions=True,
+                                                                         update_emissions=False)
 
             # log the running likelihood
             if len(self.template_model.running_likelihoods) > 0 and \
@@ -853,20 +897,22 @@ class TrainSignalAlign(object):
         """
         start = timer()
 
-        if self.args.training.normal_emissions:
-            print("[trainModels] Training HMM emission distributions is not currently available.")
         if self.args.training.expectation_maximization:
             for i in range(1, self.args.training.em_iterations + 1):
                 print("[trainModels] Training HMM transition distributions. iteration: {}".format(i))
                 # first train the model transitions
-                self.train_normal_hmm(iteration=str(i))
+                self.train_transitions(iteration=str(i))
                 print("[trainModels] Running Assignment with new HMM transition distributions. "
                       "iteration: {}".format(i))
                 # next get assignments
                 self.run_signal_align()
-                print("[trainModels] Training HDP emission distributions. iteration: {}".format(i))
                 # make new hdp
-                self.train_hdp(iteration=str(i))
+                if i == self.args.training.em_iterations:
+                    print("[trainModels] Training HDP emission distributions. iteration: {}".format(i))
+                    self.train_hdp(iteration=str(i))
+                else:
+                    print("[trainModels] Training HMM emission distributions. iteration: {}".format(i))
+                    self.train_normal_emmissions(iteration=str(i))
                 print([sample.analysis_files for sample in self.samples])
                 print(self.template_hdp_model_path)
                 print(self.template_hmm_model_path)
@@ -874,15 +920,17 @@ class TrainSignalAlign(object):
                 print(self.complement_hdp_model_path)
                 # self.new_working_folder(append=str(i))
         elif self.args.training.transitions or self.args.training.hdp_emissions or self.args.training.normal_emissions:
-            if self.args.training.transitions or self.args.training.normal_emissions:
+            if self.args.training.normal_emissions:
+                print("[trainModels] Training HMM emission distributions.")
+                if not self.args.built_alignments:
+                    self.run_signal_align(check_samples=True)
+                self.train_normal_emmissions(iteration="")
+            if self.args.training.transitions:
                 print("[trainModels] Training HMM transition distributions.")
-                # self.train_transitions()
-                self.train_normal_hmm(iteration="",
-                                      transitions=self.args.training.transitions,
-                                      emissions=self.args.training.normal_emissions)
+                self.train_transitions(iteration="")
             if self.args.training.hdp_emissions:
                 print("[trainModels] Training HDP emission distributions.")
-                if not self.args.hdp_args.built_alignments:
+                if not self.args.built_alignments:
                     self.run_signal_align(check_samples=True)
                 self.train_hdp(iteration="")
         else:
@@ -908,7 +956,7 @@ class TrainSignalAlign(object):
         # load template model
         assert self.template_hmm_model_path, "Missing template model %s" % (self.template_hmm_model_path)
         self.template_hmm_model_path = os.path.abspath(self.template_hmm_model_path)
-        self.template_model = HmmModel(self.template_hmm_model_path)
+        self.template_model = HmmModel(self.template_hmm_model_path, rna=self.rna)
         new_template_hmm = self.working_folder.add_file_path("template_trained.hmm")
         copyfile(self.template_hmm_model_path, new_template_hmm)
         assert os.path.exists(new_template_hmm), "Problem copying default model to {}".format(new_template_hmm)
@@ -920,7 +968,7 @@ class TrainSignalAlign(object):
         if self.two_d:
             assert self.complement_hmm_model_path, "Missing complement model: {}".format(self.complement_hmm_model_path)
             self.complement_hmm_model_path = os.path.abspath(self.complement_hmm_model_path)
-            self.complement_model = HmmModel(self.complement_hmm_model_path)
+            self.complement_model = HmmModel(self.complement_hmm_model_path, rna=self.rna)
             new_complement_hmm = self.working_folder.add_file_path("complement_trained.hmm")
             copyfile(self.complement_hmm_model_path, new_complement_hmm)
             assert os.path.exists(new_complement_hmm), "Problem copying default model to {}".format(new_complement_hmm)
@@ -977,7 +1025,10 @@ class TrainSignalAlign(object):
             assert (self.args.hdp_args.hdp_type, self.int_hdp_type) in set(self.HDP_TYPES_ACEGIT), \
                 "HDP type is not compatible with alphabet=ACEGIT." \
                 "Hdp_type: {}, ACEGIT HDP types:  {}".format(self.args.hdp_type, self.HDP_TYPES_ACEGIT)
-
+        elif self.alphabet == "ACGTbp":
+            assert (self.args.hdp_args.hdp_type, self.int_hdp_type) in set(self.HDP_TYPES_ACGTbp), \
+                "HDP type is not compatible with alphabet=ACGTbp." \
+                "Hdp_type: {}, ACGTbp HDP types:  {}".format(self.args.hdp_type, self.HDP_TYPES_ACGTbp)
         elif self.alphabet == "ACEGT":
             assert (self.args.hdp_args.hdp_type, self.int_hdp_type) in set(self.HDP_TYPES_ACEGT), \
                 "HDP type is not compatible with alphabet=ACEGT." \
@@ -992,20 +1043,20 @@ class TrainSignalAlign(object):
                 "HDP type is not compatible with alphabet=ACFGT." \
                 "Hdp_type: {}, ACFGT HDP types:  {}".format(self.args.hdp_type, self.HDP_TYPES_ACFGT)
         else:
-            raise AssertionError("Cannot create a HDP with proved alphabet")
+            raise AssertionError("Cannot create a HDP with this alphabet: {}".format(self.alphabet))
 
         # check buildHdpUtil executable
         self.buildHdpUtil = os.path.join(self.args.path_to_bin, "./buildHdpUtil")
         assert (os.path.exists(self.buildHdpUtil)), "ERROR: Didn't find buildHdpUtil. {}".format(self.buildHdpUtil)
         # check other parameter inconsistencies
-        if self.args.hdp_args.built_alignments:
+        if self.args.built_alignments:
             assert self.args.training.expectation_maximization is not True, "Cannot use 'built_alignments' file for " \
                                                                             "EM training. Either set " \
                                                                             "training.expectation_maximization to " \
                                                                             "false or change " \
                                                                             "hdp_args.built_alignments to null"
-            assert os.path.isfile(self.args.hdp_args.built_alignments), \
-                "Build alignment file does not exist. {}".format(self.args.hdp_args.built_alignments)
+            assert os.path.isfile(self.args.built_alignments), \
+                "Build alignment file does not exist. {}".format(self.args.built_alignments)
 
     def _check_config(self):
         """Make sure training configuration file is correctly filled out"""

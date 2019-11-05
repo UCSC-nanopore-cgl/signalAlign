@@ -73,5 +73,6 @@
   "constraint_trim": null,
   "diagonal_expansion": null,
   "traceBackDiagonals": 100,
-  "filter_reads": 7
+  "filter_reads": 7,
+  "rna": false
 }
