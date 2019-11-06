@@ -17,7 +17,7 @@ from scipy.stats import median_absolute_deviation
 import subprocess
 import tempfile
 from py3helpers.utils import create_dot_dict, merge_lists, all_string_permutations, save_json, load_json, \
-    count_lines_in_file, merge_dicts, list_dir
+    count_lines_in_file, merge_dicts, list_dir, captured_output
 from py3helpers.multiprocess import *
 
 from signalalign.signalAlignment import multithread_signal_alignment_samples, create_signalAlignment_args, \
@@ -454,12 +454,13 @@ class CreateHdpTrainingData(object):
             base_dir = os.path.dirname(self.out_file_path)
             temp_dir = os.path.join(base_dir, "top_n_kmers")
             os.mkdir(temp_dir)
-            generate_top_n_kmers_from_sa_output(assignment_files, temp_dir, self.out_file_path,
-                                                sample.number_of_kmer_assignments, alphabet=self.alphabet,
-                                                kmer_len=self.k, min_prob=sample.probability_threshold,
-                                                worker_count=self.jobs, random=False,
-                                                complement=True,
-                                                remove=False, alignment=full)
+            with captured_output() as (_, _):
+                generate_top_n_kmers_from_sa_output(assignment_files, temp_dir, self.out_file_path,
+                                                    sample.number_of_kmer_assignments, alphabet=self.alphabet,
+                                                    kmer_len=self.k, min_prob=sample.probability_threshold,
+                                                    worker_count=self.jobs, random=False,
+                                                    complement=True,
+                                                    remove=False, alignment=full)
             shutil.rmtree(temp_dir)
             # final_output.append(
             #     multiprocess_make_kmer_assignment_tables(assignment_files, kmers, self.strands,
