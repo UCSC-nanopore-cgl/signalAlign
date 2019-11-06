@@ -902,9 +902,10 @@ class TrainSignalAlign(object):
             for i in range(1, self.args.training.em_iterations + 1):
                 print("[trainModels] Training HMM transition distributions. iteration: {}".format(i))
                 # first train the model transitions
-                self.train_transitions(iteration=str(i))
-                print("[trainModels] Running Assignment with new HMM transition distributions. "
-                      "iteration: {}".format(i))
+                if self.args.training.transitions:
+                    self.train_transitions(iteration=str(i))
+                    print("[trainModels] Running Assignment with new HMM transition distributions. "
+                          "iteration: {}".format(i))
                 # next get assignments
                 self.run_signal_align()
                 # make new hdp

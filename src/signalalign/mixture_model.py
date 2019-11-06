@@ -120,7 +120,8 @@ def fit_model_to_kmer_dist(all_assignments, kmer, n_normals=2):
 
 
 def generate_gaussian_mixture_model_for_motifs(model_h, assignments, all_kmer_pars, strand,
-                                               output_dir, plot=False, name="", target_model=None, show=False):
+                                               output_dir, plot=False, name="", target_model=None, show=False,
+                                               close=True):
     """Generate new hmm model using mixture model of assignment data for each required kmer given the set of motifs
     :param model_h: HmmModel
     :param strand: 't' for template or 'c' for complement
@@ -167,7 +168,7 @@ def generate_gaussian_mixture_model_for_motifs(model_h, assignments, all_kmer_pa
                                                 other[0][0][0], other[0][1][0], strand, mixture_model=mixture_model,
                                                 kmer_assignments=assignments,
                                                 save_fig_dir=plot_output_dir,
-                                                target_model=target_model)
+                                                target_model=target_model, close=close)
     model_h.normalize(False, False)
     model_h.write(output_model_path)
 
@@ -204,7 +205,7 @@ def plot_mixture_model_distribution(canonical_kmer, modified_kmer, canonical_mod
                                     canonical_mixture_mean,
                                     canonical_mixture_sd, modified_mixture_mean, modified_mixture_sd,
                                     strand, mixture_model=None, target_model=None,
-                                    kmer_assignments=None, save_fig_dir=None):
+                                    kmer_assignments=None, save_fig_dir=None, close=False):
     """Plot normal distributions from mixture model and compare with original canonical model
     :param canonical_model_mean: canonical_model_mean
     :param canonical_model_sd: canonical_model_sd
@@ -294,7 +295,8 @@ def plot_mixture_model_distribution(canonical_kmer, modified_kmer, canonical_mod
         plt.savefig(out_path)
     else:
         plt.show()
-    plt.close(fig)
+    if close:
+        plt.close(fig)
 
 
 def main(config=None):
