@@ -710,8 +710,7 @@ class TrainSignalAlign(object):
             normal_mean, normal_sd = template_model.get_event_mean_gaussian_parameters(kmer)
             normal_mean *= self.og_model_weight
             normal_sd *= self.og_model_weight
-            template_model.set_kmer_event_mean(kmer, (med+normal_mean)/(n_data+self.og_model_weight))
-            template_model.set_kmer_event_sd(kmer, (mad+normal_sd)/(n_data+self.og_model_weight))
+            template_model.set_kmer_event_mean_params(kmer,  (med+normal_mean)/(n_data+self.og_model_weight), (mad+normal_sd)/(n_data+self.og_model_weight))
 
         template_model.normalized = True
         template_model.write(template_hmm_model_path)
@@ -729,8 +728,7 @@ class TrainSignalAlign(object):
                 normal_mean, normal_sd = complement_model.get_event_mean_gaussian_parameters(kmer)
                 normal_mean *= self.og_model_weight
                 normal_sd *= self.og_model_weight
-                complement_model.set_kmer_event_mean(kmer, (med+normal_mean)/(n_data+self.og_model_weight))
-                complement_model.set_kmer_event_sd(kmer, (mad+normal_sd)/(n_data+self.og_model_weight))
+                complement_model.set_kmer_event_mean_params(kmer,  (med+normal_mean)/(n_data+self.og_model_weight), (mad+normal_sd)/(n_data+self.og_model_weight))
             complement_model.normalized = True
             complement_model.write(complement_hmm_model_path)
 
@@ -903,9 +901,9 @@ class TrainSignalAlign(object):
                 print("[trainModels] Training HMM transition distributions. iteration: {}".format(i))
                 # first train the model transitions
                 if self.args.training.transitions:
-                    self.train_transitions(iteration=str(i))
-                    print("[trainModels] Running Assignment with new HMM transition distributions. "
+                    print("[trainModels] Training HMM transition distributions. "
                           "iteration: {}".format(i))
+                    self.train_transitions(iteration=str(i))
                 # next get assignments
                 self.run_signal_align()
                 # make new hdp

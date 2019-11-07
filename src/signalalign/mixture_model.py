@@ -150,8 +150,7 @@ def generate_gaussian_mixture_model_for_motifs(model_h, assignments, all_kmer_pa
             kmer_mean, kmer_sd = model_h.get_event_mean_gaussian_parameters(old_kmer)
             match, other, distance = closest_to_canonical(mixture_normals, kmer_mean)
             # set parameters
-            model_h.set_kmer_event_mean(new_kmer, other[0][0][0])
-            model_h.set_kmer_event_sd(new_kmer, other[0][1][0])
+            model_h.set_kmer_event_mean_params(new_kmer, other[0][0][0], other[0][1][0])
             canonical_mixture_components_comparison.append(
                 [old_kmer, kmer_mean, kmer_sd, match[0][0], match[1][0], other[0][0][0],
                  other[0][1][0], distance[0], strand])

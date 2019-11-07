@@ -554,8 +554,8 @@ class HmmModel(object):
         self.write(hmm_file)
         self.running_likelihoods.append(self.likelihood)
         self.reset_assignments()
-        print("[trainModels] NOTICE: Added {success} expectations files successfully, {problem} files had problems\n"
-              "".format(success=files_added_successfully, problem=files_with_problems), file=sys.stderr)
+        print("[trainModels] NOTICE: Added {success} expectations files successfully, {problem} files had problems"
+              "".format(success=files_added_successfully, problem=files_with_problems))
 
     def _initialize_hdp_model(self):
         """Read in HDP model and make sure parameters match the ONT model"""
@@ -886,6 +886,17 @@ class HmmModel(object):
                                   noise_sd=self.event_model["noise_SDs"][k],
                                   noise_lambda=self.event_model["noise_lambdas"][k]))
             f.write("\n")
+
+    def set_kmer_event_mean_params(self, kmer, event_mean, event_sd):
+        """Set ont event mean for a given kmer
+        :param kmer: valid K-mer
+        :param event_mean: value to set as new mean
+        """
+        k = self.get_kmer_index(kmer)
+        self.event_model["means"][k] = event_mean
+        self.event_model["SDs"][k] = event_sd
+        _, event_lambda = gaussian_param_to_inv_gaussian_param(event_mean, event_sd)
+        self.event_model["noise_lambdas"][k] = event_lambda
 
     def set_kmer_event_mean(self, kmer, event_mean):
         """Set ont event mean for a given kmer
