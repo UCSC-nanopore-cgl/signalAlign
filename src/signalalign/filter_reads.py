@@ -15,6 +15,7 @@ import numpy as np
 from collections import defaultdict
 from contextlib import closing
 from argparse import ArgumentParser
+import random
 from signalalign.fast5 import Fast5
 from signalalign.utils import multithread
 from signalalign.nanoporeRead import NanoporeRead
@@ -183,12 +184,20 @@ def filter_reads(alignment_file, readdb, read_dirs, quality_threshold=7, recursi
                 print("Found no alignments for {}".format(fast5))
 
 
-def filter_reads_to_string_wrapper(filter_reads_generator):
+def filter_reads_to_string_wrapper(filter_reads_generator, randomize=False):
     """Wrap filter reads in order to convert the aligned segment into a string so it can be pickled
+    :param randomize: option to randomize output
     :param filter_reads_generator: a filter_reads generator object
     """
-    for fast5, aligned_segment in filter_reads_generator:
-        yield fast5, aligned_segment.to_string()
+    if randomize:
+        all_fast5s = [(fast5, aligned_segment) for fast5, aligned_segment in filter_reads_generator]
+        random.shuffle(all_fast5s)
+        for fast5, aligned_segment in all_fast5s:
+            yield fast5, aligned_segment.to_string()
+    else:
+        for fast5, aligned_segment in filter_reads_generator:
+            yield fast5, aligned_segment.to_string()
+
 
 
 def filter_read_service2(work_queue, done_queue, service_name="filter_reads_service2"):

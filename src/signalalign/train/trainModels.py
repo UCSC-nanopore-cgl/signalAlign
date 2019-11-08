@@ -833,7 +833,7 @@ class TrainSignalAlign(object):
         # start iterating
         while i < self.args.transitions_args.iterations:
             # align all the samples
-            self.run_signal_align(get_expectations=True, trim=self.args.transitions_args.training_bases)
+            self.run_signal_align(get_expectations=True, trim=self.args.transitions_args.training_bases, randomize=True)
             all_sample_files = merge_lists([sample.analysis_files for sample in self.samples])
             assert len(all_sample_files) > 0, "Something failed in multithread signal alignment. We got no sample files"
             # load then normalize the expectations
@@ -913,7 +913,6 @@ class TrainSignalAlign(object):
                 else:
                     print("[trainModels] Training HMM emission distributions. iteration: {}".format(i))
                     self.train_normal_emmissions(iteration=str(i))
-                print([sample.analysis_files for sample in self.samples])
                 print(self.template_hdp_model_path)
                 print(self.template_hmm_model_path)
                 print(self.complement_hmm_model_path)
@@ -1079,7 +1078,8 @@ class TrainSignalAlign(object):
 
         return self.args
 
-    def run_signal_align(self, output_format="assignments", get_expectations=False, trim=False, check_samples=True):
+    def run_signal_align(self, output_format="assignments", get_expectations=False, trim=False, check_samples=True,
+                         randomize=False):
         """Run signal align with specified arguments"""
         alignment_args = create_signalAlignment_args(
             destination=self.working_path,
@@ -1114,11 +1114,11 @@ class TrainSignalAlign(object):
                     run_sa_samples.append(sample)
             if len(run_sa_samples) > 0:
                 run_sa_samples = multithread_signal_alignment_samples(run_sa_samples, alignment_args, self.job_count,
-                                                                      trim=trim, debug=self.debug)
+                                                                      trim=trim, debug=self.debug, randomize=randomize)
             self.samples = merge_lists([run_sa_samples, dont_run_sa_samples])
         else:
             self.samples = multithread_signal_alignment_samples(self.samples, alignment_args, self.job_count,
-                                                                trim=trim, debug=self.debug)
+                                                                trim=trim, debug=self.debug, randomize=randomize)
         return self.samples
 
 

@@ -948,7 +948,7 @@ class SignalAlignSample(object):
                                                                            positions_file=self.positions_file,
                                                                            name=self.name)
 
-    def process_reads(self, trim=False):
+    def process_reads(self, trim=False, randomize=False):
         """Creates a filter_read generator object"""
         if self.alignment_file and self.readdb and self.quality_threshold is not None:
             if self.recursive:
@@ -964,10 +964,10 @@ class SignalAlignSample(object):
                                                                 self.readdb,
                                                                 self.fast5_dirs,
                                                                 quality_threshold=self.quality_threshold,
-                                                                trim=trim))
+                                                                trim=trim), randomize=randomize)
 
 
-def multithread_signal_alignment_samples(samples, signal_align_arguments, worker_count, trim=None, debug=False):
+def multithread_signal_alignment_samples(samples, signal_align_arguments, worker_count, trim=None, debug=False, randomize=False):
     """Multiprocess SignalAlignment for a list of fast5 files given a set of alignment arguments.
 
     :param samples: list of "process_sample" samples
@@ -984,7 +984,7 @@ def multithread_signal_alignment_samples(samples, signal_align_arguments, worker
         # correct signal align arguments
         print("[multithread_signal_alignment_samples] Running SignalAlign on sample: {}".format(sample.name))
         with captured_output() as (_, _):
-            sample.process_reads(trim=trim)
+            sample.process_reads(trim=trim, randomize=randomize)
         signal_align_arguments["alignment_file"] = sample.alignment_file
         signal_align_arguments["bwa_reference"] = sample.bwa_reference
         signal_align_arguments["backward_reference"] = sample.bw_fasta_path
