@@ -951,20 +951,12 @@ class SignalAlignSample(object):
     def process_reads(self, trim=False, randomize=False):
         """Creates a filter_read generator object"""
         if self.alignment_file and self.readdb and self.quality_threshold is not None:
-            if self.recursive:
-                assert len(self.fast5_dirs) == 1, "If recursive, should just look at only one directory"
-                self.filter_read_generator = \
-                    multiprocess_filter_reads(self.fast5_dirs[0], self.alignment_file, self.readdb, trim=trim,
-                                              quality_threshold=self.quality_threshold,
-                                              worker_count=self.workers, debug=False)
-
-            else:
-                self.filter_read_generator = \
-                    filter_reads_to_string_wrapper(filter_reads(self.alignment_file,
-                                                                self.readdb,
-                                                                self.fast5_dirs,
-                                                                quality_threshold=self.quality_threshold,
-                                                                trim=trim), randomize=randomize)
+            self.filter_read_generator = \
+                filter_reads_to_string_wrapper(filter_reads(self.alignment_file,
+                                                            self.readdb,
+                                                            self.fast5_dirs,
+                                                            quality_threshold=self.quality_threshold,
+                                                            trim=trim, randomize=randomize))
 
 
 def multithread_signal_alignment_samples(samples, signal_align_arguments, worker_count, trim=None, debug=False, randomize=False):

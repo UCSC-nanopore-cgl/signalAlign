@@ -141,7 +141,7 @@ def parse_read_name_map_file(read_map, directories, recursive=False):
                             yield split_line[name_index], os.path.abspath(full_path)
 
 
-def filter_reads(alignment_file, readdb, read_dirs, quality_threshold=7, recursive=False, trim=False):
+def filter_reads(alignment_file, readdb, read_dirs, quality_threshold=7, recursive=False, trim=False, randomize=False):
     """Filter fast5 files based on a quality threshold and if there is an alignment
     :param alignment_file: bam aligment file
     :param readdb: readdb or sequence summary file
@@ -161,7 +161,11 @@ def filter_reads(alignment_file, readdb, read_dirs, quality_threshold=7, recursi
     with closing(pysam.AlignmentFile(alignment_file, 'rb')) as bamfile:
         name_indexed = pysam.IndexedReads(bamfile)
         name_indexed.build()
-        for name, fast5 in parse_read_name_map_file(readdb, read_dirs, recursive=recursive):
+        my_iterator = parse_read_name_map_file(readdb, read_dirs, recursive=recursive)
+        if randomize:
+            my_iterator = [(name, fast5) for name, fast5 in my_iterator]
+            random.shuffle(my_iterator)
+        for name, fast5 in my_iterator:
             try:
                 if trim < n_bases:
                     print("Filtered {} files for {} bases".format(n_files, n_bases))
@@ -184,20 +188,12 @@ def filter_reads(alignment_file, readdb, read_dirs, quality_threshold=7, recursi
                 print("Found no alignments for {}".format(fast5))
 
 
-def filter_reads_to_string_wrapper(filter_reads_generator, randomize=False):
+def filter_reads_to_string_wrapper(filter_reads_generator):
     """Wrap filter reads in order to convert the aligned segment into a string so it can be pickled
-    :param randomize: option to randomize output
     :param filter_reads_generator: a filter_reads generator object
     """
-    if randomize:
-        all_fast5s = [(fast5, aligned_segment) for fast5, aligned_segment in filter_reads_generator]
-        random.shuffle(all_fast5s)
-        for fast5, aligned_segment in all_fast5s:
-            yield fast5, aligned_segment.to_string()
-    else:
-        for fast5, aligned_segment in filter_reads_generator:
-            yield fast5, aligned_segment.to_string()
-
+    for fast5, aligned_segment in filter_reads_generator:
+        yield fast5, aligned_segment.to_string()
 
 
 def filter_read_service2(work_queue, done_queue, service_name="filter_reads_service2"):
