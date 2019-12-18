@@ -74,5 +74,6 @@
   "diagonal_expansion": null,
   "traceBackDiagonals": 100,
   "filter_reads": 7,
-  "rna": false
+  "rna": false,
+  "mod_only": false
 }
