@@ -25,7 +25,7 @@ message(HDF5_INCLUDE_DIRS: "${HDF5_INCLUDE_DIRS}")
 message(HDF5_LIBRARIES: "${HDF5_LIBRARIES}")
 
 find_library(HTSLIB_LIBRARY NAMES libhts.a
-        HINTS ${CMAKE_SOURCE_DIR}/htsl
+        HINTS ${CMAKE_SOURCE_DIR}/htslib
         ${CMAKE_INSTALL_PREFIX}/include)
 
 find_path(HTSLIB_INCLUDE_DIR htslib/hts.h

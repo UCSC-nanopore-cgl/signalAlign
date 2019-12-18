@@ -747,7 +747,7 @@ int main(int argc, char *argv[]) {
       sMc->shift = npRead->complementParams.shift;
       sMc->var = npRead->complementParams.var;
       if (!ESTIMATE_PARAMS && sMtype == threeState) {
-        emissions_signal_scaleNoise(sMc, npRead->templateParams);
+        emissions_signal_scaleNoise(sMc, npRead->complementParams);
       }
     }
 

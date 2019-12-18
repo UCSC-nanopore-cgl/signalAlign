@@ -658,6 +658,7 @@ class TrainSignalAlign(object):
         # check config file
         self._check_config()
         self.og_model_weight = 100
+        self.mod_only = self.args.mod_only
 
     def _create_samples(self):
         """Create SignalAlignSample for each sample"""
@@ -672,7 +673,7 @@ class TrainSignalAlign(object):
         self.working_path = self.working_folder.open_folder(os.path.join(self.args.output_dir,
                                                                          "tempFiles_trainModels_" + str(append)))
 
-    def train_normal_emmissions(self, iteration=""):
+    def train_normal_emmissions(self, iteration="", mod_only=False):
         """Generate a gaussian model from signalalign output"""
         if self.args.built_alignments:
             assert os.path.isfile(self.args.built_alignments), \
@@ -703,6 +704,9 @@ class TrainSignalAlign(object):
         complement_hmm_model_path = None
         template_model = HmmModel(self.template_hmm_model_path, rna=self.rna)
         for kmer in set(t_data["kmer"]):
+            if mod_only:
+                if len(set(kmer) - {"A", "T", "G", "C"}) == 0:
+                    continue
             kmer_data = t_data[t_data["kmer"] == kmer]["level_mean"]
             n_data = len(kmer_data)
             med = np.median(kmer_data) * n_data
@@ -721,6 +725,9 @@ class TrainSignalAlign(object):
             complement_model = HmmModel(self.complement_hmm_model_path, rna=self.rna)
             complement_hmm_model_path = os.path.join(self.working_path, "complement_hmm" + iteration + ".model")
             for kmer in set(c_data["kmer"]):
+                if mod_only:
+                    if len(set(kmer) - {"A", "T", "G", "C"}) == 0:
+                        continue
                 kmer_data = c_data[c_data["kmer"] == kmer]["level_mean"]
                 n_data = len(kmer_data)
                 med = np.median(kmer_data) * n_data
@@ -912,7 +919,7 @@ class TrainSignalAlign(object):
                     self.train_hdp(iteration=str(i))
                 else:
                     print("[trainModels] Training HMM emission distributions. iteration: {}".format(i))
-                    self.train_normal_emmissions(iteration=str(i))
+                    self.train_normal_emmissions(iteration=str(i), mod_only=self.mod_only)
                 print(self.template_hdp_model_path)
                 print(self.template_hmm_model_path)
                 print(self.complement_hmm_model_path)
@@ -923,7 +930,7 @@ class TrainSignalAlign(object):
                 print("[trainModels] Training HMM emission distributions.")
                 if not self.args.built_alignments:
                     self.run_signal_align(check_samples=True)
-                self.train_normal_emmissions(iteration="")
+                self.train_normal_emmissions(iteration="", mod_only=self.mod_only)
             if self.args.training.transitions:
                 print("[trainModels] Training HMM transition distributions.")
                 self.train_transitions(iteration="")

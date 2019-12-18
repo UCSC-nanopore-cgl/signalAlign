@@ -71,7 +71,7 @@ class MultipleModelHandler(object):
         legend_text1 = []
         handles2 = []
         legend_text2 = []
-        plt.figure(figsize=(20, 9))
+        plt.figure(figsize=(20, 20))
         panel1 = plt.axes([0.1, 0.5, .8, .45])
         panel1.set_xlabel('pA')
         panel1.set_ylabel('Density')
