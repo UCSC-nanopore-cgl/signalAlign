@@ -118,10 +118,14 @@ def make_kmer_directories(dir_path, alphabet, kmer_length, complement=False):
 
     for kmer in all_string_permutations(alphabet, length=kmer_length):
         template_path = os.path.join(dir_path, kmer)
+        if os.path.exists(template_path):
+            os.removedirs(template_path)
         os.mkdir(template_path)
         template_dirs.append(template_path)
         if complement:
             complement_path = os.path.join(dir_path, kmer+"_c")
+            if os.path.exists(complement_path):
+                os.removedirs(complement_path)
             os.mkdir(complement_path)
             complment_dirs.append(complement_path)
     template_dirs.extend(complment_dirs)
@@ -203,11 +207,12 @@ def concatenate_files(file_paths, output_file_path, remove_files=False):
     """
     with open(output_file_path, 'ab+') as out_file:
         for file_path in file_paths:
-            with open(file_path, 'rb') as in_file:
-                # 100MB per writing chunk to avoid reading big file into memory.
-                shutil.copyfileobj(in_file, out_file, 1024*1024*100)
-            if remove_files:
-                os.remove(file_path)
+            if os.path.exists(file_path):
+                with open(file_path, 'rb') as in_file:
+                    # 100MB per writing chunk to avoid reading big file into memory.
+                    shutil.copyfileobj(in_file, out_file, 1024*1024*100)
+                if remove_files:
+                    os.remove(file_path)
 
 
 def get_top_kmers_from_directory(kmer_dir, output_dir, n, random=False):

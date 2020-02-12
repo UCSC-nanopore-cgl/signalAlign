@@ -20,6 +20,7 @@ if platform.system() == "Darwin":
     mpl.use("macosx")
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
+from matplotlib.animation import FuncAnimation
 
 from argparse import ArgumentParser
 from itertools import zip_longest
@@ -226,7 +227,7 @@ class MultipleModelHandler(object):
 
         # option to save figure or just show it
         if self.savefig_dir:
-            base_name = "-".join(titles)
+            base_name = "-".join(titles)[:200]
             name = "{}.png".format(base_name)
             out_path = os.path.join(self.savefig_dir, name)
             plt.savefig(out_path)

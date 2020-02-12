@@ -286,7 +286,7 @@ int main(int argc, char *argv[]) {
     } else {
         if (hdpType != singleLevelPrior2 && hdpType != multisetPrior2 &&
             hdpType != singleLevelFixedCanonical && hdpType != singleLevelFixedM6A &&
-            hdpType != singleLevelFixedrRNA) {
+            hdpType != singleLevelFixedrRNA && hdpType != singleLevelAll16SrRNA) {
             st_errAbort("Invalid HDP type for 1D %i", hdpType);
         }
         NanoporeHdpType type = (NanoporeHdpType) hdpType;

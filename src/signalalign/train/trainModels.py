@@ -4,33 +4,31 @@
 
 import sys
 import os
-import glob
 import pandas as pd
 import numpy as np
 
-from timeit import default_timer as timer
 from argparse import ArgumentParser
 from shutil import copyfile
 from subprocess import check_call
 import shutil
 from scipy.stats import median_absolute_deviation
-import subprocess
-import tempfile
-from py3helpers.utils import create_dot_dict, merge_lists, all_string_permutations, save_json, load_json, \
+from py3helpers.utils import create_dot_dict, merge_lists, all_string_permutations, load_json, \
     count_lines_in_file, merge_dicts, list_dir, captured_output
 from py3helpers.multiprocess import *
-
+from embed import bindings
 from signalalign.signalAlignment import multithread_signal_alignment_samples, create_signalAlignment_args, \
     SignalAlignSample
 from signalalign.hiddenMarkovModel import HmmModel, parse_assignment_file, parse_alignment_file, read_in_alignment_file
 from signalalign.utils.fileHandlers import FolderHandler
 from signalalign.utils.parsers import read_fasta
 from signalalign.utils.sequenceTools import get_motif_kmers, get_sequence_kmers, CustomAmbiguityPositions
-from signalalign.build_alignments import generate_top_n_kmers_from_sa_output
+from signalalign.build_alignments import generate_top_n_kmers_from_sa_output, concatenate_files
+
 
 def make_master_assignment_table(list_of_assignment_paths, min_probability=0.0, full=False):
     """Create a master assignment table from a list of assignment paths
 
+    :param full: if assignment table is "full"
     :param list_of_assignment_paths: list of all paths to assignment.tsv files to concat
     :param min_probability: minimum probabilty to keep
     :return: pandas DataFrame of all assignments
@@ -45,6 +43,8 @@ def multiprocess_make_master_assignment_table(list_of_assignment_paths, min_prob
                                               worker_count=1):
     """Create a master assignment table from a list of assignment paths
 
+    :param worker_count: number of workers
+    :param full: if assignment table is "full"
     :param list_of_assignment_paths: list of all paths to assignment.tsv files to concat
     :param min_probability: minimum probabilty to keep
     :return: pandas DataFrame of all assignments
@@ -286,7 +286,7 @@ def filter_top_n_kmers(kmer_data, max_n=10, verbose=True):
     return pd.concat(output, ignore_index=True)
 
 
-def generate_buildAlignments(assignments_pd, kmer_list, max_assignments=10, strands=('t', 'c'), verbose=False):
+def generate_build_alignments(assignments_pd, kmer_list, max_assignments=10, strands=('t', 'c'), verbose=False):
     """Convert assignments to alignment line format for HDP training.
 
     Filter assignments on a minimum probability, read strand, and a max number of kmer assignments
@@ -296,7 +296,6 @@ def generate_buildAlignments(assignments_pd, kmer_list, max_assignments=10, stra
     :param strands: 't' or 'c' representing template or complement strand of read
     :param kmer_list: list of kmers to write to alignment file
     :param max_assignments: max number of assignments to process for each kmer
-    :param min_probability: the minimum probability to use for assigning kmers
     """
     # loop through for each strand in the assignments
     assert len(strands) > 0, \
@@ -304,25 +303,25 @@ def generate_buildAlignments(assignments_pd, kmer_list, max_assignments=10, stra
     final_output = []
     for strand in strands:
         by_strand = assignments_pd.loc[assignments_pd['strand'] == strand]
-        by_strand.sort_values(by='kmer', inplace=True)
+        by_strand = by_strand.sort_values(by='kmer')
         by_strand.set_index(keys=['kmer'], drop=False, inplace=True)
         for k in kmer_list:
             final_output.append(kmer_assignments_wrapper(by_strand, k, max_assignments, verbose))
     return pd.concat(final_output, ignore_index=True)
 
 
-def multiprocess_generate_buildAlignments(assignments_pd, kmer_list, max_assignments=10, strands=('t', 'c'),
-                                          verbose=False, worker_count=1):
+def multiprocess_generate_build_alignments(assignments_pd, kmer_list, max_assignments=10, strands=('t', 'c'),
+                                           verbose=False, worker_count=1):
     """Convert assignments to alignment line format for HDP training.
 
     Filter assignments on a minimum probability, read strand, and a max number of kmer assignments
 
+    :param worker_count: number of workers
     :param assignments_pd: giant assignments pandas data table
     :param verbose: option to print update statements
     :param strands: 't' or 'c' representing template or complement strand of read
     :param kmer_list: list of kmers to write to alignment file
     :param max_assignments: max number of assignments to process for each kmer
-    :param min_probability: the minimum probability to use for assigning kmers
     """
     # loop through for each strand in the assignments
     assert len(strands) > 0, \
@@ -334,7 +333,7 @@ def multiprocess_generate_buildAlignments(assignments_pd, kmer_list, max_assignm
         extra_args = {"by_strand": by_strand,
                       "max_assignments": max_assignments,
                       "verbose": verbose}
-        service = BasicService(kmer_assignments_wrapper, service_name="multiprocess_generate_buildAlignments")
+        service = BasicService(kmer_assignments_wrapper, service_name="multiprocess_generate_build_alignments")
         total, failure, messages, output = run_service(service.run, kmer_list,
                                                        extra_args, ["k"], worker_count)
 
@@ -353,7 +352,7 @@ def kmer_assignments_wrapper(by_strand, k, max_assignments=10, verbose=False):
     return kmer_assignments
 
 
-def generate_buildAlignments2(assignments_pd, kmer_list, max_assignments=10, strands=('t', 'c'), verbose=False):
+def generate_build_alignments2(assignments_pd, kmer_list, max_assignments=10, strands=('t', 'c'), verbose=False):
     """Convert assignments to alignment line format for HDP training.
 
     Filter assignments on a minimum probability, read strand, and a max number of kmer assignments
@@ -446,28 +445,43 @@ class CreateHdpTrainingData(object):
                     print("[CreateHdpTrainingData] WARNING: Using sample analysis files when "
                           "assignments_dir is also set: {}".format(sample.name))
                 assignment_files = [x for x in sample.analysis_files if x.endswith("assignments.tsv")]
-            # TODO need to get this to infer type before reading in
             # infer kmer length and get kmers
             sample_assignment_table = get_assignment_table(assignment_files[0], 0, full)
             self.set_kmer_len(len(sample_assignment_table.iloc[0]['kmer']))
             # kmers = self.get_sample_kmers(sample)
             base_dir = os.path.dirname(self.out_file_path)
             temp_dir = os.path.join(base_dir, "top_n_kmers")
+            if os.path.exists(temp_dir):
+                shutil.rmtree(temp_dir)
             os.mkdir(temp_dir)
-            with captured_output() as (_, _):
-                generate_top_n_kmers_from_sa_output(assignment_files, temp_dir, self.out_file_path,
-                                                    sample.number_of_kmer_assignments, alphabet=self.alphabet,
-                                                    kmer_len=self.k, min_prob=sample.probability_threshold,
-                                                    worker_count=self.jobs, random=False,
-                                                    complement=True,
-                                                    remove=False, alignment=full)
-            shutil.rmtree(temp_dir)
-            # final_output.append(
-            #     multiprocess_make_kmer_assignment_tables(assignment_files, kmers, self.strands,
-            #                                              min_probability=sample.probability_threshold,
-            #                                              verbose=verbose, full=full,
-            #                                              max_assignments=sample.number_of_kmer_assignments,
-            #                                              worker_count=self.jobs))
+            if self.complement:
+                with captured_output() as (_, _):
+                    generate_top_n_kmers_from_sa_output(assignment_files, temp_dir, self.out_file_path,
+                                                        sample.number_of_kmer_assignments, alphabet=self.alphabet,
+                                                        kmer_len=self.k, min_prob=sample.probability_threshold,
+                                                        worker_count=self.jobs, random=False,
+                                                        complement=True,
+                                                        remove=False, alignment=full)
+                shutil.rmtree(temp_dir)
+            else:
+                temp_file = os.path.join(temp_dir, "tmp.tsv")
+                bindings.generate_master_kmer_table(assignment_files, temp_file,
+                                                    sample.number_of_kmer_assignments,
+                                                    self.alphabet,
+                                                    min_prob=sample.probability_threshold,
+                                                    n_threads=self.jobs,
+                                                    verbose=verbose)
+                # os.rename(log_file, os.path.join(base_dir, sample.name, "log_file.tsv"))
+                temp_file2 = os.path.join(temp_dir, "tmp2.tsv")
+                concatenate_files([temp_file, self.out_file_path], temp_file2, remove_files=True)
+                os.replace(temp_file2, self.out_file_path)
+                shutil.rmtree(temp_dir)
+        # final_output.append(
+        #     multiprocess_make_kmer_assignment_tables(assignment_files, kmers, self.strands,
+        #                                              min_probability=sample.probability_threshold,
+        #                                              verbose=verbose, full=full,
+        #                                              max_assignments=sample.number_of_kmer_assignments,
+        #                                              worker_count=self.jobs))
 
         # master_assignment_table = pd.concat(final_output, ignore_index=True)
         # self.n_assignments = len(master_assignment_table)
@@ -509,7 +523,7 @@ class CreateHdpTrainingData(object):
     #         # get kmers associated with each sample
     #         kmers = self.get_sample_kmers(sample)
     #         # write correctly formated output
-    #         final_output.append(generate_buildAlignments(sample_assignment_table, kmers,
+    #         final_output.append(generate_build_alignments(sample_assignment_table, kmers,
     #                                                      max_assignments=sample.number_of_kmer_assignments,
     #                                                      strands=self.strands, verbose=verbose))
     #     master_assignment_table = pd.concat(final_output, ignore_index=True)
@@ -528,6 +542,7 @@ class CreateHdpTrainingData(object):
         """Get all kmers from a sample, either from the reference sequence, all possible kmers from an alphabet or
             all kmers that cover a modified nucelotide
 
+        :param kmer_len: set kmer length
         :param sample: AbstractSamples object
         :return: set of desired kmers
         """
@@ -564,7 +579,8 @@ def get_hdp_type(requested_type):
         "singleLevelPriorEcoli": 13,
         "singleLevelFixedCanonical": 14,
         "singleLevelFixedM6A": 15,
-        "singleLevelFixedrRNA": 16
+        "singleLevelFixedrRNA": 16,
+        "singleLevelAll16SrRNA": 17
     }
     assert (requested_type in list(hdp_types.keys())), "Requested HDP type is invalid, got {}".format(requested_type)
     return hdp_types[requested_type]
@@ -593,7 +609,8 @@ class TrainSignalAlign(object):
         ("multisetPrior2", 11),
         ("singleLevelFixedCanonical", 14),
         ("singleLevelFixedM6A", 15),
-        ("singleLevelFixedrRNA", 16)
+        ("singleLevelFixedrRNA", 16),
+        ("singleLevelAll16SrRNA", 17)
     ]
 
     HDP_TYPES_ACEGT = [
@@ -614,6 +631,9 @@ class TrainSignalAlign(object):
     ]
     HDP_TYPES_ACGTbp = [
         ("singleLevelFixedrRNA", 16),
+    ]
+    HDP_TYPES_ACEGTbdehip = [
+        ("singleLevelAll16SrRNA", 17),
     ]
 
     def __init__(self, args):
@@ -714,7 +734,8 @@ class TrainSignalAlign(object):
             normal_mean, normal_sd = template_model.get_event_mean_gaussian_parameters(kmer)
             normal_mean *= self.og_model_weight
             normal_sd *= self.og_model_weight
-            template_model.set_kmer_event_mean_params(kmer,  (med+normal_mean)/(n_data+self.og_model_weight), (mad+normal_sd)/(n_data+self.og_model_weight))
+            template_model.set_kmer_event_mean_params(kmer, (med + normal_mean) / (n_data + self.og_model_weight),
+                                                      (mad + normal_sd) / (n_data + self.og_model_weight))
 
         template_model.normalized = True
         template_model.write(template_hmm_model_path)
@@ -735,7 +756,8 @@ class TrainSignalAlign(object):
                 normal_mean, normal_sd = complement_model.get_event_mean_gaussian_parameters(kmer)
                 normal_mean *= self.og_model_weight
                 normal_sd *= self.og_model_weight
-                complement_model.set_kmer_event_mean_params(kmer,  (med+normal_mean)/(n_data+self.og_model_weight), (mad+normal_sd)/(n_data+self.og_model_weight))
+                complement_model.set_kmer_event_mean_params(kmer, (med + normal_mean) / (n_data + self.og_model_weight),
+                                                            (mad + normal_sd) / (n_data + self.og_model_weight))
             complement_model.normalized = True
             complement_model.write(complement_hmm_model_path)
 
@@ -944,9 +966,9 @@ class TrainSignalAlign(object):
                                  "training.transitions: {}, training.hdp_emissions: {}, "
                                  "training.expectation_maximization: "
                                  "{}, training.normal_emissions: {}".format(self.args.training.transitions,
-                                              self.args.training.hdp_emissions,
-                                              self.args.training.expectation_maximization,
-                                              self.args.training.normal_emissions))
+                                                                            self.args.training.hdp_emissions,
+                                                                            self.args.training.expectation_maximization,
+                                                                            self.args.training.normal_emissions))
 
         stop = timer()
         print("[trainModels] Complete")
@@ -960,7 +982,7 @@ class TrainSignalAlign(object):
     def load_hmm_models(self):
         """Load in the correct models depending on what is going to be trained. """
         # load template model
-        assert self.template_hmm_model_path, "Missing template model %s" % (self.template_hmm_model_path)
+        assert self.template_hmm_model_path, "Missing template model %s" % self.template_hmm_model_path
         self.template_hmm_model_path = os.path.abspath(self.template_hmm_model_path)
         self.template_model = HmmModel(self.template_hmm_model_path, rna=self.rna)
         new_template_hmm = self.working_folder.add_file_path("template_trained.hmm")
@@ -1048,6 +1070,10 @@ class TrainSignalAlign(object):
             assert (self.args.hdp_args.hdp_type, self.int_hdp_type) in set(self.HDP_TYPES_ACFGT), \
                 "HDP type is not compatible with alphabet=ACFGT." \
                 "Hdp_type: {}, ACFGT HDP types:  {}".format(self.args.hdp_type, self.HDP_TYPES_ACFGT)
+        elif self.alphabet == "ACEGTbdehip":
+            assert (self.args.hdp_args.hdp_type, self.int_hdp_type) in set(self.HDP_TYPES_ACEGTbdehip), \
+                "HDP type is not compatible with alphabet=ACEGTbdehip." \
+                "Hdp_type: {}, ACEGTbdehip HDP types:  {}".format(self.args.hdp_type, self.HDP_TYPES_ACEGTbdehip)
         else:
             raise AssertionError("Cannot create a HDP with this alphabet: {}".format(self.alphabet))
 

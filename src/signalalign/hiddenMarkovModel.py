@@ -276,8 +276,6 @@ class HmmModel(object):
             self.kmer_length = int(line[3])
             self.symbol_set_size = self.alphabet_size ** self.kmer_length
             assert self.symbol_set_size > 0, "signalHmm.load_model - Got 0 for symbol_set_size"
-            assert self.symbol_set_size <= 6 ** 6, "signalHmm.load_model - Got more than 6^6 for symbol_set_size got {}" \
-                                                   "".format(self.symbol_set_size)
 
             line = list(map(float, fH.readline().split()))
             assert len(line) == len(self.transitions) + 1, "signalHmm.load_model incorrect transitions line"
