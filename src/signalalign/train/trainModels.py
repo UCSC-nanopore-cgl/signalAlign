@@ -927,7 +927,6 @@ class TrainSignalAlign(object):
 
         if self.args.training.expectation_maximization:
             for i in range(1, self.args.training.em_iterations + 1):
-                print("[trainModels] Training HMM transition distributions. iteration: {}".format(i))
                 # first train the model transitions
                 if self.args.training.transitions:
                     print("[trainModels] Training HMM transition distributions. "
