@@ -387,7 +387,7 @@ class CreateHdpTrainingData(object):
     """Process the assignment files created from SignalAlign for the HDP distribution estimation"""
 
     def __init__(self, samples, out_file_path, template=True, complement=False, verbose=True, alphabet="ATGC",
-                 jobs=1):
+                 jobs=1, log_number=""):
         """
         Control how each kmer/event assignment is processed given a set of samples and the parameters associated with
         each sample
@@ -399,6 +399,7 @@ class CreateHdpTrainingData(object):
         :param complement: generate kmers for complement read strand: default: True
         :param verbose: option to print update statements
         :param alphabet: alphabet of sequencing experiment
+        :param log_number: log number
         """
         self.jobs = jobs
         self.strands = []
@@ -415,6 +416,7 @@ class CreateHdpTrainingData(object):
         self.alphabet = alphabet
         self.samples = samples
         self.out_file_path = out_file_path
+        self.log_number = log_number
         self.template = template
         self.complement = complement
         self.verbose = verbose
@@ -465,7 +467,13 @@ class CreateHdpTrainingData(object):
                 shutil.rmtree(temp_dir)
             else:
                 temp_file = os.path.join(temp_dir, "tmp.tsv")
-                bindings.generate_master_kmer_table(assignment_files, temp_file,
+
+                log_file = os.path.join(os.path.dirname(self.out_file_path),
+                                        sample.name+"_log"+str(self.log_number)+".tsv")
+
+                bindings.generate_master_kmer_table(assignment_files,
+                                                    temp_file,
+                                                    log_file,
                                                     sample.number_of_kmer_assignments,
                                                     self.alphabet,
                                                     min_prob=sample.probability_threshold,
@@ -712,7 +720,8 @@ class TrainSignalAlign(object):
                                              complement=complement,
                                              verbose=self.debug,
                                              alphabet=self.alphabet,
-                                             jobs=self.job_count)
+                                             jobs=self.job_count,
+                                             log_number=iteration)
             # write an hdp training file to path
             built_alignments = hdp_data.write_hdp_training_file(verbose=True)
 
@@ -787,7 +796,8 @@ class TrainSignalAlign(object):
                                              complement=complement,
                                              verbose=self.debug,
                                              alphabet=self.alphabet,
-                                             jobs=self.job_count)
+                                             jobs=self.job_count,
+                                             log_number=iteration)
             # write an hdp training file to path
             build_alignment_path = hdp_data.write_hdp_training_file(verbose=True)
             num_alignments = hdp_data.n_assignments

@@ -10,6 +10,7 @@
 
 
 import unittest
+import tempfile
 from signalalign.signalAlignment import create_sa_sample_args
 from signalalign.train.trainModels import *
 from signalalign.utils.fileHandlers import FolderHandler
@@ -111,13 +112,13 @@ class TrainSignalAlignTest(unittest.TestCase):
                 kmer_data = data2.loc[data2['kmer'] == x]
                 self.assertSequenceEqual(list(kmer_data["prob"]), sorted(kmer_data["prob"], reverse=True))
 
-    def test_generate_buildAlignments3(self):
+    def test_generate_build_alignments3(self):
         with captured_output() as (_, _):
             kmers = get_kmers(6, alphabet="ATGC")
             data_files = [self.assignment_file]
 
             sample_assignment_table = get_assignment_table(self.assignment_file, 0.0, False)
-            data1 = generate_buildAlignments(sample_assignment_table, kmers, 10, ["t"], False)
+            data1 = generate_build_alignments(sample_assignment_table, kmers, 10, ["t"], False)
 
             data2, _ = time_it(multiprocess_make_kmer_assignment_tables,
                                data_files, kmers,
@@ -146,32 +147,32 @@ class TrainSignalAlignTest(unittest.TestCase):
             self.assertRaises(AssertionError, make_alignment_line, strand='t', kmer="ATGC", prob=1, event=23.2)
             self.assertRaises(AssertionError, make_alignment_line, strand='t', kmer="ATGC", prob=0.1, event=23)
 
-    def test_generate_buildAlignments(self):
+    def test_generate_build_alignments(self):
         with captured_output() as (_, _):
             d = dict(kmer=["ATGC", "AAAA", "ATGC", "AAAA"], strand=['t', 'c', 't', 'c'],
                      level_mean=[99.9, 89.9, 99.9, 89.9], prob=[0.01, 0.99, 0.01, 0.99])
             assignments = pd.DataFrame(d)
 
-            line_generator = generate_buildAlignments(assignments, kmer_list=["ATGC", "AAAA"], max_assignments=2,
+            line_generator = generate_build_alignments(assignments, kmer_list=["ATGC", "AAAA"], max_assignments=2,
                                                       strands=['t', 'c'], verbose=False)
             self.assertEqual(4, len(line_generator))
-            line_generator = generate_buildAlignments(assignments, kmer_list=["ATGC"], max_assignments=2,
+            line_generator = generate_build_alignments(assignments, kmer_list=["ATGC"], max_assignments=2,
                                                       strands=['t', 'c'], verbose=False)
             self.assertEqual(2, len(line_generator))
 
-            line_generator = generate_buildAlignments(assignments, kmer_list=["ATGC", "AAAA"], max_assignments=1,
+            line_generator = generate_build_alignments(assignments, kmer_list=["ATGC", "AAAA"], max_assignments=1,
                                                       strands=['t', 'c'], verbose=False)
             self.assertEqual(2, len(line_generator))
-            line_generator = generate_buildAlignments(assignments, kmer_list=["ATGC", "AAAA"], max_assignments=2,
+            line_generator = generate_build_alignments(assignments, kmer_list=["ATGC", "AAAA"], max_assignments=2,
                                                       strands=['t'], verbose=False)
             self.assertEqual(2, len(line_generator))
-            line_generator = generate_buildAlignments(assignments, kmer_list=["ATGC", "AAAA"], max_assignments=2,
+            line_generator = generate_build_alignments(assignments, kmer_list=["ATGC", "AAAA"], max_assignments=2,
                                                       strands=['c'], verbose=False)
             self.assertEqual(2, len(line_generator))
-            line_generator = generate_buildAlignments(assignments, kmer_list=["ATGC", "AAAA"], max_assignments=2,
+            line_generator = generate_build_alignments(assignments, kmer_list=["ATGC", "AAAA"], max_assignments=2,
                                                       strands=['t', 'c'], verbose=False)
             self.assertEqual(4, len(line_generator))
-            self.assertRaises(AssertionError, generate_buildAlignments, assignments, kmer_list=["ATGC", "AAAA"],
+            self.assertRaises(AssertionError, generate_build_alignments, assignments, kmer_list=["ATGC", "AAAA"],
                               max_assignments=2,
                               strands=[], verbose=False)
 
@@ -480,7 +481,7 @@ class TrainSignalAlignTest(unittest.TestCase):
                 # Test EM training 3 rounds
                 TrainSignalAlign(fake_args).expectation_maximization_training()
 
-    def test_generate_buildAlignments_given_motifs(self):
+    def test_generate_build_alignments_given_motifs(self):
         with captured_output() as (_, _):
             assignments_dir = os.path.join(self.HOME, "tests/test_alignments/ecoli1D_test_alignments_sm3")
             positions_file = os.path.join(self.HOME, "tests/test_position_files/CCWGG_ecoli_k12_mg1655.positions")

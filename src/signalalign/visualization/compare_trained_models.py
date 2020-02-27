@@ -20,7 +20,7 @@ if platform.system() == "Darwin":
     mpl.use("macosx")
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
-from matplotlib.animation import FuncAnimation
+# from matplotlib.animation import FuncAnimation
 
 from argparse import ArgumentParser
 from itertools import zip_longest
