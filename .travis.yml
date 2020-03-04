@@ -4,77 +4,123 @@ notifications:
   slack:
     secure: Ni283faKj3DjyVBykmulN92K/K2kmKJTHp2q57bq0St1dWX5HECNRZs1bCoyS5oFwYnD5oQVHOnvEDJkWiJNz4vIDSbAJzMZ16Vyi1OvLLW2rTFZ4d0Js2lMJYOGPuxSzMZznA6spOjmS52xvMGtZC4DZxrjY24lOHTY8sCKs48S9nw1800AtJjY5zCIlAxx63N7LVtZzH2QuSsCXgO3oV0d2CulNpsYLjeIxJfNCZRSU0K2RrThvHvnZpXQypC++hEAT7KC0tKBxGAHpQoumI3X3lmiFeMlSSRb+YJ2dTWsZbR/PcS1poM8YFi7oczvwhAuqXuejEsksxUdT3gyoiq40alKZ+F23UKXOZ91W5nCQkRUb7OK5OWaJfqZGZttuNnj0KlmhAVcuHH8vnSEWrFv6zPhtzqTZZvpJg5OkWYEjOcN6cVVOnPtqCGTbt5IkXZFZJryH9d661S8qjxh7tQPfxstwAq7MjOITPHVcFvNfjv3Rz96QVdMm6oN8CaZjNqRHDLHPSIUD3ydVRGXPaWafoZjkYb4AALctdc8Wk+Jfarz8nMV/7d9OYhsIOA+kqbR7cGoHBXLspPeAaMGsjmvCvrUf5kYH322lWTc2y3+f8h4IXkHdXcsU/qz3fYbpf7BS9FySBRNVV2b9JLNnNbLhURuRCJQk7wNmOtbYn4=
   email: false
-os:
-- linux
-dist: trusty
-git:
-  submodules: true
+matrix:
+  include:
+    - os: linux
+      compiler: gcc
+      python: 3.6
+      addons:
+        apt:
+          sources:
+            - ubuntu-toolchain-r-test
+          packages:
+            - cmake-data
+            - gcc-6
+            - g++-6
+            - cmake
+      env:
+        - MATRIX_EVAL="CC=gcc-6 && CXX=g++-6"
 before_install:
-- git submodule update --init
-- |-
-  if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew update; brew install gcc@5 automake make open-mpi; gcc --version; alias make='gmake'; ln -s /usr/local/bin/gcc-5 /usr/local/bin/gcc; alias gcc='gcc-5'; alias g++='g++-5';
-  gcc --version;
-  else
-  sudo apt-get update -qq; sudo apt-get install autotools-dev autoconf cmake wget git make g++-5 gcc-5 zlib1g-dev libbz2-dev liblzma-dev; sudo apt-get update;
-  fi
+  - sudo apt-get update -qq
+  - sudo apt-get install build-essential autotools-dev autoconf curl libbz2-dev zlib1g-dev
+    liblzma-dev libeigen3-dev wget git -y
+  - sudo apt-get update
+
 install:
-- pwd
-- echo $HOME
-- ls
-- cd $HOME/build/UCSC-nanopore-cgl/
-- wget https://github.com/samtools/samtools/releases/download/1.9/samtools-1.9.tar.bz2
-- tar -vxjf samtools-1.9.tar.bz2
-- ls
-- cd samtools-1.9
-- "./configure --prefix=$HOME/build/UCSC-nanopore-cgl/"
-- make
-- make install
-- echo "PATH=$HOME/build/UCSC-nanopore-cgl/bin/:$PATH" >> ~/.bashrc
-- source ~/.bashrc
-- cd ..
-- which samtools
-- git clone https://github.com/lh3/bwa.git
-- cd bwa
-- make
-- echo "PATH=$HOME/build/UCSC-nanopore-cgl/bwa/:$PATH" >> ~/.bashrc
-- cd ..
-- source ~/.bashrc
-- which bwa
-- wget https://www.python.org/ftp/python/3.6.8/Python-3.6.8.tgz
-- tar -xzf Python-3.6.8.tgz
-- find $HOME/build/UCSC-nanopore-cgl/  -type d | xargs chmod 0755
-- cd Python-3.6.8/
-- "./configure --prefix=$HOME/"
-- make
-- make install
-- echo "PATH=$HOME/build/UCSC-nanopore-cgl/Python-3.6.8/:$PATH" >> ~/.bashrc
-- source ~/.bashrc
-- which python
-- which python3
-- alias python="$HOME/build/UCSC-nanopore-cgl/Python-3.6.8/python"
-- which python3
-- cd ..
-- wget https://bootstrap.pypa.io/get-pip.py
-- python3 get-pip.py --user
-- echo "PATH=$HOME/.local/bin/:$PATH" >> ~/.bashrc
-- source ~/.bashrc
-- which pip3
-- which pip
-- alias gcc=gcc-5
-- alias g++=g++-5
-- alias python="$HOME/build/UCSC-nanopore-cgl/Python-3.6.8/python"
-- gcc --version
-- pip3 install numpy
-- pip3 install setuptools
-- pip3 install pysam
-- pip3 install Cython
-- cd $HOME/build/UCSC-nanopore-cgl/signalAlign
-- make
-- python3 setup.py install
-before_script:
-- export DISPLAY=:99.0
-- sh -e /etc/init.d/xvfb start
-- sleep 3
-script:
-- export PATH=$PATH:$PWD/bin
-- make test
+  - wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh;
+  - bash miniconda.sh -b -p $HOME/miniconda
+  - export PATH="$HOME/miniconda/bin:$PATH"
+  - conda config --set always_yes yes --set changeps1 no
+  - pwd
+  - python --version
+  - cmake --version
+  - gcc --version
+  - g++ --version
+  - cc --version
+  - c++ --version
+  - cd $HOME/build/adbailey4
+  - wget -O boost_1_69_0.tar.gz https://sourceforge.net/projects/boost/files/boost/1.69.0/boost_1_69_0.tar.gz/download
+  - tar -xzf boost_1_69_0.tar.gz >/dev/null
+  - cd boost_1_69_0/
+  - "./bootstrap.sh --show-libraries"
+  - "./bootstrap.sh --with-libraries=system,date_time,filesystem,iostreams,coroutine,context
+  >/dev/null"
+  - sudo ./b2 && sudo ./b2 install
+  - export CFLAGS="$CFLAGS -fPIC"
+  - export CXXFLAGS="$CXXFLAGS -fPIC"
+  - cd $HOME/build/adbailey4/
+  - wget https://github.com/samtools/htslib/releases/download/1.9/htslib-1.9.tar.bz2
+  - tar -vxjf htslib-1.9.tar.bz2
+  - ls
+  - cd htslib-1.9 && ./configure --prefix /usr/local --enable-plugins CPPFLAGS="-fPIC"
+    CFLAGS="-fPIC" && make && sudo make install
+  - cd $HOME/build/adbailey4
+  - wget https://support.hdfgroup.org/ftp/HDF5/releases/hdf5-1.10/hdf5-1.10.4/src/hdf5-1.10.4.tar.gz
+  - tar -xzf hdf5-1.10.4.tar.gz || exit 255
+  - cd hdf5-1.10.4 && ./configure --prefix /usr/local --enable-threadsafe --disable-hl
+    && make && sudo make install
+  - cd $HOME/build/adbailey4/
+  - git clone --recursive https://github.com/adbailey4/embed_fast5/commit/5c1f270e6a2d6cd4b262e3012b48b4f007d8c310
+  - pip install cython
+  - python setup.py install
+  - pwd
+  - echo $HOME
+  - ls
+  - cd $HOME/build/UCSC-nanopore-cgl/
+  - wget https://github.com/samtools/samtools/releases/download/1.9/samtools-1.9.tar.bz2
+  - tar -vxjf samtools-1.9.tar.bz2
+  - ls
+  - cd samtools-1.9
+  - "./configure --prefix=$HOME/build/UCSC-nanopore-cgl/"
+  - make
+  - make install
+  - echo "PATH=$HOME/build/UCSC-nanopore-cgl/bin/:$PATH" >> ~/.bashrc
+  - source ~/.bashrc
+  - cd ..
+  - which samtools
+  - git clone https://github.com/lh3/bwa.git
+  - cd bwa
+  - make
+  - echo "PATH=$HOME/build/UCSC-nanopore-cgl/bwa/:$PATH" >> ~/.bashrc
+  - cd ..
+  - source ~/.bashrc
+  - which bwa
+  - wget https://www.python.org/ftp/python/3.6.8/Python-3.6.8.tgz
+  - tar -xzf Python-3.6.8.tgz
+  - find $HOME/build/UCSC-nanopore-cgl/  -type d | xargs chmod 0755
+  - cd Python-3.6.8/
+  - "./configure --prefix=$HOME/"
+  - make
+  - make install
+  - echo "PATH=$HOME/build/UCSC-nanopore-cgl/Python-3.6.8/:$PATH" >> ~/.bashrc
+  - source ~/.bashrc
+  - which python
+  - which python3
+  - alias python="$HOME/build/UCSC-nanopore-cgl/Python-3.6.8/python"
+  - which python3
+  - cd ..
+  - wget https://bootstrap.pypa.io/get-pip.py
+  - python3 get-pip.py --user
+  - echo "PATH=$HOME/.local/bin/:$PATH" >> ~/.bashrc
+  - source ~/.bashrc
+  - which pip3
+  - which pip
+  - alias gcc=gcc-5
+  - alias g++=g++-5
+  - alias python="$HOME/build/UCSC-nanopore-cgl/Python-3.6.8/python"
+  - gcc --version
+  - pip3 install numpy
+  - pip3 install setuptools
+  - pip3 install pysam
+  - pip3 install Cython
+  - pip3 install py3helpers
+  - cd $HOME/build/UCSC-nanopore-cgl/signalAlign
+  - make
+  - python3 setup.py install
+  before_script:
+  - export DISPLAY=:99.0
+  - sh -e /etc/init.d/xvfb start
+  - sleep 3
+  script:
+  - export PATH=$PATH:$PWD/bin
+  - make test
