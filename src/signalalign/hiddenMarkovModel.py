@@ -15,6 +15,7 @@ import os
 import numpy as np
 import pandas as pd
 import tempfile
+import platform
 
 from itertools import product
 from scipy.stats import norm, invgauss, entropy
@@ -27,7 +28,8 @@ import matplotlib as mpl
 if os.environ.get('DISPLAY', '') == '':
     print('no display found. Using non-interactive Agg backend')
     mpl.use('Agg')
-mpl.use("TkAgg")
+if platform.system() == "Darwin":
+    mpl.use("macosx")
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 
@@ -835,11 +837,12 @@ class HmmModel(object):
 
         return hellinger_distances, kl_divergences, median_deltas
 
-    def write_new_model(self, out_path, alphabet, replacement_base):
+    def write_new_model(self, out_path, alphabet, replacement_base, noise=0.0):
         """Write a correctly formatted new model file with a new alphabet.
         :param out_path: path to output hmm
         :param alphabet: new alphabet
         :param replacement_base: base to replaced by the new character
+        :param noise: boolean option to add small amount of variation in the distributions
 
         note: will retain same kmer size and assumes only one new character
         """
@@ -877,12 +880,22 @@ class HmmModel(object):
             # line 2 Event Model
             for kmer in new_kmers:
                 generic_kmer = kmer.replace(new_base, replacement_base)
+
                 k = self.get_kmer_index(generic_kmer)
-                f.write("{level_mean}\t{level_sd}\t{noise_mean}\t{noise_sd}\t{noise_lambda}\t"
+                if kmer == generic_kmer:
+                    f.write("{level_mean}\t{level_sd}\t{noise_mean}\t{noise_sd}\t{noise_lambda}\t"
                         "".format(level_mean=self.event_model["means"][k], level_sd=self.event_model["SDs"][k],
                                   noise_mean=self.event_model["noise_means"][k],
                                   noise_sd=self.event_model["noise_SDs"][k],
                                   noise_lambda=self.event_model["noise_lambdas"][k]))
+                else:
+                    f.write("{level_mean}\t{level_sd}\t{noise_mean}\t{noise_sd}\t{noise_lambda}\t"
+                            "".format(level_mean=self.event_model["means"][k]+np.random.uniform(-noise, noise),
+                                      level_sd=self.event_model["SDs"][k],
+                                      noise_mean=self.event_model["noise_means"][k],
+                                      noise_sd=self.event_model["noise_SDs"][k],
+                                      noise_lambda=self.event_model["noise_lambdas"][k]))
+
             f.write("\n")
 
     def set_kmer_event_mean_params(self, kmer, event_mean, event_sd):
