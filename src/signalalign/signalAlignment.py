@@ -405,7 +405,7 @@ class SignalAlignment(object):
         if self.ambig_model:
             ambig_flag = "-a {}".format(self.ambig_model)
         else:
-            ambig_flag = "-a"
+            ambig_flag = ""
 
         # commands
         if self.get_expectations:
@@ -985,8 +985,12 @@ def multithread_signal_alignment_samples(samples, signal_align_arguments, worker
     for sample in samples:
         # correct signal align arguments
         print("[multithread_signal_alignment_samples] Running SignalAlign on sample: {}".format(sample.name))
-        with captured_output() as (_, _):
+        if not debug:
+            with captured_output() as (_, _):
+                sample.process_reads(trim=trim, randomize=randomize)
+        else:
             sample.process_reads(trim=trim, randomize=randomize)
+
         signal_align_arguments["alignment_file"] = sample.alignment_file
         signal_align_arguments["bwa_reference"] = sample.bwa_reference
         signal_align_arguments["backward_reference"] = sample.bw_fasta_path
@@ -998,9 +1002,14 @@ def multithread_signal_alignment_samples(samples, signal_align_arguments, worker
         assert sample.filter_read_generator is not None, \
             "Sample {} does not have a filter read generator. " \
             "Must pass in alignment_file and readdb and quality_threshold".format(sample.name)
-        with captured_output() as (_, _):
+        if not debug:
+            with captured_output() as (_, _):
+                output_files = multithread_signal_alignment(signal_align_arguments, [], worker_count, debug=debug,
+                                                        filter_reads_to_string_wrapper=sample.filter_read_generator)
+        else:
             output_files = multithread_signal_alignment(signal_align_arguments, [], worker_count, debug=debug,
                                                         filter_reads_to_string_wrapper=sample.filter_read_generator)
+
         print("[multithread_signal_alignment_samples] {} generated {} output_files".format(sample.name, len(output_files)))
         sample.analysis_files = output_files
 

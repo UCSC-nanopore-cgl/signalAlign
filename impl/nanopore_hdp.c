@@ -1143,13 +1143,22 @@ static void nanoporeHdp_checkTwoLevelPriorParameters(double baseGammaAlpha, doub
 }
 
 
-static NanoporeHDP *loadNanoporeHdpFromScratch(NanoporeHdpType nHdpType, const char *modelFile, int64_t kmerLength,
-                                               double baseGamma, double middleGamma, double leafGamma,
-                                               double baseGammaAlpha, double baseGammaBeta,
-                                               double middleGammaAlpha, double middleGammaBeta,
-                                               double leafGammaAlpha, double leafGammaBeta,
-                                               double samplingGridStart, double samplingGridEnd,
-                                               int64_t samplingGridLength) {
+static NanoporeHDP *loadNanoporeHdpFromScratch(NanoporeHdpType nHdpType,
+                                               const char *modelFile,
+                                               int64_t kmerLength,
+                                               double baseGamma,
+                                               double middleGamma,
+                                               double leafGamma,
+                                               double baseGammaAlpha,
+                                               double baseGammaBeta,
+                                               double middleGammaAlpha,
+                                               double middleGammaBeta,
+                                               double leafGammaAlpha,
+                                               double leafGammaBeta,
+                                               double samplingGridStart,
+                                               double samplingGridEnd,
+                                               int64_t samplingGridLength,
+                                               char *alphabet) {
 
     if (nHdpType == singleLevelFixedCanonical) {
         if ((baseGamma == NULL_HYPERPARAMETER) || (leafGamma == NULL_HYPERPARAMETER)) {
@@ -1175,7 +1184,6 @@ static NanoporeHDP *loadNanoporeHdpFromScratch(NanoporeHdpType nHdpType, const c
 
       return nHdp;
     }
-
     if (nHdpType == singleLevelFixedM6A) {
         if ((baseGamma == NULL_HYPERPARAMETER) || (leafGamma == NULL_HYPERPARAMETER)) {
             st_errAbort("loadNanoporeHdpFromScratch: You need to provide a base gamma and leaf gamma "
@@ -1200,7 +1208,7 @@ static NanoporeHDP *loadNanoporeHdpFromScratch(NanoporeHdpType nHdpType, const c
 
       return nHdp;
     }
-  if (nHdpType == singleLevelFixed) {
+    if (nHdpType == singleLevelFixed) {
         if ((baseGamma == NULL_HYPERPARAMETER) || (leafGamma == NULL_HYPERPARAMETER)) {
             st_errAbort("loadNanoporeHdpFromScratch: You need to provide a base gamma and leaf gamma "
                                 "for this NanoporeHdpType\n");
@@ -1357,33 +1365,63 @@ static NanoporeHDP *loadNanoporeHdpFromScratch(NanoporeHdpType nHdpType, const c
         return nHdp;
     }
     else {
-        fprintf(stderr, "loadNanoporeHdpFromScratch: - error making HDP from scratch\n");
-        exit(EXIT_FAILURE);
+        if ((baseGamma == NULL_HYPERPARAMETER) || (leafGamma == NULL_HYPERPARAMETER)) {
+          st_errAbort("loadNanoporeHdpFromScratch: You need to provide a base gamma and leaf gamma "
+                      "for unspecified NanoporeHdpType\n");
+        }
+
+        NanoporeHDP *nHdp = flat_hdp_model(alphabet, strlen(alphabet), kmerLength,
+                                           baseGamma, leafGamma,
+                                           samplingGridStart, samplingGridEnd, samplingGridLength, modelFile);
+        return nHdp;
     }
 }
 
-void nanoporeHdp_buildNanoporeHdpFromAlignment(NanoporeHdpType type, int64_t kmerLength,
-                                               const char *templateModelFile, const char* complementModelFile,
+void nanoporeHdp_buildNanoporeHdpFromAlignment(NanoporeHdpType type,
+                                               int64_t kmerLength,
+                                               const char *templateModelFile,
+                                               const char *complementModelFile,
                                                const char *alignments,
-                                               const char *templateHDP, const char *complementHDP,
-                                               int64_t nbSamples, int64_t burnIn, int64_t thinning, bool verbose,
-                                               double baseGamma, double middleGamma, double leafGamma,
-                                               double baseGammaAlpha, double baseGammaBeta,
-                                               double middleGammaAlpha, double middleGammaBeta,
-                                               double leafGammaAlpha, double leafGammaBeta,
-                                               double samplingGridStart, double samplingGridEnd,
-                                               int64_t samplingGridLength) {
+                                               const char *templateHDP,
+                                               const char *complementHDP,
+                                               int64_t nbSamples,
+                                               int64_t burnIn,
+                                               int64_t thinning,
+                                               bool verbose,
+                                               double baseGamma,
+                                               double middleGamma,
+                                               double leafGamma,
+                                               double baseGammaAlpha,
+                                               double baseGammaBeta,
+                                               double middleGammaAlpha,
+                                               double middleGammaBeta,
+                                               double leafGammaAlpha,
+                                               double leafGammaBeta,
+                                               double samplingGridStart,
+                                               double samplingGridEnd,
+                                               int64_t samplingGridLength,
+                                               char *alphabet) {
     fprintf(stderr, "Building Nanopore HDP\n");
 #pragma omp parallel sections
  {
     {
         fprintf(stderr, "Updating Template HDP from alignments...\n");
-        NanoporeHDP *nHdpT = loadNanoporeHdpFromScratch(type, templateModelFile, kmerLength,
-                                                        baseGamma, middleGamma, leafGamma,
-                                                        baseGammaAlpha, baseGammaBeta,
-                                                        middleGammaAlpha, middleGammaBeta,
-                                                        leafGammaAlpha, leafGammaBeta,
-                                                        samplingGridStart, samplingGridEnd, samplingGridLength);
+        NanoporeHDP *nHdpT = loadNanoporeHdpFromScratch(type,
+                                                        templateModelFile,
+                                                        kmerLength,
+                                                        baseGamma,
+                                                        middleGamma,
+                                                        leafGamma,
+                                                        baseGammaAlpha,
+                                                        baseGammaBeta,
+                                                        middleGammaAlpha,
+                                                        middleGammaBeta,
+                                                        leafGammaAlpha,
+                                                        leafGammaBeta,
+                                                        samplingGridStart,
+                                                        samplingGridEnd,
+                                                        samplingGridLength,
+                                                        alphabet);
         update_nhdp_from_alignment_with_filter(nHdpT, alignments, FALSE, "t");
 
         fprintf(stderr, "Running Gibbs for template doing %"PRId64"samples, %"PRId64"burn in, %"PRId64"thinning.\n",
@@ -1399,12 +1437,22 @@ void nanoporeHdp_buildNanoporeHdpFromAlignment(NanoporeHdpType type, int64_t kme
 #pragma omp section
     {
         fprintf(stderr, "Updating Complement HDP from alignments...\n");
-        NanoporeHDP *nHdpC = loadNanoporeHdpFromScratch(type, complementModelFile, kmerLength,
-                                                        baseGamma, middleGamma, leafGamma,
-                                                        baseGammaAlpha, baseGammaBeta,
-                                                        middleGammaAlpha, middleGammaBeta,
-                                                        leafGammaAlpha, leafGammaBeta,
-                                                        samplingGridStart, samplingGridEnd, samplingGridLength);
+        NanoporeHDP *nHdpC = loadNanoporeHdpFromScratch(type,
+                                                        complementModelFile,
+                                                        kmerLength,
+                                                        baseGamma,
+                                                        middleGamma,
+                                                        leafGamma,
+                                                        baseGammaAlpha,
+                                                        baseGammaBeta,
+                                                        middleGammaAlpha,
+                                                        middleGammaBeta,
+                                                        leafGammaAlpha,
+                                                        leafGammaBeta,
+                                                        samplingGridStart,
+                                                        samplingGridEnd,
+                                                        samplingGridLength,
+                                                        alphabet);
         update_nhdp_from_alignment_with_filter(nHdpC, alignments, FALSE, "c");
 
         fprintf(stderr, "Running Gibbs for complement doing %"PRId64"samples, %"PRId64"burn in, %"PRId64"thinning.\n",
@@ -1419,24 +1467,35 @@ void nanoporeHdp_buildNanoporeHdpFromAlignment(NanoporeHdpType type, int64_t kme
 }
 }
 
-void nanoporeHdp_buildOneDHdpFromAlignment(NanoporeHdpType type, int64_t kmerLength,
+void nanoporeHdp_buildOneDHdpFromAlignment(NanoporeHdpType type,
+                                           int64_t kmerLength,
                                            const char *templateModelFile,
                                            const char *alignments,
                                            const char *templateHDP,
-                                           int64_t nbSamples, int64_t burnIn, int64_t thinning, bool verbose,
-                                           double baseGamma, double middleGamma, double leafGamma,
-                                           double baseGammaAlpha, double baseGammaBeta,
-                                           double middleGammaAlpha, double middleGammaBeta,
-                                           double leafGammaAlpha, double leafGammaBeta,
-                                           double samplingGridStart, double samplingGridEnd,
-                                           int64_t samplingGridLength) {
+                                           int64_t nbSamples,
+                                           int64_t burnIn,
+                                           int64_t thinning,
+                                           bool verbose,
+                                           double baseGamma,
+                                           double middleGamma,
+                                           double leafGamma,
+                                           double baseGammaAlpha,
+                                           double baseGammaBeta,
+                                           double middleGammaAlpha,
+                                           double middleGammaBeta,
+                                           double leafGammaAlpha,
+                                           double leafGammaBeta,
+                                           double samplingGridStart,
+                                           double samplingGridEnd,
+                                           int64_t samplingGridLength,
+                                           char *alphabet) {
     fprintf(stderr, "Updating Template HDP from alignments...\n");
     NanoporeHDP *nHdpT = loadNanoporeHdpFromScratch(type, templateModelFile, kmerLength,
                                                     baseGamma, middleGamma, leafGamma,
                                                     baseGammaAlpha, baseGammaBeta,
                                                     middleGammaAlpha, middleGammaBeta,
                                                     leafGammaAlpha, leafGammaBeta,
-                                                    samplingGridStart, samplingGridEnd, samplingGridLength);
+                                                    samplingGridStart, samplingGridEnd, samplingGridLength, alphabet);
     update_nhdp_from_alignment_with_filter(nHdpT, alignments, FALSE, "t");
 
     fprintf(stderr, "Running Gibbs for template doing %"PRId64"samples, %"PRId64"burn in, %"PRId64"thinning.\n",

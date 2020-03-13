@@ -819,6 +819,7 @@ class TrainSignalAlign(object):
                                     "-a {kmerLength} -n {gibbs_samples} -I {burnIn} -t {thin} -s {start} -e {end} " \
                                     "-k {len} {oneD} -C {cL} -T {tL} " \
                                     "-g {Ba} -r {Bb} -j {Ma} -y {Mb} -i {La} -u {Lb} -B {base} -M {middle} -L {leaf} " \
+                                    "-b {alphabet}" \
                                     "".format(buildHdpUtil=self.buildHdpUtil,
                                               hdpType=self.int_hdp_type,
                                               tHdpLoc=template_hdp_location,
@@ -844,7 +845,8 @@ class TrainSignalAlign(object):
                                               Lb=self.args.hdp_args.leaf_beta,
                                               base=self.args.hdp_args.base_gamma,
                                               middle=self.args.hdp_args.middle_gamma,
-                                              leaf=self.args.hdp_args.leaf_gamma)
+                                              leaf=self.args.hdp_args.leaf_gamma,
+                                              alphabet=self.alphabet)
 
         print("[[trainModels_buildHdpUtil] Command: {}\n".format(build_initial_hdp_command))
         check_call(build_initial_hdp_command.split())
@@ -1048,43 +1050,43 @@ class TrainSignalAlign(object):
     def _check_train_hdp_config(self):
         """Check if the input parameters will for training the HDP."""
         # make sure hdp type works with alphabet and 1D
-        self.int_hdp_type = get_hdp_type(self.args.hdp_args.hdp_type)
-        if not self.args.two_d:
-            assert (self.args.hdp_args.hdp_type, self.int_hdp_type) in set(self.HDP_TYPES_1D), \
-                "HDP type is not compatible with 1D. {}: 1D types {}".format(self.args.hdp_type,
-                                                                             self.HDP_TYPES_1D)
-        if self.alphabet == "ACEGOT":
-            assert (self.args.hdp_args.hdp_type, self.int_hdp_type) in set(self.HDP_TYPES_ACEGOT), \
-                "HDP type is not compatible with alphabet=ACEGOT." \
-                "Hdp_type: {}, ACEGOT HDP types:  {}".format(self.args.hdp_type, self.HDP_TYPES_ACEGOT)
-
-        elif self.alphabet == "ACEGIT":
-            assert (self.args.hdp_args.hdp_type, self.int_hdp_type) in set(self.HDP_TYPES_ACEGIT), \
-                "HDP type is not compatible with alphabet=ACEGIT." \
-                "Hdp_type: {}, ACEGIT HDP types:  {}".format(self.args.hdp_type, self.HDP_TYPES_ACEGIT)
-        elif self.alphabet == "ACGTbp":
-            assert (self.args.hdp_args.hdp_type, self.int_hdp_type) in set(self.HDP_TYPES_ACGTbp), \
-                "HDP type is not compatible with alphabet=ACGTbp." \
-                "Hdp_type: {}, ACGTbp HDP types:  {}".format(self.args.hdp_type, self.HDP_TYPES_ACGTbp)
-        elif self.alphabet == "ACEGT":
-            assert (self.args.hdp_args.hdp_type, self.int_hdp_type) in set(self.HDP_TYPES_ACEGT), \
-                "HDP type is not compatible with alphabet=ACEGT." \
-                "Hdp_type: {}, ACEGT HDP types:  {}".format(self.args.hdp_type, self.HDP_TYPES_ACEGT)
-
-        elif self.alphabet == "ACGT":
-            assert (self.args.hdp_args.hdp_type, self.int_hdp_type) in set(self.HDP_TYPES_ACGT), \
-                "HDP type is not compatible with alphabet=ACGT." \
-                "Hdp_type: {}, ACGT HDP types:  {}".format(self.args.hdp_type, self.HDP_TYPES_ACGT)
-        elif self.alphabet == "ACFGT":
-            assert (self.args.hdp_args.hdp_type, self.int_hdp_type) in set(self.HDP_TYPES_ACFGT), \
-                "HDP type is not compatible with alphabet=ACFGT." \
-                "Hdp_type: {}, ACFGT HDP types:  {}".format(self.args.hdp_type, self.HDP_TYPES_ACFGT)
-        elif self.alphabet == "ACEGTbdehip":
-            assert (self.args.hdp_args.hdp_type, self.int_hdp_type) in set(self.HDP_TYPES_ACEGTbdehip), \
-                "HDP type is not compatible with alphabet=ACEGTbdehip." \
-                "Hdp_type: {}, ACEGTbdehip HDP types:  {}".format(self.args.hdp_type, self.HDP_TYPES_ACEGTbdehip)
-        else:
-            raise AssertionError("Cannot create a HDP with this alphabet: {}".format(self.alphabet))
+        # self.int_hdp_type = get_hdp_type(self.args.hdp_args.hdp_type)
+        # if not self.args.two_d:
+        #     assert (self.args.hdp_args.hdp_type, self.int_hdp_type) in set(self.HDP_TYPES_1D), \
+        #         "HDP type is not compatible with 1D. {}: 1D types {}".format(self.args.hdp_type,
+        #                                                                      self.HDP_TYPES_1D)
+        # if self.alphabet == "ACEGOT":
+        #     assert (self.args.hdp_args.hdp_type, self.int_hdp_type) in set(self.HDP_TYPES_ACEGOT), \
+        #         "HDP type is not compatible with alphabet=ACEGOT." \
+        #         "Hdp_type: {}, ACEGOT HDP types:  {}".format(self.args.hdp_type, self.HDP_TYPES_ACEGOT)
+        #
+        # elif self.alphabet == "ACEGIT":
+        #     assert (self.args.hdp_args.hdp_type, self.int_hdp_type) in set(self.HDP_TYPES_ACEGIT), \
+        #         "HDP type is not compatible with alphabet=ACEGIT." \
+        #         "Hdp_type: {}, ACEGIT HDP types:  {}".format(self.args.hdp_type, self.HDP_TYPES_ACEGIT)
+        # elif self.alphabet == "ACGTbp":
+        #     assert (self.args.hdp_args.hdp_type, self.int_hdp_type) in set(self.HDP_TYPES_ACGTbp), \
+        #         "HDP type is not compatible with alphabet=ACGTbp." \
+        #         "Hdp_type: {}, ACGTbp HDP types:  {}".format(self.args.hdp_type, self.HDP_TYPES_ACGTbp)
+        # elif self.alphabet == "ACEGT":
+        #     assert (self.args.hdp_args.hdp_type, self.int_hdp_type) in set(self.HDP_TYPES_ACEGT), \
+        #         "HDP type is not compatible with alphabet=ACEGT." \
+        #         "Hdp_type: {}, ACEGT HDP types:  {}".format(self.args.hdp_type, self.HDP_TYPES_ACEGT)
+        #
+        # elif self.alphabet == "ACGT":
+        #     assert (self.args.hdp_args.hdp_type, self.int_hdp_type) in set(self.HDP_TYPES_ACGT), \
+        #         "HDP type is not compatible with alphabet=ACGT." \
+        #         "Hdp_type: {}, ACGT HDP types:  {}".format(self.args.hdp_type, self.HDP_TYPES_ACGT)
+        # elif self.alphabet == "ACFGT":
+        #     assert (self.args.hdp_args.hdp_type, self.int_hdp_type) in set(self.HDP_TYPES_ACFGT), \
+        #         "HDP type is not compatible with alphabet=ACFGT." \
+        #         "Hdp_type: {}, ACFGT HDP types:  {}".format(self.args.hdp_type, self.HDP_TYPES_ACFGT)
+        # elif self.alphabet == "ACEGTbdehip":
+        #     assert (self.args.hdp_args.hdp_type, self.int_hdp_type) in set(self.HDP_TYPES_ACEGTbdehip), \
+        #         "HDP type is not compatible with alphabet=ACEGTbdehip." \
+        #         "Hdp_type: {}, ACEGTbdehip HDP types:  {}".format(self.args.hdp_type, self.HDP_TYPES_ACEGTbdehip)
+        # else:
+        #     raise AssertionError("Cannot create a HDP with this alphabet: {}".format(self.alphabet))
 
         # check buildHdpUtil executable
         self.buildHdpUtil = os.path.join(self.args.path_to_bin, "./buildHdpUtil")
