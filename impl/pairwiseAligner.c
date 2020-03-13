@@ -64,6 +64,29 @@ stHash *create_ambig_bases() {
   return ambig_hash;
 }
 
+
+stHash *create_ambig_bases2(char* config_file) {
+    stHash *ambig_hash = stHash_construct3(stHash_stringKey, stHash_stringEqualKey,
+                                           NULL, NULL);
+    char encoding[10];
+    char ambig_bases[10];
+    char line[100];
+
+    FILE *infile = fopen(config_file, "r");
+    if (!infile) {
+        printf("Couldn't open %s for reading\n", config_file);
+        return 0;
+    }
+    int i = 0;
+    while(i < 300 && fgets(line, sizeof(line), infile) != NULL){
+        sscanf(line, "%s\t%s", encoding, ambig_bases);
+        stHash_insert(ambig_hash, stString_copy(encoding), stString_copy(ambig_bases));
+      i++;
+    }
+
+    return ambig_hash;
+}
+
 const char *PAIRWISE_ALIGNMENT_EXCEPTION_ID = "PAIRWISE_ALIGNMENT_EXCEPTION";
 
 

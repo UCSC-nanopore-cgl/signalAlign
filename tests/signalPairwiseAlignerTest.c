@@ -786,6 +786,15 @@ static void test_create_ambig_bases(CuTest *testCase) {
   stHash_destruct(something);
 }
 
+static void test_create_ambig_bases2(CuTest *testCase) {
+  char* path = stString_print("../../signalAlign/tests/test_position_code/test_positions_encoding.positions");
+  stHash* something = create_ambig_bases2(path);
+  char* ambig_1 = "L";
+  char* jt = stHash_search(something, ambig_1);
+  CuAssertStrEquals(testCase, "asdf", jt);
+  stHash_destruct(something);
+}
+
 
 static void test_stList_construct(CuTest *testCase) {
   stList *methyls = stList_construct();
@@ -813,6 +822,8 @@ CuSuite *signalPairwiseAlignerTestSuite(void) {
   CuSuite *suite = CuSuiteNew();
 
   SUITE_ADD_TEST(suite, test_create_ambig_bases);
+  SUITE_ADD_TEST(suite, test_create_ambig_bases2);
+
   SUITE_ADD_TEST(suite, test_path_permutePattern);
   SUITE_ADD_TEST(suite, test_stList_construct);
 

@@ -76,6 +76,7 @@ void path_permutePattern(stList *listOfPositions, int64_t currentLength, int64_t
 
 //char* get_ambig_chars(char* ambig_char);
 stHash *create_ambig_bases();
+stHash *create_ambig_bases2(char* config_file);
 
 char *sequence_prepareAlphabet(const char *alphabet, int64_t alphabet_size);
 
