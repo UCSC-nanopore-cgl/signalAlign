@@ -411,9 +411,14 @@ double scoreByPosteriorProbabilityIgnoringGaps(stList *alignedPairs) {
     return 100.0 * totalScore(alignedPairs) / ((double) stList_length(alignedPairs) * PAIR_ALIGNMENT_PROB_1);
 }
 
-stList *performSignalAlignment(StateMachine *sM, Sequence *eventSequence, int64_t *eventMap,
-                               int64_t mapOffset, char *target, PairwiseAlignmentParameters *p,
-                               stList *unmappedAnchors) {
+stList *performSignalAlignment(StateMachine *sM,
+                               Sequence *eventSequence,
+                               int64_t *eventMap,
+                               int64_t mapOffset,
+                               char *target,
+                               PairwiseAlignmentParameters *p,
+                               stList *unmappedAnchors,
+                               char *ambig_path) {
     if ((sM->type != threeState) && (sM->type != threeStateHdp)) {
         st_errAbort("signalAlign - You're trying to do the wrong king of alignment");
     }
@@ -426,7 +431,9 @@ stList *performSignalAlignment(StateMachine *sM, Sequence *eventSequence, int64_
     // make sequences
     Sequence *sX = sequence_constructReferenceKmerSequence(lX, target, sequence_getKmer,
                                                            sequence_sliceNucleotideSequence, kmer);
-
+    if (ambig_path != NULL){
+      sX->ambigBases = create_ambig_bases2(ambig_path);
+    }
     // do alignment
     stList *alignedPairs = getAlignedPairsUsingAnchors(sM, sX, eventSequence, filteredRemappedAnchors, p,
                                                        diagonalCalculationPosteriorMatchProbs, 1, 1);
@@ -451,9 +458,15 @@ Sequence *makeEventSequenceFromPairwiseAlignment(double *events, int64_t querySt
     return eventS;
 }
 
-void getSignalExpectations(StateMachine *sM, Hmm *hmmExpectations, Sequence *eventSequence,
-                           int64_t *eventMap, int64_t mapOffset, char *trainingTarget, PairwiseAlignmentParameters *p,
-                           stList *unmappedAnchors) {
+void getSignalExpectations(StateMachine *sM,
+                           Hmm *hmmExpectations,
+                           Sequence *eventSequence,
+                           int64_t *eventMap,
+                           int64_t mapOffset,
+                           char *trainingTarget,
+                           PairwiseAlignmentParameters *p,
+                           stList *unmappedAnchors,
+                           char *ambig_path) {
     // correct sequence length
     int64_t lX = sequence_correctSeqLength(strlen(trainingTarget), event, sM->kmerLength);
 
@@ -463,7 +476,9 @@ void getSignalExpectations(StateMachine *sM, Hmm *hmmExpectations, Sequence *eve
     Sequence *target = sequence_constructKmerSequence(
             lX, trainingTarget, sequence_getKmer, sequence_sliceNucleotideSequence,
             kmer);
-
+    if (ambig_path != NULL){
+      target->ambigBases = create_ambig_bases2(ambig_path);
+    }
     getExpectationsUsingAnchors(sM, hmmExpectations, target, eventSequence, filteredRemappedAnchors, p,
                                 diagonalCalculation_Expectations, 1, 1);
 
@@ -493,6 +508,7 @@ int main(int argc, char *argv[]) {
     char *backward_reference_path = NULL;
     char *posteriorProbsFile2 = NULL;
     const char *sequence_name = NULL;
+    char *ambig_model = NULL;
 
 
     int key;
@@ -521,11 +537,12 @@ int main(int argc, char *argv[]) {
                 {"sequence_name",           required_argument,  0,  'n'},
                 {"traceBackDiagonals",      optional_argument,  0,  'g'},
                 {"posteriorProbsFile2",     optional_argument,  0,  'i'},
+                {"ambig_model",             optional_argument,  0,  'a'},
                 {0, 0, 0, 0} };
 
         int option_index = 0;
 
-        key = getopt_long(argc, argv, "h:d:e:s:r:o:a:T:C:L:q:f:b:g:i:p:u:v:w:t:c:x:D:m:n:",
+        key = getopt_long(argc, argv, "h:d:e:s:r:o:a:T:C:a:L:q:f:b:g:i:p:u:v:w:t:c:x:D:m:n:",
                           long_options, &option_index);
 
         if (key == -1) {
@@ -542,6 +559,9 @@ int main(int argc, char *argv[]) {
                 break;
             case 'e':
                 twoD = TRUE;
+                break;
+            case 'a':
+                ambig_model = stString_copy(optarg);
                 break;
             case 'r':
                 rna = TRUE;
@@ -770,10 +790,10 @@ int main(int argc, char *argv[]) {
         // get expectations for template
         fprintf(stderr, "signalAlign - getting expectations for template\n");
         getSignalExpectations(sMt, templateExpectations, tEventSequence,
-                              (twoD ? npRead->templateEventMap : npRead->templateStrandEventMap),
-                              pA->start2,
-                              R->getTemplateTargetSequence(R),
-                              p, anchorPairs);
+                            (twoD ? npRead->templateEventMap : npRead->templateStrandEventMap),
+                            pA->start2,
+                            R->getTemplateTargetSequence(R),
+                            p, anchorPairs, ambig_model);
 
 
         if (sMtype == threeStateHdp) {
@@ -800,9 +820,9 @@ int main(int argc, char *argv[]) {
             complementExpectations = hmmContinuous_getExpectationsHmm(sMc, p->threshold, 0.001, 0.001);
 
             getSignalExpectations(sMc, complementExpectations, cEventSequence, npRead->complementEventMap,
-                                  pA->start2,
-                                  R->getComplementTargetSequence(R),
-                                  p, anchorPairs);
+                                pA->start2,
+                                R->getComplementTargetSequence(R),
+                                p, anchorPairs, ambig_model);
 
             if (sMtype == threeStateHdp) {
                 fprintf(stderr, "signalAlign - got %"PRId64"complement HDP assignments\n",
@@ -844,9 +864,10 @@ int main(int argc, char *argv[]) {
         }
 
         stList *templateAlignedPairs = performSignalAlignment(sMt, tEventSequence,
-                                                              (twoD ? npRead->templateEventMap : npRead->templateStrandEventMap),
+                                                              (twoD ? npRead->templateEventMap
+                                                                    : npRead->templateStrandEventMap),
                                                               pA->start2, R->getTemplateTargetSequence(R),
-                                                              p, anchorPairs);
+                                                              p, anchorPairs, ambig_model);
 
         double templatePosteriorScore = scoreByPosteriorProbabilityIgnoringGaps(templateAlignedPairs);
 
@@ -879,7 +900,7 @@ int main(int argc, char *argv[]) {
             complementAlignedPairs = performSignalAlignment(sMc, cEventSequence,
                                                             npRead->complementEventMap, pA->start2,
                                                             R->getComplementTargetSequence(R),
-                                                            p, anchorPairs);
+                                                            p, anchorPairs, ambig_model);
 
             complementPosteriorScore = scoreByPosteriorProbabilityIgnoringGaps(complementAlignedPairs);
 

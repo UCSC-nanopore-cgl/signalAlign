@@ -83,7 +83,6 @@ stHash *create_ambig_bases2(char* config_file) {
         stHash_insert(ambig_hash, stString_copy(encoding), stString_copy(ambig_bases));
       i++;
     }
-
     return ambig_hash;
 }
 
