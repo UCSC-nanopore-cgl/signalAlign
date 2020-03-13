@@ -184,7 +184,8 @@ def main(args):
             output_format=config_args.signal_alignment_args.output_format,
             filter_reads=config_args.filter_reads,
             delete_tmp=config_args.signal_alignment_args.delete_tmp,
-            rna=config_args.rna)
+            rna=config_args.rna,
+            ambig_model=config_args.ambig_model)
 
         multithread_signal_alignment_samples(samples, alignment_args, config_args.job_count, trim=None,
                                              debug=config_args.debug)

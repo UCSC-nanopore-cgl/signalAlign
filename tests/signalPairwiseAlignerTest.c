@@ -41,7 +41,7 @@ static double test_inverseGaussianPdf(double x, double mu, double lambda) {
 Sequence *makeTestKmerSequence() {
     char *s = "ATGXAXA"; // has 2 6mers
     int64_t lX = sequence_correctSeqLength(strlen(s), kmer, KMER_LENGTH);
-    Sequence *seq = sequence_construct(lX, s, sequence_getKmer, kmer);
+    Sequence *seq = sequence_construct(lX, s, sequence_getKmer, kmer, NULL);
     return seq;
 }
 
@@ -49,7 +49,7 @@ Sequence *makeKmerSequence(char *nucleotides) {
     int64_t lX = sequence_correctSeqLength(strlen(nucleotides), kmer, KMER_LENGTH);
     Sequence *seq = sequence_constructKmerSequence(lX, nucleotides,
                                                    sequence_getKmer, sequence_sliceNucleotideSequence,
-                                                   kmer);
+                                                   kmer, NULL);
     return seq;
 }
 
@@ -138,10 +138,10 @@ static void test_genericSequenceTests(CuTest *testCase, Sequence *testSequence, 
 static void test_Sequence(CuTest *testCase) {
     int64_t length = 1000;
     char *tS = getRandomSequence(length);
-    Sequence* testSequence = sequence_construct(length, tS, sequence_getKmer, nucleotide);
+    Sequence* testSequence = sequence_construct(length, tS, sequence_getKmer, nucleotide, NULL);
     test_genericSequenceTests(testCase, testSequence, length, tS);
     testSequence = sequence_construct2(length, tS, sequence_getKmer, sequence_sliceNucleotideSequence,
-                                       nucleotide);
+                                       nucleotide, NULL);
     sequence_destruct(testSequence);
 }
 
@@ -152,7 +152,7 @@ static void test_referenceSequence(CuTest *testCase) {
     // test construct Kmer sequence
     Sequence *testSequence = sequence_constructKmerSequence(length, tS, sequence_getKmer,
                                                             sequence_sliceNucleotideSequence,
-                                                            kmer);
+                                                            kmer, NULL);
     test_genericSequenceTests(testCase, testSequence, length, tS);
 //    test_referenceSequenceTests(testCase, testSequence);
 

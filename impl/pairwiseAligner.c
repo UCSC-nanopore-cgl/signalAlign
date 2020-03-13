@@ -66,7 +66,9 @@ stHash *create_ambig_bases() {
 
 
 stHash *create_ambig_bases2(char* config_file) {
-    stHash *ambig_hash = stHash_construct3(stHash_stringKey, stHash_stringEqualKey,
+  stHash *ambig_hash;
+  if (config_file != NULL){
+    ambig_hash = stHash_construct3(stHash_stringKey, stHash_stringEqualKey,
                                            NULL, NULL);
     char encoding[10];
     char ambig_bases[10];
@@ -74,16 +76,19 @@ stHash *create_ambig_bases2(char* config_file) {
 
     FILE *infile = fopen(config_file, "r");
     if (!infile) {
-        printf("Couldn't open %s for reading\n", config_file);
-        return 0;
+      printf("Couldn't open %s for reading\n", config_file);
+      return 0;
     }
     int i = 0;
     while(i < 300 && fgets(line, sizeof(line), infile) != NULL){
-        sscanf(line, "%s\t%s", encoding, ambig_bases);
-        stHash_insert(ambig_hash, stString_copy(encoding), stString_copy(ambig_bases));
+      sscanf(line, "%s\t%s", encoding, ambig_bases);
+      stHash_insert(ambig_hash, stString_copy(encoding), stString_copy(ambig_bases));
       i++;
     }
-    return ambig_hash;
+  } else {
+    ambig_hash = create_ambig_bases();
+  }
+  return ambig_hash;
 }
 
 const char *PAIRWISE_ALIGNMENT_EXCEPTION_ID = "PAIRWISE_ALIGNMENT_EXCEPTION";
@@ -389,19 +394,30 @@ char *sequence_prepareAlphabet(const char *alphabet, int64_t alphabet_size) {
     return internal_alphabet;
 }
 
-Sequence *sequence_construct(int64_t length, void *elements, void *(*getFcn)(void *, int64_t), SequenceType type) {
+Sequence *sequence_construct(int64_t length,
+                             void *elements,
+                             void *(*getFcn)(void *, int64_t),
+                             SequenceType type,
+                             stHash *ambig_chars) {
     Sequence *self = malloc(sizeof(Sequence));
     self->type = type;
     self->length = length;
     self->elements = elements;
     self->get = getFcn;
-    self->ambigBases = create_ambig_bases();
+    if (ambig_chars == NULL){
+      ambig_chars = create_ambig_bases();
+    }
+    self->ambigBases = ambig_chars;
     return self;
 }
 
-Sequence *sequence_construct2(int64_t length, void *elements, void *(*getFcn)(void *, int64_t),
-                              Sequence *(*sliceFcn)(Sequence *, int64_t, int64_t), SequenceType type) {
-    Sequence *self = sequence_construct(length, elements, getFcn, type);
+Sequence *sequence_construct2(int64_t length,
+                              void *elements,
+                              void *(*getFcn)(void *, int64_t),
+                              Sequence *(*sliceFcn)(Sequence *, int64_t, int64_t),
+                              SequenceType type,
+                              stHash *ambig_bases) {
+    Sequence *self = sequence_construct(length, elements, getFcn, type, ambig_bases);
     self->sliceFcn = sliceFcn;
     return self;
 }
@@ -417,7 +433,8 @@ Sequence *sequence_sliceNucleotideSequence(Sequence *inputSequence, int64_t star
     Sequence *newSequence = sequence_constructKmerSequence(sliceLength, elementSlice,
                                                            inputSequence->get,
                                                            inputSequence->sliceFcn,
-                                                           inputSequence->type);
+                                                           inputSequence->type,
+                                                           inputSequence->ambigBases);
     return newSequence;
 }
 
@@ -425,52 +442,34 @@ Sequence *sequence_sliceEventSequence(Sequence *inputSequence, int64_t start, in
     size_t elementSize = sizeof(double);
     void *elementSlice = (char *)inputSequence->elements + ((start * NB_EVENT_PARAMS) * elementSize);
     Sequence *newSequence = sequence_construct2(sliceLength, elementSlice,
-                                                inputSequence->get, inputSequence->sliceFcn, inputSequence->type);
+                                                inputSequence->get, inputSequence->sliceFcn, inputSequence->type, NULL);
     return newSequence;
 }
 
-Sequence *sequence_constructKmerSequence(int64_t length, void *elements,
+Sequence *sequence_constructKmerSequence(int64_t length,
+                                         void *elements,
                                          void *(*getFcn)(void *, int64_t),
                                          Sequence *(*sliceFcn)(Sequence *, int64_t, int64_t),
-                                         SequenceType type) {
+                                         SequenceType type,
+                                         stHash *ambig_chars) {
     if (type != kmer) {
         st_errAbort("sequence_constructKmerSequence: can only make reference sequence from kmer sequence\n");
     }
-    Sequence *self = sequence_construct2(length, elements, getFcn, sliceFcn, type);
+    Sequence *self = sequence_construct2(length, elements, getFcn, sliceFcn, type, ambig_chars);
     self->sliceFcn = sliceFcn;
     return self;
 }
-
-Sequence *sequence_constructReferenceKmerSequence(int64_t length, void *elements,
-                                                  void *(*getFcn)(void *, int64_t),
-                                                  Sequence *(*sliceFcn)(Sequence *, int64_t, int64_t),
-                                                  SequenceType type) {
-    Sequence *self = sequence_constructKmerSequence(length, elements, getFcn, sliceFcn,
-                                                    type);
-    return self;
-}
-
-Sequence *sequence_constructReferenceKmerSequence2(int64_t length, void *elements,
-                                                  void *(*getFcn)(void *, int64_t),
-                                                  Sequence *(*sliceFcn)(Sequence *, int64_t, int64_t),
-                                                  SequenceType type) {
-
-    Sequence *self = sequence_constructKmerSequence(length, elements, getFcn, sliceFcn,
-                                                    type);
-    return self;
-}
-
 
 Sequence *sequence_deepCopyNucleotideSequence(const Sequence *toCopy) {
     char *elementsCopy = stString_copy(toCopy->elements);
     Sequence *copy = sequence_constructKmerSequence(toCopy->length, elementsCopy,
                                                     toCopy->get, toCopy->sliceFcn,
-                                                    toCopy->type);
+                                                    toCopy->type, NULL);
     return copy;
 }
 
 Sequence *sequence_constructEventSequence(int64_t length, void *events) {
-    Sequence *s = sequence_construct2(length, events, sequence_getEvent, sequence_sliceEventSequence, event);
+    Sequence *s = sequence_construct2(length, events, sequence_getEvent, sequence_sliceEventSequence, event, NULL);
     return s;
 }
 
@@ -2087,8 +2086,8 @@ stList *getAlignedPairs(StateMachine *sM, void *cX, void *cY, int64_t lX, int64_
                         bool alignmentHasRaggedLeftEnd, bool alignmentHasRaggedRightEnd) {
     stList *anchorPairs = getAnchorPairFcn(cX, cY, p);
 
-    Sequence *SsX = sequence_construct2(lX, cX, getXFcn, sequence_sliceNucleotideSequence, nucleotide);
-    Sequence *SsY = sequence_construct2(lY, cY, getYFcn, sequence_sliceNucleotideSequence, nucleotide);
+    Sequence *SsX = sequence_construct2(lX, cX, getXFcn, sequence_sliceNucleotideSequence, nucleotide, NULL);
+    Sequence *SsY = sequence_construct2(lY, cY, getYFcn, sequence_sliceNucleotideSequence, nucleotide, NULL);
 
     stList *alignedPairs = getAlignedPairsUsingAnchors(sM, SsX, SsY,
                                                        anchorPairs, p,
@@ -2111,11 +2110,11 @@ stList *getAlignedPairsWithoutBanding(StateMachine *sM, void *cX, void *cY, int6
                                       bool alignmentHasRaggedLeftEnd, bool alignmentHasRaggedRightEnd) {
     // make sequence objects
     //Sequence *ScX = sequence_construct(lX, cX, getXFcn, kmer);
-    Sequence *ScX = sequence_constructKmerSequence(lX, cX, getXFcn, NULL, kmer);
+    Sequence *ScX = sequence_constructKmerSequence(lX, cX, getXFcn, NULL, kmer, NULL);
     if (sM->type == echelon) {
         sequence_padSequence(ScX);
     }
-    Sequence *ScY = sequence_construct(lY, cY, getYFcn, event);
+    Sequence *ScY = sequence_construct(lY, cY, getYFcn, event, NULL);
 
     // make matrices and bands
     int64_t diagonalNumber = ScX->length + ScY->length;
@@ -2191,8 +2190,8 @@ void getExpectations(StateMachine *sM, Hmm *hmmExpectations,
     // get anchors
     stList *anchorPairs = getAnchorPairFcn(sX, sY, p);
     // make Sequence objects
-    Sequence *SsX = sequence_construct2(lX, sX, getFcn, sequence_sliceNucleotideSequence, nucleotide);
-    Sequence *SsY = sequence_construct2(lY, sY, getFcn, sequence_sliceNucleotideSequence, nucleotide);
+    Sequence *SsX = sequence_construct2(lX, sX, getFcn, sequence_sliceNucleotideSequence, nucleotide, NULL);
+    Sequence *SsY = sequence_construct2(lY, sY, getFcn, sequence_sliceNucleotideSequence, nucleotide, NULL);
 
     getExpectationsUsingAnchors(sM, hmmExpectations, SsX, SsY,
                                 anchorPairs, p,

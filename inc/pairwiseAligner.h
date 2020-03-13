@@ -84,23 +84,26 @@ char *sequence_prepareAlphabet(const char *alphabet, int64_t alphabet_size);
 //
 //char *sequence_getBaseOptions(DegenerateType type);
 
-Sequence *sequence_construct(int64_t length, void *elements, void *(*getFcn)(void *, int64_t), SequenceType type);
+Sequence *sequence_construct(int64_t length,
+                             void *elements,
+                             void *(*getFcn)(void *, int64_t),
+                             SequenceType type,
+                             stHash *ambig_chars);
 
 // same as sequence construct, but initializes slice function
-Sequence *sequence_construct2(int64_t length, void *elements, void *(*getFcn)(void *, int64_t),
-                              Sequence *(*sliceFcn)(Sequence *, int64_t, int64_t), SequenceType type);
+Sequence *sequence_construct2(int64_t length,
+                              void *elements,
+                              void *(*getFcn)(void *, int64_t),
+                              Sequence *(*sliceFcn)(Sequence *, int64_t, int64_t),
+                              SequenceType type,
+                              stHash *ambig_bases);
 
-Sequence *sequence_constructReferenceKmerSequence(int64_t length, void *elements, void *(*getFcn)(void *, int64_t),
-                                                  Sequence *(*sliceFcn)(Sequence *, int64_t, int64_t),
-                                                  SequenceType type);
-
-Sequence *sequence_constructKmerSequence(int64_t length, void *elements, void *(*getFcn)(void *, int64_t),
-                                         Sequence *(*sliceFcn)(Sequence *, int64_t, int64_t), SequenceType type);
-
-Sequence *sequence_constructReferenceKmerSequence2(int64_t length, void *elements,
-                                                   void *(*getFcn)(void *, int64_t),
-                                                   Sequence *(*sliceFcn)(Sequence *, int64_t, int64_t),
-                                                   SequenceType type);
+Sequence *sequence_constructKmerSequence(int64_t length,
+                                         void *elements,
+                                         void *(*getFcn)(void *, int64_t),
+                                         Sequence *(*sliceFcn)(Sequence *, int64_t, int64_t),
+                                         SequenceType type,
+                                         stHash *ambig_chars);
 
 Sequence *sequence_deepCopyNucleotideSequence(const Sequence *toCopy);
 

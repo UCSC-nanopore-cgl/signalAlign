@@ -15,7 +15,7 @@ Sequence *getZymoReferenceSequence(int64_t kmerLength) {
     int64_t lX = sequence_correctSeqLength(strlen(ZymoReferenceSeq), event, kmerLength);
     Sequence *refSeq = sequence_constructKmerSequence(lX, ZymoReferenceSeq,
                                                       sequence_getKmer, sequence_sliceNucleotideSequence,
-                                                      kmer);
+                                                      kmer, NULL);
     free(ZymoReferenceFilePath);
     return refSeq;
 }
@@ -27,7 +27,7 @@ Sequence *getEcoliReferenceSequence(int64_t kmerLength) {
     int64_t lX = sequence_correctSeqLength(strlen(referenceSeq), event, kmerLength);
     Sequence *refSeq = sequence_constructKmerSequence(lX, referenceSeq,
                                                       sequence_getKmer, sequence_sliceNucleotideSequence,
-                                                      kmer);
+                                                      kmer, NULL);
     free(ecoliReferencePath);
     return refSeq;
 }
@@ -462,8 +462,13 @@ static void test_sm3_diagonalDPCalculations(CuTest *testCase) {
 
     // make Sequence objects
     //Sequence *SsX = makeKmerSequence(sX);
-    Sequence *SsX = sequence_constructKmerSequence(lX, sX, sequence_getKmer, sequence_sliceNucleotideSequence, kmer);
-    Sequence *SsY = sequence_construct(lY, sY, sequence_getEvent, event);
+    Sequence *SsX = sequence_constructKmerSequence(lX,
+                                                   sX,
+                                                   sequence_getKmer,
+                                                   sequence_sliceNucleotideSequence,
+                                                   kmer,
+                                                   NULL);
+    Sequence *SsY = sequence_construct(lY, sY, sequence_getEvent, event, NULL);
 
     DpMatrix *dpMatrixForward = dpMatrix_construct(lX + lY, sM->stateNumber, sM->kmerLength);
     DpMatrix *dpMatrixBackward = dpMatrix_construct(lX + lY, sM->stateNumber, sM->kmerLength);
@@ -591,8 +596,13 @@ static void test_sm3_5merDiagonalDPCalculations(CuTest *testCase) {
 
     // make Sequence objects
     //Sequence *SsX = makeKmerSequence(sX);
-    Sequence *SsX = sequence_constructKmerSequence(lX, sX, sequence_getKmer, sequence_sliceNucleotideSequence, kmer);
-    Sequence *SsY = sequence_construct(lY, sY, sequence_getEvent, event);
+    Sequence *SsX = sequence_constructKmerSequence(lX,
+                                                   sX,
+                                                   sequence_getKmer,
+                                                   sequence_sliceNucleotideSequence,
+                                                   kmer,
+                                                   NULL);
+    Sequence *SsY = sequence_construct(lY, sY, sequence_getEvent, event, NULL);
 
     DpMatrix *dpMatrixForward = dpMatrix_construct(lX + lY, sM->stateNumber, sM->kmerLength);
     DpMatrix *dpMatrixBackward = dpMatrix_construct(lX + lY, sM->stateNumber, sM->kmerLength);
@@ -697,7 +707,7 @@ static inline void test_stateMachine(CuTest *testCase, StateMachine *sM, Nanopor
 
     // make the event sequence object
     Sequence *eventSequence = sequence_construct2(npRead->nbTemplateEvents, npRead->templateEvents, sequence_getEvent,
-                                                  sequence_sliceEventSequence, event);
+                                                  sequence_sliceEventSequence, event, NULL);
 
     // do alignment with scaled stateMachine
     stList *alignedPairs = getAlignedPairsUsingAnchors(sM, refSeq, eventSequence, filteredRemappedAnchors, p,
@@ -757,7 +767,7 @@ static void test_r94StateMachineWithBanding(CuTest *testCase) {
     stList *filteredRemappedAnchors = get1dRemappedAnchors(refSeq, npRead, p);
     // make the event sequence object
     Sequence *eventSequence = sequence_construct2(npRead->nbTemplateEvents, npRead->templateEvents, sequence_getEvent,
-                                                  sequence_sliceEventSequence, event);
+                                                  sequence_sliceEventSequence, event, NULL);
 
     // do alignment with scaled stateMachine
     stList *alignedPairs = getAlignedPairsUsingAnchors(sM, refSeq, eventSequence, filteredRemappedAnchors, p,
@@ -791,7 +801,7 @@ static void test_r94FivemerStateMachineWithBanding(CuTest *testCase) {
     stList *filteredRemappedAnchors = get1dRemappedAnchors(refSeq, npRead, p);
     // make the event sequence object
     Sequence *eventSequence = sequence_construct2(npRead->nbTemplateEvents, npRead->templateEvents, sequence_getEvent,
-                                                  sequence_sliceEventSequence, event);
+                                                  sequence_sliceEventSequence, event, NULL);
 
     // do alignment with scaled stateMachine
     stList *alignedPairs = getAlignedPairsUsingAnchors(sM, refSeq, eventSequence, filteredRemappedAnchors, p,
@@ -919,7 +929,7 @@ static void test_DegenerateNucleotides(CuTest *testCase) {
 
     // make Sequences for reference and template events
     Sequence *eventSequence = sequence_construct2(npRead->nbTemplateEvents, npRead->templateEvents, sequence_getEvent,
-                                                  sequence_sliceEventSequence, event);
+                                                  sequence_sliceEventSequence, event, NULL);
 
     // do alignment of template events
     stList *alignedPairs = getAlignedPairsUsingAnchors(sM, refSeq, eventSequence, filteredRemappedAnchors, p,
@@ -1232,7 +1242,7 @@ static void test_continuousPairHmm_em(CuTest *testCase) {
 
     Sequence *eventSequence = sequence_construct2(npRead->nbTemplateEvents,
                                                   npRead->templateEvents, sequence_getEvent,
-                                                  sequence_sliceEventSequence, event);
+                                                  sequence_sliceEventSequence, event, NULL);
 
     for (int64_t iter = 0; iter < 10; iter++) {
         // load the table into the HMM emissions
@@ -1284,7 +1294,7 @@ static void test_hdpHmm_emTransitions(CuTest *testCase) {
 
     stList *filteredRemappedAnchors = getRemappedAnchors(refSeq, npRead, p);
     Sequence *templateSeq = sequence_construct2(npRead->nbTemplateEvents, npRead->templateEvents, sequence_getEvent,
-                                                sequence_sliceEventSequence, event);
+                                                sequence_sliceEventSequence, event, NULL);
 
     for (int64_t iter = 0; iter < 10; iter++) {
         //Hmm *hmmExpectations = hdpHmm_constructEmpty(0.0001, 3, threeStateHdp, p->threshold);

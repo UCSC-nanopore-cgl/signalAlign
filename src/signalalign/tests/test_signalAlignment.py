@@ -71,7 +71,7 @@ class SignalAlignmentTest(unittest.TestCase):
                          "bwa_reference",
                          'track_memory_usage', 'get_expectations', 'output_format', 'embed', 'event_table',
                          'check_for_temp_file_existance', 'path_to_bin', 'perform_kmer_event_alignment', 'filter_reads',
-                         'traceBackDiagonals', 'delete_tmp', 'rna'}
+                         'traceBackDiagonals', 'delete_tmp', 'rna', 'ambig_model'}
         args = create_signalAlignment_args()
         self.assertSetEqual(set(args.keys()), expected_args)
 
@@ -384,14 +384,15 @@ class SignalAlignmentTest(unittest.TestCase):
             shutil.copytree(self.test_dir_rna, new_dir)
 
             args = create_signalAlignment_args(alignment_file=self.rna_bam, bwa_reference=self.rna_reference,
-                                               forward_reference=os.path.join(self.HOME, "tests/test_sequences/fake_rna_replace/forward.fake_rna_atg.fake_rna_ref.fa"),
-                                               backward_reference=os.path.join(self.HOME, "tests/test_sequences/fake_rna_replace/backward.fake_rna_atg.fake_rna_ref.fa"),
-                                               in_templateHmm=os.path.join(self.HOME, "models/fake_testModelR9p4_5mer_acfgt_RNA.model"),
+                                               forward_reference=os.path.join(self.HOME, "tests/test_sequences/fake_rna_replace/backward.fake_rna.ambig_O.fa"),
+                                               backward_reference=os.path.join(self.HOME, "tests/test_sequences/fake_rna_replace/forward.fake_rna.ambig_O.fa"),
+                                               in_templateHmm=os.path.join(self.HOME, "models/fake_testModelR9p4_5mer_acdgt_RNA.model"),
                                                path_to_bin=self.path_to_bin, destination=working_folder.path,
                                                embed=False, output_format="full", filter_reads=0, twoD_chemistry=False,
-                                               delete_tmp=True, check_for_temp_file_existance=False)
+                                               delete_tmp=True, check_for_temp_file_existance=False,
+                                               ambig_model=os.path.join(self.HOME, "tests/test_position_code/test_amibg.model"),)
 
-            multithread_signal_alignment(args, list_dir(new_dir, ext="fast5"), worker_count=8,
+            multithread_signal_alignment(args, list_dir(new_dir, ext="fast5"), worker_count=2,
                                          forward_reference=None,
                                          debug=True, filter_reads_to_string_wrapper=None)
             self.assertEqual(len(os.listdir(working_folder.path)), 2)

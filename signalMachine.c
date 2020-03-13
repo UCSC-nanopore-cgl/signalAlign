@@ -427,14 +427,12 @@ stList *performSignalAlignment(StateMachine *sM,
 
     // remap anchor pairs
     stList *filteredRemappedAnchors = signalUtils_getRemappedAnchorPairs(unmappedAnchors, eventMap, mapOffset);
-
     // make sequences
-    Sequence *sX = sequence_constructReferenceKmerSequence(lX, target, sequence_getKmer,
-                                                           sequence_sliceNucleotideSequence, kmer);
-    if (ambig_path != NULL){
-      sX->ambigBases = create_ambig_bases2(ambig_path);
-    }
-    // do alignment
+    stHash* ambigBases = create_ambig_bases2(ambig_path);
+    Sequence *sX = sequence_constructKmerSequence(lX, target, sequence_getKmer,
+                                                  sequence_sliceNucleotideSequence, kmer, ambigBases);
+
+  // do alignment
     stList *alignedPairs = getAlignedPairsUsingAnchors(sM, sX, eventSequence, filteredRemappedAnchors, p,
                                                        diagonalCalculationPosteriorMatchProbs, 1, 1);
     sequence_destruct(sX);
@@ -473,12 +471,11 @@ void getSignalExpectations(StateMachine *sM,
     // remap the anchors
     stList *filteredRemappedAnchors = signalUtils_getRemappedAnchorPairs(unmappedAnchors, eventMap, mapOffset);
 
+    stHash* ambigBases = create_ambig_bases2(ambig_path);
+
     Sequence *target = sequence_constructKmerSequence(
-            lX, trainingTarget, sequence_getKmer, sequence_sliceNucleotideSequence,
-            kmer);
-    if (ambig_path != NULL){
-      target->ambigBases = create_ambig_bases2(ambig_path);
-    }
+        lX, trainingTarget, sequence_getKmer, sequence_sliceNucleotideSequence,
+        kmer, ambigBases);
     getExpectationsUsingAnchors(sM, hmmExpectations, target, eventSequence, filteredRemappedAnchors, p,
                                 diagonalCalculation_Expectations, 1, 1);
 

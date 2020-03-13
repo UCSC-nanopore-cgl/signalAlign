@@ -1144,7 +1144,8 @@ class TrainSignalAlign(object):
             output_format=output_format,
             filter_reads=self.args.filter_reads,
             delete_tmp=self.args.signal_alignment_args.delete_tmp,
-            rna=self.args.rna)
+            rna=self.args.rna,
+            ambig_model=self.args.ambig_model)
 
         dont_run_sa_samples = []
         run_sa_samples = []

@@ -28,7 +28,7 @@ def create_signalAlignment_args(backward_reference=None, forward_reference=None,
                                 event_table=False,
                                 check_for_temp_file_existance=True,
                                 path_to_bin='./', perform_kmer_event_alignment=None, filter_reads=False,
-                                traceBackDiagonals=100, delete_tmp=True, rna=False):
+                                traceBackDiagonals=100, delete_tmp=True, rna=False, ambig_model=None):
     """Create alignment arguments for SignalAlign. Parameters are explained in SignalAlignment"""
     alignment_args = {
         "backward_reference": backward_reference,
@@ -57,7 +57,8 @@ def create_signalAlignment_args(backward_reference=None, forward_reference=None,
         'filter_reads': filter_reads,
         'traceBackDiagonals': traceBackDiagonals,
         'delete_tmp': delete_tmp,
-        'rna': rna}
+        'rna': rna,
+        'ambig_model': ambig_model}
 
     return alignment_args
 
@@ -97,7 +98,8 @@ class SignalAlignment(object):
                  traceBackDiagonals=100,
                  cigar_string=None,
                  delete_tmp=True,
-                 rna=False):
+                 rna=False,
+                 ambig_model=None):
         self.in_fast5 = in_fast5  # fast5 file to align
         self.destination = destination  # place where the alignments go, should already exist
         self.stateMachineType = stateMachineType  # flag for signalMachine
@@ -131,7 +133,9 @@ class SignalAlignment(object):
         self.rna = rna
         self.complement_expectations_file_path = None
         self.template_expectations_file_path = None
-
+        self.ambig_model = ambig_model
+        if self.ambig_model:
+            assert os.path.isfile(self.ambig_model), "ambig_model does not exist: {}".format(self.ambig_model)
         self.aligned_segment = None
         if cigar_string:
             self.aligned_segment = sam_string_to_aligned_segment(cigar_string)  # pysam aligned segment
@@ -398,6 +402,11 @@ class SignalAlignment(object):
         else:
             rna_flag = ""
 
+        if self.ambig_model:
+            ambig_flag = "-a {}".format(self.ambig_model)
+        else:
+            ambig_flag = "-a"
+
         # commands
         if self.get_expectations:
             self.template_expectations_file_path = os.path.join(self.destination, read_label + ".template.expectations.tsv")
@@ -407,7 +416,7 @@ class SignalAlignment(object):
                 "{vA} {td} {sparse}{model} -q {npRead} " \
                 "{t_model}{c_model}{thresh}{expansion}{trim} {hdp}-L {readLabel} -p {cigarFile} " \
                 "-t {templateExpectations} -c {complementExpectations} -n {seq_name} {f_ref_fa} {b_ref_fa} " \
-                "-g {traceback} {rna}" \
+                "-g {traceback} {rna}  {ambig_model}" \
                     .format(vA=self.path_to_signalMachine, model=stateMachineType_flag,
                             cigarFile=cigar_file_,
                             npRead=npRead_, readLabel=read_label, td=twoD_flag,
@@ -416,20 +425,20 @@ class SignalAlignment(object):
                             c_model=complement_model_flag, thresh=threshold_flag, expansion=diag_expansion_flag,
                             trim=trim_flag, sparse=out_fmt, seq_name=reference_name,
                             f_ref_fa=forward_ref_flag, b_ref_fa=backward_ref_flag, traceback=self.traceBackDiagonals,
-                            rna=rna_flag)
+                            rna=rna_flag, ambig_model=ambig_flag)
         else:
             command = \
                 "{vA} {td} {sparse}{model} -q {npRead} " \
                 "{t_model}{c_model}{thresh}{expansion}{trim} -p {cigarFile} " \
-                "-u {posteriors} {hdp}-L {readLabel} -n {seq_name} {f_ref_fa} {b_ref_fa} -g {traceback} {rna}" \
-                    .format(vA=self.path_to_signalMachine, model=stateMachineType_flag, sparse=out_fmt,
+                "-u {posteriors} {hdp}-L {readLabel} -n {seq_name} {f_ref_fa} {b_ref_fa} -g {traceback} {rna} " \
+                "{ambig_model}".format(vA=self.path_to_signalMachine, model=stateMachineType_flag, sparse=out_fmt,
                             cigarFile=cigar_file_,
                             readLabel=read_label, npRead=npRead_, td=twoD_flag,
                             t_model=template_model_flag, c_model=complement_model_flag,
                             posteriors=posteriors_file_path, thresh=threshold_flag, expansion=diag_expansion_flag,
                             trim=trim_flag, hdp=hdp_flags, seq_name=reference_name,
                             f_ref_fa=forward_ref_flag, b_ref_fa=backward_ref_flag, traceback=self.traceBackDiagonals,
-                            rna=rna_flag)
+                            rna=rna_flag, ambig_model=ambig_flag)
 
         # run
         print("[SignalAlignment.run] running command: ", command, end="\n")
@@ -751,7 +760,8 @@ def multithread_signal_alignment(signal_align_arguments, fast5_locations, worker
     optional_arguments = {'backward_reference', 'alignment_file', 'bwa_reference', 'twoD_chemistry',
                           'target_regions', 'output_format', 'embed', 'event_table', 'check_for_temp_file_existance',
                           'track_memory_usage', 'get_expectations', 'path_to_bin', 'perform_kmer_event_alignment',
-                          'enforce_supported_versions', 'filter_reads', 'traceBackDiagonals', 'delete_tmp', 'rna'}
+                          'enforce_supported_versions', 'filter_reads', 'traceBackDiagonals', 'delete_tmp', 'rna',
+                          'ambig_model'}
     missing_arguments = list(filter(lambda x: x not in signal_align_arguments.keys(), required_arguments))
     unexpected_arguments = list(filter(lambda x: x not in required_arguments and x not in optional_arguments,
                                        signal_align_arguments.keys()))
