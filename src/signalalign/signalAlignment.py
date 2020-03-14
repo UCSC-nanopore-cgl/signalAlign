@@ -905,7 +905,6 @@ class SignalAlignSample(object):
         self.workers = workers
         self.assignments_dir = assignments_dir
         self.ambig_model = ambig_model
-        print("self.ambig_model", self.ambig_model)
         if self.ambig_model:
             assert os.path.isfile(self.ambig_model), "ambig_model does not exist: {}".format(self.ambig_model)
 
