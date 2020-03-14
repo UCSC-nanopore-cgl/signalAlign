@@ -287,11 +287,12 @@ class NanoporeRead(object):
         template_event_table_address = os.path.join(oned_root_address, "BaseCalled_template/Events")
         if template_event_table_address in self.fastFive:
             template_events = np.asarray(self.fastFive[template_event_table_address])
-        check_numpy_table(template_events, req_fields=('start', 'length'))
-        if template_events["start"].dtype is np.dtype('uint64'):
-            return False
-        else:
+            check_numpy_table(template_events, req_fields=('start', 'length'))
+            if template_events["start"].dtype is np.dtype('uint64'):
+                return False
             return True
+        else:
+            return False
 
     @staticmethod
     def make_event_map(events, kmer_length):
