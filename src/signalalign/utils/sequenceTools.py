@@ -574,8 +574,11 @@ class CustomAmbiguityPositions(object):
                                   "mods": np.str})
             dict1 = {}
             for x in data.iterrows():
-                 dict1[x[1]["mods"]] = x[1]["ambig"]
-                 dict1[x[1]["ambig"]] = x[1]["ambig"]
+                dict1[x[1]["mods"]] = x[1]["ambig"]
+                dict1[x[1]["ambig"]] = x[1]["ambig"]
+                mods = set(x[1]["mods"])
+                for mod in mods:
+                    dict1[mod] = mod
             return dict1
         else:
             return None
