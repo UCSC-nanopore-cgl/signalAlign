@@ -152,7 +152,8 @@ def main(args):
         print(temp_dir_path)
 
         sa_args = [merge_dicts([s,
-                                {"quality_threshold": config_args.filter_reads, "workers": config_args.job_count}])
+                                {"quality_threshold": config_args.filter_reads, "workers": config_args.job_count,
+                                 "ambig_model": config_args.ambig_model}])
                    for s in config_args.samples]
 
         samples = [SignalAlignSample(working_folder=temp_folder, **s) for s in sa_args]
