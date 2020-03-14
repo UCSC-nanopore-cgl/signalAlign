@@ -565,7 +565,8 @@ class CustomAmbiguityPositions(object):
         """Parse a tsv which encodes correct one character encoding for multiple character paths
         :param ambig_modelpath: path to ambiguity model file
         """
-        if os.path.isfile(ambig_modelpath):
+        if ambig_modelpath:
+            assert os.path.isfile(ambig_modelpath), "ambig_modelpath is not a file: {}".format(ambig_modelpath)
             data = pd.read_csv(ambig_modelpath, sep="\t",
                            usecols=(0, 1),
                            names=["ambig", "mods"],

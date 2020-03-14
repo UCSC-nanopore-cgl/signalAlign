@@ -829,8 +829,8 @@ def multithread_signal_alignment(signal_align_arguments, fast5_locations, worker
 def create_sa_sample_args(fofns=[], fast5_dirs=[], positions_file=None, motifs=None, alignment_file=None,
                           bwa_reference=None, fw_reference=None, bw_reference=None, name=None,
                           number_of_kmer_assignments=10, probability_threshold=0.8, kmers_from_reference=False,
-                          quality_threshold=7, recursive=False, workers=4, assignments_dir=None, readdb=None,
-                          ):
+                          quality_threshold=7, recursive=False, workers=4, assignments_dir=None, readdb=None, 
+                          ambig_model=None):
     """Create sample arguments for SignalAlignSample. Parameters are explained in SignalAlignmentSample"""
     sample_args = {
         "fofns": fofns,
@@ -849,7 +849,8 @@ def create_sa_sample_args(fofns=[], fast5_dirs=[], positions_file=None, motifs=N
         'recursive': recursive,
         'workers': workers,
         "assignments_dir": assignments_dir,
-        "readdb": readdb
+        "readdb": readdb,
+        "ambig_model": ambig_model
     }
     return sample_args
 
@@ -904,6 +905,7 @@ class SignalAlignSample(object):
         self.workers = workers
         self.assignments_dir = assignments_dir
         self.ambig_model = ambig_model
+        print("self.ambig_model", self.ambig_model)
         if self.ambig_model:
             assert os.path.isfile(self.ambig_model), "ambig_model does not exist: {}".format(self.ambig_model)
 
