@@ -829,7 +829,8 @@ def multithread_signal_alignment(signal_align_arguments, fast5_locations, worker
 def create_sa_sample_args(fofns=[], fast5_dirs=[], positions_file=None, motifs=None, alignment_file=None,
                           bwa_reference=None, fw_reference=None, bw_reference=None, name=None,
                           number_of_kmer_assignments=10, probability_threshold=0.8, kmers_from_reference=False,
-                          quality_threshold=7, recursive=False, workers=4, assignments_dir=None, readdb=None):
+                          quality_threshold=7, recursive=False, workers=4, assignments_dir=None, readdb=None,
+                          ):
     """Create sample arguments for SignalAlignSample. Parameters are explained in SignalAlignmentSample"""
     sample_args = {
         "fofns": fofns,
@@ -856,7 +857,8 @@ def create_sa_sample_args(fofns=[], fast5_dirs=[], positions_file=None, motifs=N
 class SignalAlignSample(object):
     def __init__(self, working_folder, fofns, fast5_dirs, positions_file, motifs, bwa_reference, fw_reference,
                  bw_reference, name, number_of_kmer_assignments, probability_threshold, kmers_from_reference,
-                 alignment_file, readdb=None, quality_threshold=0, recursive=False, workers=4, assignments_dir=None):
+                 alignment_file, readdb=None, quality_threshold=0, recursive=False, workers=4, assignments_dir=None,
+                 ambig_model=None):
         """Prepare sample for processing via signalAlign.
 
         :param working_folder: FolderHandler() object with a working directory already created
@@ -874,7 +876,7 @@ class SignalAlignSample(object):
         :param recursive: recursively search fast5 dirs for files
         :param workers: number of workers for multithreading
         :param assignments_dir: place where already built assignments were placed
-
+        :param ambig_model: path to tsv for character encoding
         ###### Sample specific HDP Training Parameters #######
         :param number_of_kmer_assignments: max number of assignments for each kmer
         :param probability_threshold: minimum probability required to use for training
@@ -901,6 +903,9 @@ class SignalAlignSample(object):
         self.recursive = recursive
         self.workers = workers
         self.assignments_dir = assignments_dir
+        self.ambig_model = ambig_model
+        if self.ambig_model:
+            assert os.path.isfile(self.ambig_model), "ambig_model does not exist: {}".format(self.ambig_model)
 
         assert self.name is not None, "Must specify a name for your sample. name: {}".format(self.name)
         assert isinstance(self.fast5_dirs, list), "fast5_dirs needs to be a list. fast5_dirs: {}".format(
@@ -956,7 +961,8 @@ class SignalAlignSample(object):
                                                                            work_folder=self.working_folder,
                                                                            motifs=self.motifs,
                                                                            positions_file=self.positions_file,
-                                                                           name=self.name)
+                                                                           name=self.name,
+                                                                           ambig_model=self.ambig_model)
 
     def process_reads(self, trim=False, randomize=False):
         """Creates a filter_read generator object"""

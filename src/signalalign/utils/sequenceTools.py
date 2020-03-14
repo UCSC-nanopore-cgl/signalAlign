@@ -549,7 +549,7 @@ def parse_full_alignment_file(alignment_file):
 
 
 class CustomAmbiguityPositions(object):
-    def __init__(self, ambig_filepath):
+    def __init__(self, ambig_filepath, ambig_model=None):
         """Deal with ambiguous positions from a tsv ambiguity position file with the format of
         contig  position            strand  change_from change_to
         'name'  0 indexed position   +/-    C           E
@@ -558,6 +558,26 @@ class CustomAmbiguityPositions(object):
         :param ambig_filepath: path to ambiguity position file"""
 
         self.ambig_df = self.parseAmbiguityFile(ambig_filepath)
+        self.ambig_model = self.parse_ambig_model(ambig_model)
+
+    @staticmethod
+    def parse_ambig_model(ambig_modelpath):
+        """Parse a tsv which encodes correct one character encoding for multiple character paths
+        :param ambig_modelpath: path to ambiguity model file
+        """
+        if os.path.isfile(ambig_modelpath):
+            data = pd.read_csv(ambig_modelpath, sep="\t",
+                           usecols=(0, 1),
+                           names=["ambig", "mods"],
+                           dtype={"ambig": np.str,
+                                  "mods": np.str})
+            dict1 = {}
+            for x in data.iterrows():
+                 dict1[x[1]["mods"]] = x[1]["ambig"]
+                 dict1[x[1]["ambig"]] = x[1]["ambig"]
+            return dict1
+        else:
+            return None
 
     @staticmethod
     def parseAmbiguityFile(ambig_filepath):
@@ -606,7 +626,10 @@ class CustomAmbiguityPositions(object):
                 raise RuntimeError(
                     "[CustomAmbiguityPositions._get_substituted_sequence]Illegal substitution requesting "
                     "change from %s to %s, row: %s" % (raw_sequence[row["position"]], row["change_to"], row))
-            raw_sequence[row["position"]] = AMBIG_BASES["".join(sorted(row["change_to"]))]
+            if self.ambig_model:
+                raw_sequence[row["position"]] = self.ambig_model["".join(sorted(row["change_to"]))]
+            else:
+                raw_sequence[row["position"]] = AMBIG_BASES["".join(sorted(row["change_to"]))]
         return "".join(raw_sequence)
 
     def _get_contig_positions(self, contig, strand):
@@ -622,7 +645,7 @@ class CustomAmbiguityPositions(object):
         return df
 
 
-def processReferenceFasta(fasta, work_folder, name, motifs=None, positions_file=None):
+def processReferenceFasta(fasta, work_folder, name, motifs=None, positions_file=None, ambig_model=None):
     """loops over all of the contigs in the reference file, writes the forward and backward sequences
     as flat files (no headers or anything) for signalMachine, returns a dict that has the sequence
     names as keys and the paths to the processed sequence as keys
@@ -631,6 +654,7 @@ def processReferenceFasta(fasta, work_folder, name, motifs=None, positions_file=
     :param work_folder: FolderHandler object
     :param motifs: list of tuple pairs for motif edits. ex [["CCAGG", "CEAGG"]]
     :param positions_file: ambiguous positions file which can be processed via CustomAmbiguityPositions
+    :param ambig_model: model for ambiguous characters
     :return: paths to possibly edited forward reference sequence and backward reference sequence
     """
     positions = None
@@ -645,7 +669,7 @@ def processReferenceFasta(fasta, work_folder, name, motifs=None, positions_file=
         if not os.path.exists(positions_file):
             raise RuntimeError("[processReferenceFasta] Did not find ambiguity position file here: %s" %
                                positions_file)
-        positions = CustomAmbiguityPositions(positions_file)
+        positions = CustomAmbiguityPositions(positions_file, ambig_model=ambig_model)
 
     # process fasta
     fw_fasta_path = work_folder.add_file_path("forward.{}.{}".format(name, os.path.basename(fasta)))
