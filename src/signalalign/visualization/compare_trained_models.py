@@ -13,6 +13,7 @@ import numpy as np
 import csv
 import matplotlib as mpl
 import platform
+
 if os.environ.get('DISPLAY', '') == '':
     print('no display found. Using non-interactive Agg backend')
     mpl.use('Agg')
@@ -20,7 +21,7 @@ if platform.system() == "Darwin":
     mpl.use("macosx")
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
-# from matplotlib.animation import FuncAnimation
+from matplotlib.animation import FuncAnimation
 
 from argparse import ArgumentParser
 from itertools import zip_longest
@@ -30,7 +31,7 @@ from sklearn.neighbors import KernelDensity
 from scipy.stats import norm, invgauss, entropy
 from scipy.spatial.distance import euclidean
 
-from py3helpers.utils import load_json, create_dot_dict, save_json
+from py3helpers.utils import load_json, create_dot_dict, save_json, merge_lists
 from signalalign.hiddenMarkovModel import HmmModel, parse_assignment_file, parse_alignment_file, hellinger2
 
 
@@ -59,7 +60,7 @@ class MultipleModelHandler(object):
         self.strands = strands
         self.savefig_dir = savefig_dir
 
-    def plot_kmer_distribution(self, kmer_list_list):
+    def plot_kmer_distribution(self, kmer_list_list, output_file=None):
         """Plot multiple kmer distribution onto a single plot with ONT and/or HDP distributions
         :param kmer_list_list: list of kmers for plotting each model
         """
@@ -154,7 +155,8 @@ class MultipleModelHandler(object):
 
                     # plot ont normal distribution
                     x = np.linspace(normal_mean - 4 * normal_sd, normal_mean + 4 * normal_sd, 200)
-                    nanopolish_handle, = panel1.plot(x, norm.pdf(x, normal_mean, normal_sd), label=kmer, color=colors[color_index])
+                    nanopolish_handle, = panel1.plot(x, norm.pdf(x, normal_mean, normal_sd), label=kmer,
+                                                     color=colors[color_index])
                     color_index += 1
                     if color_index > 6:
                         color_index = 0
@@ -231,8 +233,184 @@ class MultipleModelHandler(object):
             name = "{}.png".format(base_name)
             out_path = os.path.join(self.savefig_dir, name)
             plt.savefig(out_path)
+        elif output_file:
+            plt.savefig(output_file)
         else:
             plt.show()
+
+    def plot_kmer_distribution2(self, kmer_list, output_file=None, strand="t", color_maps=None):
+        """Plot multiple kmer distribution onto a single plot with ONT and/or HDP distributions
+        :param color_maps:
+        :param kmer_list: list of kmers for all models to plot
+        """
+        if self.savefig_dir:
+            assert os.path.exists(self.savefig_dir), "Save figure directory does not exist: {}".format(self.savefig_dir)
+        if not color_maps:
+            color_maps = ['Purples', 'Greens', 'Oranges', 'Blues', 'Reds',
+                          'YlOrBr', 'YlOrRd', 'OrRd', 'PuRd', 'RdPu', 'BuPu',
+                          'GnBu', 'PuBu', 'YlGnBu', 'PuBuGn', 'BuGn', 'YlGn']
+        assert len(color_maps) >= len(kmer_list), "Need a color map for each kmer. Please specify more color maps: " \
+                                                  "{}".format(color_maps)
+        # keep track of handles and text depending on which models are loaded
+        handles1 = []
+        legend_text1 = []
+        handles2 = []
+        legend_text2 = []
+        # plt.figure(figsize=(20, 20))
+        panel1 = plt.axes([0.1, 0.5, .8, .45])
+        panel1.set_xlabel('pA')
+        panel1.set_ylabel('Density')
+        panel1.grid(color='black', linestyle='-', linewidth=1, alpha=0.5)
+        panel1.xaxis.set_major_locator(ticker.AutoLocator())
+        panel1.xaxis.set_minor_locator(ticker.AutoMinorLocator())
+        min_x = 1000
+        max_x = 0
+        titles = []
+        for x, kmer in enumerate(kmer_list):
+            cmap = mpl.cm.get_cmap(color_maps[x])
+            colors = [cmap(x) for x in np.linspace(1 / len(self.models), 1, num=len(self.models))]
+            print(colors)
+            for i, model in enumerate(self.models):
+                nuc_type = "RNA" if model.rna else "DNA"
+                strand = "t" if strand is None else strand
+                name = "_".join([model.name, nuc_type, strand, kmer])
+
+                normal_mean, normal_sd = model.get_event_mean_gaussian_parameters(kmer)
+
+                tmp_min_x = normal_mean - (5 * normal_sd)
+                tmp_max_x = normal_mean + (5 * normal_sd)
+                if min_x > tmp_min_x:
+                    min_x = tmp_min_x
+                if max_x < tmp_max_x:
+                    max_x = tmp_max_x
+
+                # plot ont normal distribution
+                x = np.linspace(normal_mean - 4 * normal_sd, normal_mean + 4 * normal_sd, 200)
+                ont_handle, = panel1.plot(x, norm.pdf(x, normal_mean, normal_sd), label=kmer, color=colors[i])
+                # panel1.plot([normal_mean, normal_mean], [0, norm.pdf(normal_mean, normal_mean, normal_sd)], lw=2)
+                ont_model_name = os.path.basename(model.ont_model_file)
+                txt_handle1, = panel1.plot([], [], ' ')
+                txt_handle2, = panel1.plot([], [], ' ')
+
+                handles1.append(ont_handle)
+                legend_text1.append("{} ONT Normal".format(name))
+
+                handles2.extend([txt_handle1, txt_handle2])
+                print("{} ONT Model: {}".format(name, ont_model_name))
+                print("{} ONT Event Mean: {}".format(name, normal_mean))
+                print("{} ONT Event SD: {}".format(name, normal_sd))
+                legend_text2.extend(["{} ONT Model: {}".format(name, ont_model_name),
+                                     "{} ONT Event Mean: {}".format(name, normal_mean)])
+
+                titles.append(name)
+        # create legend
+        first_legend = panel1.legend(handles1, legend_text1, bbox_to_anchor=(-0.1, -0.1), loc='upper left')
+        ax = plt.gca().add_artist(first_legend)
+
+        panel1.legend(handles2, legend_text2, bbox_to_anchor=(0.5, -.1), loc='upper left')
+
+        panel1.set_xlim(min_x, max_x)
+        panel1.set_title("Kmer distribution comparisons")
+
+        # option to save figure or just show it
+        # option to save figure or just show it
+        if self.savefig_dir:
+            base_name = "-".join(titles)[:200]
+            name = "{}.png".format(base_name)
+            out_path = os.path.join(self.savefig_dir, name)
+            plt.savefig(out_path)
+        elif output_file:
+            plt.savefig(output_file)
+        else:
+            plt.show()
+
+    def animate_kmer_distribution2(self, kmer_list, output_file=None, strand="t"):
+        """Animate multiple kmer distribution onto a single plot with ONT and/or HDP distributions
+        :param color_maps:
+        :param kmer_list: list of kmers for all models to plot
+        """
+        if self.savefig_dir:
+            assert os.path.exists(self.savefig_dir), "Save figure directory does not exist: {}".format(self.savefig_dir)
+        fig = plt.figure()
+        # plt.figure(figsize=(20, 20))
+        panel1 = plt.axes([0.1, 0.1, .8, .8])
+
+        panel1.set_xlabel('pA')
+        panel1.set_ylabel('Density')
+        panel1.grid(color='black', linestyle='-', linewidth=1, alpha=0.5)
+        panel1.xaxis.set_major_locator(ticker.AutoLocator())
+        panel1.xaxis.set_minor_locator(ticker.AutoMinorLocator())
+        min_x = 1000
+        max_x = 0
+        panel1.set_xlim(30, 180)
+        panel1.set_ylim(0, 1)
+
+        ylist_main = []
+        xlist_main = []
+        label_list_main = []
+        color_list_main = []
+        cmap = mpl.cm.get_cmap("tab20")
+        colors = [cmap(x) for x in np.linspace(0, 1, num=len(kmer_list))]
+
+        for x, kmer in enumerate(kmer_list):
+            color = colors[x]
+            ylist = []
+            xlist = []
+            label_list = []
+            color_list = []
+            for i, model in enumerate(self.models):
+                nuc_type = "RNA" if model.rna else "DNA"
+                strand = "t" if strand is None else strand
+
+                normal_mean, normal_sd = model.get_event_mean_gaussian_parameters(kmer)
+                name = model.name+": "+"_".join([nuc_type, strand, kmer]) + " N("+str(round(normal_mean, ndigits=2)) \
+                       + ", "+str(round(normal_sd, ndigits=2))+")"
+
+                tmp_min_x = normal_mean - (5 * normal_sd)
+                tmp_max_x = normal_mean + (5 * normal_sd)
+                if min_x > tmp_min_x:
+                    min_x = tmp_min_x
+                if max_x < tmp_max_x:
+                    max_x = tmp_max_x
+
+                # plot ont normal distribution
+                x = np.linspace(normal_mean - 4 * normal_sd, normal_mean + 4 * normal_sd, 200)
+                xlist.append(x)
+                ylist.append(norm.pdf(x, normal_mean, normal_sd))
+                label_list.append(name)
+                color_list.append(color)
+                # panel1.plot([normal_mean, normal_mean], [0, norm.pdf(normal_mean, normal_mean, normal_sd)], lw=2)
+            ylist_main.append(ylist)
+            xlist_main.append(xlist)
+            label_list_main.append(label_list)
+            color_list_main.append(color_list)
+
+        panel1.set_xlim(min_x, max_x)
+        panel1.set_ylim(0, max([max(merge_lists(x)) for x in ylist_main]))
+        panel1.set_title("Kmer distribution comparisons")
+
+        lines = [panel1.plot([], [], lw=2, label="label")[0] for _ in range(len(kmer_list))]
+
+        legend = [panel1.legend(loc='upper left')]
+
+        def animate(i):
+            for lnum, line in enumerate(lines):
+                line.set_data(xlist_main[lnum][i], ylist_main[lnum][i])  # set data for each line separately.
+                # line.set_label(label_list_main[lnum][i])
+                line.set_color(color_list_main[lnum][i ])
+                legend[0].texts[lnum].set_text(label_list_main[lnum][i])
+                legend[0].legendHandles[lnum].set_color(color_list_main[lnum][i])
+            # legend = panel1.legend(bbox_to_anchor=(0.6, -.1), loc='upper left')
+            return lines + legend
+
+        anim = FuncAnimation(fig, animate, frames=list(range(len(self.models))), interval=400, blit=False)
+
+        if output_file:
+            anim.save(output_file, writer='imagemagick', fps=2)
+            # anim.save(output_file, writer="imagemagick")
+        else:
+            plt.show()
+        plt.close(fig)
 
     def plot_all_model_comparisons(self, write_log_file=True):
         """Plot every comparison between each model"""
@@ -417,8 +595,6 @@ class MultipleModelHandler(object):
         if len(kmers) < len(model1.sorted_kmer_tuple) or len(kmers) < len(model1.sorted_kmer_tuple):
             print("[Warning] Not including kmers that do not exist in both models")
         return kmers
-
-
 
     @staticmethod
     def get_hdp_kmer_posterior_prediction(model, kmer, linspace, get_new_linspace=False):

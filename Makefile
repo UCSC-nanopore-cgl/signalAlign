@@ -188,6 +188,10 @@ ${signalAlignBin}/plot_kmer_distributions : ${rootPath}src/signalalign/visualiza
 	cp ${rootPath}src/signalalign/visualization/plot_kmer_distributions.py ${signalAlignBin}/plot_kmer_distributions
 	chmod +x ${signalAlignBin}/plot_kmer_distributions
 
+${signalAlignBin}/plot_em_model_distributions : ${rootPath}src/signalalign/visualization/plot_em_model_distributions.py
+	cp ${rootPath}src/signalalign/visualization/plot_em_model_distributions.py ${signalAlignBin}/plot_em_model_distributions
+	chmod +x ${signalAlignBin}/plot_em_model_distributions
+
 ${signalAlignBin}/plot_variant_accuracy : ${rootPath}src/signalalign/visualization/plot_variant_accuracy.py
 	cp ${rootPath}src/signalalign/visualization/plot_variant_accuracy.py ${signalAlignBin}/plot_variant_accuracy
 	chmod +x ${signalAlignBin}/plot_variant_accuracy
