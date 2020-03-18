@@ -60,6 +60,7 @@ all : bD lib/libhdf5.a htslib/libhts.a sL ${libPath}/signalAlignLib.a ${signalAl
 	  ${signalAlignBin}/sequencing_summary ${signalAlignBin}/plot_kmer_distributions \
 	  ${signalAlignBin}/plot_variant_accuracy ${signalAlignBin}/compare_trained_models \
 	  ${signalAlignBin}/remove_sa_analyses ${signalAlignBin}/plot_labelled_read
+	  ${signalAlignBin}/plot_em_model_distributions
 
 lib/libhdf5.a:
 	if [ ! -e hdf5-$(HDF5_VERSION).tar.gz ]; then \
