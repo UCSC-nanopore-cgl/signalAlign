@@ -724,7 +724,7 @@ class TrainSignalAlign(object):
                                              jobs=self.job_count,
                                              log_number=iteration)
             # write an hdp training file to path
-            built_alignments = hdp_data.write_hdp_training_file(verbose=True)
+            built_alignments = hdp_data.write_hdp_training_file(verbose=self.debug)
 
         #     parse output and process for template
         print("[trainModels.train_normal_emmissions] Updating template gaussian model parameters")
@@ -800,7 +800,7 @@ class TrainSignalAlign(object):
                                              jobs=self.job_count,
                                              log_number=iteration)
             # write an hdp training file to path
-            build_alignment_path = hdp_data.write_hdp_training_file(verbose=True)
+            build_alignment_path = hdp_data.write_hdp_training_file(verbose=self.debug)
             num_alignments = hdp_data.n_assignments
 
         verbose_flag = "--verbose "
@@ -958,7 +958,8 @@ class TrainSignalAlign(object):
                 print(self.template_hmm_model_path)
                 print(self.complement_hmm_model_path)
                 print(self.complement_hdp_model_path)
-                # self.new_working_folder(append=str(i))
+                if not self.args.delete_alignments:
+                    self.new_working_folder(append=str(i))
         elif self.args.training.transitions or self.args.training.hdp_emissions or self.args.training.normal_emissions:
             if self.args.training.normal_emissions:
                 print("[trainModels] Training HMM emission distributions.")

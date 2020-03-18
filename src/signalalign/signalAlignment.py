@@ -1003,8 +1003,9 @@ def multithread_signal_alignment_samples(samples, signal_align_arguments, worker
         signal_align_arguments["backward_reference"] = sample.bw_fasta_path
         signal_align_arguments["forward_reference"] = sample.fw_fasta_path
         signal_align_arguments["destination"] = os.path.join(original_destination, sample.name)
-        if not os.path.exists(signal_align_arguments["destination"]):
-            os.mkdir(signal_align_arguments["destination"])
+        if os.path.exists(signal_align_arguments["destination"]):
+            shutil.rmtree(signal_align_arguments["destination"])
+        os.mkdir(signal_align_arguments["destination"])
         # run signal align
         assert sample.filter_read_generator is not None, \
             "Sample {} does not have a filter read generator. " \
@@ -1017,7 +1018,7 @@ def multithread_signal_alignment_samples(samples, signal_align_arguments, worker
             output_files = multithread_signal_alignment(signal_align_arguments, [], worker_count, debug=debug,
                                                         filter_reads_to_string_wrapper=sample.filter_read_generator)
 
-        print("[multithread_signal_alignment_samples] {} generated {} output_files".format(sample.name, len(output_files)))
+        print("[multithread_signal_alignment_samples] {} generated {} output_files".format(sample.name, len(output_files)), flush=True)
         sample.analysis_files = output_files
 
     return samples
