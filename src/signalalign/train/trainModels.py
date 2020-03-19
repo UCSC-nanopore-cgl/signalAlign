@@ -447,6 +447,9 @@ class CreateHdpTrainingData(object):
                     print("[CreateHdpTrainingData] WARNING: Using sample analysis files when "
                           "assignments_dir is also set: {}".format(sample.name))
                 assignment_files = [x for x in sample.analysis_files if x.endswith("assignments.tsv")]
+                if len(assignment_files) == 0:
+                    assignment_files = [x for x in sample.analysis_files if x.endswith("ard.tsv")]
+                    full = True
             # infer kmer length and get kmers
             sample_assignment_table = get_assignment_table(assignment_files[0], 0, full)
             self.set_kmer_len(len(sample_assignment_table.iloc[0]['kmer']))
