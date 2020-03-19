@@ -151,20 +151,29 @@ def main(config=None):
     config = create_dot_dict(load_json(args.config))
     print("Output dir: ", config.save_fig_dir)
     print("Reference: ", config.reference)
+    print("Assignments: ", config.assignments)
     print("Positions: ", config.positions)
     print("Models: ", config.models)
     print("RNA: ", config.rna)
     print("Save: ", config.save)
+    print("Scatter: ", config.scatter)
     assert os.path.isdir(config.save_fig_dir), "save_fig_dir does not exist: {}".format(config.save_fig_dir)
+    assert len(config.assignments) == len(config.models), "Number of models has to equal number of assignment files"
+    kmer_data = []
+    for path in config.assignments:
+        if path:
+            kmer_data.append(MultipleModelHandler.read_in_alignment_data(path))
+        else:
+            kmer_data.append(None)
+
     if config.rna:
         kmer_length = 5
     else:
         kmer_length = 6
 
     all_covered_bases = get_covered_bases(config.reference, config.positions, kmer_length, config.rna)
-    num_models = len(config.models)
     models = [HmmModel(x, rna=config.rna, name="model" + str(i)) for i, x in enumerate(config.models)]
-    mmh = MultipleModelHandler(models, ["t"]*len(models))
+    mmh = MultipleModelHandler(models, ["t"]*len(models), assignment_data=kmer_data)
     # #
     for contig, pos, vars, kmers in all_covered_bases:
         dir_name = os.path.join(config.save_fig_dir, "_".join([contig+"_"+str(x)+y for x, y in zip(pos, vars)]))
@@ -176,8 +185,7 @@ def main(config=None):
             output_file = None
             if config.save:
                 output_file = os.path.join(dir_name, "_".join(kmer_group)+".gif")
-            # mmh.plot_kmer_distribution2(list(kmer_group), output_file=None)
-            mmh.animate_kmer_distribution2(list(kmer_group), output_file=output_file)
+            mmh.animate_kmer_distribution(list(kmer_group), output_file=output_file, scatter=config.scatter)
 
 
 if __name__ == '__main__':

@@ -48,7 +48,7 @@ def parse_args():
 
 class MultipleModelHandler(object):
 
-    def __init__(self, models, strands, assignment_data=None, savefig_dir=None):
+    def __init__(self, models, strands, assignment_data=None, savefig_dir=None, assignment_files=None):
         assert len(models) == len(strands), "Must have strand with each model. models = {} :: strands = {}".format(
             models, strands)
         if savefig_dir is not None:
@@ -59,6 +59,9 @@ class MultipleModelHandler(object):
             self.assignment_data = [None]
         self.strands = strands
         self.savefig_dir = savefig_dir
+        self.assignment_files = assignment_files
+        if self.assignment_files is None:
+            self.assignment_files = [None]
 
     def plot_kmer_distribution(self, kmer_list_list, output_file=None):
         """Plot multiple kmer distribution onto a single plot with ONT and/or HDP distributions
@@ -270,7 +273,7 @@ class MultipleModelHandler(object):
             cmap = mpl.cm.get_cmap(color_maps[x])
             colors = [cmap(x) for x in np.linspace(1 / len(self.models), 1, num=len(self.models))]
             print(colors)
-            for i, model in enumerate(self.models):
+            for i, model, assignments in enumerate(self.models):
                 nuc_type = "RNA" if model.rna else "DNA"
                 strand = "t" if strand is None else strand
                 name = "_".join([model.name, nuc_type, strand, kmer])
@@ -303,6 +306,8 @@ class MultipleModelHandler(object):
                                      "{} ONT Event Mean: {}".format(name, normal_mean)])
 
                 titles.append(name)
+
+
         # create legend
         first_legend = panel1.legend(handles1, legend_text1, bbox_to_anchor=(-0.1, -0.1), loc='upper left')
         ax = plt.gca().add_artist(first_legend)
@@ -324,16 +329,20 @@ class MultipleModelHandler(object):
         else:
             plt.show()
 
-    def animate_kmer_distribution2(self, kmer_list, output_file=None, strand="t"):
+    def animate_kmer_distribution(self, kmer_list, output_file=None, strand="t", scatter=False):
         """Animate multiple kmer distribution onto a single plot with ONT and/or HDP distributions
-        :param color_maps:
         :param kmer_list: list of kmers for all models to plot
+        :param output_file: path to output file
+        :param strand: model strand ("t" or "c")
+        :param scatter: boolean option to plot each event mean
+        :return:
         """
         if self.savefig_dir:
             assert os.path.exists(self.savefig_dir), "Save figure directory does not exist: {}".format(self.savefig_dir)
         fig = plt.figure()
         # plt.figure(figsize=(20, 20))
-        panel1 = plt.axes([0.1, 0.1, .8, .8])
+        # panel1 = plt.axes([0.1, 0.1, .8, .8])
+        panel1 = plt.axes([0.1, 0.5, .8, .45])
 
         panel1.set_xlabel('pA')
         panel1.set_ylabel('Density')
@@ -349,16 +358,21 @@ class MultipleModelHandler(object):
         xlist_main = []
         label_list_main = []
         color_list_main = []
+        assignments_color_list_main = []
+        assignments_list_main = []
         cmap = mpl.cm.get_cmap("tab20")
-        colors = [cmap(x) for x in np.linspace(0, 1, num=len(kmer_list))]
+        colors = [cmap(x) for x in np.linspace(0, 1, num=20)]
 
         for x, kmer in enumerate(kmer_list):
-            color = colors[x]
+            color = colors[x*2]
+            color2 = colors[(x*2)+1]
             ylist = []
             xlist = []
             label_list = []
             color_list = []
-            for i, model in enumerate(self.models):
+            assignments_list = []
+            assignments_color_list = []
+            for i, (model, assignment_data) in enumerate(zip_longest(self.models, self.assignment_data)):
                 nuc_type = "RNA" if model.rna else "DNA"
                 strand = "t" if strand is None else strand
 
@@ -379,29 +393,93 @@ class MultipleModelHandler(object):
                 ylist.append(norm.pdf(x, normal_mean, normal_sd))
                 label_list.append(name)
                 color_list.append(color)
-                # panel1.plot([normal_mean, normal_mean], [0, norm.pdf(normal_mean, normal_mean, normal_sd)], lw=2)
+                assignments_color_list.append(color2)
+                data = [None, None]
+                if assignment_data is not None:
+                    kmer_assignments = assignment_data.loc[assignment_data['kmer'] == kmer]
+                    kmer_assignments = kmer_assignments.loc[kmer_assignments['strand'] == strand]
+                    kmer_means = kmer_assignments["level_mean"]
+                    kmer_prob = kmer_assignments["prob"]
+                    # get event means and linspace in correct format
+                    x = np.asarray(kmer_means).reshape(len(kmer_means), 1)
+                    alphas = np.asarray(kmer_prob).reshape(len(kmer_prob), 1)
+                    data = [x, alphas]
+                assignments_list.append(data)
+
             ylist_main.append(ylist)
             xlist_main.append(xlist)
             label_list_main.append(label_list)
             color_list_main.append(color_list)
+            assignments_list_main.append(assignments_list)
+            assignments_color_list_main.append(assignments_color_list)
 
         panel1.set_xlim(min_x, max_x)
-        panel1.set_ylim(0, max([max(merge_lists(x)) for x in ylist_main]))
+        if scatter:
+            panel1.set_ylim(-0.03, max([max(merge_lists(x)) for x in ylist_main]))
+        else:
+            panel1.set_ylim(0, max([max(merge_lists(x)) for x in ylist_main]))
+
         panel1.set_title("Kmer distribution comparisons")
 
         lines = [panel1.plot([], [], lw=2, label="label")[0] for _ in range(len(kmer_list))]
+        kde = [panel1.plot([], [], lw=2, label="label")[0] for _ in range(len(kmer_list))]
+        if scatter:
+            scatter1 = [panel1.scatter([], [], label="label") for _ in range(len(kmer_list))]
 
-        legend = [panel1.legend(loc='upper left')]
+        # legend = [panel1.legend(loc='upper left')]
+        legend = [panel1.legend(loc='upper left', bbox_to_anchor=(0.5, -.1))]
 
         def animate(i):
             for lnum, line in enumerate(lines):
                 line.set_data(xlist_main[lnum][i], ylist_main[lnum][i])  # set data for each line separately.
                 # line.set_label(label_list_main[lnum][i])
-                line.set_color(color_list_main[lnum][i ])
+                line.set_color(color_list_main[lnum][i])
                 legend[0].texts[lnum].set_text(label_list_main[lnum][i])
                 legend[0].legendHandles[lnum].set_color(color_list_main[lnum][i])
-            # legend = panel1.legend(bbox_to_anchor=(0.6, -.1), loc='upper left')
-            return lines + legend
+                x, alphas = assignments_list_main[lnum][i]
+
+                x_plot = xlist_main[lnum][i][:, np.newaxis]
+                # for red the first column needs to be one
+                if x is not None and alphas is not None and len(x) > 0:
+                    kde1 = KernelDensity(kernel="gaussian", bandwidth=0.5).fit(x)
+                    # estimate across the linspace
+                    log_dens = kde1.score_samples(x_plot)
+                    kde[lnum].set_data(x_plot[:, 0], np.exp(log_dens))
+                    legend[0].texts[lnum+len(lines)].set_text(
+                        "Event Means: {} points\nProb: mu: {}, sd:{}".format(len(x),
+                                                                             np.mean(alphas[:, 0]),
+                                                                             np.std(alphas[:, 0])))
+                    data_to_scatter = np.c_[x[:, 0], -0.005 - 0.01 * np.random.random(x.shape[0])][:, :2]
+                    legend[0].texts[lnum+len(lines)].set_text("KDE of raw event alignments".format())
+                    if scatter:
+                        scatter1[lnum].set_offsets(data_to_scatter)
+                        legend[0].texts[lnum+len(lines)+len(lines)].set_text(
+                            "Event Means: {} points\nProb: mu: {}, sd:{}".format(len(x),
+                                                                                 np.mean(alphas[:, 0]),
+                                                                                 np.std(alphas[:, 0])))
+
+                else:
+                    kde[lnum].set_data([], [])
+                    legend[0].texts[lnum+len(lines)].set_text("KDE of raw event alignments".format())
+                    if scatter:
+
+                        legend[0].texts[lnum+len(lines)+len(lines)].set_text(
+                                "Event Means: 0 points\nProb: mu: NA, sd:NA".format())
+                        scatter1[lnum].set_offsets(np.zeros(shape=(1, 2)))
+
+                kde[lnum].set_color(assignments_color_list_main[lnum][i])
+                legend[0].legendHandles[lnum+len(lines)].set_color(assignments_color_list_main[lnum][i])
+                if scatter:
+                    scatter1[lnum].set_color(assignments_color_list_main[lnum][i])
+                    legend[0].legendHandles[lnum+len(lines)+len(lines)].set_color(assignments_color_list_main[lnum][i])
+
+                # add to legend
+                # legend_text1.extend(["Gaussian KDE Estimate: {}".format(name),
+                #                      "Event Means: {} points\nProb: mu: {}, sd:{}".format(len(kmer_data),
+                #                                                                           np.mean(alphas[:, 0]),
+                #                                                                           np.std(
+                #                                                                               alphas[:, 0]))])
+            return lines + legend + kde
 
         anim = FuncAnimation(fig, animate, frames=list(range(len(self.models))), interval=400, blit=False)
 
@@ -652,6 +730,17 @@ class MultipleModelHandler(object):
         delta = linspace[dist1.index(max(dist1))] - linspace[dist2.index(max(dist2))]
         return abs(delta)
 
+    @staticmethod
+    def read_in_alignment_data(path_to_data):
+        """Read in signalalign output file"""
+        assert os.path.exists(path_to_data), \
+            "path_to_data does not exist: {}".format(path_to_data)
+        # read in both types of data
+        try:
+            data = parse_assignment_file(path_to_data)
+        except ValueError:
+            data = parse_alignment_file(path_to_data)
+        return data
 
 def main(config=None):
     if config is None:
