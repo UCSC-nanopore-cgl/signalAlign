@@ -139,6 +139,12 @@ def get_covered_bases(reference, positions, kmer_length=5, rna=True):
         strand = row[2]
         # base = row[3]
         variant_bases = row[4]
+    all_pos.append(pos)
+    all_variant_bases.append(variant_bases)
+    all_covered_bases.append([contig, all_pos, all_variant_bases,
+                              get_covered_kmers(ref_handler, contig, strand, all_pos, all_variant_bases,
+                                                rna, kmer_length)])
+
     return all_covered_bases
 
 
