@@ -345,7 +345,7 @@ StateMachine *buildStateMachine2(const char *modelFile, StateMachineType type,
 
   if (type == threeState) {
     StateMachine *sM = stateMachine3_loadFromFile(modelFile, threeState, emissions_kmer_getGapProb,
-                                                  emissions_signal_strawManGetKmerEventMatchProbWithDescaling,
+                                                  emissions_signal_strawManGetKmerEventMatchProbWithDescaling_MeanOnly,
                                                   stateMachine3_loadTransitionsFromFile, NULL);
 
     return sM;
