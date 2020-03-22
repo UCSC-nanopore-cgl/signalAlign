@@ -191,7 +191,7 @@ def main(config=None):
             output_file = None
             if config.save:
                 output_file = os.path.join(dir_name, "_".join(kmer_group)+".gif")
-            mmh.animate_kmer_distribution(list(kmer_group), output_file=output_file, scatter=config.scatter)
+            mmh.animate_kmer_distribution(sorted(list(kmer_group)), output_file=output_file, scatter=config.scatter)
 
 
 if __name__ == '__main__':
