@@ -453,7 +453,8 @@ class MultipleModelHandler(object):
                 if x is not None and alphas is not None and len(x) > 0:
                     kde1 = KernelDensity(kernel="gaussian", bandwidth=0.5).fit(x)
                     # estimate across the linspace
-                    x_plot = np.linspace(min(x), max(x), 200)[:, np.newaxis]
+                    x_plot = np.linspace(min(x), max(x), 200)
+                    x_plot = np.reshape(x_plot, (200, 1))
                     log_dens = kde1.score_samples(x_plot)
                     kde[lnum].set_data(x_plot[:, 0], np.exp(log_dens))
                     legend[1].texts[lnum].set_text(
