@@ -60,6 +60,7 @@ all : bD lib/libhdf5.a htslib/libhts.a sL ${libPath}/signalAlignLib.a ${signalAl
 	  ${signalAlignBin}/sequencing_summary ${signalAlignBin}/plot_kmer_distributions \
 	  ${signalAlignBin}/plot_variant_accuracy ${signalAlignBin}/compare_trained_models \
 	  ${signalAlignBin}/remove_sa_analyses ${signalAlignBin}/plot_labelled_read \
+	  ${signalAlignBin}/plot_multiple_variant_accuracy\
 	  ${signalAlignBin}/plot_em_model_distributions
 
 lib/libhdf5.a:
@@ -200,6 +201,10 @@ ${signalAlignBin}/plot_variant_accuracy : ${rootPath}src/signalalign/visualizati
 ${signalAlignBin}/plot_labelled_read : ${rootPath}src/signalalign/visualization/plot_labelled_read.py
 	cp ${rootPath}src/signalalign/visualization/plot_labelled_read.py ${signalAlignBin}/plot_labelled_read
 	chmod +x ${signalAlignBin}/plot_labelled_read
+
+${signalAlignBin}/plot_multiple_variant_accuracy : ${rootPath}src/signalalign/visualization/plot_multiple_variant_accuracy.py
+	cp ${rootPath}src/signalalign/visualization/plot_multiple_variant_accuracy.py ${signalAlignBin}/plot_multiple_variant_accuracy
+	chmod +x ${signalAlignBin}/plot_multiple_variant_accuracy
 
 ${signalAlignBin}/compare_trained_models : ${rootPath}src/signalalign/visualization/compare_trained_models.py
 	cp ${rootPath}src/signalalign/visualization/compare_trained_models.py ${signalAlignBin}/compare_trained_models
