@@ -111,11 +111,6 @@ def plot_variant_data(labels, probs, label_ids, output_dir, name):
         cm = ClassificationMetrics(labels,
                                    probs,
                                    label_ids=label_ids)
-        plot = cm.plot_confusion_matrix(threshold=0.5,
-                                        title="Confusion Matrix " + name,
-                                        save_fig_path=os.path.join(output_dir, name + "_confusion_matrix.png"),
-                                        class_n=None)
-        plot.close()
         if n_variants > 2:
             plot = cm.plot_multiclass_precision_recall(save_fig_path=os.path.join(output_dir,
                                                                                   name + "_precision_recall.png"),
@@ -134,6 +129,11 @@ def plot_variant_data(labels, probs, label_ids, output_dir, name):
                                                 normalize=True)
                 plot.close()
         else:
+            plot = cm.plot_confusion_matrix(threshold=0.5,
+                                            title="Confusion Matrix " + name,
+                                            save_fig_path=os.path.join(output_dir, name + "_confusion_matrix.png"),
+                                            class_n=None)
+            plot.close()
             plot = cm.plot_probability_hist(class_n,
                                             save_fig_path=os.path.join(output_dir, name + "_probability_hist.png"),
                                             bins=None,
@@ -182,6 +182,7 @@ def main(config=None):
         os.makedirs(output_dir)
     possible_number_of_variants = list(set(all_data_df['variants'].str.len()))
     for x in possible_number_of_variants:
+        print("variants_length_{}".format(x))
         labels, probs, label_ids = get_prob_and_label(all_data_df[all_data_df['variants'].str.len() == x])
         plot_variant_data(labels, probs, label_ids, output_dir, "variants_length_{}".format(x))
 
@@ -191,6 +192,7 @@ def main(config=None):
         os.makedirs(output_dir)
     possible_variants = list(set(all_data_df['variants']))
     for x in possible_variants:
+        print("variants_{}".format(x))
         labels, probs, label_ids = get_prob_and_label(all_data_df[all_data_df['variants'] == x])
         plot_variant_data(labels, probs, label_ids, output_dir, "variants_{}".format(x))
 
@@ -199,6 +201,7 @@ def main(config=None):
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
     for x, y in all_data_df.groupby(['contig', 'reference_index', "strand", "variants"], as_index=False):
+        print("_".join([str(i) for i in x]))
         labels, probs, label_ids = get_prob_and_label(y)
         plot_variant_data(labels, probs, label_ids, output_dir, "_".join([str(i) for i in x]))
 
