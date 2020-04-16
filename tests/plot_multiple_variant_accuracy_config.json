@@ -1,0 +1,16 @@
+{
+  "output_dir": "/Users/andrewbailey/CLionProjects/personal/projects/ares_rRNA/sa_training/supervised/ivt_native/em_compare_remote/compare_accuracy_plots",
+  "reference": "/Users/andrewbailey/CLionProjects/personal/projects/ares_rRNA/reference/yeast_25S_18S.fa",
+  "samples": [
+    {
+      "name": "ivt",
+      "variant_csv": "/Users/andrewbailey/CLionProjects/personal/projects/ares_rRNA/sa_training/supervised/ivt_native/em_compare_remote/tsvs/test.csv",
+      "positions_file": "/Users/andrewbailey/CLionProjects/personal/projects/ares_rRNA/mod_files/ivt_high_prob_pseudoU.positions"
+    },
+    {
+      "name": "native",
+      "variant_csv": "/Users/andrewbailey/CLionProjects/personal/projects/ares_rRNA/sa_training/supervised/ivt_native/em_compare_remote/tsvs/test.csv",
+      "positions_file": "/Users/andrewbailey/CLionProjects/personal/projects/ares_rRNA/mod_files/native_high_prob_pseudoU.positions"
+    }
+  ]
+}
