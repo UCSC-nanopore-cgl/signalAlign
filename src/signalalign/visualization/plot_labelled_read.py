@@ -178,7 +178,8 @@ class PlotSignal(object):
         handles = list()
         colors2 = ['blue', 'green', 'red', 'yellow', 'magenta', 'deepskyblue', 'purple', 'lime']
         colors = [[0.0, 0.0, 1.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0],
-                  [1.0, 0.0, 1.0], [1.0, 0.5, 0.0], [0.0, 1.0, 1.0], [0.0, 0.0, 0.0]]
+                  [1.0, 0.0, 1.0], [1.0, 0.5, 0.0], [0.0, 1.0, 1.0], [0.0, 0.0, 0.0],
+                  [1.0, 1.0, 0.0], [0.5, 1.0, 0.0], [0.5, 1.0, 0.5]]
 
         # colors = get_spaced_colors(len(self.names) + 1)
         color_selection = 0
@@ -277,8 +278,10 @@ class PlotSignal(object):
                              box.width, box.height * 0.9])
 
         # Put a legend below current axis
-        panel1.legend(handles, self.names, loc='upper center', bbox_to_anchor=(0.5, -0.05),
+        panel1.legend(handles, self.names, loc='upper center',
                       fancybox=True, shadow=True, ncol=5)
+        # panel1.legend(handles, self.names, loc='upper center', bbox_to_anchor=(0.5, -0.05),
+        #               fancybox=True, shadow=True, ncol=5)
 
         # panel1.legend(handles, self.names, loc='upper right')
         if save_fig_path:
@@ -333,7 +336,9 @@ def plot_basecalled_sequences(events1, events2=None, signal=None, save_fig_path=
     panel2.set_xlabel('Time')
     panel2.set_ylabel('Current (pA)')
 
-    panel1.legend(handles, names, loc='upper center', bbox_to_anchor=(0.5, -0.05),
+    # panel1.legend(handles, names, loc='upper center', bbox_to_anchor=(0.5, -0.05),
+    #               fancybox=True, shadow=True, ncol=5)
+    panel1.legend(handles, names, loc='upper center',
                   fancybox=True, shadow=True, ncol=5)
 
     if save_fig_path:
@@ -535,7 +540,7 @@ def main(args=None):
                     events_list.append(events)
                 if len(events_list) > 1:
                     main_plot = False
-                    print("Plotting {}".format(args.f5_path))
+                    print("Plotting {}".format(f5_path))
                     plot_basecalled_sequences(events_list[0], events2=events_list[1],
                                               signal=cl_handle.aligned_signal.scaled_signal)
 
