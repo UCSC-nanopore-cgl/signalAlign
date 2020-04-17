@@ -228,7 +228,7 @@ def load_from_raw(np_handle, alignment_file, model_file_location, path_to_bin=".
 
 
 def load_from_raw2(np_handle, aligned_segment, model_file_location, path_to_bin="./",
-                   analysis_identifier=None, write_failed_alignments=False, rna=False):
+                   analysis_identifier=None, write_failed_alignments=False, rna=False, overwrite=False):
     """Load a nanopore read from raw signal and an alignment file. Need a model to create banded alignment.
     :param np_handle: NanoporeRead class object
     :param aligned_segment: pysam aligned_segment object
@@ -290,7 +290,7 @@ def load_from_raw2(np_handle, aligned_segment, model_file_location, path_to_bin=
         np_handle.fastFive.delete(tmp_root, ignore=False)
         # save events and fastq
         saved_loc = save_event_table_and_fastq(np_handle.fastFive, events, fastq, attributes,
-                                               analysis_identifier=analysis_identifier)
+                                               analysis_identifier=analysis_identifier, overwrite=overwrite)
         return saved_loc
 
     # alignment failed, remove offending location (if it exists) and report

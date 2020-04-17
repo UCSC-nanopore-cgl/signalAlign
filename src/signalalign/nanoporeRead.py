@@ -271,7 +271,7 @@ class NanoporeRead(object):
         oned_root_address = load_from_raw2(self, self.aligned_segment, self.model_file_location, self.path_to_bin,
                                            analysis_identifier=self.event_table if self.event_table else None,
                                            write_failed_alignments=True,
-                                           rna=self.rna)
+                                           rna=self.rna, overwrite=False)
         if oned_root_address:
             self.logError(
                 "[NanoporeRead:generate_new_event_table] INFO generated event table at {}".format(oned_root_address))

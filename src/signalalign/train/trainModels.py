@@ -949,7 +949,7 @@ class TrainSignalAlign(object):
                           "iteration: {}".format(i))
                     self.train_transitions(iteration=str(i))
                 # next get assignments
-                self.run_signal_align()
+                self.run_signal_align(output_format="full")
                 # make new hdp
                 if i == self.args.training.em_iterations:
                     print("[trainModels] Training HDP emission distributions. iteration: {}".format(i))
@@ -962,7 +962,7 @@ class TrainSignalAlign(object):
                 print(self.complement_hmm_model_path)
                 print(self.complement_hdp_model_path)
                 if not self.args.delete_alignments:
-                    self.new_working_folder(append=str(i))
+                    self.new_working_folder(append=str(i+1))
         elif self.args.training.transitions or self.args.training.hdp_emissions or self.args.training.normal_emissions:
             if self.args.training.normal_emissions:
                 print("[trainModels] Training HMM emission distributions.")
@@ -1152,7 +1152,9 @@ class TrainSignalAlign(object):
             filter_reads=self.args.filter_reads,
             delete_tmp=self.args.signal_alignment_args.delete_tmp,
             rna=self.args.rna,
-            ambig_model=self.args.ambig_model)
+            ambig_model=self.args.ambig_model,
+            perform_kmer_event_alignment=self.args.perform_kmer_event_alignment
+        )
 
         dont_run_sa_samples = []
         run_sa_samples = []
