@@ -352,7 +352,10 @@ class CreateLabels(Fast5):
         cigar_label = np.zeros(len(sequence), dtype=[('raw_start', int), ('raw_length', int), ('reference_index', int),
                                                      ('posterior_probability', float), ('kmer', 'S5')])
         # assign labels
-        cigar_label['raw_start'] = events["start"]
+        if self.rna:
+            cigar_label['raw_start'] = self.aligned_signal.signal_length - events["start"]
+        else:
+            cigar_label['raw_start'] = events["start"]
         cigar_label['raw_length'] = events["length"]
         reference_map = list(range(attributes["mapped_start"], attributes["mapped_end"]))
         if attributes["mapped_strand"] != "+":
