@@ -10,8 +10,10 @@
 
 import os
 from py3helpers.utils import list_dir
+from py3helpers.multiprocess import *
 from argparse import ArgumentParser
 from signalalign.fast5 import Fast5
+import numpy as np
 
 
 def parse_args():
@@ -29,6 +31,9 @@ def parse_args():
     parser.add_argument('--signalalign', required=False, action='store_true',
                         dest='signalalign', default=False,
                         help="Remove all signalalign files")
+    parser.add_argument('--threads', required=False, action='store',
+                        dest='threads', default=1, type=int,
+                        help="number of threads to run")
 
     args = parser.parse_args()
     return args
@@ -73,24 +78,22 @@ def remove_analyses(fast5):
 
 def main():
     args = parse_args()
-    total = 0
-    files = 0
-    errors = 0
-    for f5_file in list_dir(args.dir, ext="fast5"):
-        try:
-            if args.analysis:
-                total += remove_analyses(f5_file)
-            else:
-                if args.signalalign or not args.basecall:
-                    total += remove_sa_analyses(f5_file)
-                elif args.basecall:
-                    total += remove_basecall_analyses(f5_file)
-            files += 1
-        except KeyError as e:
-            errors += 1
-            print("FAILED {}: {}".format(f5_file, e))
 
-    print("Deleted {} SignalAlign analysis datasets deleted from {} files".format(total, files))
+    function_to_run = None
+    if args.analysis:
+        function_to_run = remove_analyses
+    else:
+        if args.signalalign or not args.basecall:
+            function_to_run = remove_sa_analyses
+        elif args.basecall:
+            function_to_run = remove_basecall_analyses
+    assert function_to_run is not None, "Must select --analysis, --signalalign or --basecall."
+
+    service = BasicService(function_to_run, service_name="forward_multiprocess_aggregate_all_variantcalls")
+    files = list_dir(args.dir, ext="fast5")
+    total, failure, messages, output = run_service(service.run, files,
+                                                   {}, ["fast5"], worker_count=args.threads)
+    print("Deleted {} analysis datasets deleted from {} files".format(np.asarray(output).sum(), len(files)))
 
 
 if __name__ == '__main__':
