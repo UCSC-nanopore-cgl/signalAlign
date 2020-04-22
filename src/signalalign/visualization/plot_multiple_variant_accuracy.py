@@ -129,6 +129,9 @@ def plot_variant_data(labels, probs, label_ids, output_dir, name):
                                                 normalize=True)
                 plot.close()
         else:
+            plot = cm.plot_calibration_curve(class_n,
+                                             save_fig_path=os.path.join(output_dir, name + "_calibration_curve.png"))
+            plot.close()
             plot = cm.plot_confusion_matrix(threshold=0.5,
                                             title="Confusion Matrix " + name,
                                             save_fig_path=os.path.join(output_dir, name + "_confusion_matrix.png"),
