@@ -130,17 +130,19 @@ def plot_variant_data(labels, probs, label_ids, output_dir, name):
                 plot.close()
         else:
             plot = cm.plot_calibration_curve(class_n,
-                                             save_fig_path=os.path.join(output_dir, name + "_calibration_curve.png"))
+                                             save_fig_path=os.path.join(output_dir, name + "_calibration_curve.png"),
+                                             title="Calibration curve " + name,
+                                             n_bins=20)
             plot.close()
             plot = cm.plot_confusion_matrix(threshold=0.5,
                                             title="Confusion Matrix " + name,
                                             save_fig_path=os.path.join(output_dir, name + "_confusion_matrix.png"),
-                                            class_n=None)
+                                            class_n=class_n)
             plot.close()
             plot = cm.plot_probability_hist(class_n,
                                             save_fig_path=os.path.join(output_dir, name + "_probability_hist.png"),
                                             bins=None,
-                                            normalize=True)
+                                            normalize=False)
             plot.close()
 
             plot = cm.plot_roc(class_n, save_fig_path=os.path.join(output_dir, name + "_roc.png"),
