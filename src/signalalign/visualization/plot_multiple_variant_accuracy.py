@@ -19,6 +19,7 @@ import numpy as np
 import os
 import sys
 import platform
+import shutil
 from argparse import ArgumentParser
 from timeit import default_timer as timer
 # matplotlib
@@ -153,19 +154,20 @@ def plot_variant_data(labels, probs, label_ids, output_dir, name):
                                                                                 name + "_precision_recall.png"),
                                             title="Precision Recall curve" + name)
             plot.close()
+        return cm
+    return None
 
 
-def main(config=None):
+def main():
     start = timer()
-    if config is None:
-        args = parse_args()
-        # load model files
-        assert os.path.exists(args.config), "Config file does not exist: {}".format(args.config)
-        config = load_json(args.config)
-
-    config = create_dot_dict(config)
+    args = parse_args()
+    # load model files
+    assert os.path.exists(args.config), "Config file does not exist: {}".format(args.config)
+    config = create_dot_dict(load_json(args.config))
     assert os.path.isdir(config.output_dir), "Output directory does not exist. {}".format(config.output_dir)
     print("config.output_dir: {}".format(config.output_dir))
+    if args.config != os.path.join(config.output_dir, os.path.basename(args.config)):
+        shutil.copyfile(args.config, os.path.join(config.output_dir, os.path.basename(args.config)))
     samples = config.samples
     # aggregate and label all data
     all_data = []
