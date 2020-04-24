@@ -1,6 +1,7 @@
 {
   "output_dir": "/Users/andrewbailey/CLionProjects/personal/projects/ares_rRNA/sa_training/supervised/ivt_native/em_compare_remote/compare_accuracy_plots",
   "reference": "/Users/andrewbailey/CLionProjects/personal/projects/ares_rRNA/reference/yeast_25S_18S.fa",
+  "threshold": 0.5,
   "samples": [
     {
       "name": "ivt",

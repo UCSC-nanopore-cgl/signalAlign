@@ -105,7 +105,7 @@ def create_master_table(positions, variants):
     return complete_table
 
 
-def plot_variant_data(labels, probs, label_ids, output_dir, name):
+def plot_variant_data(labels, probs, label_ids, output_dir, name, threshold=0.5):
     if len(labels) != 0:
         n_variants = len(probs.columns)
         class_n = probs.columns[-1]
@@ -135,15 +135,11 @@ def plot_variant_data(labels, probs, label_ids, output_dir, name):
                                              title="Calibration curve " + name,
                                              n_bins=20)
             plot.close()
-            plot = cm.plot_confusion_matrix(threshold=0.5,
-                                            title="Confusion Matrix " + name,
-                                            save_fig_path=os.path.join(output_dir, name + "_confusion_matrix.png"),
+            plot = cm.plot_confusion_matrix(threshold=threshold,
+                                            title="Confusion Matrix " + name + " threshold:"+str(threshold),
+                                            save_fig_path=os.path.join(output_dir, name + "_" +
+                                                                       str(threshold) + "_confusion_matrix.png"),
                                             class_n=class_n)
-            plot.close()
-            plot = cm.plot_probability_hist(class_n,
-                                            save_fig_path=os.path.join(output_dir, name + "_probability_hist.png"),
-                                            bins=None,
-                                            normalize=False)
             plot.close()
 
             plot = cm.plot_roc(class_n, save_fig_path=os.path.join(output_dir, name + "_roc.png"),
@@ -152,7 +148,7 @@ def plot_variant_data(labels, probs, label_ids, output_dir, name):
 
             plot = cm.plot_precision_recall(class_n, save_fig_path=os.path.join(output_dir,
                                                                                 name + "_precision_recall.png"),
-                                            title="Precision Recall curve" + name)
+                                            title="Precision Recall curve " + name)
             plot.close()
         return cm
     return None
@@ -169,6 +165,10 @@ def main():
     if args.config != os.path.join(config.output_dir, os.path.basename(args.config)):
         shutil.copyfile(args.config, os.path.join(config.output_dir, os.path.basename(args.config)))
     samples = config.samples
+    threshold = 0.5
+    if config.threshold:
+        threshold = config.threshold
+
     # aggregate and label all data
     all_data = []
     for sample in samples:
@@ -191,7 +191,7 @@ def main():
     for x in possible_number_of_variants:
         print("variants_length_{}".format(x))
         labels, probs, label_ids = get_prob_and_label(all_data_df[all_data_df['variants'].str.len() == x])
-        plot_variant_data(labels, probs, label_ids, output_dir, "variants_length_{}".format(x))
+        plot_variant_data(labels, probs, label_ids, output_dir, "variants_length_{}".format(x), threshold=threshold)
 
     # all variant accuracy for each variant type
     output_dir = os.path.join(config.output_dir, "per_variant")
@@ -201,16 +201,28 @@ def main():
     for x in possible_variants:
         print("variants_{}".format(x))
         labels, probs, label_ids = get_prob_and_label(all_data_df[all_data_df['variants'] == x])
-        plot_variant_data(labels, probs, label_ids, output_dir, "variants_{}".format(x))
+        plot_variant_data(labels, probs, label_ids, output_dir, "variants_{}".format(x), threshold=threshold)
 
     # # all variant accuracy for each position
     output_dir = os.path.join(config.output_dir, "per_position")
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
-    for x, y in all_data_df.groupby(['contig', 'reference_index', "strand", "variants"], as_index=False):
-        print("_".join([str(i) for i in x]))
-        labels, probs, label_ids = get_prob_and_label(y)
-        plot_variant_data(labels, probs, label_ids, output_dir, "_".join([str(i) for i in x]))
+    with open(os.path.join(output_dir, "per_position_data.csv"), 'w') as fh:
+        print(",".join(['contig', 'reference_index', "strand", "variants", "aucroc", "avg_precision", "brier_score"]),
+              file=fh)
+        for x, y in all_data_df.groupby(['contig', 'reference_index', "strand", "variants"], as_index=False):
+            print("_".join([str(i) for i in x]))
+            labels, probs, label_ids = get_prob_and_label(y)
+            cm = plot_variant_data(labels, probs, label_ids, output_dir, "_".join([str(i) for i in x]), threshold=threshold)
+            if cm is not None:
+                class_n = probs.columns[-1]
+                rocauc = cm.roc_auc[class_n]
+                avg_precision = cm.get_average_precision(class_n)
+                brier_score = cm.brier_score[class_n]
+                line = [str(i) for i in x] + [str(round(rocauc, 4)),
+                                              str(round(avg_precision, 4)),
+                                              str(round(brier_score, 4))]
+                print(",".join(line), file=fh)
 
     stop = timer()
     print("Running Time = {} seconds".format(stop - start), file=sys.stderr)
