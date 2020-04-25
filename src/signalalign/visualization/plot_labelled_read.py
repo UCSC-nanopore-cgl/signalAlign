@@ -21,18 +21,16 @@ if os.environ.get('DISPLAY', '') == '':
 if platform.system() == "Darwin":
     mpl.use("macosx")
 import matplotlib.pyplot as plt
-import matplotlib.patches as mplpatches
 from matplotlib.collections import LineCollection
 
 import numpy as np
-import pandas as pd
 from collections import defaultdict
 from timeit import default_timer as timer
 from argparse import ArgumentParser
 from signalalign.alignedsignal import AlignedSignal, CreateLabels
 from signalalign.nanoporeRead import NanoporeRead
 from py3helpers.utils import list_dir, find_substring_indices
-from py3helpers.seq_tools import initialize_aligned_segment_wrapper, ReverseComplement
+from py3helpers.seq_tools import initialize_aligned_segment_wrapper
 
 MEA = 'm'
 SA_FULL = 's'
@@ -79,6 +77,10 @@ def parse_args():
                         dest='sa_full', required=False,
                         help="Option to plot all of the posterior probabilities from the signalalign output")
 
+    parser.add_argument('--eventalign', action='store_true', default=False,
+                        dest='eventalign', required=False,
+                        help="Option to plot the alignment from nanopolish eventalign (EventAlign)")
+
     parser.add_argument('--variant', nargs='+',
                         dest='variant', required=False,
                         help="Path to variant data tsv file")
@@ -109,7 +111,7 @@ class PlotSignal(object):
     def __init__(self, aligned_signal):
         """Plot alignment
 
-        :param fname: path to fast5 file
+        :param aligned_signal: AlignedSignal object
         """
         assert isinstance(aligned_signal, AlignedSignal), "aligned_signal must be an instance of AlignedSignal"
         self.signal_h = aligned_signal
@@ -142,7 +144,6 @@ class PlotSignal(object):
         for name, v_c in self.signal_h.variant_calls.items():
             self.names.append(name)
             self.variant_calls.append(v_c)
-
 
         # add raw starts
         if self.signal_h.raw_starts is not None:
@@ -216,19 +217,22 @@ class PlotSignal(object):
         # plot original basecalled events
         if self.guide_alignments:
             for i, (name, guide) in enumerate(self.guide_alignments.items()):
-                for j, sub_guide in enumerate(guide):
-                    handle, = panel1.plot(sub_guide[0], sub_guide[1], c=colors[color_selection])
-                handles.append(handle)
-                color_selection += 1
+                if len(guide) > 0:
+                    handle = None
+                    for j, sub_guide in enumerate(guide):
+                        handle, = panel1.plot(sub_guide[0], sub_guide[1], c=colors[color_selection])
+                    handles.append(handle)
+                    color_selection += 1
 
         colors2_index = -1
         if self.variant_calls is not []:
             for i, data in enumerate(self.variant_calls):
-                variants = set(data.columns) - {'forward_mapped', 'raw_start', 'position', 'raw_length', 'read_name', 'contig', 'strand'}
+                variants = set(data.columns) - {'forward_mapped', 'raw_start', 'position', 'raw_length', 'read_name',
+                                                'contig', 'strand'}
                 colors2_index += 1
                 color = colors2[colors2_index]
                 for j, position in data.iterrows():
-                    rectangle = plt.Rectangle((position["raw_start"], position["position"]-5), position["raw_length"],
+                    rectangle = plt.Rectangle((position["raw_start"], position["position"] - 5), position["raw_length"],
                                               11, alpha=0.4, color=color)
 
                     panel1.add_patch(rectangle)
@@ -237,7 +241,7 @@ class PlotSignal(object):
                         variant_string += "p({} = {}) = {}\n".format(position["position"], variant_base,
                                                                      np.round(position[variant_base], 3))
 
-                    panel1.text(position["raw_start"] + 10, position["position"]-6, "{}".format(variant_string))
+                    panel1.text(position["raw_start"] + 10, position["position"] - 6, "{}".format(variant_string))
 
         # if kmers provided plot them
         if kmer_info:
@@ -259,8 +263,6 @@ class PlotSignal(object):
                     return value
 
             panel1.yaxis.set_major_formatter(plt.FuncFormatter(format_func))
-
-
 
         panel2.set_xlabel('Time')
         panel2.set_ylabel('Current (pA)')
@@ -362,21 +364,26 @@ def get_spaced_colors(n):
 def analyze_event_skips(mea_events, sa_full_events, basecall_events,
                         generate_plot=True):
     # prep
-    raw_start = lambda x: x['raw_start'] if 'raw_start' in x else x[0]
-    event_rank = lambda x: x['posterior_probability'] if 'posterior_probability' in x else x[3]
-    aligned_position = lambda x: x['reference_index'] if 'reference_index' in x else x[2]
+    def raw_start(x):
+        return x['raw_start'] if 'raw_start' in x else x[0]
+
+    def event_rank(x):
+        return x['posterior_probability'] if 'posterior_probability' in x else x[3]
+
+    def aligned_position(x):
+        return x['reference_index'] if 'reference_index' in x else x[2]
 
     # build datastructure holding all events by raw start
     raw_start_to_event = dict()
 
-    def add_event(event, type):
+    def add_event(event, type1):
         key = raw_start(event)
         if key not in raw_start_to_event:
             raw_start_to_event[key] = dict()
-        if type in raw_start_to_event[key]:
-            if event_rank(raw_start_to_event[key][type]) > event_rank(event):
+        if type1 in raw_start_to_event[key]:
+            if event_rank(raw_start_to_event[key][type1]) > event_rank(event):
                 return
-        raw_start_to_event[key][type] = event
+        raw_start_to_event[key][type1] = event
 
     list(map(lambda x: add_event(x, MEA), mea_events))
     list(map(lambda x: add_event(x, SA_FULL), sa_full_events))
@@ -393,7 +400,8 @@ def analyze_event_skips(mea_events, sa_full_events, basecall_events,
     sa_event_summary = dict()
     for i, raw_start in enumerate(all_event_keys):
         # skip events only aligned in orig basecall
-        if SA_FULL not in raw_start_to_event[raw_start]: continue
+        if SA_FULL not in raw_start_to_event[raw_start]:
+            continue
 
         # get sa_full event
         sa_full = raw_start_to_event[raw_start][SA_FULL]
@@ -523,7 +531,10 @@ def main(args=None):
 
             if args.tombo:
                 for number in args.tombo:
-                    tombo_full = cl_handle.add_tombo_labels(number=int(number))
+                    cl_handle.add_tombo_labels(number=int(number))
+
+            if args.eventalign:
+                cl_handle.add_eventalign_labels()
 
             basecall_list = list()
             if args.basecall:

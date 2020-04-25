@@ -594,7 +594,6 @@ class Fast5(h5py.File):
         :param meta: meta data to attach to read
         :param overwrite: overwrite most recent path
         """
-        assert template or complement, "Must set template and/or complement dataset"
         self.assert_writable()
         path = "EventAlign_00{}"
         path = self._join_path(self.__base_analysis__, path)
@@ -603,9 +602,7 @@ class Fast5(h5py.File):
             self.delete(path, ignore=True)
         if meta:
             self._add_attrs(meta, path)
-        if not isinstance(template, np.ndarray):
-            raise TypeError('Table is not a ndarray.')
-        if not isinstance(complement, np.ndarray):
+        if not isinstance(template, np.ndarray) and not isinstance(complement, np.ndarray):
             raise TypeError('Table is not a ndarray.')
 
         if template is not None:
