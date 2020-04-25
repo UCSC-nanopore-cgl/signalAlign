@@ -585,7 +585,6 @@ class Fast5(h5py.File):
         # save
         self._add_event_table(data, destination_events)
 
-    #todo fix path creation
     def set_eventalign_table(self, template, complement, meta, overwrite=False):
         """Write eventalign table to fast5 file
 
