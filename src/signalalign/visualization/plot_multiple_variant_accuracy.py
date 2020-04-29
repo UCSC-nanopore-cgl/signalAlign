@@ -88,6 +88,7 @@ def create_master_table(positions, variants):
     label_data.columns = ["prob"+str(x+1)+"_label" for x in range(n_variants)]
     variants2 = pd.concat([variants, label_data], axis=1)
     labelled_dfs = []
+    pd.set_option('mode.chained_assignment', None)
     for x, y in variants2.groupby(['contig', 'reference_index', "strand", "variants"], as_index=False):
         label_row = positions[(positions['contig'] == x[0])
                               & (positions['reference_index'] == x[1])
@@ -207,21 +208,54 @@ def main():
     output_dir = os.path.join(config.output_dir, "per_position")
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
-    with open(os.path.join(output_dir, "per_position_data.csv"), 'w') as fh:
-        print(",".join(['contig', 'reference_index', "strand", "variants", "aucroc", "avg_precision", "brier_score"]),
+    with open(os.path.join(output_dir, "per_position_data_"+str(threshold)+".csv"), 'w') as fh:
+        print(",".join(['contig', 'reference_index', "strand", "variants",
+                        "accuracy",
+                        "precision",
+                        "negative_predictive_value",
+                        "recall",
+                        "specificity",
+                        "positive_likelihood_ratio",
+                        "negative_likelihood_ratio",
+                        "diagnostic_odds_ratio",
+                        "f1_score",
+                        "prevalence",
+                        "aucroc", "avg_precision", "brier_score"]),
               file=fh)
         for x, y in all_data_df.groupby(['contig', 'reference_index', "strand", "variants"], as_index=False):
             print("_".join([str(i) for i in x]))
             labels, probs, label_ids = get_prob_and_label(y)
-            cm = plot_variant_data(labels, probs, label_ids, output_dir, "_".join([str(i) for i in x]), threshold=threshold)
+            cm = plot_variant_data(labels, probs, label_ids, output_dir, "_".join([str(i) for i in x]),
+                                   threshold=threshold)
             if cm is not None:
                 class_n = probs.columns[-1]
                 rocauc = cm.roc_auc[class_n]
                 avg_precision = cm.get_average_precision(class_n)
                 brier_score = cm.brier_score[class_n]
-                line = [str(i) for i in x] + [str(round(rocauc, 4)),
-                                              str(round(avg_precision, 4)),
-                                              str(round(brier_score, 4))]
+                accuracy = cm.accuracy(class_n, threshold=threshold)
+                precision = cm.precision(class_n, threshold=threshold)
+                negative_predictive_value = cm.negative_predictive_value(class_n, threshold=threshold)
+                recall = cm.recall(class_n, threshold=threshold)
+                specificity = cm.specificity(class_n, threshold=threshold)
+                positive_likelihood_ratio = cm.positive_likelihood_ratio(class_n, threshold=threshold)
+                negative_likelihood_ratio = cm.negative_likelihood_ratio(class_n, threshold=threshold)
+                diagnostic_odds_ratio = cm.diagnostic_odds_ratio(class_n, threshold=threshold)
+                f1_score = cm.f1_score(class_n, threshold=threshold)
+                prevalence = cm.prevalence(class_n)
+                line = [str(i) for i in x] + [
+                    str(round(accuracy, 4)),
+                    str(round(precision, 4)),
+                    str(round(negative_predictive_value, 4)),
+                    str(round(recall, 4)),
+                    str(round(specificity, 4)),
+                    str(round(positive_likelihood_ratio, 4)),
+                    str(round(negative_likelihood_ratio, 4)),
+                    str(round(diagnostic_odds_ratio, 4)),
+                    str(round(f1_score, 4)),
+                    str(round(prevalence, 4)),
+                    str(round(rocauc, 4)),
+                    str(round(avg_precision, 4)),
+                    str(round(brier_score, 4))]
                 print(",".join(line), file=fh)
 
     stop = timer()
