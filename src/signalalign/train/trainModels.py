@@ -422,10 +422,12 @@ class CreateHdpTrainingData(object):
         self.verbose = verbose
         self.k = 0
         self.n_assignments = 0
+        self.full = None
 
     def write_hdp_training_file(self, verbose=False):
         """Write a hdp training file to a specified location"""
         # final_output = []
+        full = None
         if os.path.exists(self.out_file_path):
             os.remove(self.out_file_path)
         for sample in self.samples:
@@ -472,7 +474,7 @@ class CreateHdpTrainingData(object):
                 temp_file = os.path.join(temp_dir, "tmp.tsv")
 
                 log_file = os.path.join(os.path.dirname(self.out_file_path),
-                                        sample.name+"_log"+str(self.log_number)+".tsv")
+                                        sample.name + "_log" + str(self.log_number) + ".tsv")
 
                 bindings.generate_master_kmer_table(assignment_files,
                                                     temp_file,
@@ -481,7 +483,8 @@ class CreateHdpTrainingData(object):
                                                     self.alphabet,
                                                     min_prob=sample.probability_threshold,
                                                     n_threads=self.jobs,
-                                                    verbose=verbose)
+                                                    verbose=verbose,
+                                                    full=full)
                 # os.rename(log_file, os.path.join(base_dir, sample.name, "log_file.tsv"))
                 temp_file2 = os.path.join(temp_dir, "tmp2.tsv")
                 concatenate_files([temp_file, self.out_file_path], temp_file2, remove_files=True)
@@ -497,6 +500,7 @@ class CreateHdpTrainingData(object):
         # master_assignment_table = pd.concat(final_output, ignore_index=True)
         # self.n_assignments = len(master_assignment_table)
         # master_assignment_table.to_csv(self.out_file_path, sep='\t', header=False, index=False)
+        self.full = full
         return self.out_file_path
 
     # def write_hdp_training_file2(self, verbose=False):
@@ -648,7 +652,6 @@ class TrainSignalAlign(object):
     ]
 
     def __init__(self, args):
-        # TODO Need to create docs here
         """Initialize all objects the training routine may need"""
         # executable
         self.buildHdpUtil = None
@@ -711,6 +714,7 @@ class TrainSignalAlign(object):
             assert os.path.isfile(self.args.built_alignments), \
                 "Build alignment file does not exist. {}".format(self.args.built_alignments)
             built_alignments = self.args.built_alignments
+            full = False
         else:
             # set strands which will built
             template = True
@@ -728,10 +732,11 @@ class TrainSignalAlign(object):
                                              log_number=iteration)
             # write an hdp training file to path
             built_alignments = hdp_data.write_hdp_training_file(verbose=self.debug)
-
+            full = hdp_data.full
         #     parse output and process for template
         print("[trainModels.train_normal_emmissions] Updating template gaussian model parameters")
-        data = parse_assignment_file(built_alignments)
+        data = get_assignment_table(built_alignments, 0, full)
+        # data = parse_assignment_file(built_alignments)
         t_data = data[data["strand"] == "t"]
         template_hmm_model_path = os.path.join(self.working_path, "template_hmm" + iteration + ".model")
         complement_hmm_model_path = None
@@ -962,7 +967,7 @@ class TrainSignalAlign(object):
                 print(self.complement_hmm_model_path)
                 print(self.complement_hdp_model_path)
                 if not self.args.delete_alignments:
-                    self.new_working_folder(append=str(i+1))
+                    self.new_working_folder(append=str(i + 1))
         elif self.args.training.transitions or self.args.training.hdp_emissions or self.args.training.normal_emissions:
             if self.args.training.normal_emissions:
                 print("[trainModels] Training HMM emission distributions.")
@@ -992,8 +997,8 @@ class TrainSignalAlign(object):
         print(self.template_hmm_model_path, self.complement_hmm_model_path,
               self.template_hdp_model_path, self.complement_hdp_model_path)
 
-        return self.template_hmm_model_path, self.complement_hmm_model_path, \
-               self.template_hdp_model_path, self.complement_hdp_model_path
+        return self.template_hmm_model_path, self.complement_hmm_model_path, self.template_hdp_model_path, \
+            self.complement_hdp_model_path
 
     def load_hmm_models(self):
         """Load in the correct models depending on what is going to be trained. """
