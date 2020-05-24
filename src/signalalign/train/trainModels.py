@@ -1158,7 +1158,8 @@ class TrainSignalAlign(object):
             delete_tmp=self.args.signal_alignment_args.delete_tmp,
             rna=self.args.rna,
             ambig_model=self.args.ambig_model,
-            perform_kmer_event_alignment=self.args.perform_kmer_event_alignment
+            perform_kmer_event_alignment=self.args.perform_kmer_event_alignment,
+            overwrite=self.args.overwrite
         )
 
         dont_run_sa_samples = []

@@ -28,7 +28,8 @@ def create_signalAlignment_args(backward_reference=None, forward_reference=None,
                                 event_table=False,
                                 check_for_temp_file_existance=True,
                                 path_to_bin='./', perform_kmer_event_alignment=None, filter_reads=False,
-                                traceBackDiagonals=100, delete_tmp=True, rna=False, ambig_model=None):
+                                traceBackDiagonals=100, delete_tmp=True, rna=False, ambig_model=None,
+                                overwrite=False):
     """Create alignment arguments for SignalAlign. Parameters are explained in SignalAlignment"""
     alignment_args = {
         "backward_reference": backward_reference,
@@ -58,7 +59,9 @@ def create_signalAlignment_args(backward_reference=None, forward_reference=None,
         'traceBackDiagonals': traceBackDiagonals,
         'delete_tmp': delete_tmp,
         'rna': rna,
-        'ambig_model': ambig_model}
+        'ambig_model': ambig_model,
+        'overwrite': overwrite
+    }
 
     return alignment_args
 
@@ -99,7 +102,8 @@ class SignalAlignment(object):
                  cigar_string=None,
                  delete_tmp=True,
                  rna=False,
-                 ambig_model=None):
+                 ambig_model=None,
+                 overwrite=False):
         self.in_fast5 = in_fast5  # fast5 file to align
         self.destination = destination  # place where the alignments go, should already exist
         self.stateMachineType = stateMachineType  # flag for signalMachine
@@ -134,6 +138,8 @@ class SignalAlignment(object):
         self.complement_expectations_file_path = None
         self.template_expectations_file_path = None
         self.ambig_model = ambig_model
+        self.overwrite = overwrite
+
         if self.ambig_model:
             assert os.path.isfile(self.ambig_model), "ambig_model does not exist: {}".format(self.ambig_model)
         self.aligned_segment = None
@@ -194,7 +200,8 @@ class SignalAlignment(object):
                                   model_file_location=self.in_templateHmm,
                                   enforce_supported_versions=self.enforce_supported_versions,
                                   perform_kmer_event_alignment=self.perform_kmer_event_alignment,
-                                  filter_reads=self.filter_reads, aligned_segment=self.aligned_segment, rna=self.rna)
+                                  filter_reads=self.filter_reads, aligned_segment=self.aligned_segment, rna=self.rna,
+                                  overwrite=self.overwrite)
         # sanity check
         if not npRead.initialize_success:
             self.failStop("[SignalAlignment.run] ERROR: NanoporeRead failed initialization: {}".format(self.in_fast5),

@@ -31,7 +31,7 @@ SUPPORTED_2D_VERSIONS = ("1.15.0", "1.19.0", "1.20.0", "1.22.2", "1.22.4", "1.23
 class NanoporeRead(object):
     def __init__(self, fast_five_file, twoD=False, event_table='', initialize=False, path_to_bin="./",
                  alignment_file=None, model_file_location=None, perform_kmer_event_alignment=None,
-                 enforce_supported_versions=True, filter_reads=False, aligned_segment=None, rna=None):
+                 enforce_supported_versions=True, filter_reads=False, aligned_segment=None, rna=None, overwrite=False):
         # load the fast5
         self.filename = fast_five_file  # fast5 file path
         self.fastFive = None  # fast5 object
@@ -76,6 +76,7 @@ class NanoporeRead(object):
         # if set, unsupported versions will cause failure
         self.enforce_supported_versions = enforce_supported_versions
         self.aligned_segment = aligned_segment  # pysam aligned_segment object
+        self.overwrite = overwrite
 
         if type(self) == NanoporeRead:
             if twoD:
@@ -271,7 +272,7 @@ class NanoporeRead(object):
         oned_root_address = load_from_raw2(self, self.aligned_segment, self.model_file_location, self.path_to_bin,
                                            analysis_identifier=self.event_table if self.event_table else None,
                                            write_failed_alignments=True,
-                                           rna=self.rna, overwrite=False)
+                                           rna=self.rna, overwrite=self.overwrite)
         if oned_root_address:
             self.logError(
                 "[NanoporeRead:generate_new_event_table] INFO generated event table at {}".format(oned_root_address))
