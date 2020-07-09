@@ -155,21 +155,7 @@ def plot_variant_data(labels, probs, label_ids, output_dir, name, threshold=0.5)
     return None
 
 
-def main():
-    start = timer()
-    args = parse_args()
-    # load model files
-    assert os.path.exists(args.config), "Config file does not exist: {}".format(args.config)
-    config = create_dot_dict(load_json(args.config))
-    assert os.path.isdir(config.output_dir), "Output directory does not exist. {}".format(config.output_dir)
-    print("config.output_dir: {}".format(config.output_dir))
-    if args.config != os.path.join(config.output_dir, os.path.basename(args.config)):
-        shutil.copyfile(args.config, os.path.join(config.output_dir, os.path.basename(args.config)))
-    samples = config.samples
-    threshold = 0.5
-    if config.threshold:
-        threshold = config.threshold
-
+def plot_multiple_variant_accuracy(output_dir, samples, threshold=0.5):
     # aggregate and label all data
     all_data = []
     for sample in samples:
@@ -185,7 +171,7 @@ def main():
     all_data_df = pd.concat(all_data)
 
     # all variant accuracy for 2, 3 ... variants
-    output_dir = os.path.join(config.output_dir, "all_variants")
+    output_dir = os.path.join(output_dir, "all_variants")
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
     possible_number_of_variants = list(set(all_data_df['variants'].str.len()))
@@ -195,7 +181,7 @@ def main():
         plot_variant_data(labels, probs, label_ids, output_dir, "variants_length_{}".format(x), threshold=threshold)
 
     # all variant accuracy for each variant type
-    output_dir = os.path.join(config.output_dir, "per_variant")
+    output_dir = os.path.join(output_dir, "per_variant")
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
     possible_variants = list(set(all_data_df['variants']))
@@ -205,7 +191,7 @@ def main():
         plot_variant_data(labels, probs, label_ids, output_dir, "variants_{}".format(x), threshold=threshold)
 
     # # all variant accuracy for each position
-    output_dir = os.path.join(config.output_dir, "per_position")
+    output_dir = os.path.join(output_dir, "per_position")
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
     with open(os.path.join(output_dir, "per_position_data_"+str(threshold)+".csv"), 'w') as fh:
@@ -257,6 +243,26 @@ def main():
                     str(round(avg_precision, 4)),
                     str(round(brier_score, 4))]
                 print(",".join(line), file=fh)
+
+
+def main():
+    start = timer()
+    args = parse_args()
+    # load model files
+    assert os.path.exists(args.config), "Config file does not exist: {}".format(args.config)
+    config = create_dot_dict(load_json(args.config))
+
+    assert os.path.isdir(config.output_dir), "Output directory does not exist. {}".format(config.output_dir)
+    print("output_dir: {}".format(config.output_dir))
+    if args.config != os.path.join(config.output_dir, os.path.basename(args.config)):
+        shutil.copyfile(args.config, os.path.join(config.output_dir, os.path.basename(args.config)))
+
+    output_dir = config.output_dir
+    samples = config.samples
+    threshold = 0.5
+    if config.threshold:
+        threshold = config.threshold
+    plot_multiple_variant_accuracy(output_dir, samples, threshold=threshold)
 
     stop = timer()
     print("Running Time = {} seconds".format(stop - start), file=sys.stderr)

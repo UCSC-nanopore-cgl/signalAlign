@@ -14,7 +14,6 @@ from py3helpers.seq_tools import ReferenceHandler
 from signalalign.utils.sequenceTools import CustomAmbiguityPositions, reverse_complement
 from signalalign.hiddenMarkovModel import HmmModel
 from signalalign.visualization.compare_trained_models import MultipleModelHandler
-import numpy as np
 import os
 import shutil
 
@@ -81,6 +80,7 @@ def get_kmer_permutations(bases: list):
     num_kmers = multiply
     i = 0
     kmers = []
+    kmer = None
     while i < num_kmers:
         kmer = ""
         num = i
@@ -120,6 +120,11 @@ def get_covered_bases(reference, positions, kmer_length=5, rna=True):
     """
     ref_handler = ReferenceHandler(reference)
     positions_data = CustomAmbiguityPositions.parseAmbiguityFile(positions)
+    contig = None
+    pos = None
+    strand = None
+    # base = None
+    variant_bases = None
 
     all_covered_bases = []
     all_pos = []
@@ -148,12 +153,10 @@ def get_covered_bases(reference, positions, kmer_length=5, rna=True):
     return all_covered_bases
 
 
-def main(config=None):
-    if config is None:
-        args = parse_args()
-        # load model files
-        assert os.path.exists(args.config), "Config file does not exist: {}".format(args.config)
-        config = load_json(args.config)
+def main():
+    args = parse_args()
+    # load model files
+    assert os.path.exists(args.config), "Config file does not exist: {}".format(args.config)
     config = create_dot_dict(load_json(args.config))
     print("Output dir: ", config.save_fig_dir)
     print("Reference: ", config.reference)
@@ -181,12 +184,12 @@ def main(config=None):
     models = [HmmModel(x, rna=config.rna, name="model" + str(i)) for i, x in enumerate(config.models)]
     mmh = MultipleModelHandler(models, ["t"]*len(models), assignment_data=kmer_data)
     # #
-    for contig, pos, vars, kmers in all_covered_bases:
-        dir_name = os.path.join(config.save_fig_dir, "_".join([contig+"_"+str(x)+y for x, y in zip(pos, vars)]))
+    for contig, pos, vars1, kmers in all_covered_bases:
+        dir_name = os.path.join(config.save_fig_dir, "_".join([contig + '_' + str(x) + y for x, y in zip(pos, vars1)]))
         if os.path.exists(dir_name):
             shutil.rmtree(dir_name)
         os.mkdir(dir_name)
-        print(contig, pos, vars, kmers)
+        print(contig, pos, vars1, kmers)
         for kmer_group in kmers:
             output_file = None
             if config.save:
