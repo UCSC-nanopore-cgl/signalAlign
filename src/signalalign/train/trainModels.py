@@ -956,7 +956,7 @@ class TrainSignalAlign(object):
                 # next get assignments
                 self.run_signal_align(output_format="full")
                 # make new hdp
-                if i == self.args.training.em_iterations:
+                if i == self.args.training.em_iterations and self.args.training.hdp_emissions:
                     print("[trainModels] Training HDP emission distributions. iteration: {}".format(i))
                     self.train_hdp(iteration=str(i))
                 else:

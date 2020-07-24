@@ -159,6 +159,7 @@ def plot_multiple_variant_accuracy(output_dir, samples, threshold=0.5):
     # aggregate and label all data
     all_data = []
     for sample in samples:
+        sample = create_dot_dict(sample)
         variants = load_sa2bed_variant_data(sample.variant_csv)
         positions = load_positions_file(sample.positions_file)
         assert len(positions) == len("".join(positions["label"])), "Positions file must have only one value for label"
@@ -171,30 +172,30 @@ def plot_multiple_variant_accuracy(output_dir, samples, threshold=0.5):
     all_data_df = pd.concat(all_data)
 
     # all variant accuracy for 2, 3 ... variants
-    output_dir = os.path.join(output_dir, "all_variants")
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
+    all_variants_output_dir = os.path.join(output_dir, "all_variants")
+    if not os.path.exists(all_variants_output_dir):
+        os.makedirs(all_variants_output_dir)
     possible_number_of_variants = list(set(all_data_df['variants'].str.len()))
     for x in possible_number_of_variants:
         print("variants_length_{}".format(x))
         labels, probs, label_ids = get_prob_and_label(all_data_df[all_data_df['variants'].str.len() == x])
-        plot_variant_data(labels, probs, label_ids, output_dir, "variants_length_{}".format(x), threshold=threshold)
+        plot_variant_data(labels, probs, label_ids, all_variants_output_dir, "variants_length_{}".format(x), threshold=threshold)
 
     # all variant accuracy for each variant type
-    output_dir = os.path.join(output_dir, "per_variant")
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
+    per_variant_output_dir = os.path.join(output_dir, "per_variant")
+    if not os.path.exists(per_variant_output_dir):
+        os.makedirs(per_variant_output_dir)
     possible_variants = list(set(all_data_df['variants']))
     for x in possible_variants:
         print("variants_{}".format(x))
         labels, probs, label_ids = get_prob_and_label(all_data_df[all_data_df['variants'] == x])
-        plot_variant_data(labels, probs, label_ids, output_dir, "variants_{}".format(x), threshold=threshold)
+        plot_variant_data(labels, probs, label_ids, per_variant_output_dir, "variants_{}".format(x), threshold=threshold)
 
     # # all variant accuracy for each position
-    output_dir = os.path.join(output_dir, "per_position")
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
-    with open(os.path.join(output_dir, "per_position_data_"+str(threshold)+".csv"), 'w') as fh:
+    per_position_output_dir = os.path.join(output_dir, "per_position")
+    if not os.path.exists(per_position_output_dir):
+        os.makedirs(per_position_output_dir)
+    with open(os.path.join(per_position_output_dir, "per_position_data_"+str(threshold)+".csv"), 'w') as fh:
         print(",".join(['contig', 'reference_index', "strand", "variants",
                         "accuracy",
                         "precision",
@@ -211,7 +212,7 @@ def plot_multiple_variant_accuracy(output_dir, samples, threshold=0.5):
         for x, y in all_data_df.groupby(['contig', 'reference_index', "strand", "variants"], as_index=False):
             print("_".join([str(i) for i in x]))
             labels, probs, label_ids = get_prob_and_label(y)
-            cm = plot_variant_data(labels, probs, label_ids, output_dir, "_".join([str(i) for i in x]),
+            cm = plot_variant_data(labels, probs, label_ids, per_position_output_dir, "_".join([str(i) for i in x]),
                                    threshold=threshold)
             if cm is not None:
                 class_n = probs.columns[-1]
