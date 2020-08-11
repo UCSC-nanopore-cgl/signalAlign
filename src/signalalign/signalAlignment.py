@@ -723,7 +723,7 @@ def signal_alignment_service(work_queue, done_queue, service_name="signal_alignm
 
 
 def multithread_signal_alignment(signal_align_arguments, fast5_locations, worker_count=1, forward_reference=None,
-                                 debug=False, filter_reads_to_string_wrapper=None):
+                                 debug=False, filter_reads_to_string_wrapper_funct=None):
     """Multiprocess SignalAlignment for a list of fast5 files given a set of alignment arguments.
 
     :param signal_align_arguments: signalAlignment arguments besides 'in_fast5'
@@ -731,7 +731,7 @@ def multithread_signal_alignment(signal_align_arguments, fast5_locations, worker
     :param worker_count: number of workers
     :param forward_reference: path to forward reference for signalAlign alignment
     :param debug: option to iterate over each read so that the error messages are not suppressed
-    :param filter_reads_to_string_wrapper: if you want to pass in the generator from filter_reads
+    :param filter_reads_to_string_wrapper_funct: if you want to pass in the generator from filter_reads
     """
     # don't modify the signal_align_arguments
     signal_align_arguments = dict(**signal_align_arguments)
@@ -783,8 +783,8 @@ def multithread_signal_alignment(signal_align_arguments, fast5_locations, worker
         print("[multithread_signal_alignment] running signal_alignment on {} fast5s with 1 worker".format(
             len(fast5_locations)))
         output = []
-        if filter_reads_to_string_wrapper:
-            for in_fast5, cigar_string in filter_reads_to_string_wrapper:
+        if filter_reads_to_string_wrapper_funct:
+            for in_fast5, cigar_string in filter_reads_to_string_wrapper_funct:
                 f = merge_dicts([signal_align_arguments, {"in_fast5": in_fast5,
                                                           "cigar_string": cigar_string}])
                 alignment = SignalAlignment(**f)
@@ -799,9 +799,9 @@ def multithread_signal_alignment(signal_align_arguments, fast5_locations, worker
                 if success:
                     output.extend(success)
     else:
-        if filter_reads_to_string_wrapper:
+        if filter_reads_to_string_wrapper_funct:
             total, failure, messages, output = multithread.run_service2(
-                signal_alignment_service, filter_reads_to_string_wrapper,
+                signal_alignment_service, filter_reads_to_string_wrapper_funct,
                 signal_align_arguments, ['in_fast5', "cigar_string"], worker_count)
 
             # total, failure, messages = multithread.run_service3(
@@ -1020,10 +1020,10 @@ def multithread_signal_alignment_samples(samples, signal_align_arguments, worker
         if not debug:
             with captured_output() as (_, _):
                 output_files = multithread_signal_alignment(signal_align_arguments, [], worker_count, debug=debug,
-                                                        filter_reads_to_string_wrapper=sample.filter_read_generator)
+                                                            filter_reads_to_string_wrapper_funct=sample.filter_read_generator)
         else:
             output_files = multithread_signal_alignment(signal_align_arguments, [], worker_count, debug=debug,
-                                                        filter_reads_to_string_wrapper=sample.filter_read_generator)
+                                                        filter_reads_to_string_wrapper_funct=sample.filter_read_generator)
 
         print("[multithread_signal_alignment_samples] {} generated {} output_files".format(sample.name, len(output_files)), flush=True)
         sample.analysis_files = output_files
