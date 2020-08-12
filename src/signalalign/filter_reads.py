@@ -183,7 +183,7 @@ def filter_reads(alignment_file, readdb, read_dirs, quality_threshold=7, recursi
                     n_files += 1
                     n_bases += aligned_segment.query_length
                     yield fast5, aligned_segment
-
+                    break
             except KeyError:
                 print("Found no alignments for {}".format(fast5))
 
