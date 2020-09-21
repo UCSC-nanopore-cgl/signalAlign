@@ -857,9 +857,9 @@ class HmmModel(object):
             self.normalize_transitions_expectations()
 
         alphabet = "".join(sorted(alphabet))
-        for base in alphabet:
-            assert not is_non_canonical_iupac_base(base), \
-                "You cannot use IUPAC character to represent multiple bases. {}".format(base)
+        # for base in alphabet:
+        #     assert not is_non_canonical_iupac_base(base), \
+        #         "You cannot use IUPAC character to represent multiple bases. {}".format(base)
 
         new_base = (set(alphabet) - set(self.alphabet)).pop()
 

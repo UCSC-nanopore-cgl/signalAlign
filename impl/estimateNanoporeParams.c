@@ -29,12 +29,12 @@ double absPercentDiff(double obs, double exp) {
     return percentDiff > 0 ? percentDiff : -percentDiff;
 }
 
-Sequence *initializeSequenceFromNpReadFile(NanoporeRead *npRead, bool templateStrand) {
-    return sequence_construct2(
-            (templateStrand ? npRead->nbTemplateEvents : npRead->nbComplementEvents),
-            (templateStrand ? npRead->templateEvents : npRead->complementEvents),
-            sequence_getEvent, sequence_sliceEventSequence, event);
-}
+//Sequence *initializeSequenceFromNpReadFile(NanoporeRead *npRead, bool templateStrand) {
+//    return sequence_construct2(
+//            (templateStrand ? npRead->nbTemplateEvents : npRead->nbComplementEvents),
+//            (templateStrand ? npRead->templateEvents : npRead->complementEvents),
+//            sequence_getEvent, sequence_sliceEventSequence, event);
+//}
 
 stList *lineTokensFromFile(const char *filePath, int64_t getLine) {
     FILE *fH = fopen(filePath, "r");

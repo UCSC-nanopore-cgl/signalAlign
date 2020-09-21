@@ -1,0 +1,11 @@
+.eggs
+.gitignore
+.git
+.gitmodules
+.idea
+build
+cmake-build-debug
+dist
+Dockerfile
+.dockerignore
+
