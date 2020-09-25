@@ -1,3 +1,4 @@
+# syntax = docker/dockerfile:1.0-experimental
 FROM ubuntu:18.04 AS build
 MAINTAINER Andrew Bailey, andbaile@ucsc.edu
 
@@ -70,10 +71,27 @@ RUN git clone https://github.com/lh3/bwa.git && \
     cd bwa && \
     make && cp bwa /usr/local/bin
 
-#RUN git clone --recursive https://github.com/adbailey4/embed_fast5.git --branch docker
-COPY . /root/signalAlign
-WORKDIR /root/signalAlign/build
-RUN cmake .. -DCMAKE_INSTALL_PREFIX=. -DCMAKE_VERBOSE_MAKEFILE=ON -DBUILD_SHARED_LIBS=OFF && make
+#RUN git clone --recursive https://github.com/UCSC-nanopore-cgl/signalAlign.git --branch docker
+#COPY . /root/signalAlign
+#RUN --mount=type=bind,source=.,target=/root/signalAlign,rw cd /root/signalAlign/build && \
+#    cmake .. -DCMAKE_INSTALL_PREFIX=. -DCMAKE_VERBOSE_MAKEFILE=ON -DBUILD_SHARED_LIBS=OFF && \
+#    make && cd /root/signalAlign && python3.7 setup.py install
+RUN --mount=type=bind,source=.,target=/home/signalAlign,rw mkdir /home/signalAlign/build && \
+    cd /home/signalAlign/build && \
+    cmake .. -DCMAKE_INSTALL_PREFIX=. -DCMAKE_VERBOSE_MAKEFILE=ON -DBUILD_SHARED_LIBS=OFF && \
+    make && \
+    cd /home/signalAlign && \
+    python3.7 setup.py install && \
+    mkdir /root/signalAlign && mkdir /root/signalAlign/build && \
+    cp -r /home/signalAlign/build /root/signalAlign/build && \
+    mkdir /root/signalAlign/bin && \
+    cp -r /home/signalAlign/bin /root/signalAlign
+
+
+#WORKDIR /root/signalAlign/build
+#RUN cmake .. -DCMAKE_INSTALL_PREFIX=. -DCMAKE_VERBOSE_MAKEFILE=ON -DBUILD_SHARED_LIBS=OFF && make
+#WORKDIR /root/signalAlign
+#RUN python3.7 setup.py install
 
 FROM ubuntu:18.04 as runtime
 RUN apt-get update && \

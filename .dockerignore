@@ -1,5 +1,5 @@
 .eggs
-.gitignore
+#.gitignore
 .git
 .gitmodules
 .idea
@@ -8,4 +8,5 @@ cmake-build-debug
 dist
 Dockerfile
 .dockerignore
-
+tests/test_*
+models
