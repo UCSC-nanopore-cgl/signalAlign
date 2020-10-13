@@ -576,7 +576,7 @@ def main(args=None):
                 print("Plotting {}".format(f5_path))
                 ps = PlotSignal(cl_handle.aligned_signal)
                 ps.plot_alignment(save_fig_path=save_fig_path, plot_alpha=args.plot_alpha, kmer_info=kmer_info)
-        except KeyError as e:
+        except Exception as e:
             print("FAILED: {}: {}".format(e, f5_path))
 
     stop = timer()
