@@ -529,8 +529,8 @@ def index_bases_from_events(events, kmer_index=2):
                     try:
                         base_raw_starts.append(event['raw_start'])
                         probs.append(event['p_model_state'])
-                        bases.append(char_moves[x])
                         base_raw_lengths.append(event['raw_length'])
+                        bases.append(char_moves[x])
                     except IndexError:
                         pass
                         # print(event["model_state"])

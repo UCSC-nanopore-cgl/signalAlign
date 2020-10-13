@@ -333,6 +333,7 @@ def run_kmeralign_exe(fast5_path, nuc_sequence, model_file, dest, path_to_bin=".
             cmd.extend(['-n', fasta_location])
         if rna:
             cmd.append('--rna')
+        print(" ".join(cmd))
         subprocess.check_call(cmd)
         status = True
     except Exception as e:

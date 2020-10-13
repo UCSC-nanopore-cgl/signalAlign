@@ -57,7 +57,7 @@ target_include_directories(sa_objlib
         PUBLIC
         $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/signalalign>
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/inc>
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/sonLib/lib>
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/sonLib/C/inc>
         $<BUILD_INTERFACE:${signalalign_INCLUDE_DIRS}>
         )
 # shared libraries need PIC

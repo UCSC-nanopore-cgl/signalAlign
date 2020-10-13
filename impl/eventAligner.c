@@ -1325,6 +1325,8 @@ void alignment_to_base_event_map(stList *event_alignment, basecalled_event_table
         if (event_idx == prev_event_idx) {
             if (k_idx == prev_kmer_indx){
                 fprintf(stderr, "[Event Aligner] There was an error in the event map.");
+            } else if (prev_kmer_indx == 0) {
+                continue;
             } else {
                 b_et->event[event_idx].p_model_state = exp(lp_emission);
                 strcpy(b_et->event[event_idx].model_state, kmer);
