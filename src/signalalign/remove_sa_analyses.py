@@ -47,6 +47,7 @@ def remove_sa_analyses(fast5):
     for analyses in [x for x in list(fh["Analyses"].keys()) if "SignalAlign" in x]:
         fh.delete(os.path.join("Analyses", analyses))
         counter += 1
+    fh = fh.repack()
     fh.close()
     return counter
 
@@ -59,6 +60,7 @@ def remove_basecall_analyses(fast5):
     for analyses in [x for x in list(fh["Analyses"].keys()) if "Basecall" in x]:
         fh.delete(os.path.join("Analyses", analyses))
         counter += 1
+    fh = fh.repack()
     fh.close()
     return counter
 
@@ -72,6 +74,7 @@ def remove_analyses(fast5):
         fh.delete(os.path.join("Analyses", analyses))
         counter += 1
     fh.delete("Analyses")
+    fh = fh.repack()
     fh.close()
     return counter
 
