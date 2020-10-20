@@ -18,6 +18,7 @@ if (NOT APPLE AND NOT BUILD_SHARED_LIBS)
     target_link_libraries(signalAlignLibTests PUBLIC -static -static-libgcc -static-libstdc++)
 endif(NOT APPLE AND NOT BUILD_SHARED_LIBS)
 
+target_include_directories(signalAlignLibTests PUBLIC ${sonLib_inc})
 add_dependencies(signalAlignLibTests lastz_make)
 
 add_custom_command(
