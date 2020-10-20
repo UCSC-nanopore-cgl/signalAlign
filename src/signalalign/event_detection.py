@@ -23,11 +23,10 @@ from signalalign.utils.sequenceTools import get_full_nucleotide_read_from_alignm
 from py3helpers.utils import check_numpy_table, TimeStamp, merge_dicts
 from py3helpers.seq_tools import create_fastq_line, check_fastq_line, pairwise_alignment_accuracy
 
-
 EVENT_KMERALIGN_TMP = "KmerEventAlign_tmp"
 
 
-def check_event_table_time(event_table, min_difference = 0.0000001):
+def check_event_table_time(event_table, min_difference=0.0000001):
     """Check if event table has correct math for start and length timing for each event
 
     :param event_table: event table with "start" and "length" columns
@@ -43,7 +42,6 @@ def check_event_table_time(event_table, min_difference = 0.0000001):
     return True
 
 
-
 def save_event_table_and_fastq(f5fh, event_table, fastq_line, attributes=None, overwrite=False,
                                analysis_identifier=Fast5.__default_basecall_1d_analysis__):
     # get destination root
@@ -52,6 +50,7 @@ def save_event_table_and_fastq(f5fh, event_table, fastq_line, attributes=None, o
             # get current identifier
             destination = f5fh.get_analysis_latest(analysis_identifier)
             f5fh.delete(destination, ignore=True)
+            f5fh = f5fh.repack()
         except IndexError:
             # doesn't exist, get initial location (ie Basecall_000)
             destination = f5fh.get_analysis_new(analysis_identifier)
@@ -167,7 +166,8 @@ def load_from_raw(np_handle, alignment_file, model_file_location, path_to_bin=".
         nucleotide_sequence = np_handle.get_template_read(initalize_bypass=True)
         assert nucleotide_sequence, "alignment_file must be a real path a SAM/BAM alignment file, or " \
                                     "nucleotide_sequence must be specified (retrieval attempted from fast5). " \
-                                    "alignment_file: {}, nucleotide_sequence:{}".format(alignment_file, nucleotide_sequence)
+                                    "alignment_file: {}, nucleotide_sequence:{}".format(alignment_file,
+                                                                                        nucleotide_sequence)
 
     # check if file is open
     if not np_handle.open():
@@ -279,6 +279,7 @@ def load_from_raw2(np_handle, aligned_segment, model_file_location, path_to_bin=
     os.removedirs(tmp_directory)
     # alignment succeeded, save it to the appropriate location
     if status:
+        print(f"KEY:PASSED: {np_handle.read_label}")
         np_handle.open()
         if analysis_identifier is None: analysis_identifier = Fast5.__default_basecall_1d_analysis__
         # get attrs
@@ -295,6 +296,7 @@ def load_from_raw2(np_handle, aligned_segment, model_file_location, path_to_bin=
 
     # alignment failed, remove offending location (if it exists) and report
     else:
+        print(f"KEY:FAILED: {np_handle.read_label}")
         print("[load_from_raw] error performing kmeralign", file=sys.stderr)
         np_handle.open()
         np_handle.fastFive.delete(tmp_root, ignore=True)

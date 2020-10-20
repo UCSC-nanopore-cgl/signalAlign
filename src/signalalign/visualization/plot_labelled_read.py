@@ -280,10 +280,10 @@ class PlotSignal(object):
                              box.width, box.height * 0.9])
 
         # Put a legend below current axis
-        panel1.legend(handles, self.names, loc='upper center',
-                      fancybox=True, shadow=True, ncol=5)
-        # panel1.legend(handles, self.names, loc='upper center', bbox_to_anchor=(0.5, -0.05),
+        # panel1.legend(handles, self.names, loc='upper center',
         #               fancybox=True, shadow=True, ncol=5)
+        panel1.legend(handles, self.names, loc='upper center', bbox_to_anchor=(0.5, -0.05),
+                      fancybox=True, shadow=True, ncol=5)
 
         # panel1.legend(handles, self.names, loc='upper right')
         if save_fig_path:
@@ -549,11 +549,11 @@ def main(args=None):
                     basecall_list.append(basecall)
                     events = cl_handle.get_basecalled_data_by_number(int(number))
                     events_list.append(events)
-                if len(events_list) > 1:
-                    main_plot = False
-                    print("Plotting {}".format(f5_path))
-                    plot_basecalled_sequences(events_list[0], events2=events_list[1],
-                                              signal=cl_handle.aligned_signal.scaled_signal)
+                # if len(events_list) > 1:
+                #     main_plot = False
+                #     print("Plotting {}".format(f5_path))
+                #     plot_basecalled_sequences(events_list[0], events2=events_list[1],
+                #                               signal=cl_handle.aligned_signal.scaled_signal)
 
             if args.variant is not None:
                 for number in args.variant:

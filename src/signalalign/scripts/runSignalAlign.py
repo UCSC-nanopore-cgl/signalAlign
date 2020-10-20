@@ -186,7 +186,9 @@ def main(args):
             filter_reads=config_args.filter_reads,
             delete_tmp=config_args.signal_alignment_args.delete_tmp,
             rna=config_args.rna,
-            ambig_model=config_args.ambig_model)
+            ambig_model=config_args.ambig_model,
+            overwrite=config_args.overwrite
+        )
 
         multithread_signal_alignment_samples(samples, alignment_args, config_args.job_count, trim=None,
                                              debug=config_args.debug)
