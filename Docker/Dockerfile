@@ -77,6 +77,10 @@ RUN git clone https://github.com/lh3/bwa.git && \
 #    cmake .. -DCMAKE_INSTALL_PREFIX=. -DCMAKE_VERBOSE_MAKEFILE=ON -DBUILD_SHARED_LIBS=OFF && \
 #    make && cd /root/signalAlign && python3.7 setup.py install
 RUN --mount=type=bind,source=.,target=/home/signalAlign,rw mkdir /home/signalAlign/build && \
+    cd /home/signalAlign/sonLib && \
+    make clean && \
+    cd /home/signalAlign/externalTools && \
+    make clean && \
     cd /home/signalAlign/build && \
     cmake .. -DCMAKE_INSTALL_PREFIX=. -DCMAKE_VERBOSE_MAKEFILE=ON -DBUILD_SHARED_LIBS=OFF && \
     make && \
@@ -85,7 +89,8 @@ RUN --mount=type=bind,source=.,target=/home/signalAlign,rw mkdir /home/signalAli
     mkdir /root/signalAlign && mkdir /root/signalAlign/build && \
     cp -r /home/signalAlign/build /root/signalAlign/build && \
     mkdir /root/signalAlign/bin && \
-    cp -r /home/signalAlign/bin /root/signalAlign
+    cp -r /home/signalAlign/bin /root/signalAlign && \
+    cp -r /home/signalAlign/Docker/run_wrapper.sh /root/signalAlign/run_wrapper.sh
 
 
 #WORKDIR /root/signalAlign/build
@@ -95,7 +100,7 @@ RUN --mount=type=bind,source=.,target=/home/signalAlign,rw mkdir /home/signalAli
 
 FROM ubuntu:18.04 as runtime
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends python3.7 python3.7-venv libgomp1 && \
+    apt-get install -y --no-install-recommends python3.7 python3.7-venv libgomp1 hdf5-tools && \
     apt-get clean && \
     apt-get purge
 WORKDIR /home/
@@ -109,5 +114,5 @@ ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 RUN mkdir /data
 WORKDIR /data
 
-ENTRYPOINT ["sh", "/root/signalAlign/Docker/run_wrapper.sh"]
+ENTRYPOINT ["sh", "/root/signalAlign/run_wrapper.sh"]
 
