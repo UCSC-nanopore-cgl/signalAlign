@@ -32,3 +32,4 @@ hdf5-1.10.4/
 eventdetection/cparsers.c
 tests/minion_test_reads/1D_*
 Makefile
+Docker/run_docker.sh
