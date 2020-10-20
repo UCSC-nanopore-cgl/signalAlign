@@ -25,6 +25,8 @@ set(sonLib_LIB
         ${CMAKE_CURRENT_SOURCE_DIR}/sonLib/lib/sonLib.a
         ${CMAKE_CURRENT_SOURCE_DIR}/sonLib/lib/cuTest.a
         )
+set(sonLib_inc
+        ${CMAKE_CURRENT_SOURCE_DIR}/sonLib/externalTools/cutest/)
 
 add_custom_command(
         OUTPUT ${sonLib_LIB}
