@@ -4,9 +4,12 @@
 .gitmodules
 .idea
 build
-cmake-build-debug
+cmake-build*
 dist
 Dockerfile
+Docker/*
 .dockerignore
 tests/test_*
+tests/minion_test_reads
 models
+bin

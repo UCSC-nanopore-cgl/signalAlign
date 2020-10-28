@@ -92,6 +92,7 @@ RUN --mount=type=bind,source=.,target=/home/signalAlign,rw mkdir /home/signalAli
     cp -r /home/signalAlign/bin /root/signalAlign && \
     cp -r /home/signalAlign/Docker/run_wrapper.sh /root/signalAlign/run_wrapper.sh
 
+RUN git clone https://github.com/adbailey4/rrna_scripts
 
 #WORKDIR /root/signalAlign/build
 #RUN cmake .. -DCMAKE_INSTALL_PREFIX=. -DCMAKE_VERBOSE_MAKEFILE=ON -DBUILD_SHARED_LIBS=OFF && make
@@ -100,16 +101,16 @@ RUN --mount=type=bind,source=.,target=/home/signalAlign,rw mkdir /home/signalAli
 
 FROM ubuntu:18.04 as runtime
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends python3.7 python3.7-venv libgomp1 hdf5-tools && \
+    apt-get install -y --no-install-recommends python3.7 python3.7-venv libgomp1 hdf5-tools samtools && \
     apt-get clean && \
     apt-get purge
-WORKDIR /home/
 
+COPY --from=build /root/rrna_scripts/ /root/rrna_scripts/
 COPY --from=build /root/signalAlign/ /root/signalAlign/
 COPY --from=build /opt/venv /opt/venv
 
 ENV VIRTUAL_ENV=/opt/venv
-ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+ENV PATH="$VIRTUAL_ENV/bin:/root/rrna_scripts/:$PATH"
 
 RUN mkdir /data
 WORKDIR /data
