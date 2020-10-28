@@ -7,7 +7,7 @@ build
 cmake-build*
 dist
 Dockerfile
-Docker/*
+Docker/Dockerfile
 .dockerignore
 tests/test_*
 tests/minion_test_reads

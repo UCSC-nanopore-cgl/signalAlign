@@ -42,19 +42,16 @@ RUN curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py && \
     python3.7 get-pip.py && \
     python3.7 -m pip install setuptools cython virtualenv
 
-WORKDIR /root/
-RUN git clone --recursive https://github.com/adbailey4/embed_fast5.git --branch docker
-#COPY . /root/embed_fast5
-WORKDIR /root/embed_fast5
-
 ENV VIRTUAL_ENV=/opt/venv
 RUN python3.7 -m venv $VIRTUAL_ENV
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 # build static so we need to tranfser less shared dependencies
 ENV BUILD_SHARED_LIBS="OFF"
 
-RUN python3.7 -m pip install -v .
-#RUN python3.7 -m pip install -v . 2>&1 | grep -Ev '__text|__const_coal|note: change section name|__DATA|__datacoal_nt|.~~~~~~~.' > output2.txt
+WORKDIR /root/
+RUN git clone --recursive https://github.com/adbailey4/embed_fast5.git --branch docker && \
+    cd /root/embed_fast5 && \
+    python3.7 -m pip install -v .
 
 # install samtools
 WORKDIR /root/
@@ -71,11 +68,6 @@ RUN git clone https://github.com/lh3/bwa.git && \
     cd bwa && \
     make && cp bwa /usr/local/bin
 
-#RUN git clone --recursive https://github.com/UCSC-nanopore-cgl/signalAlign.git --branch docker
-#COPY . /root/signalAlign
-#RUN --mount=type=bind,source=.,target=/root/signalAlign,rw cd /root/signalAlign/build && \
-#    cmake .. -DCMAKE_INSTALL_PREFIX=. -DCMAKE_VERBOSE_MAKEFILE=ON -DBUILD_SHARED_LIBS=OFF && \
-#    make && cd /root/signalAlign && python3.7 setup.py install
 RUN --mount=type=bind,source=.,target=/home/signalAlign,rw mkdir /home/signalAlign/build && \
     cd /home/signalAlign/sonLib && \
     make clean && \
@@ -93,11 +85,6 @@ RUN --mount=type=bind,source=.,target=/home/signalAlign,rw mkdir /home/signalAli
     cp -r /home/signalAlign/Docker/run_wrapper.sh /root/signalAlign/run_wrapper.sh
 
 RUN git clone https://github.com/adbailey4/rrna_scripts
-
-#WORKDIR /root/signalAlign/build
-#RUN cmake .. -DCMAKE_INSTALL_PREFIX=. -DCMAKE_VERBOSE_MAKEFILE=ON -DBUILD_SHARED_LIBS=OFF && make
-#WORKDIR /root/signalAlign
-#RUN python3.7 setup.py install
 
 FROM ubuntu:18.04 as runtime
 RUN apt-get update && \
