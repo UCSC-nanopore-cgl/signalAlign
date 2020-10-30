@@ -12,14 +12,26 @@
 #include <eventAligner.h>
 #include "sonLib.h"
 #include "signalMachineUtils.h"
-#include "kseq.h"
-#include <zlib.h>
 
 #define RAW_ROOT "/Raw/Reads/"
 
 //#define DEBUG_ADAPTIVE 1
 //#define DEBUG_FAST5_IO 1
 //#define DEBUG_PRINT_STATS 1
+#ifndef NDEBUG
+#  define debug_print(msg) stderr_printf msg
+#else
+#  define debug_print(msg) (void)0
+#endif
+
+void
+stderr_printf(const char *fmt, ...)
+{
+  va_list ap;
+  va_start(ap, fmt);
+  vfprintf(stderr, fmt, ap);
+  va_end(ap);
+}
 
 
 int write_readdb_file1(char* fast5_dir, char* output_path){
@@ -1219,10 +1231,9 @@ for(int col = 0; col <= 10; ++col) {
         }
     }
 
-    fprintf(stderr,
-            "%s\tevents_per_kmer:%.2lf\tsequence_len:%zu\tavg_log_emission:%.2lf\tcurr_event_idx:%d\tmax_gap:%d\tfills:%d\n",
+    debug_print(("%s\tevents_per_kmer:%.2lf\tsequence_len:%llu\tavg_log_emission:%.2lf\tcurr_event_idx:%d\tmax_gap:%d\tfills:%d\n",
             failed ? errMsg : "OK\t.",
-            events_per_kmer, (n_kmers+kmer_length-1) , avg_log_emission, curr_event_idx, max_gap, fills);
+            events_per_kmer, (n_kmers+kmer_length-1) , avg_log_emission, curr_event_idx, max_gap, fills));
     return out;
 }
 
@@ -1230,6 +1241,8 @@ for(int col = 0; col <= 10; ++col) {
 herr_t load_from_raw(char* fast5_file_path, char* templateModelFile, char* sequence, char* path_to_embed, bool rna) {
     return load_from_raw2(fast5_file_path, templateModelFile, sequence, path_to_embed, false, rna);
 }
+
+
 herr_t load_from_raw2(char* fast5_file_path, char* templateModelFile, char* sequence, char* path_to_embed,
                       bool writeFailedAlignment, bool rna) {
     // prep
@@ -1244,9 +1257,9 @@ herr_t load_from_raw2(char* fast5_file_path, char* templateModelFile, char* sequ
 
     if (rna) {
         ed_params = &event_detection_rna;
-        fprintf(stderr, "THIS READ IS: RNA\n");
+        debug_print(("THIS READ IS: RNA\n"));
     } else {
-      fprintf(stderr, "THIS READ IS: DNA \n");
+      debug_print(("THIS READ IS: DNA \n"));
     }
 
     // get channel parameters and scale raw ADC counts to get pA raw current

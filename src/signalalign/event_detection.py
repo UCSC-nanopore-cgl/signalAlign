@@ -228,7 +228,7 @@ def load_from_raw(np_handle, alignment_file, model_file_location, path_to_bin=".
 
 
 def load_from_raw2(np_handle, aligned_segment, model_file_location, path_to_bin="./",
-                   analysis_identifier=None, write_failed_alignments=False, rna=False, overwrite=False):
+                   analysis_identifier=None, write_failed_alignments=False, rna=False, overwrite=False, debug=False):
     """Load a nanopore read from raw signal and an alignment file. Need a model to create banded alignment.
     :param np_handle: NanoporeRead class object
     :param aligned_segment: pysam aligned_segment object
@@ -297,7 +297,6 @@ def load_from_raw2(np_handle, aligned_segment, model_file_location, path_to_bin=
     # alignment failed, remove offending location (if it exists) and report
     else:
         print(f"KEY:FAILED: {np_handle.read_label}")
-        print("[load_from_raw] error performing kmeralign", file=sys.stderr)
         np_handle.open()
         np_handle.fastFive.delete(tmp_root, ignore=True)
         return False
@@ -335,11 +334,10 @@ def run_kmeralign_exe(fast5_path, nuc_sequence, model_file, dest, path_to_bin=".
             cmd.extend(['-n', fasta_location])
         if rna:
             cmd.append('--rna')
-        print(" ".join(cmd))
         subprocess.check_call(cmd)
         status = True
     except Exception as e:
-        print("Exception in run_kmeralign: {}".format(e))
+        print(f"Exception running {cmd} run_kmeralign: {e}", file=sys.stderr)
         status = False
     finally:
         if fasta_location is not None and os.path.isfile(fasta_location) and delete_tmp_fasta:

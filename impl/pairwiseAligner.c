@@ -1393,6 +1393,7 @@ void diagonalCalculationPosteriorMatchProbs(StateMachine *sM, int64_t xay, DpMat
 //                                forwardCells[sM->matchState] + backwardCells[sM->matchState], totalProbability,
 //                                exp((forwardCells[sM->matchState] + backwardCells[sM->matchState]) - totalProbability));
                         //  DEBUGGING
+//                      if (posteriorProbability >= p->threshold || (posteriorProbability >= 0.0001 && (cellForward->numberOfPaths > 1 || cellBackward->numberOfPaths > 1)) ) {
 
                         if (posteriorProbability >= p->threshold) {
                             if (posteriorProbability > 1.0) {

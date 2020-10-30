@@ -148,8 +148,6 @@ def main(args):
         temp_dir_path = temp_folder.open_folder(os.path.join(os.path.abspath(config_args.output_dir),
                                                              "tempFiles_alignment"))
         temp_dir_path = resolvePath(temp_dir_path)
-        print(config_args.output_dir)
-        print(temp_dir_path)
 
         sa_args = [merge_dicts([s,
                                 {"quality_threshold": config_args.filter_reads, "workers": config_args.job_count,
@@ -249,8 +247,6 @@ def main(args):
         temp_folder = FolderHandler()
         temp_dir_path = temp_folder.open_folder(os.path.join(os.path.abspath(args.out), "tempFiles_alignment"))
         temp_dir_path = resolvePath(temp_dir_path)
-        print(args.out)
-        print(temp_dir_path)
 
         # generate reference sequence if not specified
         if not args.forward_reference or not args.backward_reference:
@@ -310,7 +306,7 @@ def main(args):
         print("[runSignalAlign]:NOTICE: Got {} files to align".format(len(fast5s)), file=sys.stdout)
         # setup workers for multiprocessing
         multithread_signal_alignment(alignment_args, fast5s, args.nb_jobs, debug=args.DEBUG,
-                                     filter_reads_to_string_wrapper=filter_read_generator)
+                                     filter_reads_to_string_wrapper_funct=filter_read_generator)
         stop = timer()
 
         print("\n#  signalAlign - finished alignments\n", file=sys.stderr)

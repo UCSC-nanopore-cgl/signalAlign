@@ -1,4 +1,3 @@
-from __future__ import print_function
 import sys
 import os
 import re
@@ -31,7 +30,8 @@ SUPPORTED_2D_VERSIONS = ("1.15.0", "1.19.0", "1.20.0", "1.22.2", "1.22.4", "1.23
 class NanoporeRead(object):
     def __init__(self, fast_five_file, twoD=False, event_table='', initialize=False, path_to_bin="./",
                  alignment_file=None, model_file_location=None, perform_kmer_event_alignment=None,
-                 enforce_supported_versions=True, filter_reads=False, aligned_segment=None, rna=None, overwrite=False):
+                 enforce_supported_versions=True, filter_reads=False, aligned_segment=None, rna=None, overwrite=False,
+                 debug=False):
         # load the fast5
         self.filename = fast_five_file  # fast5 file path
         self.fastFive = None  # fast5 object
@@ -77,6 +77,7 @@ class NanoporeRead(object):
         self.enforce_supported_versions = enforce_supported_versions
         self.aligned_segment = aligned_segment  # pysam aligned_segment object
         self.overwrite = overwrite
+        self.debug = debug
 
         if type(self) == NanoporeRead:
             if twoD:
@@ -91,10 +92,14 @@ class NanoporeRead(object):
         if self.is_read_rna() or rna:
             self.rna = True
             assert self.twoD is False, "Cannot perform 2D analysis when using RNA data"
-        print("[NanoporeRead:open] is this an rna read?: ", self.rna)
+        self.print("[NanoporeRead:open] is this an rna read?: ", self.rna)
         # initialize if appropriate
         if initialize:
             self.Initialize()
+
+    def print(self, msg, file=sys.stdout, end="\n"):
+        if self.debug:
+            print(msg, file=file, end=end)
 
     def open(self):
         if self.is_open: return True
@@ -122,7 +127,7 @@ class NanoporeRead(object):
             else:
                 return self.fastFive.get_analysis_latest(address)
         except (ValueError, IndexError) as e:
-            print("[NanoporeRead:get_latest_basecall_edition] could not find {} in {}".format(address, self.filename),
+            self.print("[NanoporeRead:get_latest_basecall_edition] could not find {} in {}".format(address, self.filename),
                   file=sys.stderr)
             return False
 
@@ -193,7 +198,7 @@ class NanoporeRead(object):
 
         # Some RNA reads have incorrectly formatted basecall tables so we check and then force load_from_raw
         if oned_root_address and self.rna and not self.has_valid_event_table_format(oned_root_address):
-            self.logError("[NanoporeRead:_initialize] WARN invalid event table format for RNA read")
+            self.print("[NanoporeRead:_initialize] WARN invalid event table format for RNA read")
             if perform_kmer_event_aln_if_required:
                 oned_root_address = self.generate_new_event_table()
         # sanity check
@@ -203,7 +208,7 @@ class NanoporeRead(object):
             self.close()
             return False
 
-        print("[NanoporeRead._initialize] oned_root_address {}".format(oned_root_address))
+        self.print("[NanoporeRead._initialize] oned_root_address {}".format(oned_root_address))
         # get basecall version
         # if not any(x in self.fastFive[oned_root_address].attrs.keys() for x in VERSION_KEY):
         #     self.logError("[NanoporeRead:_initialize] ERROR %s missing version" % self.filename)
@@ -276,7 +281,7 @@ class NanoporeRead(object):
         self.close()
         self.open()
         if oned_root_address:
-            self.logError(
+            self.print(
                 "[NanoporeRead:generate_new_event_table] INFO generated event table at {}".format(oned_root_address))
         else:
             self.logError("[NanoporeRead:generate_new_event_table] ERROR failed to generate event table")
