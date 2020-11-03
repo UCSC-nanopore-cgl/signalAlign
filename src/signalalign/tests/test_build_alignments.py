@@ -197,8 +197,10 @@ class TrainSignalAlignTest(unittest.TestCase):
             lines = len(data.index)
             with tempfile.TemporaryDirectory() as temdir:
                 out_path = os.path.join(temdir, "test.tsv")
+                log_path = os.path.join(temdir, "log.tsv")
+
                 data2, time2 = time_it(bindings.generate_master_kmer_table,
-                                       [self.assignment_path], out_path, 10, "ACGT", 0.5, 2, False)
+                                       [self.assignment_path], out_path, log_path, 10, "ACGT", 0.5, 2, False)
 
                 # get kmers associated with each sample
                 lines2 = count_lines_in_file(out_path)
