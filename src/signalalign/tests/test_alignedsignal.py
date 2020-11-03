@@ -206,11 +206,11 @@ class CreateLabelsTest(unittest.TestCase):
 
         self.dna_handle2.add_signal_align_predictions(add_basecall=False)
         self.assertSequenceEqual(self.dna_handle2.aligned_signal.prediction["full_signalalign"][0].tolist(),
-                                 [153, 3, 1845108+self.kmer_index, 0.992924, b'CATTG'])
+                                 [153, 3, 1845108+self.kmer_index, 0.992124, b'CATTG'])
 
         self.rna1_handle.add_signal_align_predictions(add_basecall=False)
         self.assertSequenceEqual(self.rna1_handle.aligned_signal.prediction["full_signalalign"][0].tolist(),
-                                 [0, 11, 1081+self.kmer_index, 0.999781, b'AACCT'])
+                                 [0, 11, 1081+self.kmer_index,  1.0, b'AACCT'])
         self.rna2_handle.add_signal_align_predictions(add_basecall=False)
         self.assertSequenceEqual(self.rna2_handle.aligned_signal.prediction["full_signalalign"][0].tolist(),
                                  [0, 7, 3+self.kmer_index, 1.0, b'AACCT'])
@@ -223,11 +223,11 @@ class CreateLabelsTest(unittest.TestCase):
 
         self.dna_handle2.add_mea_labels()
         self.assertSequenceEqual(self.dna_handle2.aligned_signal.label["mea_signalalign"][0].tolist(),
-                                 [153, 3, 1845108+self.kmer_index, 0.992924, b'CATTG'])
+                                 [153, 3, 1845108+self.kmer_index, 0.992124, b'CATTG'])
 
         self.rna1_handle.add_mea_labels()
         self.assertSequenceEqual(self.rna1_handle.aligned_signal.label["mea_signalalign"][0].tolist(),
-                                 [0, 11, 1081+self.kmer_index, 0.999781, b'AACCT'])
+                                 [0, 11, 1081+self.kmer_index,  1.0, b'AACCT'])
         self.rna2_handle.add_mea_labels()
         self.assertSequenceEqual(self.rna2_handle.aligned_signal.label["mea_signalalign"][0].tolist(),
                                  [0, 7, 3+self.kmer_index, 1.0, b'AACCT'])
