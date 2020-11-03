@@ -109,8 +109,7 @@ def parse_alignment_file(file_path):
 
 class HmmModel(object):
     def __init__(self, ont_model_file, hdp_model_file=None, nanopolish_model_file=None, rna=False, name=None):
-        # TODO Need to create docs here
-        assert os.path.exists(ont_model_file)
+        assert os.path.exists(ont_model_file), f"Model file does not exist: {ont_model_file}"
         self.name = name
         self.rna = rna
         self.ont_model_file = ont_model_file

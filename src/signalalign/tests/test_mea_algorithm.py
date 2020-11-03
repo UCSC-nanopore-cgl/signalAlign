@@ -9,13 +9,10 @@
 ########################################################################
 
 
-import sys
-import numpy as np
 import unittest
-from collections import defaultdict
-from scipy import sparse
+
+from py3helpers.utils import captured_output
 from signalalign.mea_algorithm import *
-from py3helpers.utils import time_it, captured_output
 
 
 class MeaTest(unittest.TestCase):
@@ -24,7 +21,6 @@ class MeaTest(unittest.TestCase):
 
     def test_maximum_expected_accuracy_alignment(self):
         with captured_output() as (_, _):
-
             # """Test maximum_expected_accuracy_alignment function"""
             # ref x event
             posterior_matrix = [[0.2, 0.2, 0.3, 0.0, 0.0],
@@ -36,7 +32,8 @@ class MeaTest(unittest.TestCase):
             posterior_matrix = np.asanyarray(posterior_matrix).T
             # correct input
             shortest_ref_per_event = [0, 0, 0, 3, 3]
-            forward_edges = maximum_expected_accuracy_alignment(posterior_matrix, shortest_ref_per_event, return_all=True)
+            forward_edges = maximum_expected_accuracy_alignment(posterior_matrix, shortest_ref_per_event,
+                                                                return_all=True)
             # trim unnecessary edges
             self.assertEqual(3, len(forward_edges))
             # 0.2->0.5->0.1 = 0.7 dont count horizontal move through 0.1
@@ -50,7 +47,8 @@ class MeaTest(unittest.TestCase):
             self.assertAlmostEqual(1.6, forward_edges[2][3])
 
             # test passing through a sparse matrix
-            forward_edges = maximum_expected_accuracy_alignment(sparse.coo_matrix(posterior_matrix), shortest_ref_per_event,
+            forward_edges = maximum_expected_accuracy_alignment(sparse.coo_matrix(posterior_matrix),
+                                                                shortest_ref_per_event,
                                                                 sparse_posterior_matrix=True,
                                                                 return_all=True)
             self.assertEqual(3, len(forward_edges))
@@ -66,7 +64,8 @@ class MeaTest(unittest.TestCase):
 
             # incorrect min ref lengths
             shortest_ref_per_event = [0, 1, 1, 1, 1]
-            forward_edges = maximum_expected_accuracy_alignment(posterior_matrix, shortest_ref_per_event, return_all=True)
+            forward_edges = maximum_expected_accuracy_alignment(posterior_matrix, shortest_ref_per_event,
+                                                                return_all=True)
             self.assertEqual(4, len(forward_edges))
 
     def test_binary_search_for_edge(self):
@@ -147,7 +146,7 @@ class MeaTest(unittest.TestCase):
                             [0, 0, event1[0], 0],
                             [0, 0, 0, event1[0]]]
             events = get_events_from_path(event_matrix, path, dtype=event1.dtype)
-            self.assertSequenceEqual(events.tolist(), event1.tolist())
+            self.assertSequenceEqual(events.tolist(), list(event1.tolist()))
             event_matrix = [[0, 0, 0, 0],
                             [0, 0, 0, 0],
                             [0, 0, 0, 0]]
@@ -193,7 +192,8 @@ class MeaTest(unittest.TestCase):
             # if mapped to reverse strand
             # reverse complement
 
-            alignment = np.zeros(4, dtype=[('reference_index', int), ('event_index', int), ('posterior_probability', float),
+            alignment = np.zeros(4, dtype=[('reference_index', int), ('event_index', int),
+                                           ('posterior_probability', float),
                                            ('path_kmer', 'S5')])
 
             alignment["reference_index"] = [0, 1, 2, 3]
@@ -213,7 +213,6 @@ class MeaTest(unittest.TestCase):
 
     def test_add_events_to_signalalign(self):
         with captured_output() as (_, _):
-
             events = np.zeros(4, dtype=[('reference_index', '<i8'), ('reference_kmer', 'S5'),
                                         ('strand', 'S1'),
                                         ('event_index', '<i8'), ('event_mean', '<f8'), ('event_noise', '<f8'),
@@ -226,7 +225,6 @@ class MeaTest(unittest.TestCase):
             event_detects["raw_start"] = [10, 11, 12, 13]
             event_detects["raw_length"] = [1, 1, 1, 1]
             events["strand"] = ["t", "t", "t", "t"]
-
 
             new_data = add_events_to_signalalign(sa_events=events, event_detections=event_detects)
             self.assertSequenceEqual(new_data["raw_start"].tolist(), [10, 11, 12, 13])
@@ -250,13 +248,12 @@ class MeaTest(unittest.TestCase):
             event_detects2["raw_length"] = [1, 1, 1, 1]
 
             new_data = add_events_to_signalalign(sa_events=events, event_detections=event_detects,
-                                                            complement_event_detections=event_detects2)
+                                                 complement_event_detections=event_detects2)
             self.assertSequenceEqual(new_data["raw_start"].tolist(), [10, 11, 10, 11])
             self.assertSequenceEqual(new_data["raw_length"].tolist(), [1, 1, 1, 1])
 
     def test_create_label_from_events(self):
         with captured_output() as (_, _):
-
             events = np.zeros(4, dtype=[('reference_index', '<i8'), ('path_kmer', 'S5'),
                                         ('strand', 'S1'),
                                         ('event_index', '<i8'), ('event_mean', '<f8'), ('event_noise', '<f8'),
@@ -272,7 +269,7 @@ class MeaTest(unittest.TestCase):
             self.assertSequenceEqual(new_data["raw_start"].tolist(), [10, 11, 12, 13])
             self.assertSequenceEqual(new_data["raw_length"].tolist(), [1, 1, 1, 1])
             with self.assertRaises(ValueError):
-                fail = new_data["strand"]
+                pass
 
     def test_mea_alignment_close_to_guide(self):
         with captured_output() as (_, _):
@@ -298,7 +295,6 @@ class MeaTest(unittest.TestCase):
                 if os.path.isdir(temp_signal_align_dir):
                     shutil.rmtree(temp_signal_align_dir)
                     assert not os.path.isdir(temp_signal_align_dir)
-                temp_signal_align = temp_root.open_folder(temp_signal_align_dir)
 
                 # get input files
                 orig_fast5s = glob.glob(os.path.join(fast5_dir, "*.fast5"))
@@ -328,10 +324,10 @@ class MeaTest(unittest.TestCase):
                     f5_name = os.path.basename(fast5)
                     event_summaries = all_event_summaries[fast5]
                     max_mea_aln_diff = max(list(map(lambda x: x[ABS_SA_ALIGNMENT_DIFF],
-                                                list(filter(lambda x: x[MEA], event_summaries)))))
+                                                    list(filter(lambda x: x[MEA], event_summaries)))))
                     self.assertTrue(max_mea_aln_diff <= threshold,
-                                    "MEA produced alignment greater than {} positions from guide alignment for {}".format(
-                                        max_mea_aln_diff, f5_name))
+                                    f"MEA produced alignment greater than {max_mea_aln_diff} "
+                                    f"positions from guide alignment for {f5_name}")
 
 
 if __name__ == '__main__':
