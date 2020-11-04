@@ -8,6 +8,7 @@ class FolderHandler(object):
         self.path = None  # place to make temp folder
         self.open = False  # flag for open or closed
         self.filenames = []  # place to hold paths to temp files
+        self.already_exists = False
 
     def open_folder(self, path):
         path = os.path.abspath(path)
@@ -51,9 +52,7 @@ class FolderHandler(object):
         if self.already_exists:
             self.open = False
             return
-        if os.listdir(self.path) == []:
+        if not os.listdir(self.path):
             os.rmdir(self.path)
             self.open = False
             return
-
-

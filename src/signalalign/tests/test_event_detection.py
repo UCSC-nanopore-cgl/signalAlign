@@ -21,6 +21,8 @@ import math
 
 class EventDetectTests(unittest.TestCase):
 
+    tmp_directory = None
+
     @classmethod
     def setUpClass(cls):
         super(EventDetectTests, cls).setUpClass()
@@ -31,11 +33,14 @@ class EventDetectTests(unittest.TestCase):
         cls.tmp_directory = tempfile.mkdtemp()
 
         dna_file = os.path.join(cls.HOME,
-                                "tests/minion_test_reads/canonical_ecoli_R9/miten_PC_20160820_FNFAD20259_MN17223_mux_scan_AMS_158_R9_WGA_Ecoli_08_20_16_83098_ch138_read23_strand.fast5")
+                                "tests/minion_test_reads/canonical_ecoli_R9/miten_PC_20160820_FNFAD20259_"
+                                "MN17223_mux_scan_AMS_158_R9_WGA_Ecoli_08_20_16_83098_ch138_read23_strand.fast5")
         rna_file = os.path.join(cls.HOME,
-                                "tests/minion_test_reads/RNA_edge_cases/DEAMERNANOPORE_20170922_FAH26525_MN16450_sequencing_run_MA_821_R94_NA12878_mRNA_09_22_17_67136_read_61_ch_151_strand.fast5")
+                                "tests/minion_test_reads/RNA_edge_cases/DEAMERNANOPORE_20170922_FAH26525_MN16450_"
+                                "sequencing_run_MA_821_R94_NA12878_mRNA_09_22_17_67136_read_61_ch_151_strand.fast5")
         rna_file2 = os.path.join(cls.HOME,
-                                 "tests/minion_test_reads/RNA_edge_cases/DEAMERNANOPORE_20170922_FAH26525_MN16450_sequencing_run_MA_821_R94_NA12878_mRNA_09_22_17_67136_read_36_ch_218_strand.fast5")
+                                 "tests/minion_test_reads/RNA_edge_cases/DEAMERNANOPORE_20170922_FAH26525_MN16450_"
+                                 "sequencing_run_MA_821_R94_NA12878_mRNA_09_22_17_67136_read_36_ch_218_strand.fast5")
         # get file locations
         cls.tmp_dna_file = os.path.join(str(cls.tmp_directory), 'test_dna.fast5')
         cls.tmp_rna_file1 = os.path.join(str(cls.tmp_directory), 'test_rna1.fast5')
@@ -85,15 +90,16 @@ class EventDetectTests(unittest.TestCase):
 
         # add raw fields
         event_table = add_raw_start_and_raw_length_to_events(event_table, start_time, sampling_freq)
-        raw_starts = event_table['raw_start'].tolist()
-        raw_lengths = event_table['raw_length'].tolist()
+        # raw_starts = event_table['raw_start'].tolist()
+        # raw_lengths = event_table['raw_length'].tolist()
 
         # save old fields
         event_table = rename_fields(event_table, {'start': 'original_start', 'length': 'original_length'})
 
         # add non-raw fields
         event_table = add_start_and_length_to_events(event_table, start_time, sampling_freq)
-        self.assertTrue(check_event_table_time(event_table, min_difference=1.0/sampling_freq), "Invalid modified start times")
+        self.assertTrue(check_event_table_time(event_table, min_difference=1.0/sampling_freq), 
+                        "Invalid modified start times")
 
         # get fields
         original_starts = event_table['original_start'].tolist()
@@ -138,7 +144,12 @@ class EventDetectTests(unittest.TestCase):
     def test_run_kmeralign_exe(self):
         path_to_bin = os.path.join(self.HOME, "bin")
         rna_fast5_path = os.path.abspath(self.tmp_rna_file2)
-        nuc_sequence = "CAUCCUGCCCUGUGUUAUCCAGUUAUGAGAUAAAAAAUGAAUAUAAGAGUGCUUGUCAUUAUAAAAGUUUUCCUUUUUAUUACCAUCCAAGCCACCAGCUGCCAGCCACCAGCAGCCAGCUGCCAGCACUAGCUUUUUUUUUUUAGCACUUAGUAUUUAGCAGCAUUUAUUAACAGGUACUUUAAGAAUGAUGAAGCAUUGUUUUAAUCUCACUGACUAUGAAGGUUUUAGUUUCUGCUUUUGCAAUUGUGUUUGUGAAAUUUGAAUACUUGCAGGCUUUGUAUGUGAAUAAUUUUAGCGGCUGGUUGGAGAUAAUCCUACGGGAAUUACUUAAAACUGUGCUUUAACUAAAAUGAAUGAGCUUUAAAAUCCCUCCUCCUACUCCAUCAUCAUCCCACUAUUCAUCUUAUCUCAUUAUCAUCAACCUAUCCCACAUCCCUAUCACCACAGCAAUCCAA"
+        nuc_sequence = "CAUCCUGCCCUGUGUUAUCCAGUUAUGAGAUAAAAAAUGAAUAUAAGAGUGCUUGUCAUUAUAAAA" \
+                       "GUUUUCCUUUUUAUUACCAUCCAAGCCACCAGCUGCCAGCCACCAGCAGCCAGCUGCCAGCACUAGCUU" \
+                       "UUUUUUUUUAGCACUUAGUAUUUAGCAGCAUUUAUUAACAGGUACUUUAAGAAUGAUGAAGCAUUGUUUUAAUCUCACUGACUAUGAAGGUU" \
+                       "UUAGUUUCUGCUUUUGCAAUUGUGUUUGUGAAAUUUGAAUACUUGCAGGCUUUGUAUGUGAAUAAUUUUAGCGGCUGGUUGGAGAUAAUCCU" \
+                       "ACGGGAAUUACUUAAAACUGUGCUUUAACUAAAAUGAAUGAGCUUUAAAAUCCCUCCUCCUACUCCAUCAUCAUCCCACUAUUCAUCUUAUC" \
+                       "UCAUUAUCAUCAACCUAUCCCACAUCCCUAUCACCACAGCAAUCCAA"
         rna_model_file = self.rna_model_file
         np_handle = NanoporeRead(os.path.abspath(self.tmp_rna_file3))
         np_handle._initialize_metadata()

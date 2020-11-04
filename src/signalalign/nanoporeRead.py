@@ -92,7 +92,7 @@ class NanoporeRead(object):
         if self.is_read_rna() or rna:
             self.rna = True
             assert self.twoD is False, "Cannot perform 2D analysis when using RNA data"
-        self.print("[NanoporeRead:open] is this an rna read?: ", self.rna)
+        self.print(f"[NanoporeRead:open] is this an rna read?: {self.rna}")
         # initialize if appropriate
         if initialize:
             self.Initialize()
@@ -127,8 +127,9 @@ class NanoporeRead(object):
             else:
                 return self.fastFive.get_analysis_latest(address)
         except (ValueError, IndexError) as e:
-            self.print("[NanoporeRead:get_latest_basecall_edition] could not find {} in {}".format(address, self.filename),
-                  file=sys.stderr)
+            self.print("[NanoporeRead:get_latest_basecall_edition] could not find {} in {}".format(address,
+                                                                                                   self.filename),
+                       file=sys.stderr)
             return False
 
     def Initialize(self):
