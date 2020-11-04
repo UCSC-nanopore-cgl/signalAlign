@@ -8,13 +8,12 @@
 # History: 12/13/18 Created
 ########################################################################
 
-import os
-import unittest
 import tempfile
-from py3helpers.utils import list_dir, load_json, captured_output
+import unittest
+
+from py3helpers.utils import load_json, captured_output
 from signalalign.variantCaller import *
 from signalalign.visualization.plot_variant_accuracy import plot_roc_from_config
-from signalalign.train.trainModels import read_in_alignment_file
 
 
 class TestVariantCaller(unittest.TestCase):

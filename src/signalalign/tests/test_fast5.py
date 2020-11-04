@@ -2,6 +2,7 @@
 """
     Place unit tests for fast5.py
 """
+import os
 ########################################################################
 # File: fast5_test.py
 #  executable: fast5_test.py
@@ -11,10 +12,7 @@
 # History: 12/20/2017 Created
 ########################################################################
 import unittest
-import os
-import numpy as np
-import threading
-import time
+
 from signalalign.fast5 import Fast5
 
 
@@ -24,7 +22,9 @@ class Fast5Test(unittest.TestCase):
     def setUpClass(cls):
         super(Fast5Test, cls).setUpClass()
         cls.HOME = '/'.join(os.path.abspath(__file__).split("/")[:-4])
-        fast5_file = os.path.join(cls.HOME, "tests/minion_test_reads/canonical_ecoli_R9/miten_PC_20160820_FNFAD20259_MN17223_mux_scan_AMS_158_R9_WGA_Ecoli_08_20_16_83098_ch138_read23_strand.fast5")
+        fast5_file = os.path.join(cls.HOME, "tests/minion_test_reads/canonical_ecoli_R9"
+                                            "/miten_PC_20160820_FNFAD20259_MN17223_mux_scan_AMS_"
+                                            "158_R9_WGA_Ecoli_08_20_16_83098_ch138_read23_strand.fast5")
         fast5handle = Fast5(fast5_file, 'r+')
         cls.fast5handle = fast5handle.create_copy("test.fast5")
 
@@ -54,7 +54,6 @@ class Fast5Test(unittest.TestCase):
         self.fast5handle.delete("UniqueGlobalKey/channel_id")
         self.fast5handle.delete("UniqueGlobalKey/fakedata", ignore=True)
         with self.assertRaises(KeyError):
-            error = self.fast5handle["UniqueGlobalKey/channel_id"]
             self.fast5handle.delete("UniqueGlobalKey/channel_id")
             self.fast5handle.delete("UniqueGlobalKey/fakedata")
         self.fast5handle._add_attrs(channel_id, "UniqueGlobalKey/channel_id", convert=None)

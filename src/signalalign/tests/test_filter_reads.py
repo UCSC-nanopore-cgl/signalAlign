@@ -11,15 +11,16 @@
 # History: 11/1/2018 Created
 ########################################################################
 
-import unittest
 import tempfile
-import shutil
-import pysam
+import unittest
+
 from py3helpers.utils import captured_output
 from signalalign.filter_reads import *
 
 
 class FilterReadsTest(unittest.TestCase):
+    tmp_directory = None
+
     @classmethod
     def setUpClass(cls):
         super(FilterReadsTest, cls).setUpClass()
@@ -110,7 +111,8 @@ class FilterReadsTest(unittest.TestCase):
     def test_find_fast5s_from_ids_readdb(self):
         read_ids = ["5cc86bac-79fd-4897-8631-8f1c55954a45"]
         path = [y for x, y in find_fast5s_from_ids_readdb(self.readdb, read_ids, [self.dna_dir])]
-        self.assertEqual(os.path.basename(path[0]), "LomanLabz_PC_20161025_FNFAB42699_MN17633_sequencing_run_20161025_E_coli_native_450bps_82361_ch92_read1108_strand.fast5")
+        self.assertEqual(os.path.basename(path[0]), "LomanLabz_PC_20161025_FNFAB42699_MN17633_sequencing_run_"
+                                                    "20161025_E_coli_native_450bps_82361_ch92_read1108_strand.fast5")
 
     def test_copy_files_from_readdb(self):
         with tempfile.TemporaryDirectory() as tempdir:

@@ -9,20 +9,16 @@
 ########################################################################
 
 
-import sys
-import os
-import numpy as np
-import pandas as pd
-import unittest
+import filecmp
 import tempfile
 import timeit
-import filecmp
+import unittest
 from itertools import product
-from py3helpers.utils import get_random_string, find_substring_indices, captured_output
-from py3helpers.seq_tools import ReverseComplement, ReferenceHandler
 
-from signalalign.utils.sequenceTools import *
+from py3helpers.seq_tools import ReverseComplement, ReferenceHandler
+from py3helpers.utils import get_random_string, captured_output
 from signalalign.utils.fileHandlers import FolderHandler
+from signalalign.utils.sequenceTools import *
 
 
 class TestMakePositionsFiles(unittest.TestCase):
@@ -49,10 +45,12 @@ class TestMakePositionsFiles(unittest.TestCase):
                 rev_strand_data = data[data["strand"] == '-']
 
                 for i, line in forward_strand_data.iterrows():
-                    self.assertEqual("CCAGG", rh.get_sequence(line["contig"], line["position"] - 1, line["position"] + 4))
+                    self.assertEqual("CCAGG", rh.get_sequence(line["contig"], line["position"] - 1,
+                                                              line["position"] + 4))
 
                 for i, line in rev_strand_data.iterrows():
-                    self.assertEqual("CCAGG", reverse_complement(rh.get_sequence(line["contig"], line["position"] - 3, line["position"] + 2)))
+                    self.assertEqual("CCAGG", reverse_complement(rh.get_sequence(line["contig"], line["position"] - 3,
+                                                                                 line["position"] + 2)))
 
     def test_find_gatc_motifs(self):
         with captured_output() as (_, _):
@@ -142,7 +140,8 @@ class TestMakePositionsFiles(unittest.TestCase):
                     print("AAATTTGGGCCCATGATG", file=input_fasta)
                 # test normal examples
                 new_fasta_path = os.path.join(tempdir, "test2.fasta")
-                new_fasta = replace_motif_reference_positions(old_path, new_fasta_path, [["AAA", "AAT"], ["ATG", "ACG"]])
+                new_fasta = replace_motif_reference_positions(old_path, new_fasta_path,
+                                                              [["AAA", "AAT"], ["ATG", "ACG"]])
                 for header, comment, sequence in read_fasta(new_fasta):
                     self.assertEqual(sequence, "AATTTTGGGCCCACGACG")
                 # test overlap error
@@ -325,15 +324,20 @@ class SignalAlignUtilsTest(unittest.TestCase):
         cls.reference = os.path.join(cls.HOME, "tests/test_sequences/pUC19_SspI_Zymo.fa")
         cls.fast5_dir = os.path.join(cls.HOME, "tests/minion_test_reads/canonical_ecoli_R9")
         cls.files = [
-            "miten_PC_20160820_FNFAD20259_MN17223_mux_scan_AMS_158_R9_WGA_Ecoli_08_20_16_83098_ch138_read23_strand.fast5",
-            "miten_PC_20160820_FNFAD20259_MN17223_sequencing_run_AMS_158_R9_WGA_Ecoli_08_20_16_43623_ch101_read456_strand.fast5",
-            "miten_PC_20160820_FNFAD20259_MN17223_sequencing_run_AMS_158_R9_WGA_Ecoli_08_20_16_43623_ch101_read544_strand1.fast5",
-            "miten_PC_20160820_FNFAD20259_MN17223_sequencing_run_AMS_158_R9_WGA_Ecoli_08_20_16_43623_ch103_read333_strand1.fast5"]
+            "miten_PC_20160820_FNFAD20259_MN17223_mux_scan_AMS_158_R9_WGA_Ecoli_08_20_16_83098_ch138_read23_"
+            "strand.fast5",
+            "miten_PC_20160820_FNFAD20259_MN17223_sequencing_run_AMS_158_R9_WGA_Ecoli_08_20_16_43623_ch101_"
+            "read456_strand.fast5",
+            "miten_PC_20160820_FNFAD20259_MN17223_sequencing_run_AMS_158_R9_WGA_Ecoli_08_20_16_43623_ch101_"
+            "read544_strand1.fast5",
+            "miten_PC_20160820_FNFAD20259_MN17223_sequencing_run_AMS_158_R9_WGA_Ecoli_08_20_16_43623_ch103_"
+            "read333_strand1.fast5"]
         cls.fast5_paths = [os.path.join(cls.fast5_dir, f) for f in os.listdir(cls.fast5_dir)
                            if os.path.isfile(os.path.join(cls.fast5_dir, f))]
         cls.ambiguity_positions_file = os.path.join(cls.HOME, "tests/test_position_files/test_positions_file.tsv")
         cls.alignment_file = os.path.join(cls.HOME,
-                                          "tests/test_alignments/ecoli1D_test_alignments_sm3/5cc86bac-79fd-4897-8631-8f1c55954a45.sm.backward.tsv")
+                                          "tests/test_alignments/ecoli1D_test_alignments_sm3/5cc86bac-"
+                                          "79fd-4897-8631-8f1c55954a45.sm.backward.tsv")
 
     def test_processReferenceFasta_positions(self):
         with captured_output() as (_, _):
@@ -360,7 +364,7 @@ class SignalAlignUtilsTest(unittest.TestCase):
                 self.assertRaises(RuntimeError, processReferenceFasta, self.reference, work_folder, motifs="something",
                                   positions_file=self.ambiguity_positions_file, name="")
 
-    def test_processReferenceFasta_positions(self):
+    def test_processReferenceFasta_positions2(self):
         with captured_output() as (_, _):
             with tempfile.TemporaryDirectory() as tempdir:
                 work_folder = FolderHandler()
@@ -435,10 +439,14 @@ class CustomAmbiguityPositionsTest(unittest.TestCase):
         cls.reference = os.path.join(cls.HOME, "tests/test_sequences/pUC19_SspI_Zymo.fa")
         cls.fast5_dir = os.path.join(cls.HOME, "tests/minion_test_reads/canonical_ecoli_R9")
         cls.files = [
-            "miten_PC_20160820_FNFAD20259_MN17223_mux_scan_AMS_158_R9_WGA_Ecoli_08_20_16_83098_ch138_read23_strand.fast5",
-            "miten_PC_20160820_FNFAD20259_MN17223_sequencing_run_AMS_158_R9_WGA_Ecoli_08_20_16_43623_ch101_read456_strand.fast5",
-            "miten_PC_20160820_FNFAD20259_MN17223_sequencing_run_AMS_158_R9_WGA_Ecoli_08_20_16_43623_ch101_read544_strand1.fast5",
-            "miten_PC_20160820_FNFAD20259_MN17223_sequencing_run_AMS_158_R9_WGA_Ecoli_08_20_16_43623_ch103_read333_strand1.fast5"]
+            "miten_PC_20160820_FNFAD20259_MN17223_mux_scan_AMS_158_R9_WGA_Ecoli_08_20_16_"
+            "83098_ch138_read23_strand.fast5",
+            "miten_PC_20160820_FNFAD20259_MN17223_sequencing_run_AMS_158_R9_WGA_Ecoli_08_"
+            "20_16_43623_ch101_read456_strand.fast5",
+            "miten_PC_20160820_FNFAD20259_MN17223_sequencing_run_AMS_158_R9_WGA_Ecoli_08_"
+            "20_16_43623_ch101_read544_strand1.fast5",
+            "miten_PC_20160820_FNFAD20259_MN17223_sequencing_run_AMS_158_R9_WGA_Ecoli_08_"
+            "20_16_43623_ch103_read333_strand1.fast5"]
         cls.fast5_paths = [os.path.join(cls.fast5_dir, f) for f in os.listdir(cls.fast5_dir)
                            if os.path.isfile(os.path.join(cls.fast5_dir, f))]
 
