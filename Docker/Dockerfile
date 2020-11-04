@@ -40,7 +40,7 @@ RUN wget -O boost_1_69_0.tar.gz https://sourceforge.net/projects/boost/files/boo
 WORKDIR /root/
 RUN curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py && \
     python3.7 get-pip.py && \
-    python3.7 -m pip install setuptools cython virtualenv
+    python3.7 -m pip install setuptools cython virtualenv pytest
 
 ENV VIRTUAL_ENV=/opt/venv
 RUN python3.7 -m venv $VIRTUAL_ENV
@@ -78,13 +78,13 @@ RUN --mount=type=bind,source=.,target=/home/signalAlign,rw mkdir /home/signalAli
     make && \
     cd /home/signalAlign && \
     python3.7 setup.py install && \
+    python3.7 -m pytest && \
     mkdir /root/signalAlign && mkdir /root/signalAlign/build && \
     cp -r /home/signalAlign/build /root/signalAlign/build && \
     mkdir /root/signalAlign/bin && \
     cp -r /home/signalAlign/bin /root/signalAlign && \
     cp -r /home/signalAlign/Docker/run_wrapper.sh /root/signalAlign/run_wrapper.sh
 
-RUN git clone https://github.com/adbailey4/rrna_scripts
 
 FROM ubuntu:18.04 as runtime
 RUN apt-get update && \

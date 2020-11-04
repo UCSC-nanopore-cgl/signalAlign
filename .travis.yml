@@ -1,126 +1,53 @@
-python:
-- 3.5
+sudo: required
+services:
+- docker
+env:
+  global:
+  - REGISTRY_USER=travisbot
+  - BRANCH=${TRAVIS_PULL_REQUEST_BRANCH:-$TRAVIS_BRANCH}
+  - secure: RzOOUkJiYCKZL30yjbkxhdCxrCdo5oigt/9rgV1AGkJBQ1O+oZYHj4nlaIQYj1R/lalBc53b5jqBtpKD4lRX1nT7OazDMjhVk9l4k5uONhGCfsFslOuNYOKOdLE1sHxKOhHVd9pQte9jPSGOvMnMFZMm4Tp5owS0p9vJ4ckXZch9qdWR+SHqi2+eiDhe8KENlIuyTRYou1+xnNmmchzvSY/YGpbCETMZLLBc1pjmo/B0bHHUm5BLnDrOWyDdfAdH78x3mEuOZuc2P/P71yjNCfNttCtjD/eEHOeNWk/aJgGwfw/j1xCWLBNibTbcIz3BYzydllnD4iBIldfAXFzi9rETa5fOh1H8YbvXqTVDabnm2CzVF4gZWMI708jtAXNP8r1Ds6MpivEnF5rp3Y7BwMyoiFM/pugzdNOQCHyf3R2EB1UXKRTxkCJH1w11l+TmLbNASeJSGZ7LtvGWhkzyHfPbJ0Y/vaG992gZUEIiSouyVwo9KzewBYhphlit8YWvZVX94X3qHCgQsmlGqnI/oCH+QI6pBpdMS2pwhN8z+K+uHCzijnZ5EwphPrLnxMmhcLDtgidnNvssn2cOECHNhA+GSZW0MJjDfashHVC53gJQEjtcVUmhR5ghC27qNyM90aUcnx5fZWf3xcAvy7APTT5g6cwhnZ40qZ87wp5qiuU=
+  - REPO=ucscbailey/signalalign
 notifications:
   slack:
     secure: NZuZZdOxl6Qrfqfre16A0r2dkg5UqJGMDhGWvhT/Qz3fcDQIkSQyPRSLSLtnmGL01h9N4n5fguInshF526CyEEE13o+AyZ7dGiV0pcSth/hqjKTcUxZdzkBJM0K1JEDSd4euRNSwgi2lQpyK5JHqyYWrMM6fs4S7XZSJ72Dq+9scTSHrQwncaYz4U+ILN338eJZeDGWM7LsH+9HeZAPEmg63DPHCm6lr7o/l5EpwvktGSxpcjj5WWNv0ho3CaDIxW2I94NYYHXRAZsqnBMYP4ZToke2ZgHlrNrw5MIDbwcCbhx8tCyiVzYnMYlxdQFTyYzoPgtmPCKyClJi9YerZID8nIKNIySIp6J+nH1wf914PKqZ/qKTqgNIP5zKZX8NwV4If6/QeoWqm/8YCs8xG4kAr6C+zRDwMWU8Y/6nj+psWM4x2XgK7Hm4maE8aFC36t7Y3vmU6F5wAuoE9jydnQQDvDgh3lhHAeUGgaiodJ8chj+RYc0n3anKewLTl7w3lc/IWlCL71ii0uHDAf+cXAKh2GQbb261WoFFkLQBRp4Jgto7ZAQ35FHo3N64XQJK/AQf00ciaoyv+OYalKvawoWl1s0TahTYEMhhRzIorwlb5JC376EXgpsXXguXi0HcJeRdA9htlAeq+2tkZivkLnSSyfPuzxs3u/4DQsC0HebI=
   email: false
-matrix:
+
+jobs:
   include:
     - os: linux
-      compiler: gcc
-      python: 3.6
-      addons:
-        apt:
-          sources:
-            - ubuntu-toolchain-r-test
-          packages:
-            - cmake-data
-            - gcc-6
-            - g++-6
-            - cmake
-      env:
-        - MATRIX_EVAL="CC=gcc-6 && CXX=g++-6"
-before_install:
-  - sudo apt-get update -qq
-  - sudo apt-get install build-essential autotools-dev autoconf curl libbz2-dev zlib1g-dev
-    liblzma-dev libeigen3-dev wget git -y
-  - sudo apt-get update
+      dist: bionic
 
-install:
-  - wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh;
-  - bash miniconda.sh -b -p $HOME/miniconda
-  - export PATH="$HOME/miniconda/bin:$PATH"
-  - conda config --set always_yes yes --set changeps1 no
-  - pwd
-  - python --version
-  - cmake --version
-  - gcc --version
-  - g++ --version
-  - cc --version
-  - c++ --version
-  - cd $HOME/build/adbailey4
-  - wget -O boost_1_69_0.tar.gz https://sourceforge.net/projects/boost/files/boost/1.69.0/boost_1_69_0.tar.gz/download
-  - tar -xzf boost_1_69_0.tar.gz >/dev/null
-  - cd boost_1_69_0/
-  - "./bootstrap.sh --show-libraries"
-  - "./bootstrap.sh --with-libraries=system,date_time,filesystem,iostreams,coroutine,context
-  >/dev/null"
-  - sudo ./b2 && sudo ./b2 install
-  - export CFLAGS="$CFLAGS -fPIC"
-  - export CXXFLAGS="$CXXFLAGS -fPIC"
-  - cd $HOME/build/adbailey4/
-  - wget https://github.com/samtools/htslib/releases/download/1.9/htslib-1.9.tar.bz2
-  - tar -vxjf htslib-1.9.tar.bz2
-  - ls
-  - cd htslib-1.9 && ./configure --prefix /usr/local --enable-plugins CPPFLAGS="-fPIC"
-    CFLAGS="-fPIC" && make && sudo make install
-  - cd $HOME/build/adbailey4
-  - wget https://support.hdfgroup.org/ftp/HDF5/releases/hdf5-1.10/hdf5-1.10.4/src/hdf5-1.10.4.tar.gz
-  - tar -xzf hdf5-1.10.4.tar.gz || exit 255
-  - cd hdf5-1.10.4 && ./configure --prefix /usr/local --enable-threadsafe --disable-hl
-    && make && sudo make install
-  - cd $HOME/build/adbailey4/
-  - git clone --recursive https://github.com/adbailey4/embed_fast5/commit/5c1f270e6a2d6cd4b262e3012b48b4f007d8c310
-  - pip install cython
-  - python setup.py install
-  - pwd
-  - echo $HOME
-  - ls
-  - cd $HOME/build/UCSC-nanopore-cgl/
-  - wget https://github.com/samtools/samtools/releases/download/1.9/samtools-1.9.tar.bz2
-  - tar -vxjf samtools-1.9.tar.bz2
-  - ls
-  - cd samtools-1.9
-  - "./configure --prefix=$HOME/build/UCSC-nanopore-cgl/"
-  - make
-  - make install
-  - echo "PATH=$HOME/build/UCSC-nanopore-cgl/bin/:$PATH" >> ~/.bashrc
-  - source ~/.bashrc
-  - cd ..
-  - which samtools
-  - git clone https://github.com/lh3/bwa.git
-  - cd bwa
-  - make
-  - echo "PATH=$HOME/build/UCSC-nanopore-cgl/bwa/:$PATH" >> ~/.bashrc
-  - cd ..
-  - source ~/.bashrc
-  - which bwa
-  - wget https://www.python.org/ftp/python/3.6.8/Python-3.6.8.tgz
-  - tar -xzf Python-3.6.8.tgz
-  - find $HOME/build/UCSC-nanopore-cgl/  -type d | xargs chmod 0755
-  - cd Python-3.6.8/
-  - "./configure --prefix=$HOME/"
-  - make
-  - make install
-  - echo "PATH=$HOME/build/UCSC-nanopore-cgl/Python-3.6.8/:$PATH" >> ~/.bashrc
-  - source ~/.bashrc
-  - which python
-  - which python3
-  - alias python="$HOME/build/UCSC-nanopore-cgl/Python-3.6.8/python"
-  - which python3
-  - cd ..
-  - wget https://bootstrap.pypa.io/get-pip.py
-  - python3 get-pip.py --user
-  - echo "PATH=$HOME/.local/bin/:$PATH" >> ~/.bashrc
-  - source ~/.bashrc
-  - which pip3
-  - which pip
-  - alias gcc=gcc-5
-  - alias g++=g++-5
-  - alias python="$HOME/build/UCSC-nanopore-cgl/Python-3.6.8/python"
-  - gcc --version
-  - pip3 install numpy
-  - pip3 install setuptools
-  - pip3 install pysam
-  - pip3 install Cython
-  - pip3 install py3helpers
-  - cd $HOME/build/UCSC-nanopore-cgl/signalAlign
-  - make
-  - python3 setup.py install
+
+before_install:
+  #  docker
+  - curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
+  - sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
+  - sudo apt-get update
+  - sudo apt-get -y -o Dpkg::Options::="--force-confnew" install docker-ce
+  - echo '{"experimental":true}' | sudo tee /etc/docker/daemon.json
+  - sudo service docker restart
+  - 'if [ "${BRANCH}" = "master" ]; then
+      export BRANCH="latest";
+    else
+      echo "Strings are not equal.";
+    fi'
+  - echo BRANCH "$BRANCH"
+
+
 before_script:
-  - export DISPLAY=:99.0
-  - sh -e /etc/init.d/xvfb start
-  - sleep 3
+  - docker --version
+  - docker version -f '{{.Server.Experimental}}'
+  - docker pull $REPO || true
 script:
-  - export PATH=$PATH:$PWD/bin
-  - make test
+  - cp Docker/Dockerfile .
+  - export DOCKER_BUILDKIT=1
+  - docker build --progress=plain --pull --cache-from $REPO:$BRANCH --tag $REPO:$BRANCH .
+  - docker run $REPO:$BRANCH
+  - rm Dockerfile
+before_deploy:
+  - echo "$REGISTRY_PASS" | docker login --username $REGISTRY_USER --password-stdin
+deploy:
+  provider: script
+  script: docker push $REPO:$BRANCH
+  on:
+    all_branches: true
