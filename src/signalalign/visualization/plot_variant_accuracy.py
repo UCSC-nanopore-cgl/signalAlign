@@ -134,13 +134,19 @@ def plot_roc_and_precision_and_save_data(per_read_labels_only, per_read_probs_on
             confusion_recall_path = os.path.join(save_fig_dir, "{}_confusion_{}".format(name, variant))
             plot_probability_hist_path = os.path.join(save_fig_dir, "{}_prob_hist_{}".format(name, variant))
 
-        roc_h.plot_roc(variant, title="{} ROC for {}".format(name, variant), save_fig_path=roc_path)
-        roc_h.plot_precision_recall(variant, title="{} Precison Recall for {}".format(name, variant),
-                                    save_fig_path=precision_recall_path)
-        roc_h.plot_confusion_matrix(title="{} Confusion Matrix for {}".format(name, variant),
-                                    save_fig_path=confusion_recall_path, threshold=threshold, class_n=variant)
+        plot_1 = roc_h.plot_roc(variant, title="{} ROC for {}".format(name, variant), save_fig_path=roc_path)
+        plot_1.close()
+        plot_1 = roc_h.plot_precision_recall(variant, title="{} Precison Recall for {}".format(name, variant),
+                                             save_fig_path=precision_recall_path)
+        plot_1.close()
+        plot_1 = roc_h.plot_confusion_matrix(title="{} Confusion Matrix for {}".format(name, variant),
+                                             save_fig_path=confusion_recall_path, threshold=threshold, class_n=variant)
+        plot_1.close()
         bins = max(int(len(roc_h.class_probabilities[variant]) / 30), 10)
-        roc_h.plot_probability_hist(variant, save_fig_path=plot_probability_hist_path, bins=bins, normalize=False)
+        plot_1 = roc_h.plot_probability_hist(variant, save_fig_path=plot_probability_hist_path, bins=bins,
+                                             normalize=False)
+        plot_1.close()
+
 
     # save pickle of classification metrics class
     if save_fig_dir:

@@ -12,6 +12,7 @@ import tempfile
 import unittest
 
 from py3helpers.utils import load_json, captured_output
+from signalalign.train.trainModels import read_in_alignment_file
 from signalalign.variantCaller import *
 from signalalign.visualization.plot_variant_accuracy import plot_roc_from_config
 
