@@ -9,7 +9,5 @@ dist
 Dockerfile
 Docker/Dockerfile
 .dockerignore
-tests/test_*
-tests/minion_test_reads
 models
 bin
