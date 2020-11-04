@@ -40,7 +40,7 @@ RUN wget -q -O boost_1_69_0.tar.gz https://sourceforge.net/projects/boost/files/
 WORKDIR /root/
 RUN curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py && \
     python3.7 get-pip.py && \
-    python3.7 -m pip -q install setuptools wheel cython virtualenv pytest
+    python3.7 -m pip -q install setuptools cython virtualenv
 
 ENV VIRTUAL_ENV=/opt/venv
 RUN python3.7 -m venv $VIRTUAL_ENV
@@ -48,6 +48,7 @@ ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 # build static so we need to tranfser less shared dependencies
 ENV BUILD_SHARED_LIBS="OFF"
 
+RUN python3.7 -m pip -q install pytest wheel
 WORKDIR /root/
 RUN git clone --recursive https://github.com/adbailey4/embed_fast5.git && \
     cd /root/embed_fast5 && \
