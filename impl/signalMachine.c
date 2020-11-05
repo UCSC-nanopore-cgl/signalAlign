@@ -672,7 +672,7 @@ int main(int argc, char *argv[]) {
     PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
     p->threshold = threshold;
     p->constraintDiagonalTrim = constraintTrim;
-    p->diagonalExpansion = diagExpansion;
+    p->diagonalExpansion = diagExpansion % 2 == 0 ? diagExpansion: diagExpansion+1;
     p->traceBackDiagonals = traceBackDiagonals;
     // HDP routines //
     // load HDPs

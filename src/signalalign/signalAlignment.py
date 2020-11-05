@@ -1,21 +1,18 @@
 #!/usr/bin/env python3
-
-from __future__ import print_function
 import shutil
 
 import signalalign.utils.multithread as multithread
+from py3helpers.seq_tools import sam_string_to_aligned_segment
+from py3helpers.utils import merge_dicts, check_numpy_table, merge_lists, list_dir_recursive, list_dir, captured_output
 from signalalign import defaultModelFromVersion, parseFofn
-from signalalign.nanoporeRead import NanoporeRead, NanoporeRead2D
 from signalalign.event_detection import add_raw_start_and_raw_length_to_events
+from signalalign.filter_reads import filter_reads_to_string_wrapper, filter_reads
+from signalalign.mea_algorithm import mea_alignment_from_signal_align, \
+    add_events_to_signalalign, create_label_from_events
+from signalalign.nanoporeRead import NanoporeRead, NanoporeRead2D
 from signalalign.utils.bwaWrapper import *
 from signalalign.utils.fileHandlers import FolderHandler
 from signalalign.utils.sequenceTools import fastaWrite, samtools_faidx_fasta, processReferenceFasta
-from signalalign.mea_algorithm import mea_alignment_from_signal_align, \
-    add_events_to_signalalign, create_label_from_events
-from signalalign.motif import getDegenerateEnum
-from signalalign.filter_reads import filter_reads_to_string_wrapper, filter_reads, multiprocess_filter_reads
-from py3helpers.utils import merge_dicts, check_numpy_table, merge_lists, list_dir_recursive, list_dir, captured_output
-from py3helpers.seq_tools import sam_string_to_aligned_segment
 
 
 def create_signalAlignment_args(backward_reference=None, forward_reference=None, destination=None,
