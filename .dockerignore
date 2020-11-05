@@ -9,5 +9,4 @@ dist
 Dockerfile
 Docker/Dockerfile
 .dockerignore
-models
 bin
