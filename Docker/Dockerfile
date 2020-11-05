@@ -93,12 +93,11 @@ RUN apt-get update && \
     apt-get clean && \
     apt-get purge
 
-COPY --from=build /root/rrna_scripts/ /root/rrna_scripts/
 COPY --from=build /root/signalAlign/ /root/signalAlign/
 COPY --from=build /opt/venv /opt/venv
 
 ENV VIRTUAL_ENV=/opt/venv
-ENV PATH="$VIRTUAL_ENV/bin:/root/rrna_scripts/:$PATH"
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
 RUN mkdir /data
 WORKDIR /data
