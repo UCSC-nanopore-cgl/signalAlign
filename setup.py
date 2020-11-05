@@ -1,66 +1,19 @@
 #!/usr/bin/env python
-
 from setuptools import setup, find_packages  # , Extension
-# from Cython.Build import cythonize
-# import os
-
-# import numpy as np
-
-# c_compile_args = ['-pedantic', '-Wall', '-std=c99']
-# optimisation = ['-DNDEBUG', '-fstrict-aliasing']
-# c_compile_args.extend(optimisation)
-#
-# event_detect = 'eventdetection'
-# pkg_path = os.path.join(os.path.dirname(__file__), event_detect)
-#
-# son_Lib = "sonLib/lib"
-# hdf_5 = "./include"
-# include_dirs = [event_detect, son_Lib, hdf_5]
-#
-# extensions = []
-
-# nanonet filters ###
-
-# extensions.append(Extension(
-#     'nanonetfilters',
-#     sources=[os.path.join(pkg_path, 'filters.c')],
-#     include_dirs=include_dirs,
-#     extra_compile_args=c_compile_args
-# ))
+import re
 
 
-# cparsers ###
+def get_version():
+    try:
+        content = open("CMakeLists.txt", "r").read()
+        version = re.search(r'project\(signalAlign VERSION (.*)\)', content).group(1)
+        return version.strip()
+    except RuntimeError:
+        return None
 
-# extensions.append(
-#     Extension("signalalign.cparsers", [os.path.join(pkg_path, 'cparsers.pyx')], include_dirs=[np.get_include()]))
-
-
-# kmer align ###
-
-# HOME = os.path.abspath(os.path.dirname(__file__))
-#
-# sonlib_include = os.path.join(HOME, "sonLib/C/inc")
-# sa_include = os.path.join(HOME, "inc")
-#
-# signalAlign_a = os.path.join(HOME, "sonLib/lib/signalAlignLib.a")
-# son_Lib_a = os.path.join(HOME, "sonLib/lib/sonLib.a")
-# cu_test_a = os.path.join(HOME, "sonLib/lib/cuTest.a")
-#
-# libraries = ['dl', 'z', 'm', 'pthread', 'gomp']
-# extra_objects = [signalAlign_a, son_Lib_a]
-# include_dirs = [sa_include, sonlib_include, hdf_5]
-# c_compile_args = ['-pedantic', '-Wall', '-std=c99', '-DNDEBUG', '-fstrict-aliasing', '-fopenmp',
-#                   '-lhdf5']
-#
-# extensions.append(Extension('kmeralign',
-#                             sources=[os.path.join(pkg_path, 'event_align_wrapper.c')],
-#                             include_dirs=include_dirs,
-#                             extra_compile_args=c_compile_args,
-#                             libraries=libraries,
-#                             extra_objects=extra_objects))
 
 setup(name="signalAlign",
-      version="0.2.1",
+      version=get_version(),
       description="A library for signal-level analysis of ONT data",
       author="Art Rand / Andrew Bailey / Trevor Pesout",
       author_email="andbaile@ucsc.edu",
