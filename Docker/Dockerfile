@@ -79,7 +79,7 @@ RUN --mount=type=bind,source=.,target=/home/signalAlign,rw mkdir /home/signalAli
     make && \
     cd /home/signalAlign && \
     python3.7 setup.py install && \
-    python3.7 -m pytest && \
+    pytest && \
     mkdir /root/signalAlign && mkdir /root/signalAlign/build && \
     cp -r /home/signalAlign/build /root/signalAlign/build && \
     mkdir /root/signalAlign/bin && \
