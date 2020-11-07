@@ -16,7 +16,7 @@ find_package(HTSlib REQUIRED htslib)
 find_package(Eigen3 REQUIRED NO_MODULE)
 #set(HDF5_FIND_DEBUG TRUE)
 set(HDF5_PREFER_PARALLEL TRUE)
-find_package(HDF5 1.10.0 COMPONENTS C CXX REQUIRED)
+find_package(HDF5 1.10.0 COMPONENTS C REQUIRED)
 
 ############################################################################################################
 # sonlib
@@ -71,9 +71,9 @@ if (NOT TARGET hdf5::hdf5)
     list(APPEND signalalign_LINK_LIBRARIES ${HDF5_LIBRARIES})
     set(signalalign_INCLUDE_DIRS
             ${HDF5_INCLUDE_DIRS})
-    if(NOT APPLE)
-        list(APPEND signalalign_LINK_LIBRARIES aec)
-    endif(NOT APPLE)
+#    if(NOT APPLE)
+#        list(APPEND signalalign_LINK_LIBRARIES aec)
+#    endif(NOT APPLE)
 else()
     list(APPEND signalalign_LINK_LIBRARIES hdf5::hdf5)
 endif()
