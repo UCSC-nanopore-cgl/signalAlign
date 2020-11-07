@@ -130,7 +130,7 @@ float fast5_read_float_attribute(hid_t group, const char *attribute);
 NanoporeReadAdjustmentParameters estimate_scalings_using_mom(stList* kmer_list, StateMachine pore_model, event_table et);
 
 // update the SignalMachine with new NanoporeReadAdjustementParameters
-void* update_SignalMachineWithNanoporeParameters(NanoporeReadAdjustmentParameters npp, StateMachine *sM);
+void update_SignalMachineWithNanoporeParameters(NanoporeReadAdjustmentParameters npp, StateMachine *sM);
 
 // create adaptive banded alignment in C using our model
 stList* adaptive_banded_simple_event_align(event_table et, StateMachine *pore_model, stList* kmer_list);

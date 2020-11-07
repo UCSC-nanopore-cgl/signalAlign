@@ -566,7 +566,7 @@ double emissions_signal_strawManGetKmerEventMatchProbWithDescaling_MeanOnly(Stat
 //    double eventNoise = *(double *) ((char *) e_j + sizeof(double)); // aaah pointers
 
     // make temp x_i
-    char *kmer_i = malloc((self->model.kmerLength) * sizeof(char));
+    char *kmer_i = malloc((self->model.kmerLength) * sizeof(char)+1);
     for (int64_t x = 0; x < self->model.kmerLength; x++) {
         kmer_i[x] = *((char *) x_i + x);
     }
