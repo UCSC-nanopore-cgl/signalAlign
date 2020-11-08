@@ -78,9 +78,9 @@ class SignalAlignAlignmentTest(unittest.TestCase):
         os.chdir(BIN_PATH)
 
         # prep command
-        run_signal_align = os.path.join(scripts_PATH, "runSignalAlign.py")
+        run_signal_align = "runSignalAlign.py"
         # removed: --debug
-        alignment_command = "python {runsignalalign} run2 -d={reads} --bwa_reference={ref} " \
+        alignment_command = "{runsignalalign} run2 -d={reads} --bwa_reference={ref} " \
                             "-smt=threeState -o={testDir} " \
                             "--keep_tmp_folder ".format(runsignalalign=run_signal_align,
                                                         reads=reads,
