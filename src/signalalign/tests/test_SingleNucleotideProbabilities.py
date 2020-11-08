@@ -36,16 +36,17 @@ class SingleNuclProbsTest(unittest.TestCase):
     WORK_DIR = os.path.abspath("./singleNuclProb_unittest/")
 
     def setUp(self):
+        self.cwd = os.path.abspath(".")
         if os.path.exists(SingleNuclProbsTest.WORK_DIR):
             shutil.rmtree(SingleNuclProbsTest.WORK_DIR)
         os.makedirs(SingleNuclProbsTest.WORK_DIR)
         shutil.copy(SIGNALMACHINE_EXE, os.path.join(SingleNuclProbsTest.WORK_DIR, "signalMachine"))
         shutil.copy(KMEREVENTALIGN_EXE, os.path.join(SingleNuclProbsTest.WORK_DIR, "kmerEventAlign"))
-
         os.chdir(SingleNuclProbsTest.WORK_DIR)
 
     def tearDown(self):
         shutil.rmtree(SingleNuclProbsTest.WORK_DIR)
+        os.chdir(self.cwd)
 
     def run_single_nucl_prob(self, fast5_glob, reference_location, alignment_file):
         output_tmp_dir = os.path.join(os.path.abspath(SingleNuclProbsTest.WORK_DIR), "output")
