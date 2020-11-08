@@ -48,15 +48,6 @@ class LibTest(unittest.TestCase):
         os.chdir(current_wd)
 
 
-class SignalAlignLibTests(unittest.TestCase):
-    def setUp(self):
-        self.work_dir = "./signalAlign_pylibTest/"
-        os.makedirs(self.work_dir)
-
-    def tearDown(self):
-        shutil.rmtree(self.work_dir)
-
-
 class SignalAlignAlignmentTest(unittest.TestCase):
     def setUp(self):
         self.current_wd = os.getcwd()
