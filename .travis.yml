@@ -41,7 +41,8 @@ before_script:
 script:
   - cp Docker/Dockerfile .
   - export DOCKER_BUILDKIT=1
-  - docker build --progress=plain --pull --cache-from $REPO:$BRANCH --tag $REPO:$BRANCH .
+  - docker build --progress=plain --target test --pull --cache-from $REPO:$BRANCH .
+  - docker build -q --target runtime --tag $REPO:$BRANCH .
   - docker run $REPO:$BRANCH
   - rm Dockerfile
 before_deploy:
