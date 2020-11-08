@@ -253,7 +253,8 @@ class HiddenMarkovTests(unittest.TestCase):
 
     def test_read_in_alignment_file(self):
         assignments_dir = os.path.join(self.HOME, "tests/test_alignments/ecoli1D_test_alignments_sm3")
-        data = read_in_alignment_file(list_dir(assignments_dir)[0])
+        alignment_file = [x for x in list_dir(assignments_dir) if "5cc86bac-79fd-4897-8631-8f1c55954a45" in x][0]
+        data = read_in_alignment_file(alignment_file)
         self.assertEqual(len(data["contig"]), 16852)
         self.assertEqual(len(data["reference_index"]), 16852)
         self.assertEqual(len(data["reference_kmer"]), 16852)

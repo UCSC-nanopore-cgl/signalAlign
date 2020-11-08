@@ -7,6 +7,5 @@ build
 cmake-build*
 dist
 Dockerfile
-Docker/Dockerfile
 .dockerignore
 bin
