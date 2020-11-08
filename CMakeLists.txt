@@ -1,6 +1,6 @@
 ############################################################################################################
 cmake_minimum_required(VERSION 3.15)
-project(signalAlign VERSION 0.2.1)
+project(signalAlign VERSION 0.3.0)
 
 # set build shared libs option if not set
 set(BUILD_SHARED_LIBS  "ON" CACHE STRING "Default build shared library")
