@@ -132,7 +132,7 @@ def concat_variant_call_files(path):
     return
 
 
-def main(args):
+def main():
     # parse args
     start = timer()
 
@@ -194,7 +194,7 @@ def main(args):
         print("\n#  signalAlign - finished alignments\n", file=sys.stderr)
         print("\n#  signalAlign - finished alignments\n", file=sys.stdout)
         stop = timer()
-    else:
+    if args.command == "run2":
         command_line = " ".join(sys.argv[:])
         print(os.getcwd())
 
@@ -311,10 +311,14 @@ def main(args):
 
         print("\n#  signalAlign - finished alignments\n", file=sys.stderr)
         print("\n#  signalAlign - finished alignments\n", file=sys.stdout)
+    else:
+        print("Must specify run or run2: 'runSignalAlign.py run' ")
+        stop = timer()
+        sys.exit()
 
     print("[signalAlign] Complete")
     print("Running Time = {} seconds".format(stop - start))
 
 
 if __name__ == "__main__":
-    sys.exit(main(sys.argv))
+    main()
