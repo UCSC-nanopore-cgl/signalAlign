@@ -11,7 +11,7 @@ from argparse import ArgumentParser
 from shutil import copyfile
 from subprocess import check_call
 import shutil
-from scipy.stats import median_absolute_deviation
+from scipy.stats import median_abs_deviation
 from py3helpers.utils import create_dot_dict, merge_lists, all_string_permutations, load_json, \
     count_lines_in_file, merge_dicts, list_dir, captured_output
 from py3helpers.multiprocess import *
@@ -748,7 +748,7 @@ class TrainSignalAlign(object):
             kmer_data = t_data[t_data["kmer"] == kmer]["level_mean"]
             n_data = len(kmer_data)
             med = np.median(kmer_data) * n_data
-            mad = median_absolute_deviation(kmer_data) * n_data
+            mad = median_abs_deviation(kmer_data, scale='normal') * n_data
             normal_mean, normal_sd = template_model.get_event_mean_gaussian_parameters(kmer)
             normal_mean *= self.og_model_weight
             normal_sd *= self.og_model_weight
@@ -770,7 +770,7 @@ class TrainSignalAlign(object):
                 kmer_data = c_data[c_data["kmer"] == kmer]["level_mean"]
                 n_data = len(kmer_data)
                 med = np.median(kmer_data) * n_data
-                mad = median_absolute_deviation(kmer_data) * n_data
+                mad = median_abs_deviation(kmer_data, scale='normal') * n_data
                 normal_mean, normal_sd = complement_model.get_event_mean_gaussian_parameters(kmer)
                 normal_mean *= self.og_model_weight
                 normal_sd *= self.og_model_weight
