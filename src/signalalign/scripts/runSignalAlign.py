@@ -194,7 +194,7 @@ def main():
         print("\n#  signalAlign - finished alignments\n", file=sys.stderr)
         print("\n#  signalAlign - finished alignments\n", file=sys.stdout)
         stop = timer()
-    if args.command == "run2":
+    elif args.command == "run2":
         command_line = " ".join(sys.argv[:])
         print(os.getcwd())
 
@@ -314,7 +314,7 @@ def main():
     else:
         print("Must specify run or run2: 'runSignalAlign.py run' ")
         stop = timer()
-        sys.exit()
+        sys.exit(1)
 
     print("[signalAlign] Complete")
     print("Running Time = {} seconds".format(stop - start))
