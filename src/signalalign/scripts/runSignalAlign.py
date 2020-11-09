@@ -77,9 +77,6 @@ def parse_args():
                              help="template serialized HDP file")
     run_parser2.add_argument('--complement_hdp', '-cH', action='store', dest='complementHDP', default=None,
                              help="complement serialized HDP file")
-    run_parser2.add_argument('--degenerate', '-x', action='store', dest='degenerate', default="variant",
-                             help="Specify degenerate nucleotide options: "
-                                  "variant -> {ACGT}, cytosine2 -> {CE} cytosine3 -> {CEO} adenosine -> {AI}")
     run_parser2.add_argument('--stateMachineType', '-smt', action='store', dest='stateMachineType', type=str,
                              default="threeState", help="decide which model to use, threeState by default")
     run_parser2.add_argument('--file_of_files', '-fofn', action='store', dest='fofn', required=False, type=str,
@@ -135,7 +132,7 @@ def concat_variant_call_files(path):
     return
 
 
-def main(args):
+def main():
     # parse args
     start = timer()
 
@@ -151,11 +148,10 @@ def main(args):
         temp_dir_path = temp_folder.open_folder(os.path.join(os.path.abspath(config_args.output_dir),
                                                              "tempFiles_alignment"))
         temp_dir_path = resolvePath(temp_dir_path)
-        print(config_args.output_dir)
-        print(temp_dir_path)
 
         sa_args = [merge_dicts([s,
-                                {"quality_threshold": config_args.filter_reads, "workers": config_args.job_count}])
+                                {"quality_threshold": config_args.filter_reads, "workers": config_args.job_count,
+                                 "ambig_model": config_args.ambig_model}])
                    for s in config_args.samples]
 
         samples = [SignalAlignSample(working_folder=temp_folder, **s) for s in sa_args]
@@ -176,6 +172,7 @@ def main(args):
             constraint_trim=config_args.constraint_trim,
             traceBackDiagonals=config_args.traceBackDiagonals,
             twoD_chemistry=config_args.two_d,
+            perform_kmer_event_alignment=config_args.perform_kmer_event_alignment,
             get_expectations=False,
             path_to_bin=resolvePath(config_args.path_to_bin),
             check_for_temp_file_existance=True,
@@ -185,7 +182,11 @@ def main(args):
             event_table=config_args.signal_alignment_args.event_table,
             output_format=config_args.signal_alignment_args.output_format,
             filter_reads=config_args.filter_reads,
-            delete_tmp=config_args.signal_alignment_args.delete_tmp)
+            delete_tmp=config_args.signal_alignment_args.delete_tmp,
+            rna=config_args.rna,
+            ambig_model=config_args.ambig_model,
+            overwrite=config_args.overwrite
+        )
 
         multithread_signal_alignment_samples(samples, alignment_args, config_args.job_count, trim=None,
                                              debug=config_args.debug)
@@ -193,7 +194,7 @@ def main(args):
         print("\n#  signalAlign - finished alignments\n", file=sys.stderr)
         print("\n#  signalAlign - finished alignments\n", file=sys.stdout)
         stop = timer()
-    else:
+    if args.command == "run2":
         command_line = " ".join(sys.argv[:])
         print(os.getcwd())
 
@@ -246,8 +247,6 @@ def main(args):
         temp_folder = FolderHandler()
         temp_dir_path = temp_folder.open_folder(os.path.join(os.path.abspath(args.out), "tempFiles_alignment"))
         temp_dir_path = resolvePath(temp_dir_path)
-        print(args.out)
-        print(temp_dir_path)
 
         # generate reference sequence if not specified
         if not args.forward_reference or not args.backward_reference:
@@ -280,7 +279,6 @@ def main(args):
             "threshold": args.threshold,
             "diagonal_expansion": args.diag_expansion,
             "constraint_trim": args.constraint_trim,
-            "degenerate": getDegenerateEnum(args.degenerate),
             "twoD_chemistry": args.twoD,
             "target_regions": args.target_regions,
             "embed": args.embed,
@@ -308,15 +306,19 @@ def main(args):
         print("[runSignalAlign]:NOTICE: Got {} files to align".format(len(fast5s)), file=sys.stdout)
         # setup workers for multiprocessing
         multithread_signal_alignment(alignment_args, fast5s, args.nb_jobs, debug=args.DEBUG,
-                                     filter_reads_to_string_wrapper=filter_read_generator)
+                                     filter_reads_to_string_wrapper_funct=filter_read_generator)
         stop = timer()
 
         print("\n#  signalAlign - finished alignments\n", file=sys.stderr)
         print("\n#  signalAlign - finished alignments\n", file=sys.stdout)
+    else:
+        print("Must specify run or run2: 'runSignalAlign.py run' ")
+        stop = timer()
+        sys.exit()
 
     print("[signalAlign] Complete")
     print("Running Time = {} seconds".format(stop - start))
 
 
 if __name__ == "__main__":
-    sys.exit(main(sys.argv))
+    main()

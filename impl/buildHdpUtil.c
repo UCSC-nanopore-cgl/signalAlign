@@ -47,6 +47,7 @@ void usage() {
     fprintf(stderr, "-s: sampling grid start\n");
     fprintf(stderr, "-e: sampling grid end\n");
     fprintf(stderr, "-k: sampling grid length\n");
+    fprintf(stderr, "-b: alphabet\n");
     exit(1);
 }
 
@@ -85,6 +86,7 @@ int main(int argc, char *argv[]) {
     char *alignmentsFile = NULL;
     char *templateHdpOutfile = NULL;
     char *complementHdpOutfile = NULL;
+    char *alphabet = NULL;
 
     int64_t nbSamples, burnIn, thinning, samplingGridLength, kmerLength, j;
     bool verbose = FALSE;
@@ -133,10 +135,11 @@ int main(int argc, char *argv[]) {
                 {"samplingGridStart",           required_argument,  0,  's'},
                 {"samplingGridEnd",             required_argument,  0,  'e'},
                 {"samplingGridLength",          required_argument,  0,  'k'},
+                {"alphabet",                    optional_argument,  0,  'b'},
                 {0, 0, 0, 0} };
 
         int option_index = 0;
-        key = getopt_long(argc, argv, "h:a:o:q:p:T:C:l:v:w:n:I:t:B:M:L:g:r:j:y:i:u:s:e:k:",
+        key = getopt_long(argc, argv, "h:a:o:q:p:T:C:l:v:w:n:I:t:B:M:L:g:r:j:b:y:i:u:s:e:k:",
                           long_options, &option_index);
         if (key == -1) {
             //usage();
@@ -169,6 +172,9 @@ int main(int argc, char *argv[]) {
                 break;
             case 'w':
                 complementHdpOutfile = stString_copy(optarg);
+                break;
+            case 'b':
+                alphabet = stString_copy(optarg);
                 break;
             case 'n':
                 j = sscanf(optarg, "%" PRIi64 "", &nbSamples);
@@ -269,38 +275,30 @@ int main(int argc, char *argv[]) {
     if (alignmentsFile == NULL) st_errAbort("[buildHdpUtil]Need to provide build alignment (assignments)");
     // option for building from alignment
     if (twoD) {
-        if (!((hdpType >= 0) && (hdpType <= 13))) {
-            st_errAbort("Invalid HDP type");
-        }
-        NanoporeHdpType type = (NanoporeHdpType) hdpType;
-        nanoporeHdp_buildNanoporeHdpFromAlignment(type, kmerLength,
-                                                  templateLookupTable, complementLookupTable, alignmentsFile,
-                                                  templateHdpOutfile, complementHdpOutfile,
-                                                  nbSamples, burnIn, thinning, verbose,
-                                                  baseGamma, middleGamma, leafGamma,
-                                                  baseGammaAlpha, baseGammaBeta,
-                                                  middleGammaAlpha, middleGammaBeta,
-                                                  leafGammaAlpha, leafGammaBeta,
-                                                  samplingGridStart, samplingGridEnd, samplingGridLength);
+      NanoporeHdpType type = (NanoporeHdpType) hdpType;
+      nanoporeHdp_buildNanoporeHdpFromAlignment(type, kmerLength,
+                                                templateLookupTable, complementLookupTable, alignmentsFile,
+                                                templateHdpOutfile, complementHdpOutfile,
+                                                nbSamples, burnIn, thinning, verbose,
+                                                baseGamma, middleGamma, leafGamma,
+                                                baseGammaAlpha, baseGammaBeta,
+                                                middleGammaAlpha, middleGammaBeta,
+                                                leafGammaAlpha, leafGammaBeta,
+                                                samplingGridStart, samplingGridEnd, samplingGridLength, alphabet);
             
     } else {
-        if (hdpType != singleLevelPrior2 && hdpType != multisetPrior2 &&
-            hdpType != singleLevelFixedCanonical && hdpType != singleLevelFixedM6A) {
-            st_errAbort("Invalid HDP type for 1D %i", hdpType);
-        }
-        NanoporeHdpType type = (NanoporeHdpType) hdpType;
-        nanoporeHdp_buildOneDHdpFromAlignment(type, kmerLength,
-                                              templateLookupTable,
-                                              alignmentsFile,
-                                              templateHdpOutfile,
-                                              nbSamples, burnIn, thinning, verbose,
-                                              baseGamma, middleGamma, leafGamma,
-                                              baseGammaAlpha, baseGammaBeta,
-                                              middleGammaAlpha, middleGammaBeta,
-                                              leafGammaAlpha, leafGammaBeta,
-                                              samplingGridStart, samplingGridEnd, samplingGridLength);
+      NanoporeHdpType type = (NanoporeHdpType) hdpType;
+      nanoporeHdp_buildOneDHdpFromAlignment(type, kmerLength,
+                                            templateLookupTable,
+                                            alignmentsFile,
+                                            templateHdpOutfile,
+                                            nbSamples, burnIn, thinning, verbose,
+                                            baseGamma, middleGamma, leafGamma,
+                                            baseGammaAlpha, baseGammaBeta,
+                                            middleGammaAlpha, middleGammaBeta,
+                                            leafGammaAlpha, leafGammaBeta,
+                                            samplingGridStart, samplingGridEnd, samplingGridLength, alphabet);
                                           
     }
-
     return 0;
 }

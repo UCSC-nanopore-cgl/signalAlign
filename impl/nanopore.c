@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include "nanopore.h"
+#include "nanopore_hdp.h"
 #include "pairwiseAligner.h"
 
 
@@ -141,7 +142,7 @@ NanoporeReadAdjustmentParameters set4_NanoporeReadAdjustmentParameters(double _s
 
 
 
-NanoporeRead *nanopore_loadNanoporeReadFromFile(const char *nanoporeReadFile) {
+NanoporeRead *nanopore_loadNanoporeReadFromFile(const char *nanoporeReadFile, char *alphabet, int64_t alphabetSize) {
     FILE *fH = fopen(nanoporeReadFile, "r");
     // line 1: all tab-seperated
     // 0 alignment read length
@@ -407,14 +408,16 @@ NanoporeRead *nanopore_loadNanoporeReadFromFile(const char *nanoporeReadFile) {
     string = stFile_getLineFromFile(fH);
     tokens = stString_split(string);
     char *modelState;
-    // check
+    int64_t kmer_len = strlen((char *)stList_get(tokens, 0));
+
+  // check
     if (stList_length(tokens) != (npRead->nbTemplateEvents)) {
         st_errAbort("Got incorrect number of model states (kmers) got %"PRId64"\n");
     }
     for (int64_t i = 0; i < npRead->nbTemplateEvents; i++) {
         modelState = (char *)stList_get(tokens, i);
-        npRead->templateModelState[i] = emissions_discrete_getKmerIndexFromPtr(modelState);
-    }
+        npRead->templateModelState[i] = kmer_id(modelState, alphabet, alphabetSize, kmer_len);
+      }
     free(string);
     stList_destruct(tokens);
 
@@ -443,7 +446,7 @@ NanoporeRead *nanopore_loadNanoporeReadFromFile(const char *nanoporeReadFile) {
     }
     for (int64_t i = 0; i < npRead->nbComplementEvents; i++) {
         modelState = (char *)stList_get(tokens, i);
-        npRead->complementModelState[i] = emissions_discrete_getKmerIndexFromPtr(modelState);
+        npRead->complementModelState[i] = kmer_id(modelState, alphabet, alphabetSize, kmer_len);
     }
     free(string);
     stList_destruct(tokens);
@@ -543,25 +546,26 @@ stList *nanopore_remapAnchorPairsWithOffset(stList *unmappedPairs, int64_t *even
     return mappedPairs;
 }
 
-stList *nanopore_getAnchorKmersToEventsMap(stList *anchorPairs, double *eventSequence, char *nucleotideSequence) {
-    stList *mapOfEventsToKmers = stList_construct3(0, &free);
-    // loop over the remappedAnchors and make (event_mean, event_sd, reference_kmer_index) tuples
-    for (int64_t i = 0; i < stList_length(anchorPairs); i++) {
-        stIntTuple *pair = stList_get(anchorPairs, i);
-        if (stIntTuple_length(pair) != 2) {
-            st_errAbort("nanopore_getAnchorKmersToEventsMap: remapped tuple incorrect length\n");
-        }
-        int64_t ref_idx = stIntTuple_get(pair, 0);
-        int64_t eventIndex = stIntTuple_get(pair, 1);
-        int64_t kmerIndex = emissions_discrete_getKmerIndexFromPtr(nucleotideSequence + ref_idx);
-        double eventMean = nanopore_getEventMean(eventSequence, eventIndex);
-        double eventSd = nanopore_getEventSd(eventSequence, eventIndex);
-        double eventDeltaTime = nanopore_getEventDeltaTime(eventSequence, eventIndex);
-        EventKmerTuple *t = nanopore_eventKmerTupleConstruct(eventMean, eventSd, eventDeltaTime, kmerIndex);
-        stList_append(mapOfEventsToKmers, t);
-    }
-    return mapOfEventsToKmers;
-}
+//stList *nanopore_getAnchorKmersToEventsMap(stList *anchorPairs, double *eventSequence, char *nucleotideSequence) {
+//    stList *mapOfEventsToKmers = stList_construct3(0, &free);
+//    // loop over the remappedAnchors and make (event_mean, event_sd, reference_kmer_index) tuples
+//    for (int64_t i = 0; i < stList_length(anchorPairs); i++) {
+//        stIntTuple *pair = stList_get(anchorPairs, i);
+//        if (stIntTuple_length(pair) != 2) {
+//            st_errAbort("nanopore_getAnchorKmersToEventsMap: remapped tuple incorrect length\n");
+//        }
+//
+//        int64_t ref_idx = stIntTuple_get(pair, 0);
+//        int64_t eventIndex = stIntTuple_get(pair, 1);
+//        int64_t kmerIndex = emissions_discrete_getKmerIndexFromPtr(nucleotideSequence + ref_idx);
+//        double eventMean = nanopore_getEventMean(eventSequence, eventIndex);
+//        double eventSd = nanopore_getEventSd(eventSequence, eventIndex);
+//        double eventDeltaTime = nanopore_getEventDeltaTime(eventSequence, eventIndex);
+//        EventKmerTuple *t = nanopore_eventKmerTupleConstruct(eventMean, eventSd, eventDeltaTime, kmerIndex);
+//        stList_append(mapOfEventsToKmers, t);
+//    }
+//    return mapOfEventsToKmers;
+//}
 
 // This function basically reads off the 1D alignment table, and will give back eventKmerTuples that have kmers with
 // whatever length the base caller used

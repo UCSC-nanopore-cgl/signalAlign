@@ -17,13 +17,14 @@ static PyObject *wrap_load_from_raw(PyObject *self, PyObject *args, PyObject *ke
     char* template_model_file;
     char* nuc_sequence;
     char* path_in_fast5;
-    static char *kwlist[] = {"fast5_path", "template_model_file", "nuc_sequence", "path_in_fast5", NULL};
+    bool rna;
+    static char *kwlist[] = {"fast5_path", "template_model_file", "nuc_sequence", "path_in_fast5", "rna", NULL};
 
     if (!PyArg_ParseTupleAndKeywords(args, keywds, "ssss", kwlist,
-                                     &fast5_path, &template_model_file, &nuc_sequence, &path_in_fast5))
+                                     &fast5_path, &template_model_file, &nuc_sequence, &path_in_fast5, &rna))
         return NULL;
 
-    int status = load_from_raw(fast5_path, template_model_file, nuc_sequence, path_in_fast5);
+    int status = load_from_raw(fast5_path, template_model_file, nuc_sequence, path_in_fast5, rna);
 
     return Py_BuildValue("i", status);
 }

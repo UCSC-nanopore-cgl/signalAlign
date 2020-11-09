@@ -28,14 +28,57 @@ runSignalAlign run --config tests/runSignalAlign-config.json &> log_file.txt
 ```
 
 ### Description of programs
-* extract
-    * extract fastq information from basecalled section in fast5 and generates a read_id to fast5_path mapping. If there is no Fastq it will still generate the fast5_mapping
 * filterReads
     * Filter out reads based on mapping information and base quality score if MD flag is present in the BAM file. 
 * runSignalAlign
     * Aligns ionic current events from a directory of basecalled MinION reads (.fast5) to a reference sequence. With appropriate inputs, characters in the reference sequence can be flagged as _ambiguous_, meaning multiple bases will be probabilistically aligned to a position. Right now, the program the program supports aligning cytosine variants (5-mC and 5-hmC) and adenine variants (6-mA) to a position.
 * trainModels
     * Trains the transitions and/or emissions of the HMM. Uses a directory of basecalled reads and a reference sequence to learn transition parameters to the model. Once enough assignments have been accumulated it will (optionally) rebuild a hierarchical Dirichlet process (HDP) from these assignments.
+
+### Nucleotide Encodings
+| Character | Nucleotide         |
+|:---------:|--------------------|
+| A         | Adenine            |
+| T         | Thymine/Uracil     |
+| G         | Guanine            |
+| C         | Cytosine           |
+|---------|--------------------|
+| F         | 6-Methyladenine  |
+| E         | 5-Methylcytosine   |
+| O         | 5-Hydroxymethylcytosine   |
+| J         | Bromodeoxyuridine   |
+| p         | Pseudouridine   |
+| b         | 7-Methylguanosine   |
+| d         | 2-methylguanosine   |
+| e         | n4-methylcytidine   |
+| h         | 2'-O-methyluridine   |
+| i         | n6,n6-dimethyladenosine   |
+
+| Ambig Character | Other Characters |
+|:---------:|--------------------|
+| R         |AG |
+| Y         |CT |
+| S         |CG |
+| W         |AT |
+| K         |GT |
+| M         |AC |
+| B         |CGT |
+| D         |AGT |
+| H         |ACT |
+| V         |ACG |
+| X         |ACGT |
+| L         |CEO |
+| P         |CE |
+| Q         |AI |
+| f         |AF |
+| U         |ACEGOT |
+| Z         |JT |
+| j         |Tp |
+| k         |Gb |
+| l         |Gd |
+| m         |Ce |
+| n         |Th |
+| o         |Ai |
 
 
 ### extract

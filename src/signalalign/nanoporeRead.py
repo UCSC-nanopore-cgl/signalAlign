@@ -1,4 +1,3 @@
-from __future__ import print_function
 import sys
 import os
 import re
@@ -31,7 +30,8 @@ SUPPORTED_2D_VERSIONS = ("1.15.0", "1.19.0", "1.20.0", "1.22.2", "1.22.4", "1.23
 class NanoporeRead(object):
     def __init__(self, fast_five_file, twoD=False, event_table='', initialize=False, path_to_bin="./",
                  alignment_file=None, model_file_location=None, perform_kmer_event_alignment=None,
-                 enforce_supported_versions=True, filter_reads=False, aligned_segment=None):
+                 enforce_supported_versions=True, filter_reads=False, aligned_segment=None, rna=None, overwrite=False,
+                 debug=False):
         # load the fast5
         self.filename = fast_five_file  # fast5 file path
         self.fastFive = None  # fast5 object
@@ -76,6 +76,8 @@ class NanoporeRead(object):
         # if set, unsupported versions will cause failure
         self.enforce_supported_versions = enforce_supported_versions
         self.aligned_segment = aligned_segment  # pysam aligned_segment object
+        self.overwrite = overwrite
+        self.debug = debug
 
         if type(self) == NanoporeRead:
             if twoD:
@@ -87,13 +89,17 @@ class NanoporeRead(object):
 
         # determination of RNA read
         self.rna = False
-        if self.is_read_rna():
+        if self.is_read_rna() or rna:
             self.rna = True
             assert self.twoD is False, "Cannot perform 2D analysis when using RNA data"
-
+        self.print(f"[NanoporeRead:open] is this an rna read?: {self.rna}")
         # initialize if appropriate
         if initialize:
             self.Initialize()
+
+    def print(self, msg, file=sys.stdout, end="\n"):
+        if self.debug:
+            print(msg, file=file, end=end)
 
     def open(self):
         if self.is_open: return True
@@ -121,8 +127,9 @@ class NanoporeRead(object):
             else:
                 return self.fastFive.get_analysis_latest(address)
         except (ValueError, IndexError) as e:
-            print("[NanoporeRead:get_latest_basecall_edition] could not find {} in {}".format(address, self.filename),
-                  file=sys.stderr)
+            self.print("[NanoporeRead:get_latest_basecall_edition] could not find {} in {}".format(address,
+                                                                                                   self.filename),
+                       file=sys.stderr)
             return False
 
     def Initialize(self):
@@ -192,7 +199,7 @@ class NanoporeRead(object):
 
         # Some RNA reads have incorrectly formatted basecall tables so we check and then force load_from_raw
         if oned_root_address and self.rna and not self.has_valid_event_table_format(oned_root_address):
-            self.logError("[NanoporeRead:_initialize] WARN invalid event table format for RNA read")
+            self.print("[NanoporeRead:_initialize] WARN invalid event table format for RNA read")
             if perform_kmer_event_aln_if_required:
                 oned_root_address = self.generate_new_event_table()
         # sanity check
@@ -202,29 +209,29 @@ class NanoporeRead(object):
             self.close()
             return False
 
-        print("[NanoporeRead._initialize] oned_root_address {}".format(oned_root_address))
+        self.print("[NanoporeRead._initialize] oned_root_address {}".format(oned_root_address))
         # get basecall version
-        if not any(x in self.fastFive[oned_root_address].attrs.keys() for x in VERSION_KEY):
-            self.logError("[NanoporeRead:_initialize] ERROR %s missing version" % self.filename)
-            self.close()
-            return False
-        if "version" in self.fastFive[oned_root_address].attrs.keys():
-            self.version = self.bytes_to_string(self.fastFive[oned_root_address].attrs["version"])
-        elif "dragonet version" in self.fastFive[oned_root_address].attrs.keys():
-            self.version = self.bytes_to_string(self.fastFive[oned_root_address].attrs["dragonet version"])
-        elif "nanotensor version" in self.fastFive[oned_root_address].attrs.keys():
-            self.version = self.fastFive[oned_root_address].attrs["nanotensor version"]
-        else:
-            self.version = self.fastFive[oned_root_address].attrs["signalAlign version"]
+        # if not any(x in self.fastFive[oned_root_address].attrs.keys() for x in VERSION_KEY):
+        #     self.logError("[NanoporeRead:_initialize] ERROR %s missing version" % self.filename)
+        #     self.close()
+        #     return False
+        # if "version" in self.fastFive[oned_root_address].attrs.keys():
+        #     self.version = self.bytes_to_string(self.fastFive[oned_root_address].attrs["version"])
+        # elif "dragonet version" in self.fastFive[oned_root_address].attrs.keys():
+        #     self.version = self.bytes_to_string(self.fastFive[oned_root_address].attrs["dragonet version"])
+        # elif "nanotensor version" in self.fastFive[oned_root_address].attrs.keys():
+        #     self.version = self.fastFive[oned_root_address].attrs["nanotensor version"]
+        # else:
+        #     self.version = self.fastFive[oned_root_address].attrs["signalAlign version"]
 
-        if self.version not in SUPPORTED_1D_VERSIONS:
-            self.logError("[NanoporeRead:_initialize] ERROR %s unsupported version %s " % (self.filename, self.version))
-            if self.enforce_supported_versions:
-                self.close()
-                return False
-            else:
-                self.logError(
-                    "[NanoporeRead:_initialize] unexpected behavior may be due to unexpected nanopore read version")
+        # if self.version not in SUPPORTED_1D_VERSIONS:
+        #     self.logError("[NanoporeRead:_initialize] ERROR %s unsupported version %s " % (self.filename, self.version))
+        #     if self.enforce_supported_versions:
+        #         self.close()
+        #         return False
+        #     else:
+        #         self.logError(
+        #             "[NanoporeRead:_initialize] unexpected behavior may be due to unexpected nanopore read version")
 
         self.template_event_table_address = os.path.join(oned_root_address, "BaseCalled_template/Events")
         self.template_model_address = os.path.join(oned_root_address, "BaseCalled_template/Model")
@@ -269,9 +276,13 @@ class NanoporeRead(object):
                 get_full_nucleotide_read_from_alignment(self.alignment_file, self.read_label)
 
         oned_root_address = load_from_raw2(self, self.aligned_segment, self.model_file_location, self.path_to_bin,
-                                           analysis_identifier=self.event_table if self.event_table else None)
+                                           analysis_identifier=self.event_table if self.event_table else None,
+                                           write_failed_alignments=True,
+                                           rna=self.rna, overwrite=self.overwrite)
+        self.close()
+        self.open()
         if oned_root_address:
-            self.logError(
+            self.print(
                 "[NanoporeRead:generate_new_event_table] INFO generated event table at {}".format(oned_root_address))
         else:
             self.logError("[NanoporeRead:generate_new_event_table] ERROR failed to generate event table")
@@ -285,11 +296,12 @@ class NanoporeRead(object):
         template_event_table_address = os.path.join(oned_root_address, "BaseCalled_template/Events")
         if template_event_table_address in self.fastFive:
             template_events = np.asarray(self.fastFive[template_event_table_address])
-        check_numpy_table(template_events, req_fields=('start', 'length'))
-        if template_events["start"].dtype is np.dtype('uint64'):
-            return False
-        else:
+            check_numpy_table(template_events, req_fields=('start', 'length'))
+            if template_events["start"].dtype is np.dtype('uint64'):
+                return False
             return True
+        else:
+            return False
 
     @staticmethod
     def make_event_map(events, kmer_length):

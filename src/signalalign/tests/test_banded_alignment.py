@@ -25,6 +25,7 @@ from signalalign.hiddenMarkovModel import HmmModel
 
 
 class BandedAlignmentTests(unittest.TestCase):
+    tmp_directory = None
     UNIT_TEST_NAME = "PyUnittest"
 
     @classmethod
@@ -50,7 +51,8 @@ class BandedAlignmentTests(unittest.TestCase):
     def run_kmeralign_exe(self, rna_fast5_path, nuc_sequence, rna_model_file, dest):
         executable = os.path.join(self.HOME, "bin/kmerEventAlign")
         try:
-            subprocess.check_call([executable, '-f', rna_fast5_path, '-m', rna_model_file, '-N', nuc_sequence, '-p', dest])
+            subprocess.check_call([executable, '-f', rna_fast5_path, '-m', rna_model_file, '-N', nuc_sequence,
+                                   '-p', dest])
             status = 0
         except Exception as e:
             print("Exception in run_kmeralign: {}".format(e))
@@ -79,8 +81,9 @@ class BandedAlignmentTests(unittest.TestCase):
 
             old_event = old_events[old_event_idx]
             new_event = new_events[new_event_idx]
-            if (old_event['model_state'] != new_event['model_state']):
-                # print("ERROR  i:{}  oei:{}  nei:{}  oems:{}  nems:{}".format(i, old_event_idx, new_event_idx, old_event['model_state'], new_event['model_state']))
+            if old_event['model_state'] != new_event['model_state']:
+                # print("ERROR  i:{}  oei:{}  nei:{}  oems:{}  nems:{}".format(i,
+                # old_event_idx, new_event_idx, old_event['model_state'], new_event['model_state']))
                 err_cnt += 1
             else:
                 starts.append(abs(old_event['start'] - new_event['start']))
@@ -91,10 +94,11 @@ class BandedAlignmentTests(unittest.TestCase):
         start_diff_avg = np.mean(starts)
         mean_diff_avg = np.mean(means)
         std_diff_avg = np.mean(stds)
-        print("total differently-aligned model states: %d/%d (%2.5f%%)" % (err_cnt, len(old_event_map), 100.0 * err_cnt / len(old_event_map)))
-        print("DIFF: start:   avg:%.8f  max:%.8f" % (start_diff_avg, max(starts)))
-        print("DIFF: mean:    avg:%.8f  max:%.8f" % (mean_diff_avg, max(means)))
-        print("DIFF: std:     avg:%.8f  max:%.8f" % (std_diff_avg, max(stds)))
+        print("total differently-aligned model states: %d/%d (%2.5f%%)" % (err_cnt, len(old_event_map),
+                                                                           100.0 * err_cnt / len(old_event_map)))
+        # print("DIFF: start:   avg:%.8f  max:%.8f" % (start_diff_avg, max(starts)))
+        # print("DIFF: mean:    avg:%.8f  max:%.8f" % (mean_diff_avg, max(means)))
+        # print("DIFF: std:     avg:%.8f  max:%.8f" % (std_diff_avg, max(stds)))
 
         return start_diff_avg, mean_diff_avg, std_diff_avg
 
@@ -108,8 +112,6 @@ class BandedAlignmentTests(unittest.TestCase):
         with closing(Fast5(file_path, read='r+')) as fast5_handle:
             nuc_sequence = fast5_handle.get_fastq(analysis="Basecall_1D", section="template").split()[2]
             dest = fast5_handle.get_analysis_events_path_new(self.UNIT_TEST_NAME)
-            #todo verify we don't need this
-            # fast5_handle.ensure_path(dest)
 
         # run kmeralign
         model_file = self.dna_template_model_file if dna else self.rna_model_file
@@ -120,9 +122,6 @@ class BandedAlignmentTests(unittest.TestCase):
             new_events = fast5_handle.get_custom_analysis_events(self.UNIT_TEST_NAME)
             if dna:
                 old_events = fast5_handle.get_custom_analysis_events(fast5_handle.__default_basecall_1d_analysis__)
-            else:
-                old_events = fast5_handle.get_resegment_basecall()
-                # og_events = fast5_handle.get_custom_analysis_events(fast5_handle.__default_basecall_1d_analysis__)
 
             print("\nComparing {} events from {}".format("DNA" if dna else "RNA", file_name))
 
@@ -133,28 +132,32 @@ class BandedAlignmentTests(unittest.TestCase):
 
     # todo: need to figure out how to do RNA right
     # def test_kmeralign_rna1(self):
-    #     rna_name = "DEAMERNANOPORE_20170922_FAH26525_MN16450_sequencing_run_MA_821_R94_NA12878_mRNA_09_22_17_67136_read_61_ch_151_strand.fast5"
+    #     rna_name = "DEAMERNANOPORE_20170922_FAH26525_MN16450_sequencing_run_MA_821_R94_NA12878_mRNA_" \
+    #                "09_22_17_67136_read_61_ch_151_strand.fast5"
     #     rna_src = os.path.join(self.HOME, "tests/minion_test_reads/RNA_edge_cases", rna_name)
     #     self.run_alignment_comparison(rna_src, dna=False)
     #
     # def test_kmeralign_rna2(self):
-    #     rna_name = "DEAMERNANOPORE_20170922_FAH26525_MN16450_sequencing_run_MA_821_R94_NA12878_mRNA_09_22_17_67136_read_36_ch_218_strand.fast5"
+    #     rna_name = "DEAMERNANOPORE_20170922_FAH26525_MN16450_sequencing_run_MA_821_R94_NA12878_mRNA_09_
+    #     22_17_67136_read_36_ch_218_strand.fast5"
     #     rna_src = os.path.join(self.HOME, "tests/minion_test_reads/RNA_edge_cases", rna_name)
     #     self.run_alignment_comparison(rna_src, dna=False)
 
     def test_kmeralign_dna1(self):
-        dna_name = "LomanLabz_PC_20161025_FNFAB42699_MN17633_sequencing_run_20161025_E_coli_native_450bps_82361_ch112_read108_strand.fast5"
+        dna_name = "LomanLabz_PC_20161025_FNFAB42699_MN17633_sequencing_run_20161025_E_" \
+                   "coli_native_450bps_82361_ch112_read108_strand.fast5"
         dna_src = os.path.join(self.HOME, "tests/minion_test_reads/1D", dna_name)
         self.run_alignment_comparison(dna_src, dna=True)
 
-    # todo: the alignment needs too much memory for the travis node (Malloc failed with a request for: 2684354520 bytes)
-    def test_kmeralign_dna2(self):
-        dna_name = "LomanLabz_PC_20161025_FNFAB42699_MN17633_sequencing_run_20161025_E_coli_native_450bps_82361_ch6_read347_strand.fast5"
-        dna_src = os.path.join(self.HOME, "tests/minion_test_reads/1D", dna_name)
-        self.run_alignment_comparison(dna_src, dna=True)
+    # def test_kmeralign_dna2(self):
+    #     dna_name = "LomanLabz_PC_20161025_FNFAB42699_MN17633_sequencing_run_20161025_" \
+    #                "E_coli_native_450bps_82361_ch6_read347_strand.fast5"
+    #     dna_src = os.path.join(self.HOME, "tests/minion_test_reads/1D", dna_name)
+    #     self.run_alignment_comparison(dna_src, dna=True)
 
     def test_kmeralign_dna3(self):
-        dna_name = "LomanLabz_PC_20161025_FNFAB42699_MN17633_sequencing_run_20161025_E_coli_native_450bps_82361_ch92_read1108_strand.fast5"
+        dna_name = "LomanLabz_PC_20161025_FNFAB42699_MN17633_sequencing_run_20161025_E_" \
+                   "coli_native_450bps_82361_ch92_read1108_strand.fast5"
         dna_src = os.path.join(self.HOME, "tests/minion_test_reads/1D", dna_name)
         self.run_alignment_comparison(dna_src, dna=True)
 

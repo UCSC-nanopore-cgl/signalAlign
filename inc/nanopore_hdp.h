@@ -38,6 +38,8 @@ typedef enum _nanoporeHdpType {
     singleLevelPriorEcoli = 13,
     singleLevelFixedCanonical = 14,
     singleLevelFixedM6A = 15,
+    singleLevelFixedrRNA = 16,
+    singleLevelAll16SrRNA = 17
 } NanoporeHdpType;
 
 typedef struct _nanoporeDistributionMetricMemo {
@@ -155,29 +157,53 @@ NanoporeHDP* group_multiset_hdp_model_2(const char* alphabet, int64_t* char_grou
 void serialize_nhdp(NanoporeHDP* nhdp, const char* filepath);
 NanoporeHDP* deserialize_nhdp(const char* filepath);
 
-void nanoporeHdp_buildNanoporeHdpFromAlignment(NanoporeHdpType type, int64_t kmerLength,
-                                               const char *templateModelFile, const char* complementModelFile,
+void nanoporeHdp_buildNanoporeHdpFromAlignment(NanoporeHdpType type,
+                                               int64_t kmerLength,
+                                               const char *templateModelFile,
+                                               const char *complementModelFile,
                                                const char *alignments,
-                                               const char *templateHDP, const char *complementHDP,
-                                               int64_t nbSamples, int64_t burnIn, int64_t thinning, bool verbose,
-                                               double baseGamma, double middleGamma, double leafGamma,
-                                               double baseGammaAlpha, double baseGammaBeta,
-                                               double middleGammaAlpha, double middleGammaBeta,
-                                               double leafGammaAlpha, double leafGammaBeta,
-                                               double samplingGridStart, double samplingGridEnd,
-                                               int64_t samplingGridLength);
+                                               const char *templateHDP,
+                                               const char *complementHDP,
+                                               int64_t nbSamples,
+                                               int64_t burnIn,
+                                               int64_t thinning,
+                                               bool verbose,
+                                               double baseGamma,
+                                               double middleGamma,
+                                               double leafGamma,
+                                               double baseGammaAlpha,
+                                               double baseGammaBeta,
+                                               double middleGammaAlpha,
+                                               double middleGammaBeta,
+                                               double leafGammaAlpha,
+                                               double leafGammaBeta,
+                                               double samplingGridStart,
+                                               double samplingGridEnd,
+                                               int64_t samplingGridLength,
+                                               char *alphabet);
 
-void nanoporeHdp_buildOneDHdpFromAlignment(NanoporeHdpType type, int64_t kmerLength,
+void nanoporeHdp_buildOneDHdpFromAlignment(NanoporeHdpType type,
+                                           int64_t kmerLength,
                                            const char *templateModelFile,
                                            const char *alignments,
                                            const char *templateHDP,
-                                           int64_t nbSamples, int64_t burnIn, int64_t thinning, bool verbose,
-                                           double baseGamma, double middleGamma, double leafGamma,
-                                           double baseGammaAlpha, double baseGammaBeta,
-                                           double middleGammaAlpha, double middleGammaBeta,
-                                           double leafGammaAlpha, double leafGammaBeta,
-                                           double samplingGridStart, double samplingGridEnd,
-                                           int64_t samplingGridLength);
+                                           int64_t nbSamples,
+                                           int64_t burnIn,
+                                           int64_t thinning,
+                                           bool verbose,
+                                           double baseGamma,
+                                           double middleGamma,
+                                           double leafGamma,
+                                           double baseGammaAlpha,
+                                           double baseGammaBeta,
+                                           double middleGammaAlpha,
+                                           double middleGammaBeta,
+                                           double leafGammaAlpha,
+                                           double leafGammaBeta,
+                                           double samplingGridStart,
+                                           double samplingGridEnd,
+                                           int64_t samplingGridLength,
+                                           char *alphabet);
 
 // n^k
 int64_t power(int64_t n, int64_t k);

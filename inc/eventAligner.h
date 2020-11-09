@@ -130,7 +130,7 @@ float fast5_read_float_attribute(hid_t group, const char *attribute);
 NanoporeReadAdjustmentParameters estimate_scalings_using_mom(stList* kmer_list, StateMachine pore_model, event_table et);
 
 // update the SignalMachine with new NanoporeReadAdjustementParameters
-void* update_SignalMachineWithNanoporeParameters(NanoporeReadAdjustmentParameters npp, StateMachine *sM);
+void update_SignalMachineWithNanoporeParameters(NanoporeReadAdjustmentParameters npp, StateMachine *sM);
 
 // create adaptive banded alignment in C using our model
 stList* adaptive_banded_simple_event_align(event_table et, StateMachine *pore_model, stList* kmer_list);
@@ -146,8 +146,8 @@ void alignment_to_base_event_map(stList *event_alignment, basecalled_event_table
 void rna_alignment_to_base_event_map(stList *event_alignment, basecalled_event_table* b_et,
                                      stList *kmer_list, StateMachine *pore_model);
 
-herr_t load_from_raw(char* fast5_file_path, char* templateModelFile, char* sequence, char* path_to_embed);
-herr_t load_from_raw2(char* fast5_file_path, char* templateModelFile, char* sequence, char* path_to_embed, bool writeFailedAlignment);
+herr_t load_from_raw(char* fast5_file_path, char* templateModelFile, char* sequence, char* path_to_embed, bool rna);
+herr_t load_from_raw2(char* fast5_file_path, char* templateModelFile, char* sequence, char* path_to_embed, bool writeFailedAlignment, bool rna);
 
 event_table reverse_events(event_table et);
 

@@ -2,6 +2,7 @@
 """
     Place unit tests for fast5.py
 """
+import os
 ########################################################################
 # File: fast5_test.py
 #  executable: fast5_test.py
@@ -11,10 +12,7 @@
 # History: 12/20/2017 Created
 ########################################################################
 import unittest
-import os
-import numpy as np
-import threading
-import time
+
 from signalalign.fast5 import Fast5
 
 
@@ -24,9 +22,14 @@ class Fast5Test(unittest.TestCase):
     def setUpClass(cls):
         super(Fast5Test, cls).setUpClass()
         cls.HOME = '/'.join(os.path.abspath(__file__).split("/")[:-4])
-        fast5_file = os.path.join(cls.HOME, "tests/minion_test_reads/canonical_ecoli_R9/miten_PC_20160820_FNFAD20259_MN17223_mux_scan_AMS_158_R9_WGA_Ecoli_08_20_16_83098_ch138_read23_strand.fast5")
+        fast5_file = os.path.join(cls.HOME, "tests/minion_test_reads/canonical_ecoli_R9"
+                                            "/miten_PC_20160820_FNFAD20259_MN17223_mux_scan_AMS_"
+                                            "158_R9_WGA_Ecoli_08_20_16_83098_ch138_read23_strand.fast5")
         fast5handle = Fast5(fast5_file, 'r+')
         cls.fast5handle = fast5handle.create_copy("test.fast5")
+        fast5_file2 = os.path.join(cls.HOME, "tests/minion_test_reads/embedded_files/LomanLabz_PC_20161025_FNFAB42699_MN17633_sequencing_run_20161025_E_coli_native_450bps_82361_ch92_read1108_strand.fast5")
+        fast5handle2 = Fast5(fast5_file2, 'r+')
+        cls.fast5handle2 = fast5handle2.create_copy("test2.fast5")
 
     def test_get_fastq(self):
         # """Test get_fastq method of Fast5 class"""
@@ -54,7 +57,6 @@ class Fast5Test(unittest.TestCase):
         self.fast5handle.delete("UniqueGlobalKey/channel_id")
         self.fast5handle.delete("UniqueGlobalKey/fakedata", ignore=True)
         with self.assertRaises(KeyError):
-            error = self.fast5handle["UniqueGlobalKey/channel_id"]
             self.fast5handle.delete("UniqueGlobalKey/channel_id")
             self.fast5handle.delete("UniqueGlobalKey/fakedata")
         self.fast5handle._add_attrs(channel_id, "UniqueGlobalKey/channel_id", convert=None)
@@ -62,6 +64,10 @@ class Fast5Test(unittest.TestCase):
     def test_get_read_id(self):
         some_id = self.fast5handle.get_read_id()
         self.assertEqual(some_id, "5048dffc-a463-4d84-bd3b-90ca183f488a")
+
+    def test_get_sam(self):
+        sam = self.fast5handle2.get_signalalign_events(sam=True)
+        self.assertEqual(sam.split('\t')[2], "gi_ecoli")
 
     @classmethod
     def tearDownClass(cls):

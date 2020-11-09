@@ -15,6 +15,7 @@ import numpy as np
 from collections import defaultdict
 from contextlib import closing
 from argparse import ArgumentParser
+import random
 from signalalign.fast5 import Fast5
 from signalalign.utils import multithread
 from signalalign.nanoporeRead import NanoporeRead
@@ -119,6 +120,8 @@ def parse_read_name_map_file(read_map, directories, recursive=False):
     with open(read_map, 'r') as fh:
         for line in fh:
             split_line = line.split()
+            if len(split_line) < 2:
+                continue
             for dir_path in directories:
                 if recursive:
                     if os.path.exists(split_line[path_index]):
@@ -138,7 +141,7 @@ def parse_read_name_map_file(read_map, directories, recursive=False):
                             yield split_line[name_index], os.path.abspath(full_path)
 
 
-def filter_reads(alignment_file, readdb, read_dirs, quality_threshold=7, recursive=False, trim=False):
+def filter_reads(alignment_file, readdb, read_dirs, quality_threshold=7, recursive=False, trim=False, randomize=False):
     """Filter fast5 files based on a quality threshold and if there is an alignment
     :param alignment_file: bam aligment file
     :param readdb: readdb or sequence summary file
@@ -158,7 +161,11 @@ def filter_reads(alignment_file, readdb, read_dirs, quality_threshold=7, recursi
     with closing(pysam.AlignmentFile(alignment_file, 'rb')) as bamfile:
         name_indexed = pysam.IndexedReads(bamfile)
         name_indexed.build()
-        for name, fast5 in parse_read_name_map_file(readdb, read_dirs, recursive=recursive):
+        my_iterator = parse_read_name_map_file(readdb, read_dirs, recursive=recursive)
+        if randomize:
+            my_iterator = [(name, fast5) for name, fast5 in my_iterator]
+            random.shuffle(my_iterator)
+        for name, fast5 in my_iterator:
             try:
                 if trim < n_bases:
                     print("Filtered {} files for {} bases".format(n_files, n_bases))
@@ -176,7 +183,7 @@ def filter_reads(alignment_file, readdb, read_dirs, quality_threshold=7, recursi
                     n_files += 1
                     n_bases += aligned_segment.query_length
                     yield fast5, aligned_segment
-
+                    break
             except KeyError:
                 print("Found no alignments for {}".format(fast5))
 

@@ -10,26 +10,39 @@
 #include <hdf5.h>
 #include <scrappie_structures.h>
 #include <eventAligner.h>
+#include "math.h"
 #include "sonLib.h"
 #include "signalMachineUtils.h"
-#include "kseq.h"
-#include <zlib.h>
 
 #define RAW_ROOT "/Raw/Reads/"
 
 //#define DEBUG_ADAPTIVE 1
 //#define DEBUG_FAST5_IO 1
 //#define DEBUG_PRINT_STATS 1
+#ifndef NDEBUG
+#  define debug_print(msg) stderr_printf msg
+#else
+#  define debug_print(msg) (void)0
+#endif
+
+void
+stderr_printf(const char *fmt, ...)
+{
+  va_list ap;
+  va_start(ap, fmt);
+  vfprintf(stderr, fmt, ap);
+  va_end(ap);
+}
 
 
 int write_readdb_file1(char* fast5_dir, char* output_path){
     assert(stFile_isDir(fast5_dir));
-    char* fast5_file;
-    char* fastq;
-    char* fast5_path;
-    fastq_entry *fastqEntry;
+    char* fast5_file = NULL;
+    char* fastq = NULL;
+    char* fast5_path = NULL;
+    fastq_entry *fastqEntry = NULL;
     FILE *fH = fopen(output_path, "a");
-    hid_t f5_handle;
+    hid_t f5_handle = 0;
     if (!check_file_ext(output_path, "readdb")){
         st_errAbort("Output path must end with readdb: %s", output_path);
     }
@@ -59,17 +72,17 @@ int write_readdb_file1(char* fast5_dir, char* output_path){
 
 int write_fastq_and_readdb_file1(char* fast5_dir, char* fastq_output_path, char* readdb_output_path){
     assert(stFile_isDir(fast5_dir));
-    char* fast5_file;
-    char* fastq;
-    char* fast5_path;
-    char* read_id;
-    fastq_entry *fastqEntry;
+    char* fast5_file = NULL;
+    char* fastq = NULL;
+    char* fast5_path = NULL;
+    char* read_id = NULL;
+    fastq_entry *fastqEntry = NULL;
     FILE *db_fH = fopen(readdb_output_path, "a");
     FILE *fq_fH = fopen(fastq_output_path, "a");
 
-    hid_t f5_handle;
-    herr_t status;
-    H5Eset_auto(NULL, NULL, NULL);
+    hid_t f5_handle = 0;
+    herr_t status = 0;
+    H5Eset_auto((hid_t) NULL, NULL, NULL);
 
   if (!check_file_ext(readdb_output_path, "readdb")){
         st_errAbort("Output path must end with readdb: %s", readdb_output_path);
@@ -119,7 +132,7 @@ void fastq_entry_destruct(fastq_entry *fastq) {
 
 fastq_entry *parse_fastq_string(char* fastq_string){
     fastq_entry *fastq = malloc(sizeof(fastq_entry));
-    char* name;
+    char* name = NULL;
     stList *all_fields = stString_splitByString(fastq_string, "\n");
     name = stList_get(all_fields, 0);
 
@@ -155,12 +168,12 @@ fastq_entry *parse_fastq_string(char* fastq_string){
 int write_fastqs_to_file(char* fast5_dir, char* output_path){
 //    get fast5s
     assert(stFile_isDir(fast5_dir));
-    char* fast5_file;
-    char* fastq;
-    char* fast5_path;
+    char* fast5_file = NULL;
+    char* fastq = NULL;
+    char* fast5_path = NULL;
     // open the file for output
     FILE *fH = fopen(output_path, "a");
-    hid_t f5_handle;
+    hid_t f5_handle = 0;
     stList* fast5_files = stFile_getFileNamesInDirectory(fast5_dir);
     for (int i = 0; i < stList_length(fast5_files); i++){
         fast5_file = stList_get(fast5_files, i);
@@ -200,7 +213,7 @@ char* path_join_two_strings(char* directory, char* file_name){
 
 bool check_file_ext(char* file_path, char* ext){
     stList *split_file = stString_splitByString(file_path, ".");
-    bool return_item;
+    bool return_item = 0;
     if (stString_eq(stList_get(split_file, (stList_length(split_file)-1)), ext)){
         return_item = TRUE;
     } else {
@@ -211,8 +224,8 @@ bool check_file_ext(char* file_path, char* ext){
 }
 
 bool hdf5_group_exists(hid_t hdf5_file, char* path){
-    hid_t group;
-    bool output;
+    hid_t group = 0;
+    bool output = 0;
     H5E_BEGIN_TRY {
         group = H5Gopen(hdf5_file, path, H5P_DEFAULT);
         if (group == -1){
@@ -221,7 +234,7 @@ bool hdf5_group_exists(hid_t hdf5_file, char* path){
             output = TRUE;
         }
         H5Gclose(group);
-    } H5E_END_TRY;
+    } H5E_END_TRY
     return output;
 }
 
@@ -231,7 +244,7 @@ char *fast5_get_fastq(hid_t hdf5_file) {
     bool keep_going = TRUE;
     char str[10];
     char* keep = "not_found";
-    char* maybe;
+    char* maybe = NULL;
 
     while (keep_going){
         sprintf(str, "%d", i);
@@ -264,13 +277,13 @@ char *fast5_get_fastq(hid_t hdf5_file) {
 
 char *fast5_get_string(hid_t hdf5_file, char* path){
 
-    hid_t       filetype, memtype, space, dset;
+    hid_t       filetype = 0, memtype = 0, space = 0, dset = 0;
     /* Handles */
-    herr_t      status;
+    herr_t      status = 0;
     hsize_t     dims[1] = {1};
-    char        **rdata;
-    int         ndims;
-    char*       out_string;
+    char        **rdata = NULL;
+    int         ndims = 0;
+    char*       out_string = NULL;
 
     dset = H5Dopen (hdf5_file, path, H5P_DEFAULT);
     /*
@@ -381,7 +394,7 @@ char* fast5_get_raw_read_group(hid_t hdf5_file)
 {
     char* read_name = fast5_get_raw_read_name(hdf5_file);
 
-    if (read_name != "") {
+    if (strlen(read_name) != 0) {
         char* read_group = stString_concat(RAW_ROOT, read_name);
         return read_group;
     } else {
@@ -392,16 +405,15 @@ char* fast5_get_raw_read_group(hid_t hdf5_file)
 
 char* fast5_get_read_id(hid_t hdf5_file)
 {
-    int ret;
-    hid_t read_name_attribute, raw_group, attribute_type;
+    int ret = 0;
+    hid_t read_name_attribute = 0, raw_group = 0, attribute_type = 0;
     size_t storage_size = 0;
-    char* read_name_str = NULL;
 
     char* out = "";
 
     // Get the path to the raw read group
     char* raw_read_group = fast5_get_raw_read_group(hdf5_file);
-    if(raw_read_group == "") {
+    if(strlen(raw_read_group) == 0) {
         return out;
     }
 
@@ -410,11 +422,8 @@ char* fast5_get_read_id(hid_t hdf5_file)
 
 raw_table fast5_get_raw_samples(hid_t hdf5_file, fast5_raw_scaling scaling)
 {
-    float* rawptr = NULL;
     hid_t space;
     hsize_t nsample;
-    herr_t status;
-    float raw_unit;
     raw_table rawtbl = { 0, 0, 0, NULL };
 
     // mostly from scrappie
@@ -438,8 +447,8 @@ raw_table fast5_get_raw_samples(hid_t hdf5_file, fast5_raw_scaling scaling)
     }
 
     H5Sget_simple_extent_dims(space, &nsample, NULL);
-    rawptr = (float*)calloc(nsample, sizeof(float));
-    status = H5Dread(dset, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, rawptr);
+    float* rawptr = (float*)calloc(nsample, sizeof(float));
+    herr_t status = H5Dread(dset, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, rawptr);
 
     if (status < 0) {
         free(rawptr);
@@ -451,7 +460,7 @@ raw_table fast5_get_raw_samples(hid_t hdf5_file, fast5_raw_scaling scaling)
 
     // convert to pA
     rawtbl = (raw_table) { nsample, 0, nsample, rawptr };
-    raw_unit = scaling.range / scaling.digitisation;
+    float raw_unit = scaling.range / scaling.digitisation;
     for (size_t i = 0; i < nsample; i++) {
         rawptr[i] = (rawptr[i] + scaling.offset) * raw_unit;
     }
@@ -523,10 +532,10 @@ fast5_raw_scaling fast5_get_channel_params(hid_t hdf5_file)
 
 char* fast5_get_fixed_string_attribute(hid_t hdf5_file, char* group_name, char* attribute_name)
     {
-    size_t storage_size;
-    char* buffer;
-    hid_t group, attribute, attribute_type;
-    int ret;
+    size_t storage_size = 0;
+    char* buffer = NULL;
+    hid_t group = 0, attribute = 0, attribute_type = 0;
+    int ret = 0;
     char* out = "";
 
     // according to http://hdf-forum.184993.n3.nabble.com/check-if-dataset-exists-td194725.html
@@ -630,8 +639,8 @@ herr_t fast5_set_basecall_event_table(hid_t hdf5_file, char* table_location, bas
     assert(k != 0);
     assert(n_events != 0);
     basecalled_event *dst_buf = calloc(n_events, sizeof(basecalled_event));
-    hid_t      dataset, space; /* Handles */
-    herr_t     status;
+    hid_t      dataset = 0, space = 0; /* Handles */
+    herr_t     status = 0;
     hsize_t    dim = n_events;   /* Dataspace dimensions */
     hid_t      dtypes[2];
     fast5_basecall_event_type(dtypes);
@@ -663,14 +672,12 @@ herr_t fast5_set_basecall_event_table(hid_t hdf5_file, char* table_location, bas
     if (status != 0) {
         st_logInfo("Error creating groups for %s\n", table_location);
     }
-
     dataset = H5Dcreate2(hdf5_file, table_location, bce_tid, space, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
     status = H5Dwrite(dataset, bce_tid, H5S_ALL, H5S_ALL, H5P_DEFAULT, dst_buf);
-
     /* Release resources */
+    H5Sclose(space);
     H5Tclose(str_tid);
     H5Tclose(bce_tid);
-    H5Sclose(space);
     H5Dclose(dataset);
     free(dst_buf);
 
@@ -680,8 +687,9 @@ herr_t fast5_set_basecall_event_table(hid_t hdf5_file, char* table_location, bas
 herr_t fast5_create_group(hid_t hdf5_file, char* group_location){
     H5Eset_auto(NULL, NULL, NULL);
     herr_t status = H5Gget_objinfo(hdf5_file, group_location, 0, NULL);
+    hid_t group_id = 0;
     if (status != 0) {
-        hid_t group_id = H5Gcreate2(hdf5_file, group_location, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+        group_id = H5Gcreate2(hdf5_file, group_location, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
         status = H5Gclose(group_id);
     }
     return status;
@@ -690,7 +698,7 @@ herr_t fast5_create_group(hid_t hdf5_file, char* group_location){
 herr_t fast5_create_all_groups(hid_t hdf5_file, char* group_location){
     H5Eset_auto(NULL, NULL, NULL);
     char* group = "";
-    char* temp_group;
+    char* temp_group = NULL;
     herr_t status = 0;
     stList* all_groups = stString_splitByString(group_location, "/");
     // we don't want to create the last "group" as this is the table name
@@ -707,8 +715,8 @@ herr_t fast5_create_all_groups(hid_t hdf5_file, char* group_location){
 // There is no size checking in H5Dread, so dst_buf MUST BE of the right size.
 // I recommend that this only be used in unit tests
 herr_t fast5_get_basecall_events(hid_t hdf5_file, char* table_location, basecalled_event *dst_buf) {
-    hid_t      dataset;
-    herr_t     status;
+    hid_t      dataset = 0;
+    herr_t     status = 0;
     hid_t      dtypes[2];
     fast5_basecall_event_type(dtypes);
     hid_t      bce_tid = dtypes[0];
@@ -808,7 +816,7 @@ NanoporeReadAdjustmentParameters estimate_scalings_using_mom(stList* kmer_list, 
         char* kmer = stList_get(kmer_list, i);
         int64_t kmerIndex = kmer_id(kmer, alphabet, alphabet_size, k);
         // get the µ for level and noise for the model
-        double levelMean = emissions_signal_getModelLevelMean(eventModel, kmerIndex);
+        double levelMean = emissions_signal_getModelLevelMean(eventModel, kmerIndex, pore_model.parameterSetSize);
         kmer_level_sum += levelMean;
         kmer_level_sq_sum += pow(levelMean, 2.0f);
     }
@@ -833,7 +841,7 @@ NanoporeReadAdjustmentParameters estimate_scalings_using_mom(stList* kmer_list, 
     return out;
 }
 
-void* update_SignalMachineWithNanoporeParameters(NanoporeReadAdjustmentParameters npp, StateMachine *sM){
+void update_SignalMachineWithNanoporeParameters(NanoporeReadAdjustmentParameters npp, StateMachine *sM){
     sM->scale = npp.scale;
     sM->shift = npp.shift;
     sM->var   = npp.var;
@@ -1219,19 +1227,20 @@ for(int col = 0; col <= 10; ++col) {
         }
     }
 
-    fprintf(stderr,
-            "%s\tevents_per_kmer:%.2lf\tsequence_len:%zu\tavg_log_emission:%.2lf\tcurr_event_idx:%d\tmax_gap:%d\tfills:%d\n",
+    debug_print(("%s\tevents_per_kmer:%.2lf\tsequence_len:%llu\tavg_log_emission:%.2lf\tcurr_event_idx:%d\tmax_gap:%d\tfills:%d\n",
             failed ? errMsg : "OK\t.",
-            events_per_kmer, (n_kmers+kmer_length-1) , avg_log_emission, curr_event_idx, max_gap, fills);
+            events_per_kmer, (n_kmers+kmer_length-1) , avg_log_emission, curr_event_idx, max_gap, fills));
     return out;
 }
 
 // embed event table from fast5 path, template model path and nucleotide sequence
-herr_t load_from_raw(char* fast5_file_path, char* templateModelFile, char* sequence, char* path_to_embed) {
-    return load_from_raw2(fast5_file_path, templateModelFile, sequence, path_to_embed, false);
+herr_t load_from_raw(char* fast5_file_path, char* templateModelFile, char* sequence, char* path_to_embed, bool rna) {
+    return load_from_raw2(fast5_file_path, templateModelFile, sequence, path_to_embed, false, rna);
 }
+
+
 herr_t load_from_raw2(char* fast5_file_path, char* templateModelFile, char* sequence, char* path_to_embed,
-                      bool writeFailedAlignment) {
+                      bool writeFailedAlignment, bool rna) {
     // prep
     StateMachine *sM = stateMachine3_loadFromFile(templateModelFile, threeState, emissions_kmer_getGapProb,
                                                   emissions_signal_strawManGetKmerEventMatchProbWithDescaling_MeanOnly,
@@ -1239,13 +1248,14 @@ herr_t load_from_raw2(char* fast5_file_path, char* templateModelFile, char* sequ
     hid_t hdf5_file = fast5_open(fast5_file_path);
     float start_time = fast5_get_start_time(hdf5_file);
     const detector_param *ed_params = &event_detection_defaults;
-    // if experiment is RNA, change defaults and nucleotide sequence
-    char *experiment_type = fast5_get_experiment_type(hdf5_file);
     // get kmers we want to align to the events
-    stList* kmer_list = build_kmer_list(sequence, sM->kmerLength, strcmp(experiment_type, "rna") == 0);
+    stList* kmer_list = build_kmer_list(sequence, sM->kmerLength, rna);
 
-    if (strcmp(experiment_type, "rna") == 0) {
+    if (rna) {
         ed_params = &event_detection_rna;
+        debug_print(("THIS READ IS: RNA\n"));
+    } else {
+      debug_print(("THIS READ IS: DNA \n"));
     }
 
     // get channel parameters and scale raw ADC counts to get pA raw current
@@ -1257,14 +1267,14 @@ herr_t load_from_raw2(char* fast5_file_path, char* templateModelFile, char* sequ
     int trim_start = 200;
     int trim_end = 10;
     int varseg_chunk = 100;
-    float varseg_thresh = 0.0;
+    float varseg_thresh = 0;
     trim_and_segment_raw(rt, trim_start, trim_end, varseg_chunk, varseg_thresh);
 
     // get events
     event_table et = detect_events(rt, *ed_params);
     assert(rt.n > 0);
     assert(et.n > 0);
-    if (strcmp(experiment_type, "rna") == 0) {
+    if (rna) {
         event_table et2 = reverse_events(et);
         et = et2;
     }
@@ -1279,19 +1289,16 @@ herr_t load_from_raw2(char* fast5_file_path, char* templateModelFile, char* sequ
     // create new event table with our own data structure
     basecalled_event_table* b_et = event_table_to_basecalled_table(&et, channel_params, start_time);
 
-    if (strcmp(experiment_type, "rna")==0){
+    if (rna){
         rna_alignment_to_base_event_map(event_alignment, b_et, kmer_list, sM);
         basecalled_event_table *bet2 = reverse_basecalled_events(b_et);
         free(b_et);
         b_et = bet2;
-
     } else {
         alignment_to_base_event_map(event_alignment, b_et, kmer_list, sM);
-
     }
 
     herr_t write_success = fast5_set_basecall_event_table(hdf5_file, path_to_embed, b_et);
-
     // cleanup
     free(b_et->event);
     free(b_et);
@@ -1307,10 +1314,10 @@ void alignment_to_base_event_map(stList *event_alignment, basecalled_event_table
     // transform alignment into the base-to-event map
     int64_t alignment_length = stList_length(event_alignment);
     assert(alignment_length > 0) ;
-    int k_idx;
-    int event_idx;
-    char *kmer;
-    double lp_emission;
+    int k_idx = 0;
+    int event_idx = 0;
+    char *kmer = NULL;
+    double lp_emission = NAN;
     int prev_event_idx = -1;
     int prev_kmer_indx = 0;
     b_et->aln_n = 0;
@@ -1327,6 +1334,8 @@ void alignment_to_base_event_map(stList *event_alignment, basecalled_event_table
         if (event_idx == prev_event_idx) {
             if (k_idx == prev_kmer_indx){
                 fprintf(stderr, "[Event Aligner] There was an error in the event map.");
+            } else if (prev_kmer_indx == 0) {
+                continue;
             } else {
                 b_et->event[event_idx].p_model_state = exp(lp_emission);
                 strcpy(b_et->event[event_idx].model_state, kmer);
@@ -1353,17 +1362,17 @@ void alignment_to_base_event_map(stList *event_alignment, basecalled_event_table
 void rna_alignment_to_base_event_map(stList *event_alignment, basecalled_event_table* b_et,
                                      stList *kmer_list, StateMachine *pore_model) {
 
-    StateMachine3 *sM3 = (StateMachine3 *) pore_model;
-    // transform alignment into the base-to-event map
-    int64_t alignment_length = stList_length(event_alignment);
-    assert(alignment_length > 0) ;
-    int k_idx;
-    int event_idx;
-    char *kmer;
-    double lp_emission;
-    int prev_event_idx = -1;
-    int64_t prev_kmer_indx = stList_length(kmer_list) -1;
-    b_et->aln_n = 0;
+  StateMachine3 *sM3 = (StateMachine3 *) pore_model;
+  // transform alignment into the base-to-event map
+  int64_t alignment_length = stList_length(event_alignment);
+  assert(alignment_length > 0) ;
+  int64_t k_idx = 0;
+  int event_idx = 0;
+  char *kmer = NULL;
+  double lp_emission = 0;
+  int prev_event_idx = -1;
+  int64_t prev_kmer_indx = stList_length(kmer_list) -1;
+  b_et->aln_n = 0;
 
     // loop through the alignment and create assignments
     for (int64_t i = alignment_length-1; i >= 0; --i) {
@@ -1406,15 +1415,14 @@ void rna_alignment_to_base_event_map(stList *event_alignment, basecalled_event_t
 
 event_table reverse_events(event_table et){
 
-    size_t i, j;
-    j = et.n;
+    size_t j = et.n;
     event_table et2 = { 0 };
     et2.event = calloc(et.n, sizeof(event_t));
     et2.n = et.n;
     et2.end = et.end;
     et2.start = et.start;
 
-    for (i = 0; i < j; i++) {
+    for (size_t i = 0; i < j; i++) {
         et2.event[i] = et.event[j - 1 - i];
     }
 
@@ -1423,8 +1431,7 @@ event_table reverse_events(event_table et){
 
 basecalled_event_table* reverse_basecalled_events(basecalled_event_table *bet){
 
-    size_t i, j;
-    j = bet->n;
+    size_t j = bet->n;
     basecalled_event_table* bet2 = malloc(sizeof(basecalled_event_table));
     bet2->event = calloc(bet->n, sizeof(basecalled_event));
     bet2->n = bet->n;
@@ -1432,7 +1439,7 @@ basecalled_event_table* reverse_basecalled_events(basecalled_event_table *bet){
     bet2->start = bet->start;
     bet2->aln_n = bet->aln_n;
 
-    for (i = 0; i < j; i++) {
+    for (size_t i = 0; i < j; i++) {
         bet2->event[i] = bet->event[j - 1 - i];
     }
 

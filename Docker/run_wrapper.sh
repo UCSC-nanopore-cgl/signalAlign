@@ -10,4 +10,4 @@ finish() {
 trap finish EXIT
 
 # Call tool with parameters
-/home/signalAlign/bin/runSignalAlign "$@"
+runSignalAlign.py "$@"

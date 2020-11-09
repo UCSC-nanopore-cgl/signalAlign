@@ -15,20 +15,21 @@ import os
 import numpy as np
 import pandas as pd
 import tempfile
+import platform
 
 from itertools import product
 from scipy.stats import norm, invgauss, entropy
 from scipy.spatial.distance import euclidean
 from sklearn.neighbors import KernelDensity
 from py3helpers.utils import all_string_permutations
-from py3helpers.seq_tools import is_non_canonical_iupac_base
 
 import matplotlib as mpl
 
 if os.environ.get('DISPLAY', '') == '':
     print('no display found. Using non-interactive Agg backend')
     mpl.use('Agg')
-mpl.use("TkAgg")
+if platform.system() == "Darwin":
+    mpl.use("macosx")
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 
@@ -36,6 +37,16 @@ import matplotlib.ticker as ticker
 NORM_DIST_PARAMS = 2
 NB_MODEL_PARAMS = 5
 _SQRT2 = np.sqrt(2)
+
+IUPAC_BASES = ("A", "C", "T", "G", "W", "R", "Y", "S", "K", "M", "B", "D", "H", "V", "N")
+
+
+def is_non_canonical_iupac_base(nuc):
+    """Return True if base is one of teh IUPAC bases but not ATGC"""
+    if nuc in IUPAC_BASES and nuc not in "ATGC":
+        return True
+    else:
+        return False
 
 
 def parse_assignment_file(file_path):
@@ -89,8 +100,8 @@ def parse_alignment_file(file_path):
     """
     assert os.path.exists(file_path), "File path does not exist: {}".format(file_path)
     data = pd.read_csv(file_path, delimiter="\t",
-                       usecols=(4, 9, 13, 12),
-                       names=["strand", "kmer", "prob", "level_mean"],
+                       usecols=(4, 12, 13, 15),
+                       names=["strand", "prob", "level_mean", "kmer"],
                        dtype={"kmer": np.str, "strand": np.str, "level_mean": np.float64, "prob": np.float64},
                        header=None)[["kmer", "strand", "level_mean", "prob"]]
     return data
@@ -98,8 +109,7 @@ def parse_alignment_file(file_path):
 
 class HmmModel(object):
     def __init__(self, ont_model_file, hdp_model_file=None, nanopolish_model_file=None, rna=False, name=None):
-        # TODO Need to create docs here
-        assert os.path.exists(ont_model_file)
+        assert os.path.exists(ont_model_file), f"Model file does not exist: {ont_model_file}"
         self.name = name
         self.rna = rna
         self.ont_model_file = ont_model_file
@@ -267,8 +277,6 @@ class HmmModel(object):
             self.kmer_length = int(line[3])
             self.symbol_set_size = self.alphabet_size ** self.kmer_length
             assert self.symbol_set_size > 0, "signalHmm.load_model - Got 0 for symbol_set_size"
-            assert self.symbol_set_size <= 6 ** 6, "signalHmm.load_model - Got more than 6^6 for symbol_set_size got {}" \
-                                                   "".format(self.symbol_set_size)
 
             line = list(map(float, fH.readline().split()))
             assert len(line) == len(self.transitions) + 1, "signalHmm.load_model incorrect transitions line"
@@ -545,8 +553,8 @@ class HmmModel(object):
         self.write(hmm_file)
         self.running_likelihoods.append(self.likelihood)
         self.reset_assignments()
-        print("[trainModels] NOTICE: Added {success} expectations files successfully, {problem} files had problems\n"
-              "".format(success=files_added_successfully, problem=files_with_problems), file=sys.stderr)
+        print("[trainModels] NOTICE: Added {success} expectations files successfully, {problem} files had problems"
+              "".format(success=files_added_successfully, problem=files_with_problems))
 
     def _initialize_hdp_model(self):
         """Read in HDP model and make sure parameters match the ONT model"""
@@ -828,11 +836,12 @@ class HmmModel(object):
 
         return hellinger_distances, kl_divergences, median_deltas
 
-    def write_new_model(self, out_path, alphabet, replacement_base):
+    def write_new_model(self, out_path, alphabet, replacement_base, noise=0.0):
         """Write a correctly formatted new model file with a new alphabet.
         :param out_path: path to output hmm
         :param alphabet: new alphabet
         :param replacement_base: base to replaced by the new character
+        :param noise: boolean option to add small amount of variation in the distributions
 
         note: will retain same kmer size and assumes only one new character
         """
@@ -846,12 +855,11 @@ class HmmModel(object):
         if not self.normalized:
             self.normalize_transitions_expectations()
 
-        alphabet = "".join(sorted(alphabet.upper()))
-        for base in alphabet:
-            assert not is_non_canonical_iupac_base(base), \
-                "You cannot use IUPAC character to represent multiple bases. {}".format(base)
+        alphabet = "".join(sorted(alphabet))
+        # for base in alphabet:
+        #     assert not is_non_canonical_iupac_base(base), \
+        #         "You cannot use IUPAC character to represent multiple bases. {}".format(base)
 
-        replacement_base = replacement_base.upper()
         new_base = (set(alphabet) - set(self.alphabet)).pop()
 
         alphabet_size = len(alphabet)
@@ -871,13 +879,34 @@ class HmmModel(object):
             # line 2 Event Model
             for kmer in new_kmers:
                 generic_kmer = kmer.replace(new_base, replacement_base)
+
                 k = self.get_kmer_index(generic_kmer)
-                f.write("{level_mean}\t{level_sd}\t{noise_mean}\t{noise_sd}\t{noise_lambda}\t"
+                if kmer == generic_kmer:
+                    f.write("{level_mean}\t{level_sd}\t{noise_mean}\t{noise_sd}\t{noise_lambda}\t"
                         "".format(level_mean=self.event_model["means"][k], level_sd=self.event_model["SDs"][k],
                                   noise_mean=self.event_model["noise_means"][k],
                                   noise_sd=self.event_model["noise_SDs"][k],
                                   noise_lambda=self.event_model["noise_lambdas"][k]))
+                else:
+                    f.write("{level_mean}\t{level_sd}\t{noise_mean}\t{noise_sd}\t{noise_lambda}\t"
+                            "".format(level_mean=self.event_model["means"][k]+np.random.uniform(-noise, noise),
+                                      level_sd=self.event_model["SDs"][k],
+                                      noise_mean=self.event_model["noise_means"][k],
+                                      noise_sd=self.event_model["noise_SDs"][k],
+                                      noise_lambda=self.event_model["noise_lambdas"][k]))
+
             f.write("\n")
+
+    def set_kmer_event_mean_params(self, kmer, event_mean, event_sd):
+        """Set ont event mean for a given kmer
+        :param kmer: valid K-mer
+        :param event_mean: value to set as new mean
+        """
+        k = self.get_kmer_index(kmer)
+        self.event_model["means"][k] = event_mean
+        self.event_model["SDs"][k] = event_sd
+        _, event_lambda = gaussian_param_to_inv_gaussian_param(event_mean, event_sd)
+        self.event_model["noise_lambdas"][k] = event_lambda
 
     def set_kmer_event_mean(self, kmer, event_mean):
         """Set ont event mean for a given kmer

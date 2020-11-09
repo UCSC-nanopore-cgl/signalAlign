@@ -59,7 +59,7 @@
     "normal_emissions": true,
     "hdp_emissions": true,
     "expectation_maximization": false,
-    "em_iterations": 3
+    "em_iterations": 2
   },
   "path_to_bin": "./bin",
   "complement_hdp_model": null,
@@ -67,11 +67,13 @@
   "complement_hmm_model": "./models/testModelR9_5mer_acgt_complement.model",
   "template_hmm_model": "./models/testModelR9_5mer_acgt_template.model",
   "job_count": 2,
-  "debug": false,
+  "debug": true,
   "two_d": false,
   "output_dir": "./",
   "constraint_trim": null,
   "diagonal_expansion": null,
   "traceBackDiagonals": 100,
-  "filter_reads": 7
+  "filter_reads": 0,
+  "rna": false,
+  "mod_only": false
 }

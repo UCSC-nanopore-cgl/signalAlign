@@ -11,13 +11,10 @@
 # History: 5/31/2018 Created
 ########################################################################
 import unittest
-import os
-import numpy as np
-import tempfile
 from shutil import copyfile
 
+from py3helpers.utils import get_random_string, list_dir
 from signalalign.hiddenMarkovModel import *
-from py3helpers.utils import all_string_permutations, get_random_string, list_dir
 
 
 class HiddenMarkovTests(unittest.TestCase):
@@ -31,7 +28,8 @@ class HiddenMarkovTests(unittest.TestCase):
 
         cls.model = HmmModel(ont_model_file=cls.model_file)
         cls.expectation_file = os.path.join(cls.HOME,
-                                            "tests/test_expectation_files/4f9a316c-8bb3-410a-8cfc-026061f7e8db.template.expectations.tsv")
+                                            "tests/test_expectation_files/4f9a316c-8bb3-410a-"
+                                            "8cfc-026061f7e8db.template.expectations.tsv")
         cls.nanopolish_model = os.path.join(cls.HOME, "models/r9.4_450bps.nucleotide.6mer.template.model")
         cls.cpg_nanopolish_model = os.path.join(cls.HOME, "models/r9.4_450bps.cpg.6mer.template.model")
 
@@ -42,10 +40,11 @@ class HiddenMarkovTests(unittest.TestCase):
             self.assertEqual(all_kmers.index(kmer), self.model.get_kmer_index(kmer))
 
     def test_log_event_mean_gaussian_probability_match(self):
-        def emissions_signal_logGaussPdf(x, mu, sigma):
+
+        def emissions_signal_log_gauss_pdf(x_i, mu_i, sigma_i):
             log_inv_sqrt_2pi = -0.91893853320467267
-            l_sigma = np.log(sigma)
-            a = (x - mu) / sigma
+            l_sigma = np.log(sigma_i)
+            a = (x_i - mu_i) / sigma_i
             # // returns Log-space
             return log_inv_sqrt_2pi - l_sigma + (-0.5 * a * a)
 
@@ -53,27 +52,27 @@ class HiddenMarkovTests(unittest.TestCase):
             kmer = get_random_string(5, chars="ATGC")
             mu, sigma = self.model.get_event_mean_gaussian_parameters(kmer)
             prob = self.model.log_event_mean_gaussian_probability_match(50, kmer)
-            self.assertAlmostEqual(prob, emissions_signal_logGaussPdf(50, mu, sigma))
+            self.assertAlmostEqual(prob, emissions_signal_log_gauss_pdf(50, mu, sigma))
 
     def test_log_event_sd_inv_gaussian_probability_match(self):
-        def emissions_signal_logInvGaussPdf(eventNoise, modelNoiseMean, modelNoiseLambda):
-            l_twoPi = 1.8378770664093453  # // log(2*pi)
-            l_eventNoise = np.log(eventNoise)
-            a = (eventNoise - modelNoiseMean) / modelNoiseMean
-            l_modelNoseLambda = np.log(modelNoiseLambda)
+        def emissions_signal_log_inv_gauss_pdf(event_noise, model_noise_mean, model_noise_lambda):
+            l_two_pi = 1.8378770664093453  # // log(2*pi)
+            l_event_noise = np.log(event_noise)
+            a = (event_noise - model_noise_mean) / model_noise_mean
+            l_model_nose_lambda = np.log(model_noise_lambda)
             # // returns Log-space
-            return (l_modelNoseLambda - l_twoPi - 3 * l_eventNoise - (modelNoiseLambda * a * a / eventNoise)) / 2
+            return (l_model_nose_lambda - l_two_pi - 3 * l_event_noise - (model_noise_lambda * a * a / event_noise)) / 2
 
         for x in range(10):
             kmer = get_random_string(5, chars="ATGC")
             mu, lambda1 = self.model.get_event_sd_inv_gaussian_parameters(kmer)
             prob = self.model.log_event_sd_inv_gaussian_probability_match(2, kmer)
-            self.assertAlmostEqual(prob, emissions_signal_logInvGaussPdf(2, mu, lambda1))
+            self.assertAlmostEqual(prob, emissions_signal_log_inv_gauss_pdf(2, mu, lambda1))
 
     def test_get_event_mean_gaussian_parameters(self):
         for x in range(10):
             kmer = get_random_string(5, chars="ATGC")
-            mu, sigma = self.model.get_event_mean_gaussian_parameters(kmer)
+            _, _ = self.model.get_event_mean_gaussian_parameters(kmer)
         mu, sigma = self.model.get_event_mean_gaussian_parameters("TTTTT")
         self.assertEqual(self.model.event_model["means"][-1], mu)
         self.assertEqual(self.model.event_model["SDs"][-1], sigma)
@@ -81,7 +80,7 @@ class HiddenMarkovTests(unittest.TestCase):
     def test_get_event_sd_inv_gaussian_parameters(self):
         for x in range(10):
             kmer = get_random_string(5, chars="ATGC")
-            mu, sigma = self.model.get_event_sd_inv_gaussian_parameters(kmer)
+            _, _ = self.model.get_event_sd_inv_gaussian_parameters(kmer)
         mean, lambda1 = self.model.get_event_sd_inv_gaussian_parameters("TTTTT")
         self.assertEqual(self.model.event_model["noise_means"][-1], mean)
         self.assertEqual(self.model.event_model["noise_lambdas"][-1], lambda1)
@@ -207,7 +206,6 @@ class HiddenMarkovTests(unittest.TestCase):
             self.assertEqual(hmm_handle.kmer_length, hmm_handle2.kmer_length)
             self.assertEqual(hmm_handle2.alphabet, "ACFGT")
             self.assertEqual(hmm_handle2.alphabet_size, 5)
-            self.assertRaises(AssertionError, hmm_handle.write_new_model, test_model_file, "ATGCW", "A")
 
     def test_create_new_model(self):
         with tempfile.TemporaryDirectory() as tempdir:
@@ -227,7 +225,7 @@ class HiddenMarkovTests(unittest.TestCase):
             self.assertEqual(mean3, mean4)
             self.assertEqual(mean4, mean5)
             self.assertEqual(mean5, mean6)
-            new_model = create_new_model(self.model_file, test_model_file, [("A", "J")])
+            _ = create_new_model(self.model_file, test_model_file, [("A", "J")])
 
     def test_set_kmer_event_mean(self):
         hmm_handle = HmmModel(ont_model_file=self.model_file)
@@ -255,7 +253,8 @@ class HiddenMarkovTests(unittest.TestCase):
 
     def test_read_in_alignment_file(self):
         assignments_dir = os.path.join(self.HOME, "tests/test_alignments/ecoli1D_test_alignments_sm3")
-        data = read_in_alignment_file(list_dir(assignments_dir)[0])
+        alignment_file = [x for x in list_dir(assignments_dir) if "5cc86bac-79fd-4897-8631-8f1c55954a45" in x][0]
+        data = read_in_alignment_file(alignment_file)
         self.assertEqual(len(data["contig"]), 16852)
         self.assertEqual(len(data["reference_index"]), 16852)
         self.assertEqual(len(data["reference_kmer"]), 16852)
@@ -298,6 +297,16 @@ class HiddenMarkovTests(unittest.TestCase):
             model_mean, model_sd = sa_model.get_event_mean_gaussian_parameters("AAAAEE")
             self.assertEqual(model_mean, 75.7063)
             self.assertEqual(model_sd, 2.70501)
+
+    def test_parse_alignment_file(self):
+        test_path = \
+            "tests/test_alignments/ecoli1D_test_alignments_RAW/5cc86bac-79fd-4897-8631-8f1c55954a45.sm.backward.tsv"
+        full_path = os.path.join(self.HOME, test_path)
+        data = parse_alignment_file(full_path)
+        self.assertTrue(data["kmer"][0], "AGGTG")
+        self.assertTrue(data["strand"][0], "t")
+        self.assertTrue(data["level_mean"][0], 63.674513)
+        self.assertTrue(data["prob"][0], 1)
 
 
 if __name__ == '__main__':

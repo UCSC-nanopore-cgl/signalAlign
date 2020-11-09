@@ -1,34 +1,32 @@
 #!/usr/bin/env python3
-
-from __future__ import print_function
 import shutil
 
 import signalalign.utils.multithread as multithread
+from py3helpers.seq_tools import sam_string_to_aligned_segment
+from py3helpers.utils import merge_dicts, check_numpy_table, merge_lists, list_dir_recursive, list_dir, captured_output
 from signalalign import defaultModelFromVersion, parseFofn
-from signalalign.nanoporeRead import NanoporeRead, NanoporeRead2D
 from signalalign.event_detection import add_raw_start_and_raw_length_to_events
+from signalalign.filter_reads import filter_reads_to_string_wrapper, filter_reads
+from signalalign.mea_algorithm import mea_alignment_from_signal_align, \
+    add_events_to_signalalign, create_label_from_events
+from signalalign.nanoporeRead import NanoporeRead, NanoporeRead2D
 from signalalign.utils.bwaWrapper import *
 from signalalign.utils.fileHandlers import FolderHandler
 from signalalign.utils.sequenceTools import fastaWrite, samtools_faidx_fasta, processReferenceFasta
-from signalalign.mea_algorithm import mea_alignment_from_signal_align, \
-    add_events_to_signalalign, create_label_from_events
-from signalalign.motif import getDegenerateEnum
-from signalalign.filter_reads import filter_reads_to_string_wrapper, filter_reads, multiprocess_filter_reads
-from py3helpers.utils import merge_dicts, check_numpy_table, merge_lists, list_dir_recursive, list_dir
-from py3helpers.seq_tools import sam_string_to_aligned_segment
 
 
 def create_signalAlignment_args(backward_reference=None, forward_reference=None, destination=None,
                                 stateMachineType="threeState", in_templateHmm=None,
                                 in_complementHmm=None, in_templateHdp=None, in_complementHdp=None, threshold=0.01,
                                 diagonal_expansion=None,
-                                constraint_trim=None, target_regions=None, degenerate=None, twoD_chemistry=False,
+                                constraint_trim=None, target_regions=None, twoD_chemistry=False,
                                 alignment_file=None, bwa_reference=None,
                                 track_memory_usage=False, get_expectations=False, output_format='full', embed=False,
                                 event_table=False,
                                 check_for_temp_file_existance=True,
                                 path_to_bin='./', perform_kmer_event_alignment=None, filter_reads=False,
-                                traceBackDiagonals=100, delete_tmp=True):
+                                traceBackDiagonals=100, delete_tmp=True, rna=False, ambig_model=None,
+                                overwrite=False, debug=False):
     """Create alignment arguments for SignalAlign. Parameters are explained in SignalAlignment"""
     alignment_args = {
         "backward_reference": backward_reference,
@@ -43,7 +41,6 @@ def create_signalAlignment_args(backward_reference=None, forward_reference=None,
         "diagonal_expansion": diagonal_expansion,
         "constraint_trim": constraint_trim,
         "target_regions": target_regions,
-        "degenerate": degenerate,
         "twoD_chemistry": twoD_chemistry,
         "alignment_file": alignment_file,
         "bwa_reference": bwa_reference,
@@ -57,7 +54,12 @@ def create_signalAlignment_args(backward_reference=None, forward_reference=None,
         'perform_kmer_event_alignment': perform_kmer_event_alignment,
         'filter_reads': filter_reads,
         'traceBackDiagonals': traceBackDiagonals,
-        'delete_tmp': delete_tmp}
+        'delete_tmp': delete_tmp,
+        'rna': rna,
+        'ambig_model': ambig_model,
+        'overwrite': overwrite,
+        'debug': debug
+    }
 
     return alignment_args
 
@@ -74,7 +76,6 @@ class SignalAlignment(object):
                  threshold,
                  diagonal_expansion,
                  constraint_trim,
-                 degenerate,
                  forward_reference,
                  backward_reference=None,
                  # one of these needs to be set
@@ -97,7 +98,11 @@ class SignalAlignment(object):
                  filter_reads=False,
                  traceBackDiagonals=100,
                  cigar_string=None,
-                 delete_tmp=True):
+                 delete_tmp=True,
+                 rna=False,
+                 ambig_model=None,
+                 overwrite=False,
+                 debug=False):
         self.in_fast5 = in_fast5  # fast5 file to align
         self.destination = destination  # place where the alignments go, should already exist
         self.stateMachineType = stateMachineType  # flag for signalMachine
@@ -106,7 +111,6 @@ class SignalAlignment(object):
         self.diagonal_expansion = diagonal_expansion  # alignment algorithm param
         self.constraint_trim = constraint_trim  # alignment algorithm param
         self.output_format = output_format  # smaller output files
-        self.degenerate = degenerate  # set of nucleotides for degenerate characters
         self.twoD_chemistry = twoD_chemistry  # flag for 2D sequencing runs
         self.temp_folder = FolderHandler()  # object for holding temporary files (non-toil)
         self.read_name = self.in_fast5.split("/")[-1][:-6]  # get the name without the '.fast5'
@@ -129,17 +133,24 @@ class SignalAlignment(object):
         self.filter_reads = filter_reads  # filter reads out with average fastq quality scores less than 7
         self.traceBackDiagonals = traceBackDiagonals  # number of traceback diagonals to caluclate before calculating
         self.delete_tmp = delete_tmp
-
+        self.rna = rna
         self.complement_expectations_file_path = None
         self.template_expectations_file_path = None
+        self.ambig_model = ambig_model
+        self.overwrite = overwrite
+        self.debug = debug
 
+        if self.ambig_model:
+            assert os.path.isfile(self.ambig_model), "ambig_model does not exist: {}".format(self.ambig_model)
         self.aligned_segment = None
         if cigar_string:
             self.aligned_segment = sam_string_to_aligned_segment(cigar_string)  # pysam aligned segment
-        if shutil.which("signalMachine") is None:
-            assert os.path.exists(self.path_to_signalMachine), "Path to signalMachine does not exist"
-        else:
-            self.path_to_signalMachine = shutil.which("signalMachine")
+        if not os.path.exists(self.path_to_signalMachine):
+            if shutil.which("signalMachine") is None:
+                self.failStop(
+                    "Path to signalMachine does not exist and is not in PATH: {}".format(self.path_to_signalMachine))
+            else:
+                self.path_to_signalMachine = shutil.which("signalMachine")
         assert self.bwa_reference is not None or self.alignment_file is not None or self.aligned_segment is not None, \
             "either 'bwa_reference' or 'alignment_file' or 'cigar_string' " \
             "argument is needed to generate cigar strings"
@@ -164,15 +175,19 @@ class SignalAlignment(object):
             self.in_complementHdp = None
         assert os.path.isdir(self.destination), "Destination path does not exist: {}".format(self.destination)
 
+    def print(self, msg, file=sys.stdout, end="\n"):
+        if self.debug:
+            print(msg, file=file, end=end)
+
     def run(self):
-        print("[SignalAlignment.run] INFO: Starting on {read}".format(read=self.in_fast5))
+        self.print("[SignalAlignment.run] INFO: Starting on {read}".format(read=self.in_fast5))
         if self.get_expectations:
             assert self.in_templateHmm is not None, "Need template HMM files for model training"
             if self.twoD_chemistry:
                 assert self.in_complementHmm is not None, "Need complement HMM files for model training"
         if not os.path.isfile(self.in_fast5):
-            print("[SignalAlignment.run] ERROR: Did not find fast5 at {file}".format(file=self.in_fast5),
-                  file=sys.stderr)
+            self.print("[SignalAlignment.run] ERROR: Did not find fast5 at {file}".format(file=self.in_fast5),
+                       file=sys.stderr)
             # raise Exception("Missing fast5: {}".format(self.in_fast5))
             return False
 
@@ -190,7 +205,8 @@ class SignalAlignment(object):
                                   model_file_location=self.in_templateHmm,
                                   enforce_supported_versions=self.enforce_supported_versions,
                                   perform_kmer_event_alignment=self.perform_kmer_event_alignment,
-                                  filter_reads=self.filter_reads, aligned_segment=self.aligned_segment)
+                                  filter_reads=self.filter_reads, aligned_segment=self.aligned_segment, rna=self.rna,
+                                  overwrite=self.overwrite, debug=self.debug)
         # sanity check
         if not npRead.initialize_success:
             self.failStop("[SignalAlignment.run] ERROR: NanoporeRead failed initialization: {}".format(self.in_fast5),
@@ -204,14 +220,14 @@ class SignalAlignment(object):
         # validate input models and get defaults if appropriate
         if self.in_templateHmm is None:
             self.in_templateHmm = defaultModelFromVersion(strand="template", version=npRead.version)
-            print("[SignalAlignment.run] Inferred template HMM {} from np read version {}".format(
+            self.print("[SignalAlignment.run] Inferred template HMM {} from np read version {}".format(
                 self.in_templateHmm, npRead.version))
 
         if self.twoD_chemistry and self.in_complementHmm is None:
             pop1_complement = npRead.complement_model_id == "complement_median68pA_pop1.model"
             self.in_complementHmm = defaultModelFromVersion(strand="complement", version=npRead.version,
                                                             pop1_complement=pop1_complement)
-            print("[SignalAlignment.run] Inferred complement HMM {} from np read version {}".format(
+            self.print("[SignalAlignment.run] Inferred complement HMM {} from np read version {}".format(
                 self.in_complementHmm, npRead.version))
         assert self.in_templateHmm is not None
         if self.twoD_chemistry:
@@ -235,8 +251,6 @@ class SignalAlignment(object):
         # alignment info
         cigar_file_ = self.addTempFilePath("temp_cigar_%s.txt" % read_label)
         temp_samfile_ = self.addTempFilePath("temp_sam_file_%s.sam" % read_label)
-        strand = None
-        reference_name = None
         if not (self.check_for_temp_file_existance and os.path.isfile(cigar_file_)):
 
             # need guide alignment to generate cigar file
@@ -250,7 +264,7 @@ class SignalAlignment(object):
                 guide_alignment = getGuideAlignmentFromAlignmentFile(self.alignment_file, read_name=read_label,
                                                                      target_regions=self.target_regions)
                 if guide_alignment is None:
-                    print("[SignalAlignment.run] read {} not found in {}".format(read_label, self.alignment_file))
+                    self.print("[SignalAlignment.run] read {} not found in {}".format(read_label, self.alignment_file))
 
             # get from bwa
             if guide_alignment is None and self.bwa_reference is not None:
@@ -258,14 +272,14 @@ class SignalAlignment(object):
                 read_fasta_ = self.addTempFilePath("temp_seq_%s.fa" % read_label)
                 ok = self.write_nucleotide_read(npRead, read_fasta_)
                 if not ok:
-                    print("[SignalAlignment.run] Failed to write nucleotide read.  Continuing execution.")
+                    self.print("[SignalAlignment.run] Failed to write nucleotide read.  Continuing execution.")
 
                 guide_alignment = generateGuideAlignment(reference_fasta=self.bwa_reference,
                                                          query=read_fasta_,
                                                          temp_sam_path=temp_samfile_,
                                                          target_regions=self.target_regions)
                 if guide_alignment is None:
-                    print("[SignalAlignment.run] read {} could not be aligned with BWA".format(read_label))
+                    self.print("[SignalAlignment.run] read {} could not be aligned with BWA".format(read_label))
 
             # could not map
             if guide_alignment is None:
@@ -333,7 +347,7 @@ class SignalAlignment(object):
             return False
 
         if os.path.isfile(posteriors_file_path):
-            print("[SignalAlignment.run] NOTICE: Removing previous alignment file {}".format(posteriors_file_path))
+            self.print("[SignalAlignment.run] NOTICE: Removing previous alignment file {}".format(posteriors_file_path))
             os.remove(posteriors_file_path)
         # flags
         template_model_flag = "-T {} ".format(self.in_templateHmm)
@@ -342,8 +356,8 @@ class SignalAlignment(object):
         else:
             complement_model_flag = ""
 
-        print("[SignalAlignment.run] NOTICE: template model {t} complement model {c}"
-              "".format(t=self.in_templateHmm, c=self.in_complementHmm))
+        self.print("[SignalAlignment.run] NOTICE: template model {t} complement model {c}"
+                   "".format(t=self.in_templateHmm, c=self.in_complementHmm))
 
         # reference sequences
         assert os.path.isfile(self.forward_reference)
@@ -388,14 +402,6 @@ class SignalAlignment(object):
         if self.output_formats[self.output_format] == 3:
             out_fmt += "-i {} ".format(posteriors_file_path2)
 
-        # degenerate nucleotide information
-        if self.degenerate is not None:
-            if type(self.degenerate) is str:
-                self.degenerate = getDegenerateEnum(self.degenerate)
-            degenerate_flag = "-o {} ".format(self.degenerate)
-        else:
-            degenerate_flag = ""
-
         # twoD flag
         if self.twoD_chemistry:
             twoD_flag = "--twoD"
@@ -408,47 +414,55 @@ class SignalAlignment(object):
         else:
             rna_flag = ""
 
+        if self.ambig_model:
+            ambig_flag = "-a {}".format(self.ambig_model)
+        else:
+            ambig_flag = ""
+
         # commands
         if self.get_expectations:
-            self.template_expectations_file_path = os.path.join(self.destination, read_label + ".template.expectations.tsv")
+            self.template_expectations_file_path = os.path.join(self.destination,
+                                                                read_label + ".template.expectations.tsv")
             self.complement_expectations_file_path = os.path.join(self.destination,
-                                                             read_label + ".complement.expectations.tsv")
+                                                                  read_label + ".complement.expectations.tsv")
             command = \
-                "{vA} {td} {degen}{sparse}{model} -q {npRead} " \
+                "{vA} {td} {sparse}{model} -q {npRead} " \
                 "{t_model}{c_model}{thresh}{expansion}{trim} {hdp}-L {readLabel} -p {cigarFile} " \
                 "-t {templateExpectations} -c {complementExpectations} -n {seq_name} {f_ref_fa} {b_ref_fa} " \
-                "-g {traceback} {rna}" \
+                "-g {traceback} {rna}  {ambig_model}" \
                     .format(vA=self.path_to_signalMachine, model=stateMachineType_flag,
                             cigarFile=cigar_file_,
                             npRead=npRead_, readLabel=read_label, td=twoD_flag,
                             templateExpectations=self.template_expectations_file_path, hdp=hdp_flags,
                             complementExpectations=self.complement_expectations_file_path, t_model=template_model_flag,
                             c_model=complement_model_flag, thresh=threshold_flag, expansion=diag_expansion_flag,
-                            trim=trim_flag, degen=degenerate_flag, sparse=out_fmt, seq_name=reference_name,
+                            trim=trim_flag, sparse=out_fmt, seq_name=reference_name,
                             f_ref_fa=forward_ref_flag, b_ref_fa=backward_ref_flag, traceback=self.traceBackDiagonals,
-                            rna=rna_flag)
+                            rna=rna_flag, ambig_model=ambig_flag)
         else:
             command = \
-                "{vA} {td} {degen}{sparse}{model} -q {npRead} " \
+                "{vA} {td} {sparse}{model} -q {npRead} " \
                 "{t_model}{c_model}{thresh}{expansion}{trim} -p {cigarFile} " \
-                "-u {posteriors} {hdp}-L {readLabel} -n {seq_name} {f_ref_fa} {b_ref_fa} -g {traceback} {rna}" \
-                    .format(vA=self.path_to_signalMachine, model=stateMachineType_flag, sparse=out_fmt,
-                            cigarFile=cigar_file_,
-                            readLabel=read_label, npRead=npRead_, td=twoD_flag,
-                            t_model=template_model_flag, c_model=complement_model_flag,
-                            posteriors=posteriors_file_path, thresh=threshold_flag, expansion=diag_expansion_flag,
-                            trim=trim_flag, hdp=hdp_flags, degen=degenerate_flag, seq_name=reference_name,
-                            f_ref_fa=forward_ref_flag, b_ref_fa=backward_ref_flag, traceback=self.traceBackDiagonals,
-                            rna=rna_flag)
+                "-u {posteriors} {hdp}-L {readLabel} -n {seq_name} {f_ref_fa} {b_ref_fa} -g {traceback} {rna} " \
+                "{ambig_model}".format(vA=self.path_to_signalMachine, model=stateMachineType_flag, sparse=out_fmt,
+                                       cigarFile=cigar_file_,
+                                       readLabel=read_label, npRead=npRead_, td=twoD_flag,
+                                       t_model=template_model_flag, c_model=complement_model_flag,
+                                       posteriors=posteriors_file_path, thresh=threshold_flag,
+                                       expansion=diag_expansion_flag,
+                                       trim=trim_flag, hdp=hdp_flags, seq_name=reference_name,
+                                       f_ref_fa=forward_ref_flag, b_ref_fa=backward_ref_flag,
+                                       traceback=self.traceBackDiagonals,
+                                       rna=rna_flag, ambig_model=ambig_flag)
 
         # run
-        print("[SignalAlignment.run] running command: ", command, end="\n")
+        self.print(f"[SignalAlignment.run] running command: {command}")
         try:
             command = command.split()
 
             # if self.track_memory_usage:
             #     mem_command = ['/usr/bin/time', '-f', '\\nDEBUG_MAX_MEM:%M\\n']
-            #     print("[SignalAlignment.run] Prepending command to track mem usage: {}".format(mem_command))
+            #     self.print("[SignalAlignment.run] Prepending command to track mem usage: {}".format(mem_command))
             #     mem_command.extend(command)
             #     command = mem_command
 
@@ -461,16 +475,16 @@ class SignalAlignment(object):
             errors = errors.decode().splitlines()
             output = output.decode().splitlines()
             for line in merge_lists([errors, output]):
-                print("[SignalAlignment.run]    {}: {}".format(read_label, line))
+                self.print("[SignalAlignment.run]    {}: {}".format(read_label, line))
                 if line.startswith("DEBUG_MAX_MEM"):
                     self.max_memory_usage_kb = int(line.split(":")[1])
 
             if passed == -1:
-                self.failStop("[SignalAlignment.run] ERROR exception running signalAlign")
+                self.failStop("[SignalAlignment.run] ERROR exception running signalMachine")
                 return False
 
         except Exception as e:
-            print("[SignalAlignment.run] exception ({}) running signalAlign: {}".format(type(e), e))
+            self.print("[SignalAlignment.run] exception ({}) running signalAlign: {}".format(type(e), e))
             raise e
 
         # save to fast5 file (if appropriate)
@@ -486,7 +500,7 @@ class SignalAlignment(object):
             return posteriors_file_path, ""
 
     def embed_file(self, npRead, posteriors_file_path, posteriors_file_path2, read_label, temp_samfile_):
-        print("[SignalAlignment.run] embedding into Fast5 ")
+        self.print("[SignalAlignment.run] embedding into Fast5 ")
         # load output data and grab new analysis path
         if self.output_format == "both":
             data = self.read_in_signal_align_tsv(posteriors_file_path, file_type="full")
@@ -520,13 +534,13 @@ class SignalAlignment(object):
         npRead.fastFive._add_attrs(attributes, signal_align_path)
 
         if self.output_format == "full" or self.output_format == "both":
-            print("[SignalAlignment.run] getting maximum expected alignment")
-            alignment = mea_alignment_from_signal_align(None, events=sa_events[sa_events["strand"]==b't'])
+            self.print("[SignalAlignment.run] getting maximum expected alignment")
+            alignment = mea_alignment_from_signal_align(None, events=sa_events[sa_events["strand"] == b't'])
             mae_path = npRead._join_path(signal_align_path, "MEA_alignment_labels")
             labels = create_label_from_events(alignment)
             npRead.write_data(labels, mae_path)
             if self.twoD_chemistry:
-                alignment = mea_alignment_from_signal_align(None, events=sa_events[sa_events["strand"]==b'c'])
+                alignment = mea_alignment_from_signal_align(None, events=sa_events[sa_events["strand"] == b'c'])
                 mae_path = npRead._join_path(signal_align_path, "MEA_alignment_labels_complement")
                 labels = create_label_from_events(alignment)
                 npRead.write_data(labels, mae_path)
@@ -542,7 +556,6 @@ class SignalAlignment(object):
             sam_string = self.aligned_segment.tostring()
             sam_path = npRead._join_path(signal_align_path, "sam")
             npRead.write_data(data=sam_string, location=sam_path, compression=None)
-
 
     @staticmethod
     def get_complement_events(npRead):
@@ -594,7 +607,8 @@ class SignalAlignment(object):
 
             return True
         except Exception as e:
-            print('[SignalAlignment.write_nucleotide_read] {} exception: {}'.format(type(e), str(e)), file=sys.stderr)
+            self.print('[SignalAlignment.write_nucleotide_read] {} exception: {}'.format(type(e), str(e)),
+                       file=sys.stderr)
             return False
 
     def openTempFolder(self, temp_dir):
@@ -608,7 +622,7 @@ class SignalAlignment(object):
             self.temp_folder.remove_folder()
         if nanopore_read is not None:
             nanopore_read.close()
-        print(message, file=sys.stdout)
+        print(message, file=sys.stderr)
 
     @staticmethod
     def read_in_signal_align_tsv(tsv_path, file_type):
@@ -658,7 +672,7 @@ def signal_alignment_service2(args, service_name="signal_alignment"):
         if alignment.max_memory_usage_kb is not None:
             mem_usage = alignment.max_memory_usage_kb
         if not success:
-            print(success)
+            # print(success)
             error = True
 
     except Exception as e:
@@ -717,7 +731,7 @@ def signal_alignment_service(work_queue, done_queue, service_name="signal_alignm
 
 
 def multithread_signal_alignment(signal_align_arguments, fast5_locations, worker_count=1, forward_reference=None,
-                                 debug=False, filter_reads_to_string_wrapper=None):
+                                 debug=False, filter_reads_to_string_wrapper_funct=None):
     """Multiprocess SignalAlignment for a list of fast5 files given a set of alignment arguments.
 
     :param signal_align_arguments: signalAlignment arguments besides 'in_fast5'
@@ -725,7 +739,7 @@ def multithread_signal_alignment(signal_align_arguments, fast5_locations, worker
     :param worker_count: number of workers
     :param forward_reference: path to forward reference for signalAlign alignment
     :param debug: option to iterate over each read so that the error messages are not suppressed
-    :param filter_reads_to_string_wrapper: if you want to pass in the generator from filter_reads
+    :param filter_reads_to_string_wrapper_funct: if you want to pass in the generator from filter_reads
     """
     # don't modify the signal_align_arguments
     signal_align_arguments = dict(**signal_align_arguments)
@@ -757,11 +771,12 @@ def multithread_signal_alignment(signal_align_arguments, fast5_locations, worker
     # ensure required arguments are in signal_align_argments
     required_arguments = {'destination', 'stateMachineType', 'in_templateHmm', 'in_complementHmm',
                           'in_templateHdp', 'in_complementHdp', 'threshold', 'diagonal_expansion', 'constraint_trim',
-                          'degenerate', 'forward_reference'}
+                          'forward_reference'}
     optional_arguments = {'backward_reference', 'alignment_file', 'bwa_reference', 'twoD_chemistry',
                           'target_regions', 'output_format', 'embed', 'event_table', 'check_for_temp_file_existance',
                           'track_memory_usage', 'get_expectations', 'path_to_bin', 'perform_kmer_event_alignment',
-                          'enforce_supported_versions', 'filter_reads', 'traceBackDiagonals', 'delete_tmp'}
+                          'enforce_supported_versions', 'filter_reads', 'traceBackDiagonals', 'delete_tmp', 'rna',
+                          'ambig_model', 'overwrite', 'debug'}
     missing_arguments = list(filter(lambda x: x not in signal_align_arguments.keys(), required_arguments))
     unexpected_arguments = list(filter(lambda x: x not in required_arguments and x not in optional_arguments,
                                        signal_align_arguments.keys()))
@@ -776,8 +791,8 @@ def multithread_signal_alignment(signal_align_arguments, fast5_locations, worker
         print("[multithread_signal_alignment] running signal_alignment on {} fast5s with 1 worker".format(
             len(fast5_locations)))
         output = []
-        if filter_reads_to_string_wrapper:
-            for in_fast5, cigar_string in filter_reads_to_string_wrapper:
+        if filter_reads_to_string_wrapper_funct:
+            for in_fast5, cigar_string in filter_reads_to_string_wrapper_funct:
                 f = merge_dicts([signal_align_arguments, {"in_fast5": in_fast5,
                                                           "cigar_string": cigar_string}])
                 alignment = SignalAlignment(**f)
@@ -792,9 +807,9 @@ def multithread_signal_alignment(signal_align_arguments, fast5_locations, worker
                 if success:
                     output.extend(success)
     else:
-        if filter_reads_to_string_wrapper:
+        if filter_reads_to_string_wrapper_funct:
             total, failure, messages, output = multithread.run_service2(
-                signal_alignment_service, filter_reads_to_string_wrapper,
+                signal_alignment_service, filter_reads_to_string_wrapper_funct,
                 signal_align_arguments, ['in_fast5', "cigar_string"], worker_count)
 
             # total, failure, messages = multithread.run_service3(
@@ -830,7 +845,7 @@ def create_sa_sample_args(fofns=[], fast5_dirs=[], positions_file=None, motifs=N
                           bwa_reference=None, fw_reference=None, bw_reference=None, name=None,
                           number_of_kmer_assignments=10, probability_threshold=0.8, kmers_from_reference=False,
                           quality_threshold=7, recursive=False, workers=4, assignments_dir=None, readdb=None,
-                          degenerate="variant"):
+                          ambig_model=None):
     """Create sample arguments for SignalAlignSample. Parameters are explained in SignalAlignmentSample"""
     sample_args = {
         "fofns": fofns,
@@ -850,7 +865,7 @@ def create_sa_sample_args(fofns=[], fast5_dirs=[], positions_file=None, motifs=N
         'workers': workers,
         "assignments_dir": assignments_dir,
         "readdb": readdb,
-        "degenerate": degenerate
+        "ambig_model": ambig_model
     }
     return sample_args
 
@@ -859,7 +874,7 @@ class SignalAlignSample(object):
     def __init__(self, working_folder, fofns, fast5_dirs, positions_file, motifs, bwa_reference, fw_reference,
                  bw_reference, name, number_of_kmer_assignments, probability_threshold, kmers_from_reference,
                  alignment_file, readdb=None, quality_threshold=0, recursive=False, workers=4, assignments_dir=None,
-                 degenerate="variant"):
+                 ambig_model=None):
         """Prepare sample for processing via signalAlign.
 
         :param working_folder: FolderHandler() object with a working directory already created
@@ -877,7 +892,7 @@ class SignalAlignSample(object):
         :param recursive: recursively search fast5 dirs for files
         :param workers: number of workers for multithreading
         :param assignments_dir: place where already built assignments were placed
-
+        :param ambig_model: path to tsv for character encoding
         ###### Sample specific HDP Training Parameters #######
         :param number_of_kmer_assignments: max number of assignments for each kmer
         :param probability_threshold: minimum probability required to use for training
@@ -904,9 +919,9 @@ class SignalAlignSample(object):
         self.recursive = recursive
         self.workers = workers
         self.assignments_dir = assignments_dir
-        if degenerate is None:
-            degenerate = "variant"
-        self.degenerate = getDegenerateEnum(degenerate)
+        self.ambig_model = ambig_model
+        if self.ambig_model:
+            assert os.path.isfile(self.ambig_model), "ambig_model does not exist: {}".format(self.ambig_model)
 
         assert self.name is not None, "Must specify a name for your sample. name: {}".format(self.name)
         assert isinstance(self.fast5_dirs, list), "fast5_dirs needs to be a list. fast5_dirs: {}".format(
@@ -962,28 +977,22 @@ class SignalAlignSample(object):
                                                                            work_folder=self.working_folder,
                                                                            motifs=self.motifs,
                                                                            positions_file=self.positions_file,
-                                                                           name=self.name)
+                                                                           name=self.name,
+                                                                           ambig_model=self.ambig_model)
 
-    def process_reads(self, trim=False):
+    def process_reads(self, trim=False, randomize=False):
         """Creates a filter_read generator object"""
         if self.alignment_file and self.readdb and self.quality_threshold is not None:
-            if self.recursive:
-                assert len(self.fast5_dirs) == 1, "If recursive, should just look at only one directory"
-                self.filter_read_generator = \
-                    multiprocess_filter_reads(self.fast5_dirs[0], self.alignment_file, self.readdb, trim=trim,
-                                              quality_threshold=self.quality_threshold,
-                                              worker_count=self.workers, debug=False)
-
-            else:
-                self.filter_read_generator = \
-                    filter_reads_to_string_wrapper(filter_reads(self.alignment_file,
-                                                                self.readdb,
-                                                                self.fast5_dirs,
-                                                                quality_threshold=self.quality_threshold,
-                                                                trim=trim))
+            self.filter_read_generator = \
+                filter_reads_to_string_wrapper(filter_reads(self.alignment_file,
+                                                            self.readdb,
+                                                            self.fast5_dirs,
+                                                            quality_threshold=self.quality_threshold,
+                                                            trim=trim, randomize=randomize))
 
 
-def multithread_signal_alignment_samples(samples, signal_align_arguments, worker_count, trim=None, debug=False):
+def multithread_signal_alignment_samples(samples, signal_align_arguments, worker_count, trim=None, debug=False,
+                                         randomize=False):
     """Multiprocess SignalAlignment for a list of fast5 files given a set of alignment arguments.
 
     :param samples: list of "process_sample" samples
@@ -999,22 +1008,36 @@ def multithread_signal_alignment_samples(samples, signal_align_arguments, worker
     for sample in samples:
         # correct signal align arguments
         print("[multithread_signal_alignment_samples] Running SignalAlign on sample: {}".format(sample.name))
-        sample.process_reads(trim=trim)
-        signal_align_arguments["degenerate"] = sample.degenerate
+        if not debug:
+            with captured_output() as (_, _):
+                sample.process_reads(trim=trim, randomize=randomize)
+        else:
+            sample.process_reads(trim=trim, randomize=randomize)
+
         signal_align_arguments["alignment_file"] = sample.alignment_file
         signal_align_arguments["bwa_reference"] = sample.bwa_reference
         signal_align_arguments["backward_reference"] = sample.bw_fasta_path
         signal_align_arguments["forward_reference"] = sample.fw_fasta_path
         signal_align_arguments["destination"] = os.path.join(original_destination, sample.name)
-        if not os.path.exists(signal_align_arguments["destination"]):
-            os.mkdir(signal_align_arguments["destination"])
+        signal_align_arguments["debug"] = debug
+        if os.path.exists(signal_align_arguments["destination"]):
+            shutil.rmtree(signal_align_arguments["destination"])
+        os.mkdir(signal_align_arguments["destination"])
         # run signal align
         assert sample.filter_read_generator is not None, \
             "Sample {} does not have a filter read generator. " \
             "Must pass in alignment_file and readdb and quality_threshold".format(sample.name)
+        if not debug:
+            # with captured_output() as (_, _):
+            output_files = multithread_signal_alignment(signal_align_arguments, [], worker_count, debug=debug,
+                                                        filter_reads_to_string_wrapper_funct=sample.filter_read_generator)
+        else:
+            output_files = multithread_signal_alignment(signal_align_arguments, [], worker_count, debug=debug,
+                                                        filter_reads_to_string_wrapper_funct=sample.filter_read_generator)
 
-        output_files = multithread_signal_alignment(signal_align_arguments, [], worker_count, debug=debug,
-                                                    filter_reads_to_string_wrapper=sample.filter_read_generator)
+        print("[multithread_signal_alignment_samples] {} generated {} output_files".format(sample.name,
+                                                                                           len(output_files)),
+              flush=True)
         sample.analysis_files = output_files
 
     return samples

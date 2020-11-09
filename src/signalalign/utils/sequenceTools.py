@@ -22,6 +22,71 @@ from signalalign.utils.parsers import read_fasta
 from py3helpers.utils import find_substring_indices, all_string_permutations
 
 
+AMBIG_BASES = {
+    "AG": "R",
+    "CT": "Y",
+    "CG": "S",
+    "AT": "W",
+    "GT": "K",
+    "AC": "M",
+    "CGT": "B",
+    "AGT": "D",
+    "ACT": "H",
+    "ACG": "V",
+    "ACGT": "X",
+    "CEO": "L",
+    "CE": "P",
+    "AI": "Q",
+    "AF": "f",
+    "ACEGOT": "U",
+    "JT": "Z",
+    "A": "A",
+    "T": "T",
+    "C": "C",
+    "G": "G",
+    "E": "E",
+    "O": "O",
+    "F": "F",
+    "J": "J",
+    "I": "I",
+    "R": "R",
+    "Y": "Y",
+    "S": "S",
+    "W": "W",
+    "K": "K",
+    "M": "M",
+    "B": "B",
+    "D": "D",
+    "H": "H",
+    "V": "V",
+    "X": "X",
+    "L": "L",
+    "P": "P",
+    "Q": "Q",
+    "f": "f",
+    "U": "U",
+    "Z": "Z",
+    "p": "p",
+    "b": "b",
+    "d": "d",
+    "e": "e",
+    "h": "h",
+    "i": "i",
+    "j": "j",
+    "k": "k",
+    "l": "l",
+    "m": "m",
+    "n": "n",
+    "o": "o",
+    "Tp": "j",
+    "Gb": "k",
+    "Gd": "l",
+    "Ce": "m",
+    "Th": "n",
+    "Ai": "o"
+}
+
+
 def find_gatc_motifs(sequence):
     """Generate index of 'A' within the 'GATC' motifs in a nucleotide sequence
 
@@ -471,7 +536,7 @@ def count_kmers(dna, k):
 
 
 def parse_full_alignment_file(alignment_file):
-    data = pd.read_table(alignment_file, usecols=(1, 4, 5, 9, 12, 13),
+    data = pd.read_csv(alignment_file, usecols=(1, 4, 5, 9, 12, 13), sep="\t",
                          dtype={'ref_pos': np.int64,
                                 'strand': np.str,
                                 'event_index': np.int64,
@@ -484,7 +549,7 @@ def parse_full_alignment_file(alignment_file):
 
 
 class CustomAmbiguityPositions(object):
-    def __init__(self, ambig_filepath):
+    def __init__(self, ambig_filepath, ambig_model=None):
         """Deal with ambiguous positions from a tsv ambiguity position file with the format of
         contig  position            strand  change_from change_to
         'name'  0 indexed position   +/-    C           E
@@ -493,6 +558,30 @@ class CustomAmbiguityPositions(object):
         :param ambig_filepath: path to ambiguity position file"""
 
         self.ambig_df = self.parseAmbiguityFile(ambig_filepath)
+        self.ambig_model = self.parse_ambig_model(ambig_model)
+
+    @staticmethod
+    def parse_ambig_model(ambig_modelpath):
+        """Parse a tsv which encodes correct one character encoding for multiple character paths
+        :param ambig_modelpath: path to ambiguity model file
+        """
+        if ambig_modelpath:
+            assert os.path.isfile(ambig_modelpath), "ambig_modelpath is not a file: {}".format(ambig_modelpath)
+            data = pd.read_csv(ambig_modelpath, sep="\t",
+                           usecols=(0, 1),
+                           names=["ambig", "mods"],
+                           dtype={"ambig": np.str,
+                                  "mods": np.str})
+            dict1 = {}
+            for x in data.iterrows():
+                dict1["".join(sorted(x[1]["mods"]))] = x[1]["ambig"]
+                dict1[x[1]["ambig"]] = x[1]["ambig"]
+                mods = set(x[1]["mods"])
+                for mod in mods:
+                    dict1[mod] = mod
+            return dict1
+        else:
+            return None
 
     @staticmethod
     def parseAmbiguityFile(ambig_filepath):
@@ -501,7 +590,7 @@ class CustomAmbiguityPositions(object):
 
         :param ambig_filepath: path to ambiguity position file
         """
-        return pd.read_table(ambig_filepath,
+        return pd.read_csv(ambig_filepath, sep="\t",
                              usecols=(0, 1, 2, 3, 4),
                              names=["contig", "position", "strand", "change_from", "change_to"],
                              dtype={"contig": np.str,
@@ -541,7 +630,10 @@ class CustomAmbiguityPositions(object):
                 raise RuntimeError(
                     "[CustomAmbiguityPositions._get_substituted_sequence]Illegal substitution requesting "
                     "change from %s to %s, row: %s" % (raw_sequence[row["position"]], row["change_to"], row))
-            raw_sequence[row["position"]] = row["change_to"]
+            if self.ambig_model:
+                raw_sequence[row["position"]] = self.ambig_model["".join(sorted(row["change_to"]))]
+            else:
+                raw_sequence[row["position"]] = AMBIG_BASES["".join(sorted(row["change_to"]))]
         return "".join(raw_sequence)
 
     def _get_contig_positions(self, contig, strand):
@@ -557,7 +649,7 @@ class CustomAmbiguityPositions(object):
         return df
 
 
-def processReferenceFasta(fasta, work_folder, name, motifs=None, positions_file=None):
+def processReferenceFasta(fasta, work_folder, name, motifs=None, positions_file=None, ambig_model=None):
     """loops over all of the contigs in the reference file, writes the forward and backward sequences
     as flat files (no headers or anything) for signalMachine, returns a dict that has the sequence
     names as keys and the paths to the processed sequence as keys
@@ -566,6 +658,7 @@ def processReferenceFasta(fasta, work_folder, name, motifs=None, positions_file=
     :param work_folder: FolderHandler object
     :param motifs: list of tuple pairs for motif edits. ex [["CCAGG", "CEAGG"]]
     :param positions_file: ambiguous positions file which can be processed via CustomAmbiguityPositions
+    :param ambig_model: model for ambiguous characters
     :return: paths to possibly edited forward reference sequence and backward reference sequence
     """
     positions = None
@@ -580,7 +673,7 @@ def processReferenceFasta(fasta, work_folder, name, motifs=None, positions_file=
         if not os.path.exists(positions_file):
             raise RuntimeError("[processReferenceFasta] Did not find ambiguity position file here: %s" %
                                positions_file)
-        positions = CustomAmbiguityPositions(positions_file)
+        positions = CustomAmbiguityPositions(positions_file, ambig_model=ambig_model)
 
     # process fasta
     fw_fasta_path = work_folder.add_file_path("forward.{}.{}".format(name, os.path.basename(fasta)))

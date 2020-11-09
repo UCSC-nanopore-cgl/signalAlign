@@ -893,6 +893,9 @@ HierarchicalDirichletProcess* new_hier_dir_proc(int64_t num_dps, int64_t depth, 
         fprintf(stderr, "beta parameter of Normal-Inverse Gamma distribution must be positive.\n");
         exit(EXIT_FAILURE);
     }
+    if (alpha <= 1.0){
+      alpha = 1.00001;
+    }
     if (2 * alpha != (int64_t) 2 * alpha || alpha <= 1.0) {
         fprintf(stderr, "Normal-Inverse Gamma parameter 'alpha' must be integer or half-integer > 1.0.\n");
         exit(EXIT_FAILURE);

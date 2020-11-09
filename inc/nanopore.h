@@ -1,6 +1,7 @@
 #ifndef NANOPORE
 #define NANOPORE
 #include "sonLibTypes.h"
+
 #define NB_EVENT_PARAMS 4
 
 #ifndef MACHEP
@@ -63,7 +64,7 @@ void printNanoporeReadAdjustmentParameters(NanoporeReadAdjustmentParameters *npP
 
 // loads a nanopore read (.npRead) from a file
 // TODO refactor format so that it can handle 1D reads also
-NanoporeRead *nanopore_loadNanoporeReadFromFile(const char *nanoporeReadFile);
+NanoporeRead *nanopore_loadNanoporeReadFromFile(const char *nanoporeReadFile, char *alphabet, int64_t alphabetSize);
 
 EventKmerTuple *nanopore_eventKmerTupleConstruct(double mean, double sd, double deltaTime, int64_t kmerIndex);
 

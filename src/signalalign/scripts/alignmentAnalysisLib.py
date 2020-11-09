@@ -203,7 +203,7 @@ class CallMethylation(object):
 
                     # select the rows in the dataFrame that have events aligned to this position
                     crit = self.data['ref_index'].map(lambda x: x in positions)
-                    select = self.data[crit].ix[(self.data['strand'] == strand) & (self.data['prob'] >= threshold)]
+                    select = self.data[crit].loc[(self.data['strand'] == strand) & (self.data['prob'] >= threshold)]
                     # select = select.drop(select[['strand', 'ref_kmer']], axis=1)
                     select = select.drop(select[['strand']], axis=1)
 

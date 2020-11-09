@@ -8,21 +8,20 @@
 # History: Created 03/09/18
 ########################################################################
 
-import unittest
 import os
-import numpy as np
-import tempfile
 import shutil
-import pysam
+import tempfile
+import unittest
 
+import pysam
+from py3helpers.utils import merge_dicts, captured_output
 from signalalign.alignedsignal import *
-from signalalign.visualization.plot_labelled_read import PlotSignal
 from signalalign.signalAlignment import SignalAlignment, create_signalAlignment_args
-from py3helpers.utils import merge_dicts, binary_search
-from py3helpers.seq_tools import ReverseComplement, sam_string_to_aligned_segment
 
 
 class CreateLabelsTest(unittest.TestCase):
+
+    tmp_directory = None
 
     @classmethod
     def setUpClass(cls):
@@ -31,13 +30,21 @@ class CreateLabelsTest(unittest.TestCase):
         cls.fasta = os.path.join(cls.HOME,
                                  "tests/test_sequences/E.coli_K12.fasta")
         dna_file = os.path.join(cls.HOME,
-                                "tests/minion_test_reads/1D/LomanLabz_PC_20161025_FNFAB42699_MN17633_sequencing_run_20161025_E_coli_native_450bps_82361_ch112_read108_strand.fast5")
+                                "tests/minion_test_reads/1D"
+                                "/LomanLabz_PC_20161025_FNFAB42699_MN17633_sequencing_run_20161025_E_coli_native_"
+                                "450bps_82361_ch112_read108_strand.fast5")
         rev_dna_file = os.path.join(cls.HOME,
-                                    "tests/minion_test_reads/1D/LomanLabz_PC_20161025_FNFAB42699_MN17633_sequencing_run_20161025_E_coli_native_450bps_82361_ch6_read347_strand.fast5")
+                                    "tests/minion_test_reads/1D"
+                                    "/LomanLabz_PC_20161025_FNFAB42699_MN17633_sequencing_run_20161025_E_coli_native_"
+                                    "450bps_82361_ch6_read347_strand.fast5")
         rev_rna_file = os.path.join(cls.HOME,
-                                "tests/minion_test_reads/RNA_no_events/DEAMERNANOPORE_20170922_FAH26525_MN16450_sequencing_run_MA_821_R94_NA12878_mRNA_09_22_17_67136_read_61_ch_151_strand.fast5")
+                                    "tests/minion_test_reads/RNA_no_events"
+                                    "/DEAMERNANOPORE_20170922_FAH26525_MN16450_sequencing_run_MA_821_R94_NA12878_mRNA_"
+                                    "09_22_17_67136_read_61_ch_151_strand.fast5")
         forward_rna_file = os.path.join(cls.HOME,
-                                "tests/minion_test_reads/RNA_no_events/DEAMERNANOPORE_20170922_FAH26525_MN16450_sequencing_run_MA_821_R94_NA12878_mRNA_09_22_17_67136_read_36_ch_218_strand.fast5")
+                                        "tests/minion_test_reads/RNA_no_events/DEAMERNANOPORE_20170922_FAH26525_"
+                                        "MN16450_sequencing_run_MA_821_R94_NA12878_mRNA_09_22_17_67136_read_36_"
+                                        "ch_218_strand.fast5")
 
         rna_reference = os.path.join(cls.HOME, "tests/test_sequences/fake_rna_ref.fa")
         ecoli_dna_reference = os.path.join(cls.HOME, "tests/test_sequences/E.coli_K12.fasta")
@@ -45,7 +52,7 @@ class CreateLabelsTest(unittest.TestCase):
         cls.rna_reference_handle = pysam.FastaFile(rna_reference)
         cls.tmp_directory = tempfile.mkdtemp()
 
-         # get file locations
+        # get file locations
         cls.tmp_dna_file = os.path.join(str(cls.tmp_directory), 'test_dna.fast5')
         cls.tmp_dna_file2 = os.path.join(str(cls.tmp_directory), 'test_dna2.fast5')
 
@@ -76,26 +83,27 @@ class CreateLabelsTest(unittest.TestCase):
                                            path_to_bin=cls.bin_path,
                                            diagonal_expansion=5,
                                            delete_tmp=False)
-        sa_h = SignalAlignment(**merge_dicts([args, {'in_fast5': cls.tmp_rna_file1}]))
-        sa_h.run()
+        with captured_output() as (_, _):
+            sa_h = SignalAlignment(**merge_dicts([args, {'in_fast5': cls.tmp_rna_file1}]))
+            sa_h.run()
 
-        sa_h = SignalAlignment(**merge_dicts([args, {'in_fast5': cls.tmp_rna_file2}]))
-        sa_h.run()
+            sa_h = SignalAlignment(**merge_dicts([args, {'in_fast5': cls.tmp_rna_file2}]))
+            sa_h.run()
 
-        args = create_signalAlignment_args(destination=cls.tmp_directory,
-                                           in_templateHmm=cls.dna_model_file_94,
-                                           alignment_file=cls.dna_sam,
-                                           forward_reference=ecoli_dna_reference,
-                                           embed=True,
-                                           path_to_bin=cls.bin_path,
-                                           diagonal_expansion=10,
-                                           traceBackDiagonals=100,
-                                           constraint_trim=3)
-        sa_h = SignalAlignment(**merge_dicts([args, {'in_fast5': cls.tmp_dna_file}]))
-        sa_h.run()
+            args = create_signalAlignment_args(destination=cls.tmp_directory,
+                                               in_templateHmm=cls.dna_model_file_94,
+                                               alignment_file=cls.dna_sam,
+                                               forward_reference=ecoli_dna_reference,
+                                               embed=True,
+                                               path_to_bin=cls.bin_path,
+                                               diagonal_expansion=10,
+                                               traceBackDiagonals=100,
+                                               constraint_trim=3)
+            sa_h = SignalAlignment(**merge_dicts([args, {'in_fast5': cls.tmp_dna_file}]))
+            sa_h.run()
 
-        sa_h = SignalAlignment(**merge_dicts([args, {'in_fast5': cls.tmp_dna_file2}]))
-        sa_h.run()
+            sa_h = SignalAlignment(**merge_dicts([args, {'in_fast5': cls.tmp_dna_file2}]))
+            sa_h.run()
 
         cls.dna_handle = CreateLabels(cls.tmp_dna_file, kmer_index=cls.kmer_index)
         cls.dna_handle2 = CreateLabels(cls.tmp_dna_file2, kmer_index=cls.kmer_index)
@@ -105,9 +113,10 @@ class CreateLabelsTest(unittest.TestCase):
         cls.rev_comp = ReverseComplement()
 
         cls.tmp_dna_file3 = os.path.join(cls.HOME,
-                                         "tests/minion_test_reads/embedded_files/miten_PC_20160820_FNFAD20259_MN17223_sequencing_run_AMS_158_R9_WGA_Ecoli_08_20_16_43623_ch100_read2324_strand.fast5")
+                                         "tests/minion_test_reads/embedded_files/miten_PC_20160820_FNFAD20259_"
+                                         "MN17223_sequencing_run_AMS_158_R9_WGA_Ecoli_08_20_16_43623_ch100_"
+                                         "read2324_strand.fast5")
         cls.dna3_handle = CreateLabels(cls.tmp_dna_file3, kmer_index=cls.kmer_index)
-
 
     def test_initialize(self):
         self.assertEqual(self.dna_handle.aligned_signal.raw_signal[0], 1172)
@@ -122,10 +131,9 @@ class CreateLabelsTest(unittest.TestCase):
         self.dna_handle2.aligned_signal.minus_strand = False
         for row in mea_alignment1:
             kmer = row["kmer"].decode()
-            base = kmer[self.kmer_index]
 
             ref_kmer = self.dna_reference_handle.fetch(reference="gi_ecoli", start=row["reference_index"],
-                                                       end=row["reference_index"]+5)
+                                                       end=row["reference_index"] + 5)
             self.assertEqual(kmer, ref_kmer)
         # changes in place
         self.dna_handle.fix_sa_reference_indexes(mea_alignment1)
@@ -133,7 +141,7 @@ class CreateLabelsTest(unittest.TestCase):
             kmer = row["kmer"].decode()
             base = kmer[self.kmer_index]
             ref_base = self.dna_reference_handle.fetch(reference="gi_ecoli", start=row["reference_index"],
-                                                       end=row["reference_index"]+1)
+                                                       end=row["reference_index"] + 1)
             self.assertEqual(base, ref_base)
 
     def test_fix_sa_reference_indexes_dna_reverse(self):
@@ -143,7 +151,7 @@ class CreateLabelsTest(unittest.TestCase):
         for row in mea_alignment2:
             kmer = row["kmer"].decode()
             ref_kmer = self.dna_reference_handle.fetch(reference="gi_ecoli", start=row["reference_index"],
-                                                       end=row["reference_index"]+5)
+                                                       end=row["reference_index"] + 5)
             minus_strand_kmer = self.rev_comp.reverse_complement(ref_kmer)
             self.assertEqual(kmer, minus_strand_kmer)
         # changes in place
@@ -152,7 +160,7 @@ class CreateLabelsTest(unittest.TestCase):
             kmer = row["kmer"].decode()
             base = kmer[self.kmer_index]
             ref_base = self.dna_reference_handle.fetch(reference="gi_ecoli", start=row["reference_index"],
-                                                       end=row["reference_index"]+1)
+                                                       end=row["reference_index"] + 1)
             minus_strand_base = self.rev_comp.reverse_complement(ref_base)
 
             self.assertEqual(base, minus_strand_base)
@@ -164,7 +172,7 @@ class CreateLabelsTest(unittest.TestCase):
         for row in mea_alignment1:
             kmer = row["kmer"].decode()
             ref_kmer = self.rna_reference_handle.fetch(reference="rna_fake", start=row["reference_index"],
-                                                       end=row["reference_index"]+5)
+                                                       end=row["reference_index"] + 5)
             # reverse kmer because it is 3'-5' for RNA
             self.assertEqual(kmer[::-1], ref_kmer)
         # changes in place
@@ -173,7 +181,7 @@ class CreateLabelsTest(unittest.TestCase):
             kmer = row["kmer"].decode()
             base = kmer[self.kmer_index]
             ref_base = self.rna_reference_handle.fetch(reference="rna_fake", start=row["reference_index"],
-                                                       end=row["reference_index"]+1)
+                                                       end=row["reference_index"] + 1)
 
             self.assertEqual(base, ref_base)
 
@@ -184,7 +192,7 @@ class CreateLabelsTest(unittest.TestCase):
         for row in mea_alignment2:
             kmer = row["kmer"].decode()
             ref_kmer = self.rna_reference_handle.fetch(reference="rna_fake", start=row["reference_index"],
-                                                       end=row["reference_index"]+5)
+                                                       end=row["reference_index"] + 5)
             minus_strand_kmer = self.rev_comp.reverse_complement(ref_kmer)
 
             # reverse kmer because it is 3'-5' for RNA
@@ -195,58 +203,58 @@ class CreateLabelsTest(unittest.TestCase):
             kmer = row["kmer"].decode()
             base = kmer[self.kmer_index]
             ref_base = self.rna_reference_handle.fetch(reference="rna_fake", start=row["reference_index"],
-                                                       end=row["reference_index"]+1)
+                                                       end=row["reference_index"] + 1)
             minus_strand_base = self.rev_comp.reverse_complement(ref_base)
             self.assertEqual(base, minus_strand_base)
 
     def test_add_signal_align_predictions(self):
         self.dna_handle.add_signal_align_predictions(add_basecall=False)
         self.assertSequenceEqual(self.dna_handle.aligned_signal.prediction["full_signalalign"][0].tolist(),
-                                 [774, 3, 3560628+self.kmer_index, 1., b'CGTTT'])
+                                 [774, 3, 3560628 + self.kmer_index, 1., b'CGTTT'])
 
         self.dna_handle2.add_signal_align_predictions(add_basecall=False)
         self.assertSequenceEqual(self.dna_handle2.aligned_signal.prediction["full_signalalign"][0].tolist(),
-                                 [153, 3, 1845108+self.kmer_index, 0.992924, b'CATTG'])
+                                 [153, 3, 1845108 + self.kmer_index, 0.992124, b'CATTG'])
 
         self.rna1_handle.add_signal_align_predictions(add_basecall=False)
         self.assertSequenceEqual(self.rna1_handle.aligned_signal.prediction["full_signalalign"][0].tolist(),
-                                 [0, 11, 1081+self.kmer_index, 0.999781, b'AACCT'])
+                                 [0, 11, 1081 + self.kmer_index, 1.0, b'AACCT'])
         self.rna2_handle.add_signal_align_predictions(add_basecall=False)
         self.assertSequenceEqual(self.rna2_handle.aligned_signal.prediction["full_signalalign"][0].tolist(),
-                                 [0, 7, 3+self.kmer_index, 1.0, b'AACCT'])
+                                 [0, 7, 3 + self.kmer_index, 1.0, b'AACCT'])
 
     def test_add_mea_labels(self):
         """Test add mea labels"""
         self.dna_handle.add_mea_labels()
         self.assertSequenceEqual(self.dna_handle.aligned_signal.label["mea_signalalign"][0].tolist(),
-                                 [774, 3, 3560628+self.kmer_index, 1., b'CGTTT'])
+                                 [774, 3, 3560628 + self.kmer_index, 1., b'CGTTT'])
 
         self.dna_handle2.add_mea_labels()
         self.assertSequenceEqual(self.dna_handle2.aligned_signal.label["mea_signalalign"][0].tolist(),
-                                 [153, 3, 1845108+self.kmer_index, 0.992924, b'CATTG'])
+                                 [153, 3, 1845108 + self.kmer_index, 0.992124, b'CATTG'])
 
         self.rna1_handle.add_mea_labels()
         self.assertSequenceEqual(self.rna1_handle.aligned_signal.label["mea_signalalign"][0].tolist(),
-                                 [0, 11, 1081+self.kmer_index, 0.999781, b'AACCT'])
+                                 [0, 11, 1081 + self.kmer_index, 1.0, b'AACCT'])
         self.rna2_handle.add_mea_labels()
         self.assertSequenceEqual(self.rna2_handle.aligned_signal.label["mea_signalalign"][0].tolist(),
-                                 [0, 7, 3+self.kmer_index, 1.0, b'AACCT'])
+                                 [0, 7, 3 + self.kmer_index, 1.0, b'AACCT'])
 
     def test_add_basecall_alignment_prediction(self):
         self.rna1_handle.add_basecall_alignment_prediction()
         self.assertSequenceEqual(self.rna1_handle.aligned_signal.prediction["matches_guide_alignment"][0].tolist(),
-                                 [0, 11, 1081+self.kmer_index, 0.025408448110250344, b'C'])
+                                 [0, 11, 1081 + self.kmer_index, 0.025408448110250344, b'C'])
         self.rna2_handle.add_basecall_alignment_prediction()
         self.assertSequenceEqual(self.rna2_handle.aligned_signal.prediction["matches_guide_alignment"][0].tolist(),
-                                 [0, 7, 3+self.kmer_index, 0.026885957628966044, b'C'])
+                                 [0, 7, 3 + self.kmer_index, 0.026885957628966044, b'C'])
 
         self.dna_handle.add_basecall_alignment_prediction()
         self.assertSequenceEqual(self.dna_handle.aligned_signal.prediction["matches_guide_alignment"][0].tolist(),
-                                 [774, 3, 3560628+self.kmer_index, 0.8552098274230957, b'T'])
+                                 [774, 3, 3560628 + self.kmer_index, 0.8552098274230957, b'T'])
 
         self.dna_handle2.add_basecall_alignment_prediction()
         self.assertSequenceEqual(self.dna_handle2.aligned_signal.prediction["matches_guide_alignment"][0].tolist(),
-                                 [153, 3, 1845108+self.kmer_index, 0.11882638931274414, b'T'])
+                                 [153, 3, 1845108 + self.kmer_index, 0.11882638931274414, b'T'])
 
     def test_match_cigar_with_basecall_guide_rna1(self):
         events = self.rna1_handle.get_basecall_data()
@@ -256,7 +264,7 @@ class CreateLabelsTest(unittest.TestCase):
                                                                          rna=rna, one_ref_indexing=False)
         for match in matches:
             ref_base = self.rna_reference_handle.fetch(reference="rna_fake", start=match["reference_index"],
-                                                       end=match["reference_index"]+1)
+                                                       end=match["reference_index"] + 1)
             self.assertEqual(match["kmer"].decode(), ref_base)
 
     def test_match_cigar_with_basecall_guide_rna2(self):
@@ -267,7 +275,7 @@ class CreateLabelsTest(unittest.TestCase):
                                                                          rna=rna, one_ref_indexing=False)
         for match in matches:
             ref_base = self.rna_reference_handle.fetch(reference="rna_fake", start=match["reference_index"],
-                                                       end=match["reference_index"]+1)
+                                                       end=match["reference_index"] + 1)
             self.assertEqual(match["kmer"].decode(), self.rev_comp.complement(ref_base))
 
     def test_match_cigar_with_basecall_guide_dna1(self):
@@ -281,7 +289,7 @@ class CreateLabelsTest(unittest.TestCase):
                                                                          rna=rna, one_ref_indexing=False)
         for match in matches:
             ref_base = self.dna_reference_handle.fetch(reference="gi_ecoli", start=match["reference_index"],
-                                                       end=match["reference_index"]+1)
+                                                       end=match["reference_index"] + 1)
             self.assertEqual(match["kmer"].decode(), ref_base)
 
     def test_match_cigar_with_basecall_guide_dna2(self):
@@ -295,7 +303,7 @@ class CreateLabelsTest(unittest.TestCase):
                                                                          rna=rna, one_ref_indexing=False)
         for match in matches:
             ref_base = self.dna_reference_handle.fetch(reference="gi_ecoli", start=match["reference_index"],
-                                                       end=match["reference_index"]+1)
+                                                       end=match["reference_index"] + 1)
             self.assertEqual(match["kmer"].decode(), self.rev_comp.complement(ref_base))
 
     def test_index_bases_from_events(self):
@@ -337,7 +345,9 @@ class CreateLabelsTest(unittest.TestCase):
     def test_get_distance_from_guide_alignment(self):
         data = self.dna3_handle.add_variant_data(number=0)
         basecall_data = self.dna3_handle.add_basecall_alignment_prediction(number=0)
-        get_distance_from_guide_alignment(pd.DataFrame(data),pd.DataFrame(basecall_data[0]), reference_index_key="position", minus_strand=self.dna3_handle.aligned_signal.minus_strand)
+        get_distance_from_guide_alignment(pd.DataFrame(data), pd.DataFrame(basecall_data[0]),
+                                          reference_index_key="position",
+                                          minus_strand=self.dna3_handle.aligned_signal.minus_strand)
 
     def test_add_variant_data(self):
         data = self.dna3_handle.add_variant_data(number=0)
@@ -356,11 +366,15 @@ class AlignedSignalTest(unittest.TestCase):
         super(AlignedSignalTest, cls).setUpClass()
         cls.HOME = '/'.join(os.path.abspath(__file__).split("/")[:-2])
         cls.dna_file = os.path.join(cls.HOME,
-                                    "tests/test_files/minion-reads/canonical/miten_PC_20160820_FNFAD20259_MN17223_sequencing_run_AMS_158_R9_WGA_Ecoli_08_20_16_43623_ch100_read280_strand.fast5")
+                                    "tests/test_files/minion-reads/canonical/miten_PC_20160820_FNFAD20259_MN17223_"
+                                    "sequencing_run_AMS_158_R9_WGA_Ecoli_08_20_16_43623_ch100_read280_strand.fast5")
         cls.modified_file = os.path.join(cls.HOME,
-                                         "tests/test_files/minion-reads/methylated/DEAMERNANOPORE_20160805_FNFAD19383_MN16450_sequencing_run_MA_821_R9_gEcoli_MG1655_08_05_16_89825_ch100_read5189_strand.fast5")
+                                         "tests/test_files/minion-reads/methylated/DEAMERNANOPORE_20160805_FNFAD19383_"
+                                         "MN16450_sequencing_run_MA_821_R9_gEcoli_MG1655_08_05_16_89825_ch100_read5189_"
+                                         "strand.fast5")
         cls.rna_file = os.path.join(cls.HOME,
-                                    "tests/test_files/minion-reads/rna_reads/DEAMERNANOPORE_20170922_FAH26525_MN16450_sequencing_run_MA_821_R94_NA12878_mRNA_09_22_17_67136_read_61_ch_151_strand.fast5")
+                                    "tests/test_files/minion-reads/rna_reads/DEAMERNANOPORE_20170922_FAH26525_MN16450_"
+                                    "sequencing_run_MA_821_R94_NA12878_mRNA_09_22_17_67136_read_61_ch_151_strand.fast5")
         cls.handle = AlignedSignal(scaled_signal=[1.1, 2.2, 1.1, 2.2, 1.1, 2.2])
 
     def test__add_label(self):
@@ -455,4 +469,3 @@ class AlignedSignalTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-    raise SystemExit

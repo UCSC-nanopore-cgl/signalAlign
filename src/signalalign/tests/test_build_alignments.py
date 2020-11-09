@@ -11,16 +11,14 @@
 
 import unittest
 import tempfile
-import os
 import numpy as np
-import pandas as pd
-from multiprocessing import Manager, Process, current_process
 from signalalign.build_alignments import *
-from signalalign.train.trainModels import get_kmers, get_assignment_table, multiprocess_make_kmer_assignment_tables
-from py3helpers.utils import time_it
+from signalalign.train.trainModels import get_kmers, multiprocess_make_kmer_assignment_tables
+from py3helpers.utils import time_it, count_lines_in_file, captured_output
+from embed import bindings
+
 
 class TrainSignalAlignTest(unittest.TestCase):
-
     @classmethod
     def setUpClass(cls):
         super(TrainSignalAlignTest, cls).setUpClass()
@@ -50,129 +48,165 @@ class TrainSignalAlignTest(unittest.TestCase):
                                            "d6160b0b-a35e-43b5-947f-adaa1abade28.sm.assignments.tsv")
 
     def test_add_to_queue(self):
-        work_queue = Manager().Queue()
-        worker_count = 2
-        for w in range(worker_count):
-            p = Process(target=add_to_queue, args=(work_queue, ), daemon=True)
-            p.start()
-        data = get_from_queue(work_queue, worker_count)
-        # print(data)
-        self.assertSequenceEqual(sorted(list(range(10))+list(range(10))), sorted(data))
+        with captured_output() as (_, _):
+            work_queue = Manager().Queue()
+            worker_count = 2
+            for w in range(worker_count):
+                p = Process(target=add_to_queue, args=(work_queue,), daemon=True)
+                p.start()
+            data = get_from_queue(work_queue, worker_count)
+            # print(data)
+            self.assertSequenceEqual(sorted(list(range(10)) + list(range(10))), sorted(data))
 
     def test_alignment_file_to_queues(self):
-        max_size = 10
-        work_queues = [Manager().Queue(max_size) for _ in range(2)]
+        with captured_output() as (_, _):
+            max_size = 10
+            work_queues = [Manager().Queue(max_size) for _ in range(2)]
 
-        alignment_file_to_queues(self.alignments_path, work_queues, min_prob=0.9)
-        first_one = work_queues[0].get()
-        self.assertSequenceEqual(first_one, ["TGAAAA", "t", 75.375476, 0.999576])
+            alignment_file_to_queues(self.alignments_path, work_queues, min_prob=0.9)
+            first_one = work_queues[0].get()
+            self.assertSequenceEqual(first_one, ["TGAAAA", "t", 75.375476, 0.999576])
 
     def test_assignment_file_to_queues(self):
-        max_size = 10
-        work_queues = [Manager().Queue(max_size) for _ in range(2)]
+        with captured_output() as (_, _):
+            max_size = 10
+            work_queues = [Manager().Queue(max_size) for _ in range(2)]
 
-        assignment_file_to_queues(self.assignment_path, work_queues, min_prob=0.9)
+            assignment_file_to_queues(self.assignment_path, work_queues, min_prob=0.9)
 
-        first_one = work_queues[0].get()
-        self.assertSequenceEqual(first_one, ["GCCTTA", "t",	83.709275, 1.000000])
+            first_one = work_queues[0].get()
+            self.assertSequenceEqual(first_one, ["GCCTTA", "t", 83.709275, 1.000000])
 
     def test_get_nlargest_queue(self):
-        work_queue = Manager().Queue()
-        all_data = []
-        for x in np.random.randint(100, size=100):
-            work_queue.put(x)
-            all_data.append(x)
+        with captured_output() as (_, _):
+            work_queue = Manager().Queue()
+            all_data = []
+            for x in np.random.randint(100, size=100):
+                work_queue.put(x)
+                all_data.append(x)
 
-        data = get_nlargest_queue(work_queue, topn=100)
-        self.assertSequenceEqual(data, sorted(all_data)[::-1])
+            data = get_nlargest_queue(work_queue, topn=100)
+            self.assertSequenceEqual(data, sorted(all_data)[::-1])
 
     def test_get_nlargest_alignment_queue(self):
-        work_queue = Manager().Queue()
-        all_data = []
-        for x in np.random.randint(100, size=100):
-            data = ["GCCTTA", "t",	"83.709275", x]
-            work_queue.put(data)
-            all_data.append(data)
+        with captured_output() as (_, _):
+            work_queue = Manager().Queue()
+            all_data = []
+            for x in np.random.randint(100, size=100):
+                data = ["GCCTTA", "t", "83.709275", x]
+                work_queue.put(data)
+                all_data.append(data)
 
-        data = get_nlargest_alignment_queue(work_queue, topn=100)
-        self.assertSequenceEqual(data, sorted(all_data)[::-1])
+            data = get_nlargest_alignment_queue(work_queue, topn=100)
+            self.assertSequenceEqual(data, sorted(all_data)[::-1])
 
     def test_make_kmer_directories(self):
-        with tempfile.TemporaryDirectory() as temdir:
-            dirs = make_kmer_directories(temdir, "ACGT", 6, complement=False)
-            for new_dir in dirs:
-                self.assertTrue(os.path.isdir(new_dir))
+        with captured_output() as (_, _):
+            with tempfile.TemporaryDirectory() as temdir:
+                dirs = make_kmer_directories(temdir, "ACGT", 6, complement=False)
+                for new_dir in dirs:
+                    self.assertTrue(os.path.isdir(new_dir))
 
     def test_split_assignment_file(self):
-        with tempfile.TemporaryDirectory() as temdir:
-            dirs = make_kmer_directories(temdir, "ACGT", 6, complement=False)
-            split_assignment_file(self.assignment_path, dirs, "ACGT", 6, 4, min_prob=0.0)
-            self.assertTrue(os.path.exists(os.path.join(os.path.join(temdir, "GCCTTA"), os.path.basename(self.assignment_path))))
-        with tempfile.TemporaryDirectory() as temdir:
-            dirs = make_kmer_directories(temdir, "ACGT", 6, complement=False)
-            split_assignment_file(self.alignments_path, dirs, "ACGT", 6, 4, min_prob=0.0, alignment=True)
-            self.assertTrue(os.path.exists(os.path.join(os.path.join(temdir, "TGAAAA"), os.path.basename(self.alignments_path))))
+        with captured_output() as (_, _):
+            with tempfile.TemporaryDirectory() as temdir:
+                dirs = make_kmer_directories(temdir, "ACGT", 6, complement=False)
+                split_assignment_file(self.assignment_path, dirs, "ACGT", 6, 4, min_prob=0.0)
+                self.assertTrue(
+                    os.path.exists(os.path.join(os.path.join(temdir, "GCCTTA"), os.path.basename(self.assignment_path))))
+            with tempfile.TemporaryDirectory() as temdir:
+                dirs = make_kmer_directories(temdir, "ACGT", 6, complement=False)
+                split_assignment_file(self.alignments_path, dirs, "ACGT", 6, 4, min_prob=0.0, alignment=True)
+                self.assertTrue(
+                    os.path.exists(os.path.join(os.path.join(temdir, "TGAAAA"), os.path.basename(self.alignments_path))))
 
     def test_multiprocess_split_assignment_file(self):
-        with tempfile.TemporaryDirectory() as temdir:
-            dirs = make_kmer_directories(temdir, "ACGT", 6, complement=False)
-            multiprocess_split_sa_tsv_file([self.assignment_path], dirs, "ACGT", 6, min_prob=0.0, worker_count=1)
-            self.assertTrue(os.path.exists(os.path.join(os.path.join(temdir, "GCCTTA"), os.path.basename(self.assignment_path))))
-
-        with tempfile.TemporaryDirectory() as temdir:
-            dirs = make_kmer_directories(temdir, "ACGT", 6, complement=True)
-            multiprocess_split_sa_tsv_file([self.alignments_path], dirs, "ACGT", 6, min_prob=0.0,
+        with captured_output() as (_, _):
+            with tempfile.TemporaryDirectory() as temdir:
+                dirs = make_kmer_directories(temdir, "ACGT", 6, complement=False)
+                multiprocess_split_sa_tsv_file([self.assignment_path], dirs, "ACGT", 6, min_prob=0.0, worker_count=1)
+                self.assertTrue(os.path.exists(os.path.join(os.path.join(temdir, "GCCTTA"),
+                                                            os.path.basename(self.assignment_path))))
+            with tempfile.TemporaryDirectory() as temdir:
+                dirs = make_kmer_directories(temdir, "ACGT", 6, complement=True)
+                multiprocess_split_sa_tsv_file([self.alignments_path], dirs, "ACGT", 6, min_prob=0.0,
                                                worker_count=1, alignment=True)
-            self.assertTrue(os.path.exists(os.path.join(os.path.join(temdir, "TGAAAA"), os.path.basename(self.alignments_path))))
+                self.assertTrue(
+                    os.path.exists(os.path.join(os.path.join(temdir, "TGAAAA"),
+                                                os.path.basename(self.alignments_path))))
 
     def test_get_top_kmers_from_directory(self):
-        with tempfile.TemporaryDirectory() as temdir:
-            dirs = make_kmer_directories(temdir, "ACGT", 6, complement=False)
-            split_assignment_file(self.assignment_path, dirs, "ACGT", 6, 4, min_prob=0.0)
-            get_top_kmers_from_directory(dirs[2428], temdir, 10, random=False)
-            data = []
-            with open(os.path.join(temdir, "GCCTTA.tsv"), "r") as fh:
-                line = fh.readline()
-                data.append(line.split()[3])
+        with captured_output() as (_, _):
+            with tempfile.TemporaryDirectory() as temdir:
+                    dirs = make_kmer_directories(temdir, "ACGT", 6, complement=False)
+                    split_assignment_file(self.assignment_path, dirs, "ACGT", 6, 4, min_prob=0.0)
+                    get_top_kmers_from_directory(dirs[2428], temdir, 10, random=False)
+                    data = []
+                    with open(os.path.join(temdir, "GCCTTA.tsv"), "r") as fh:
+                        line = fh.readline()
+                        data.append(line.split()[3])
 
-            self.assertSequenceEqual(sorted(data)[::-1], data)
+                    self.assertSequenceEqual(sorted(data)[::-1], data)
 
     def test_multiprocess_get_top_kmers_from_directory(self):
-        with tempfile.TemporaryDirectory() as temdir:
-            dirs = make_kmer_directories(temdir, "ACGT", 6, complement=False)
-            split_assignment_file(self.assignment_path, dirs, "ACGT", 6, 4, min_prob=0.0)
-            multiprocess_get_top_kmers_from_directory(dirs, temdir, 10, random=False)
-            data = []
-            with open(os.path.join(temdir, "GCCTTA.tsv"), "r") as fh:
-                line = fh.readline()
-                data.append(line.split()[3])
+        with captured_output() as (_, _):
+            with tempfile.TemporaryDirectory() as temdir:
+                    dirs = make_kmer_directories(temdir, "ACGT", 6, complement=False)
+                    split_assignment_file(self.assignment_path, dirs, "ACGT", 6, 4, min_prob=0.0)
+                    multiprocess_get_top_kmers_from_directory(dirs, temdir, 10, random=False)
+                    data = []
+                    with open(os.path.join(temdir, "GCCTTA.tsv"), "r") as fh:
+                        line = fh.readline()
+                        data.append(line.split()[3])
 
-            self.assertSequenceEqual(sorted(data)[::-1], data)
+                    self.assertSequenceEqual(sorted(data)[::-1], data)
 
     def test_generate_top_n_kmers_from_sa_output(self):
-        with tempfile.TemporaryDirectory() as temdir:
-            output_file = os.path.join(temdir, "built_alignment.tsv")
-            generate_top_n_kmers_from_sa_output([self.alignments_path], temdir, output_file, 10,
-                                                kmer_len=6, min_prob=0.8, worker_count=1, random=False)
+        with captured_output() as (_, _):
+            with tempfile.TemporaryDirectory() as temdir:
+                    output_file = os.path.join(temdir, "built_alignment.tsv")
+                    generate_top_n_kmers_from_sa_output([self.alignments_path], temdir, output_file, 10,
+                                                        kmer_len=6, min_prob=0.8, worker_count=1, random=False)
 
     def test_generate_buildAlignments4(self):
-        kmers = get_kmers(6, alphabet="ATGC")
-        data_files = [self.alignments_path]
+        with captured_output() as (_, _):
+            kmers = get_kmers(6, alphabet="ATGC")
+            data_files = [self.alignments_path]
+            data, time1 = time_it(multiprocess_make_kmer_assignment_tables,
+                                  data_files, kmers,
+                                  {"t", "c"}, 0.0, True, True, 10, 2)
 
-        data, time = time_it(multiprocess_make_kmer_assignment_tables,
-                          data_files, kmers,
-                             {"t", "c"}, 0.0, False, True, 10, 8)
+            with tempfile.TemporaryDirectory() as temdir:
+                output_file = os.path.join(temdir, "built_alignment.tsv")
+                data2, time2 = time_it(generate_top_n_kmers_from_sa_output,
+                                       data_files, temdir, output_file, 10, "ACGT", 6, 0.0, 8, False, True, False, True)
 
-        with tempfile.TemporaryDirectory() as temdir:
-            output_file = os.path.join(temdir, "built_alignment.tsv")
-            data2, time2 = time_it(generate_top_n_kmers_from_sa_output,
-                               data_files, temdir, output_file, 10, "ACGT", 6, 0.0, 8, False, True, False, True)
+                # get kmers associated with each sample
+                num_lines = len(list(open(output_file)))
+            self.assertEqual(len(data.index), num_lines)
+            self.assertLess(time2, time1)
 
-        # get kmers associated with each sample
-            num_lines = len(list(open(output_file)))
-        print(time2, time)
-        self.assertEqual(len(data.index), num_lines)
-        self.assertLess(time2, time)
+    def test_generate_buildAlignments5(self):
+        with captured_output() as (_, _):
+            data_files = [self.assignment_path]
+            data, time1 = time_it(multiprocess_make_kmer_assignment_tables,
+                                  data_files, get_kmers(6, alphabet="ATGC"),
+                                  {"t", "c"}, 0.5, True, False, 10, 2)
+
+            # get kmers associated with each sample
+            lines = len(data.index)
+            with tempfile.TemporaryDirectory() as temdir:
+                out_path = os.path.join(temdir, "test.tsv")
+                log_path = os.path.join(temdir, "log.tsv")
+
+                data2, time2 = time_it(bindings.generate_master_kmer_table,
+                                       [self.assignment_path], out_path, log_path, 10, "ACGT", 0.5, 2, False)
+
+                # get kmers associated with each sample
+                lines2 = count_lines_in_file(out_path)
+
+            self.assertLess(time2, time1)
+            self.assertEqual(lines, lines2)
 
 
 if __name__ == '__main__':

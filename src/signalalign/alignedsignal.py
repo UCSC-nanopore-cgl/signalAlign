@@ -8,9 +8,6 @@
 # History: Created 03/09/18
 ########################################################################
 
-import sys
-import os
-import subprocess
 import numpy as np
 import pandas as pd
 from collections import defaultdict
@@ -30,7 +27,7 @@ class AlignedSignal(object):
 
         :param scaled_signal: scaled signal to pA
         """
-        self.scaled_signal = None
+        self.scaled_signal = scaled_signal
         self.raw_signal = None
         self._add_scaled_signal(scaled_signal)
         self.signal_length = len(self.scaled_signal)
@@ -73,6 +70,7 @@ class AlignedSignal(object):
     def add_label(self, label, name, label_type, guide_name=None, check_strand=True):
         """Add labels to class.
 
+        :param check_strand: boolean option to check the strand of the added label
         :param label: label numpy array with required fields ['raw_start', 'raw_length', 'reference_index',
                                                               'kmer', 'posterior_probability']
         :param name: name of the label for signal
@@ -161,16 +159,16 @@ class AlignedSignal(object):
 class CreateLabels(Fast5):
     """Create an Aligned Signal object from a fast5 file with """
 
-    def __init__(self, fast5_path, kmer_index=2):
+    def __init__(self, fast5_path, kmer_index=2, rna=False):
         """Initialize fast5 object and keep track of AlignedSignal object
         :param fast5_path: path to fast5 file
-        :param reference: path to reference so we can run signalAlign
-        :param alignment_file: alignment file to run signalAlign or for alignment info
+        :param kmer_index: nuc index of kmer for mapping
+        :param rna: boolean option
         """
         self.fast5_path = fast5_path
         super(CreateLabels, self).__init__(fast5_path)
         self.kmer_index = kmer_index
-        self.rna = self.is_read_rna()
+        self.rna = self.is_read_rna() or rna
         self.aligned_signal = self._initialize()
         self.has_guide_alignment = False
 
@@ -267,7 +265,7 @@ class CreateLabels(Fast5):
         if add_basecall:
             try:
                 events = self[basecall_events_path][()]
-            except:
+            except Exception:
                 raise ValueError('Could not retrieve basecall_1D data from events')
             self.add_basecall_alignment_prediction(my_events=events,
                                                    number=basecall_events_path[24],
@@ -282,7 +280,7 @@ class CreateLabels(Fast5):
         return predictions
 
     def add_basecall_alignment_prediction(self, sam=None, number=None, add_mismatches=False, my_events=None, trim=None):
-        """Add the original basecalled event table and add matches and missmatches to 'prediction'
+        """Add the original basecalled event table and add matches and mismatches to 'prediction'
             alignment labels to signal_label handle
         :param sam: correctly formatted SAM string
         :param number: integer representing which signal align predictions to plot
@@ -334,7 +332,7 @@ class CreateLabels(Fast5):
         events_path = self.__default_template_1d_basecall_events__.format(number)
         try:
             events = self[events_path][()]
-        except:
+        except Exception:
             raise ValueError('Could not retrieve basecall_1D data from {}'.format(events_path))
         try:
             check_numpy_table(events, req_fields=('raw_start', 'raw_length'))
@@ -352,7 +350,10 @@ class CreateLabels(Fast5):
         cigar_label = np.zeros(len(sequence), dtype=[('raw_start', int), ('raw_length', int), ('reference_index', int),
                                                      ('posterior_probability', float), ('kmer', 'S5')])
         # assign labels
-        cigar_label['raw_start'] = events["start"]
+        if self.rna:
+            cigar_label['raw_start'] = self.aligned_signal.signal_length - events["start"]
+        else:
+            cigar_label['raw_start'] = events["start"]
         cigar_label['raw_length'] = events["length"]
         reference_map = list(range(attributes["mapped_start"], attributes["mapped_end"]))
         if attributes["mapped_strand"] != "+":
@@ -363,23 +364,25 @@ class CreateLabels(Fast5):
         self.aligned_signal.add_label(cigar_label, name="tombo_{}".format(number), label_type='label')
         return cigar_label
 
-    # def add_eventalign_labels(self):
-    #     """Add eventalign labels"""
-    #     section = "template"
-    #     ea_events = self.get_eventalign_events(section=section)
-    #     events = self.get_basecall_data(section=section)
-    #     sampling_freq = self.sample_rate
-    #     start_time = self.raw_attributes['start_time']
-    # TODO fix time to index
-    #     events = time_to_index(events, sampling_freq=sampling_freq, start_time=start_time)
+    def add_eventalign_labels(self):
+        """Add eventalign labels"""
+        section = "template"
+        ea_events = self.get_eventalign_events(section=section)
+        label = np.zeros(len(ea_events), dtype=[('raw_start', int), ('raw_length', int), ('reference_index', int),
+                                                ('posterior_probability', float), ('kmer', 'S6')])
 
-    #     lables = match_events_with_eventalign(events=ea_events, event_detections=events)
-    #     if self.rna:
-    #         lables["reference_index"] -= self.kmer_index
-    #     else:
-    #         lables["reference_index"] += self.kmer_index
-    #
-    #     self.aligned_signal.add_label(lables, name='eventAlign', label_type='label')
+        label['raw_start'] = ea_events["start_idx"]
+        label['raw_length'] = ea_events["end_idx"] - ea_events["start_idx"]
+        label['reference_index'] = ea_events["position"]
+
+        label['kmer'] = ea_events["reference_kmer"]
+        label['posterior_probability'] = np.ones(len(ea_events))
+        if self.rna:
+            label["reference_index"] -= self.kmer_index
+        else:
+            label["reference_index"] += self.kmer_index
+
+        self.aligned_signal.add_label(label, name='eventAlign', label_type='label')
 
 
 def get_distance_from_guide_alignment(data, guide_data, reference_index_key="position", minus_strand=False):
@@ -403,11 +406,12 @@ def get_distance_from_guide_alignment(data, guide_data, reference_index_key="pos
             if getattr(guide, "reference_index") == v_position:
                 guide_index = i
             else:
-                guide_index = i-1
+                guide_index = i - 1
 
             v_position_middle = (variant_data.iloc[variant_index]["raw_start"] +
                                  (variant_data.iloc[variant_index]["raw_length"] / 2))
-            guide_middle_position = np.round((guide_data.iloc[guide_index]["raw_start"] + (guide_data.iloc[guide_index]["raw_length"] / 2)))
+            guide_middle_position = np.round(
+                (guide_data.iloc[guide_index]["raw_start"] + (guide_data.iloc[guide_index]["raw_length"] / 2)))
 
             distance_to_guide.append(v_position_middle - guide_middle_position)
             variant_index += 1
@@ -425,15 +429,15 @@ def match_ref_position_with_raw_start_band(aggregate_reference_position, per_eve
     """Match up the reference position from aggregated probability table and the per event data"""
     final_data = []
     for position in aggregate_reference_position["position"]:
-
         # get the start and length of total number of events which had bases aligned to this position
         pos_data = per_event_data[per_event_data["reference_position"] == position]
         min_raw_start = min(pos_data["raw_start"])
         last_event_length = pos_data[pos_data["raw_start"] == max(pos_data["raw_start"])]["raw_length"][0]
         total_length = max(pos_data["raw_start"]) - min(pos_data["raw_start"]) + last_event_length
         final_data.append(
-            merge_lists([aggregate_reference_position[aggregate_reference_position["position"] == position].values.tolist()[0],
-                         [min_raw_start, total_length]]))
+            merge_lists(
+                [aggregate_reference_position[aggregate_reference_position["position"] == position].values.tolist()[0],
+                 [min_raw_start, total_length]]))
     final_data = pd.DataFrame(final_data, columns=merge_lists([aggregate_reference_position.columns,
                                                                ["raw_start", "raw_length"]]))
     return final_data
@@ -445,7 +449,8 @@ def trim_matches(matches, trim):
     if trim = 2
         10M -> 6M
 
-    :param matches:
+    :param trim: number of matches to trim on each side of matches
+    :param matches: the matches
 
     """
     # mask = np.ones(len(arr), dtype=bool)
@@ -458,33 +463,34 @@ def trim_matches(matches, trim):
     else:
         mask = np.ones(len(matches), dtype=bool)
         remove_indices = []
-        curr_ref_index = matches[0]["reference_index"]-1
+        curr_ref_index = matches[0]["reference_index"] - 1
         # track where we are in match block
         length = 0
+        i = 0
         for i, match in enumerate(matches):
             if match["reference_index"] == curr_ref_index + 1:
                 length += 1
                 curr_ref_index = match["reference_index"]
                 continue
 
-            if length < 2*trim:
-                for x in range(i-length, i):
+            if length < 2 * trim:
+                for x in range(i - length, i):
                     remove_indices.append(x)
             else:
-                for x in range(i-length, i-length+trim):
+                for x in range(i - length, i - length + trim):
                     remove_indices.append(x)
-                for x in range(i-trim, i):
+                for x in range(i - trim, i):
                     remove_indices.append(x)
             length = 1
             curr_ref_index = match["reference_index"]
 
-        if length < 2*trim:
-            for x in range(i-length+1, i+1):
+        if length < 2 * trim:
+            for x in range(i - length + 1, i + 1):
                 remove_indices.append(x)
         else:
-            for x in range(i-length+1, i-length+trim+1):
+            for x in range(i - length + 1, i - length + trim + 1):
                 remove_indices.append(x)
-            for x in range(i-trim+1, i+1):
+            for x in range(i - trim + 1, i + 1):
                 remove_indices.append(x)
 
         mask[remove_indices] = False
@@ -507,6 +513,7 @@ def index_bases_from_events(events, kmer_index=2):
     base_raw_starts = []
     bases = []
     base_raw_lengths = []
+    event = None
     for i, event in enumerate(events):
         if i == 0:
             # initialize with first kmer
@@ -522,8 +529,8 @@ def index_bases_from_events(events, kmer_index=2):
                     try:
                         base_raw_starts.append(event['raw_start'])
                         probs.append(event['p_model_state'])
-                        bases.append(char_moves[x])
                         base_raw_lengths.append(event['raw_length'])
+                        bases.append(char_moves[x])
                     except IndexError:
                         pass
                         # print(event["model_state"])
@@ -540,147 +547,52 @@ def index_bases_from_events(events, kmer_index=2):
     return bases, base_raw_starts, base_raw_lengths, probs
 
 
-def get_eventalign_events(fast5_dir, reference, output_dir, threads=1, overwrite=False):
-    """Get nanopolish eventalign events"""
-    eventalign_output_path, eventalign_fofn_path = call_eventalign_script(fast5_dir,
-                                                                          reference,
-                                                                          output_dir,
-                                                                          threads=threads,
-                                                                          overwrite=overwrite)
+def get_fast5_paths(read_db_path):
     fast5_files = []
-    with open(eventalign_fofn_path, 'r') as fofn:
+    with open(read_db_path, 'r') as fofn:
         for line in fofn:
             fast5_files.append(line.split('\t')[1][:-1])
-    # gather event data
-    dtype = [('contig', 'S10'), ('position', int),
-             ('reference_kmer', 'S6'), ('read_index', int),
-             ('strand', 'S1'), ('event_index', int),
-             ('event_level_mean', float), ('event_stdv', float),
-             ('event_length', float), ('model_kmer', 'S6'),
-             ('model_mean', float), ('model_stdv', float),
-             ('standardized_level', float)]
-    with open(eventalign_output_path, 'r') as event_align:
-        read_number = 0
-        eventalign_data_template = []
-        eventalign_data_complement = []
-        event_align.readline()
-        for line in event_align:
-            data = line.split('\t')
-
-            if int(data[3]) != read_number:
-                t = np.array(eventalign_data_template, dtype=dtype)
-                c = np.array(eventalign_data_complement, dtype=dtype)
-                yield t, c, fast5_files[read_number]
-                read_number = int(data[3])
-                eventalign_data_template = []
-                eventalign_data_complement = []
-
-            data[1] = int(data[1])
-            data[3] = int(data[3])
-            data[5] = int(data[5])
-            data[6] = float(data[6])
-            data[7] = float(data[7])
-            data[8] = float(data[8])
-            data[10] = float(data[10])
-            data[11] = float(data[11])
-            data[12] = float(data[12])
-            if str(data[4]) == 't':
-                eventalign_data_template.append(tuple(data))
-            else:
-                eventalign_data_complement.append(tuple(data))
-
-            # print(int(data[3]), read_number)
-        t = np.array(eventalign_data_template, dtype=dtype)
-        c = np.array(eventalign_data_complement, dtype=dtype)
-        assert t or c, "Check reference genome, no alignment generated for any read: {}".format(reference)
-        yield t, c, fast5_files[read_number]
+    return fast5_files
 
 
-def call_eventalign_script(fast5_dir, reference, output_dir, threads=1, overwrite=False):
-    """Call eventalign script from scripts folder"""
-    # call_eventalign.sh -f ../test_files/minion-reads/canonical/ -t 1 -r ~/data/example_references/ecoli_k12_mg1655.fa -o ~/CLionProjects/nanopolish/dnacanonical/
-    call_eventalign_exe = "call_eventalign.sh"
-    eventalign_output_path = os.path.join(output_dir, "eventalign.txt")
-    eventalign_fofn_path = os.path.join(output_dir, "all_files.fastq.index.readdb")
-    if not os.path.exists(eventalign_output_path) or overwrite:
-        subprocess.call([call_eventalign_exe, '-f', fast5_dir, '-t', str(threads), '-r', reference, '-o', output_dir])
-    return eventalign_output_path, eventalign_fofn_path
-
-
-def embed_eventalign_events(fast5_dir, reference, output_dir, threads=1, overwrite=False):
-    """Call eventalign and embed events"""
-    event_generator = get_eventalign_events(fast5_dir,
-                                            reference,
-                                            output_dir,
-                                            threads=threads,
-                                            overwrite=overwrite)
-    attributes = None
-    for template, complement, fast5path in event_generator:
-        print(fast5path)
-        print("template", template)
-        if template or complement:
-            handle = Fast5(fast5path, read='r+')
-            handle.set_eventalign_table(template=template, complement=complement, meta=attributes, overwrite=True)
-        else:
-            print("{} did not align".format(fast5path))
-    return True
-
-
-def match_events_with_eventalign(events=None, event_detections=None, minus=False, rna=False):
-    """Match event index with event detection data to label segments of signal for each kmer
-
-    # RNA is sequenced 3'-5'
-    # reversed for fasta/q sequence
-    # if mapped to reverse strand
-    # reverse reverse complement = complement
-
-    # DNA is sequenced 5'-3'
-    # if mapped to reverse strand
-    # reverse complement
-
-    :param events: events table reference_index', 'event_index', 'aligned_kmer', 'posterior_probability
-    :param event_detections: event detection event table
-    :param minus: boolean option to for minus strand mapping
-    :param rna: boolean for RNA read
+def embed_eventalign(eventalign_path, readdb):
+    """Embed eventalign events into corresponding fats5s. NOTE: Must be run with signal index option set
+    :param eventalign_path: path to eventalign output file
+    :param readdb: readdb of files to embed from eventalign index
     """
-    assert events is not None, "Must pass signal alignment events"
-    assert event_detections is not None, "Must pass event_detections events"
+    dtype_dict = {'contig': 'S10',
+                  'position': int,
+                  'reference_kmer': 'S6',
+                  'read_name': 'S50',
+                  'strand': 'S1',
+                  'event_index': int,
+                  'event_level_mean': float,
+                  'event_stdv': float,
+                  'event_length': float,
+                  'model_kmer': 'S6',
+                  'model_mean': float,
+                  'model_stdv': float,
+                  'standardized_level': float,
+                  'start_idx': int,
+                  'end_idx': int}
 
-    check_numpy_table(events, req_fields=('position', 'event_index',
-                                          'reference_kmer'))
+    nanopolish_data = pd.read_csv(eventalign_path, sep="\t")
+    f5_paths = get_fast5_paths(readdb)
 
-    check_numpy_table(event_detections, req_fields=('start', 'length'))
-
-    label = np.zeros(len(events), dtype=[('raw_start', int), ('raw_length', int), ('reference_index', int),
-                                         ('posterior_probability', float), ('kmer', 'S6')])
-
-    label['raw_start'] = [event_detections[x]["start"] for x in events["event_index"]]
-    label['raw_length'] = [event_detections[x]["length"] for x in events["event_index"]]
-    label['reference_index'] = events["position"]
-
-    def convert_to_str(string):
-        """Helper function to catch bytes as strings"""
-        if type(string) is str:
-            return string
-        else:
-            return bytes.decode(string)
-
-    flip = ReverseComplement()
-    if minus:
-        if rna:
-            kmers = [flip.complement(convert_to_str(x)) for x in events["reference_kmer"]]
-        else:
-            kmers = [flip.reverse_complement(convert_to_str(x)) for x in events["reference_kmer"]]
-    else:
-        if rna:
-            kmers = [flip.reverse(convert_to_str(x)) for x in events["reference_kmer"]]
-        else:
-            kmers = events["reference_kmer"]
-    label['kmer'] = kmers
-    label['posterior_probability'] = np.ones(len(events))
-    # np.sort(label, order='raw_start', kind='mergesort')
-
-    return label
+    for index, y in nanopolish_data.groupby(["read_name"]):
+        read_id = index.split(":")[0]
+        template = None
+        complement = None
+        for strand, data in y.groupby("strand"):
+            if strand == "t":
+                template = data.to_records(index=False, column_dtypes=dtype_dict)
+            else:
+                complement = data.to_records(index=False, column_dtypes=dtype_dict)
+        fast5_file = [x for x in f5_paths if read_id in x][0]
+        handle = Fast5(fast5_file, read='r+')
+        handle.set_eventalign_table(template=template, complement=complement, meta=None, overwrite=True)
+        handle.close()
+    return True
 
 
 def match_cigar_with_basecall_guide(events, sam_string, kmer_index, rna=False, reference_path=None,
@@ -763,7 +675,8 @@ def match_cigar_with_basecall_guide(events, sam_string, kmer_index, rna=False, r
     mismatches['posterior_probability'] = mismatches_posterior_probability
 
     # trim extra event alignments
-    return matches[kmer_index:len(matches)-kmer_index], mismatches[kmer_index:len(matches)-kmer_index], events["raw_start"]
+    return matches[kmer_index:len(matches) - kmer_index], mismatches[kmer_index:len(matches) - kmer_index], events[
+        "raw_start"]
 
 
 def get_highest_single_digit_integer_from_string(in_string):

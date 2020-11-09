@@ -27,14 +27,15 @@ CuSuite *eventAlignerTestSuite(void);
 CuSuite *stBaseAlignerRunAllTests(void) {
     CuString *output = CuStringNew();
     CuSuite *suite = CuSuiteNew();
-    CuSuiteAddSuite(suite, NanoporeHdpTestSuite());
-    CuSuiteAddSuite(suite, HdpTestSuite());
     CuSuiteAddSuite(suite, signalPairwiseAlignerTestSuite());
     CuSuiteAddSuite(suite, variableOrderPairwiseAlignerTestSuite());
     CuSuiteAddSuite(suite, stateMachineAlignmentTestSuite());
     CuSuiteAddSuite(suite, fastaHandlerTestSuite());
     CuSuiteAddSuite(suite, eventAlignerTestSuite());
-    // coming soon..
+    CuSuiteAddSuite(suite, NanoporeHdpTestSuite());
+    CuSuiteAddSuite(suite, HdpTestSuite());
+
+  // coming soon..
     //CuSuiteAddSuite(suite, multipleAlignerTestSuite());
     //CuSuiteAddSuite(suite, pairwiseAlignmentLongTestSuite());
 

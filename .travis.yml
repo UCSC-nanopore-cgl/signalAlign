@@ -1,138 +1,54 @@
-python:
-- 3.5
-notifications: # set notification options
+sudo: required
+services:
+- docker
+env:
+  global:
+  - REGISTRY_USER=travisbot
+  - BRANCH=${TRAVIS_PULL_REQUEST_BRANCH:-$TRAVIS_BRANCH}
+  - secure: RzOOUkJiYCKZL30yjbkxhdCxrCdo5oigt/9rgV1AGkJBQ1O+oZYHj4nlaIQYj1R/lalBc53b5jqBtpKD4lRX1nT7OazDMjhVk9l4k5uONhGCfsFslOuNYOKOdLE1sHxKOhHVd9pQte9jPSGOvMnMFZMm4Tp5owS0p9vJ4ckXZch9qdWR+SHqi2+eiDhe8KENlIuyTRYou1+xnNmmchzvSY/YGpbCETMZLLBc1pjmo/B0bHHUm5BLnDrOWyDdfAdH78x3mEuOZuc2P/P71yjNCfNttCtjD/eEHOeNWk/aJgGwfw/j1xCWLBNibTbcIz3BYzydllnD4iBIldfAXFzi9rETa5fOh1H8YbvXqTVDabnm2CzVF4gZWMI708jtAXNP8r1Ds6MpivEnF5rp3Y7BwMyoiFM/pugzdNOQCHyf3R2EB1UXKRTxkCJH1w11l+TmLbNASeJSGZ7LtvGWhkzyHfPbJ0Y/vaG992gZUEIiSouyVwo9KzewBYhphlit8YWvZVX94X3qHCgQsmlGqnI/oCH+QI6pBpdMS2pwhN8z+K+uHCzijnZ5EwphPrLnxMmhcLDtgidnNvssn2cOECHNhA+GSZW0MJjDfashHVC53gJQEjtcVUmhR5ghC27qNyM90aUcnx5fZWf3xcAvy7APTT5g6cwhnZ40qZ87wp5qiuU=
+  - REPO=ucscbailey/signalalign
+notifications:
   slack:
-    rooms:
-    - ucsc-cgl:Edwfgt7MJEVZV9Lib3igueTF
-    on_success: change
-    on_failure: always
+    secure: NZuZZdOxl6Qrfqfre16A0r2dkg5UqJGMDhGWvhT/Qz3fcDQIkSQyPRSLSLtnmGL01h9N4n5fguInshF526CyEEE13o+AyZ7dGiV0pcSth/hqjKTcUxZdzkBJM0K1JEDSd4euRNSwgi2lQpyK5JHqyYWrMM6fs4S7XZSJ72Dq+9scTSHrQwncaYz4U+ILN338eJZeDGWM7LsH+9HeZAPEmg63DPHCm6lr7o/l5EpwvktGSxpcjj5WWNv0ho3CaDIxW2I94NYYHXRAZsqnBMYP4ZToke2ZgHlrNrw5MIDbwcCbhx8tCyiVzYnMYlxdQFTyYzoPgtmPCKyClJi9YerZID8nIKNIySIp6J+nH1wf914PKqZ/qKTqgNIP5zKZX8NwV4If6/QeoWqm/8YCs8xG4kAr6C+zRDwMWU8Y/6nj+psWM4x2XgK7Hm4maE8aFC36t7Y3vmU6F5wAuoE9jydnQQDvDgh3lhHAeUGgaiodJ8chj+RYc0n3anKewLTl7w3lc/IWlCL71ii0uHDAf+cXAKh2GQbb261WoFFkLQBRp4Jgto7ZAQ35FHo3N64XQJK/AQf00ciaoyv+OYalKvawoWl1s0TahTYEMhhRzIorwlb5JC376EXgpsXXguXi0HcJeRdA9htlAeq+2tkZivkLnSSyfPuzxs3u/4DQsC0HebI=
   email: false
 
-os:
-- linux
-#- osx
-dist: trusty
-git:
-  submodules: true
+jobs:
+  include:
+    - os: linux
+      dist: bionic
+
 
 before_install:
-- git submodule update --init
-- if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
-  brew update;
-  brew install gcc@5 automake make open-mpi;
-  gcc --version;
-  alias make='gmake';
-  ln -s /usr/local/bin/gcc-5 /usr/local/bin/gcc;
-  alias gcc='gcc-5';
-  alias g++='g++-5';
+  #  docker
+  - curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
+  - sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
+  - sudo apt-get update
+  - sudo apt-get -y -o Dpkg::Options::="--force-confnew" install docker-ce
+  - echo '{"features":{ "buildkit":true },"experimental":true}'  | sudo tee /etc/docker/daemon.json
+  - sudo service docker restart
+  - 'if [ "${BRANCH}" = "master" ]; then
+      export BRANCH="latest";
+    else
+      echo "Strings are not equal.";
+    fi'
+  - echo BRANCH "$BRANCH"
 
-  gcc --version;
-
-  else
-
-    sudo apt-get update -qq;
-    sudo apt-get install autotools-dev autoconf cmake wget git make g++-5 gcc-5 zlib1g-dev libbz2-dev liblzma-dev;
-    sudo apt-get update;
-
-  fi
-
-#- bash anaconda.sh -b -p $HOME/anaconda3
-#    wget https://repo.anaconda.com/archive/Anaconda3-5.3.0-Linux-x86_64.sh -O anaconda.sh;
-#    sudo apt-get install python3-dev python3-setuptools python3-pip;
-
-install:
-#- export PATH="$PATH:$HOME/anaconda3/bin"
-#- export C_INCLUDE_PATH="$C_INCLUDE_PATH:/usr/local/Cellar/gcc@5/5.5.0_2/include:/usr/include:/usr/local/include:$HOME/anaconda3/envs/signalalign/include"
-#- export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/usr/local/Cellar/gcc@5/5.5.0_2/lib/gcc/5:/usr/lib:/usr/local/lib:$HOME/anaconda3/envs/signalalign/lib"
-#- export LIBRARY_PATH="$LIBRARY_PATH:/usr/local/Cellar/gcc@5/5.5.0_2/lib/gcc/5:/usr/local/lib:/usr/lib:$HOME/anaconda3/envs/signalalign/lib"
-#- export C_INCLUDE_PATH="$C_INCLUDE_PATH:$HOME/anaconda3/envs/signalalign/include"
-#- export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/usr/local/Cellar/gcc@5/5.5.0_2/lib/gcc/5:$HOME/anaconda3/envs/signalalign/lib"
-#- export LIBRARY_PATH="$LIBRARY_PATH:/usr/local/Cellar/gcc@5/5.5.0_2/lib/gcc/5:$HOME/anaconda3/envs/signalalign/lib"
-
-#- hash -r
-#- conda config --set always_yes yes --set changeps1 no
-#- conda update -q conda
-# Useful for debugging any issues with conda
-#- conda info -a
-#- conda env create -f requirements.yml python=3.6
-#- source activate signalalign
-- pwd
-- echo $HOME
-- ls
-# samtools install
-- cd $HOME/build/UCSC-nanopore-cgl/
-- wget https://github.com/samtools/samtools/releases/download/1.9/samtools-1.9.tar.bz2
-- tar -vxjf samtools-1.9.tar.bz2
-- ls
-- cd samtools-1.9
-- ./configure --prefix=$HOME/build/UCSC-nanopore-cgl/
-- make
-- make install
-- echo "PATH=$HOME/build/UCSC-nanopore-cgl/bin/:$PATH" >> ~/.bashrc
-- source ~/.bashrc
-- cd ..
-- which samtools
-  # bwa install
-- git clone https://github.com/lh3/bwa.git
-- cd bwa
-- make
-- echo "PATH=$HOME/build/UCSC-nanopore-cgl/bwa/:$PATH" >> ~/.bashrc
-- cd ..
-- source ~/.bashrc
-- which bwa
-  # python install
-- wget https://www.python.org/ftp/python/3.6.8/Python-3.6.8.tgz
-- tar -xzf Python-3.6.8.tgz
-- find $HOME/build/UCSC-nanopore-cgl/  -type d | xargs chmod 0755
-- cd Python-3.6.8/
-- ./configure --prefix=$HOME/
-- make
-- make install
-- echo "PATH=$HOME/build/UCSC-nanopore-cgl/Python-3.6.8/:$PATH" >> ~/.bashrc
-- source ~/.bashrc
-- which python
-- which python3
-- alias python="$HOME/build/UCSC-nanopore-cgl/Python-3.6.8/python"
-- which python3
-# install pip
-- cd ..
-- wget https://bootstrap.pypa.io/get-pip.py
-- python3 get-pip.py --user
-- echo "PATH=$HOME/.local/bin/:$PATH" >> ~/.bashrc
-- source ~/.bashrc
-- which pip3
-- which pip
-- alias gcc=gcc-5
-- alias g++=g++-5
-- alias python="$HOME/build/UCSC-nanopore-cgl/Python-3.6.8/python"
-- gcc --version
-- pip3 install numpy
-- pip3 install setuptools
-- cd $HOME/build/UCSC-nanopore-cgl/signalAlign
-- make
-- python3 setup.py install
-#- if [[ "$TRAVIS_OS_NAME" != "osx" ]]; then
-#      "export DISPLAY=:99.0";
-#      "sh -e /etc/init.d/xvfb start";
-#      sleep 3; # give xvfb some time to start
-#  fi
 
 before_script:
-- "export DISPLAY=:99.0"
-- "sh -e /etc/init.d/xvfb start"
-- sleep 3 # give xvfb some time to start
-
-
-
+  - docker --version
+  - docker version -f '{{.Server.Experimental}}'
+  - docker pull $REPO || true
 script:
-- export PATH=$PATH:$PWD/bin
-- make test
-
-#export PATH="$HOME/anaconda3/bin:$PATH"
-#export C_INCLUDE_PATH="$HOME/anaconda3/envs/signalalign/include:$C_INCLUDE_PATH"
-#export LD_LIBRARY_PATH="$HOME/anaconda3/envs/test_test2/lib:$LD_LIBRARY_PATH"
-#export LIBRARY_PATH="$HOME/anaconda3/envs/test_test2/lib:$LIBRARY_PATH"
-
-#export LIBRARY_PATH="$LIBRARY_PATH:$HOME/anaconda3/envs/signalalign/lib"
-#export CPLUS_INCLUDE_PATH="$HOME/anaconda3/envs/signalalign/include:$CPLUS_INCLUDE_PATH"
-
+  - cp Docker/Dockerfile .
+  - export DOCKER_BUILDKIT=1
+  - docker build --progress=plain --target test --pull --cache-from $REPO:$BRANCH .
+  - docker build -q --target runtime --tag $REPO:$BRANCH .
+  - docker run $REPO:$BRANCH
+  - rm Dockerfile
+before_deploy:
+  - echo "$REGISTRY_PASS" | docker login --username $REGISTRY_USER --password-stdin
+deploy:
+  provider: script
+  script: docker push $REPO:$BRANCH
+  on:
+    all_branches: true

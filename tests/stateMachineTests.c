@@ -3,7 +3,6 @@
 #include <string.h>
 #include <math.h>
 #include <inttypes.h>
-#include "stateMachine.h"
 #include "CuTest.h"
 #include "pairwiseAligner.h"
 #include "discreteHmm.h"
@@ -16,7 +15,7 @@ Sequence *getZymoReferenceSequence(int64_t kmerLength) {
     int64_t lX = sequence_correctSeqLength(strlen(ZymoReferenceSeq), event, kmerLength);
     Sequence *refSeq = sequence_constructKmerSequence(lX, ZymoReferenceSeq,
                                                       sequence_getKmer, sequence_sliceNucleotideSequence,
-                                                      "CEO", 3, kmer);
+                                                      kmer, NULL);
     free(ZymoReferenceFilePath);
     return refSeq;
 }
@@ -28,7 +27,7 @@ Sequence *getEcoliReferenceSequence(int64_t kmerLength) {
     int64_t lX = sequence_correctSeqLength(strlen(referenceSeq), event, kmerLength);
     Sequence *refSeq = sequence_constructKmerSequence(lX, referenceSeq,
                                                       sequence_getKmer, sequence_sliceNucleotideSequence,
-                                                      "CEO", 3, kmer);
+                                                      kmer, NULL);
     free(ecoliReferencePath);
     return refSeq;
 }
@@ -43,8 +42,7 @@ NanoporeRead *loadTestNanoporeRead() {
     if (!stFile_exists(npReadFile)) {
         st_errAbort("Could not find test npRead file\n");
     }
-
-    NanoporeRead *npRead = nanopore_loadNanoporeReadFromFile(npReadFile);
+    NanoporeRead *npRead = nanopore_loadNanoporeReadFromFile(npReadFile, "ACEGOT", 6);
     free(npReadFile);
     return npRead;
 }
@@ -54,8 +52,7 @@ NanoporeRead *loadTestR9NanoporeRead() {
     if (!stFile_exists(npReadFile)) {
         st_errAbort("Could not find test npRead file\n");
     }
-
-    NanoporeRead *npRead = nanopore_loadNanoporeReadFromFile(npReadFile);
+    NanoporeRead *npRead = nanopore_loadNanoporeReadFromFile(npReadFile, "ACGT", 4);
     free(npReadFile);
     return npRead;
 }
@@ -63,7 +60,8 @@ NanoporeRead *loadTestR9NanoporeRead() {
 NanoporeRead *loadTestR94NanopreRead(CuTest *testCase) {
     char *npReadFile = stString_print("../tests/test_npReads/r9p4_oneD.npRead");
     CuAssertTrue(testCase, stFile_exists(npReadFile));
-    NanoporeRead *npRead = nanopore_loadNanoporeReadFromFile(npReadFile);
+
+    NanoporeRead *npRead = nanopore_loadNanoporeReadFromFile(npReadFile, "ACGT", 4);
     free(npReadFile);
     return npRead;
 }
@@ -352,48 +350,48 @@ static void test_models(CuTest *testCase) {
     stateMachine_destruct(sM);
 }
 
-static void test_nanoporeScaleParamsFromAnchorPairs(CuTest *testCase) {
-    NanoporeRead *npRead = loadTestNanoporeRead();
-    Sequence *eventSequence = sequence_construct2(npRead->nbTemplateEvents, npRead->templateEvents, sequence_getEvent,
-                                                  sequence_sliceEventSequence, event);
-    Sequence *referenceSequence = getZymoReferenceSequence(KMER_LENGTH);
-    PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
-    p->constraintDiagonalTrim = 18;
-    stList *filteredRemappedAnchors = getRemappedAnchors(referenceSequence, npRead, p);
-    stList *map = nanopore_getAnchorKmersToEventsMap(filteredRemappedAnchors, eventSequence->elements,
-                                                     referenceSequence->elements);
-    //st_uglyf("Map has %lld assignments\n", stList_length(map));
-    // test the event/kmer tuples
-    for (int64_t i = 0; i < stList_length(map); i++) {
-        EventKmerTuple *t = stList_get(map, i);
-        stIntTuple *pair = stList_get(filteredRemappedAnchors, i);
-        int64_t checkKmerIndex = emissions_discrete_getKmerIndexFromKmer(
-                referenceSequence->get(referenceSequence->elements, stIntTuple_get(pair, 0)));
-        double *event = eventSequence->get(eventSequence->elements, stIntTuple_get(pair, 1));
-        double eventMean = *event;
-        double eventSd = *(1 + event);
-        double eventDuration = *(3 + event);
-        CuAssertIntEquals(testCase, checkKmerIndex, t->kmerIndex);
-        CuAssertDblEquals(testCase, eventMean, t->eventMean, 0.0);
-        CuAssertDblEquals(testCase, eventSd, t->eventSd, 0.0);
-        CuAssertDblEquals(testCase, eventDuration, t->deltaTime, 0.0);
-    }
-    NanoporeReadAdjustmentParameters *params = nanopore_readAdjustmentParametersConstruct();
-    StateMachine *sM = loadDescaledStateMachine3(npRead);
-    nanopore_compute_mean_scale_params(sM->EMISSION_MATCH_MATRIX, map, params, FALSE, TRUE);
-
-    CuAssertTrue(testCase, absPercentDiff(params->scale, npRead->templateParams.scale) < 5.0);
-    CuAssertTrue(testCase, absPercentDiff(params->shift, npRead->templateParams.shift) < 10.0);
-    CuAssertTrue(testCase, absPercentDiff(params->var, npRead->templateParams.var) < 50.0);
-    /*
-    st_uglyf("npRead scale: %f, estimated: %f diff %f\n", npRead->templateParams.scale, params->scale,
-             absPercentDiff(params->scale, npRead->templateParams.scale));
-    st_uglyf("npRead shift: %f, estimated: %f diff %f\n", npRead->templateParams.shift, params->shift,
-             absPercentDiff(params->shift, npRead->templateParams.shift));
-    st_uglyf("npRead var: %f, estimated: %f diff %f\n", npRead->templateParams.var, params->var,
-             absPercentDiff(params->var, npRead->templateParams.var));
-    */
-}
+//static void test_nanoporeScaleParamsFromAnchorPairs(CuTest *testCase) {
+//    NanoporeRead *npRead = loadTestNanoporeRead();
+//    Sequence *eventSequence = sequence_construct2(npRead->nbTemplateEvents, npRead->templateEvents, sequence_getEvent,
+//                                                  sequence_sliceEventSequence, event);
+//    Sequence *referenceSequence = getZymoReferenceSequence(6);
+//    PairwiseAlignmentParameters *p = pairwiseAlignmentBandingParameters_construct();
+//    p->constraintDiagonalTrim = 18;
+//    stList *filteredRemappedAnchors = getRemappedAnchors(referenceSequence, npRead, p);
+////    stList *map = nanopore_getAnchorKmersToEventsMap(filteredRemappedAnchors, eventSequence->elements,
+////                                                     referenceSequence->elements);
+//    //st_uglyf("Map has %lld assignments\n", stList_length(map));
+//    // test the event/kmer tuples
+//    for (int64_t i = 0; i < stList_length(map); i++) {
+//        EventKmerTuple *t = stList_get(map, i);
+//        stIntTuple *pair = stList_get(filteredRemappedAnchors, i);
+////        int64_t checkKmerIndex = emissions_discrete_getKmerIndexFromKmer(
+//                referenceSequence->get(referenceSequence->elements, stIntTuple_get(pair, 0)));
+//        double *event = eventSequence->get(eventSequence->elements, stIntTuple_get(pair, 1));
+//        double eventMean = *event;
+//        double eventSd = *(1 + event);
+//        double eventDuration = *(3 + event);
+//        CuAssertIntEquals(testCase, checkKmerIndex, t->kmerIndex);
+//        CuAssertDblEquals(testCase, eventMean, t->eventMean, 0.0);
+//        CuAssertDblEquals(testCase, eventSd, t->eventSd, 0.0);
+//        CuAssertDblEquals(testCase, eventDuration, t->deltaTime, 0.0);
+//    }
+//    NanoporeReadAdjustmentParameters *params = nanopore_readAdjustmentParametersConstruct();
+//    StateMachine *sM = loadDescaledStateMachine3(npRead);
+//    nanopore_compute_mean_scale_params(sM->EMISSION_MATCH_MATRIX, map, params, FALSE, TRUE);
+//
+//    CuAssertTrue(testCase, absPercentDiff(params->scale, npRead->templateParams.scale) < 5.0);
+//    CuAssertTrue(testCase, absPercentDiff(params->shift, npRead->templateParams.shift) < 10.0);
+//    CuAssertTrue(testCase, absPercentDiff(params->var, npRead->templateParams.var) < 50.0);
+//    /*
+//    st_uglyf("npRead scale: %f, estimated: %f diff %f\n", npRead->templateParams.scale, params->scale,
+//             absPercentDiff(params->scale, npRead->templateParams.scale));
+//    st_uglyf("npRead shift: %f, estimated: %f diff %f\n", npRead->templateParams.shift, params->shift,
+//             absPercentDiff(params->shift, npRead->templateParams.shift));
+//    st_uglyf("npRead var: %f, estimated: %f diff %f\n", npRead->templateParams.var, params->var,
+//             absPercentDiff(params->var, npRead->templateParams.var));
+//    */
+//}
 
 static void test_nanoporeScaleParamsFromOneDAssignments(CuTest *testCase) {
     NanoporeRead *npRead = loadTestNanoporeRead();
@@ -442,7 +440,7 @@ static void test_adjustForDrift(CuTest *testCase) {
 
 static void test_sm3_diagonalDPCalculations(CuTest *testCase) {
     // make some DNA sequences and fake nanopore read data
-    char *sX = "ACGATAXGGACAT";
+    char *sX = "ACGATALGGACAT";
     double sY[28] = {
             58.743435, 0.887833, 0.0571, 0.0, //ACGATA 0
             53.604965, 0.816836, 0.0571, 0.1,//CGATAC 1
@@ -464,9 +462,13 @@ static void test_sm3_diagonalDPCalculations(CuTest *testCase) {
 
     // make Sequence objects
     //Sequence *SsX = makeKmerSequence(sX);
-    Sequence *SsX = sequence_constructKmerSequence(lX, sX, sequence_getKmer, sequence_sliceNucleotideSequence,
-                                                   THREE_CYTOSINES, NB_CYTOSINE_OPTIONS, kmer);
-    Sequence *SsY = sequence_construct(lY, sY, sequence_getEvent, event);
+    Sequence *SsX = sequence_constructKmerSequence(lX,
+                                                   sX,
+                                                   sequence_getKmer,
+                                                   sequence_sliceNucleotideSequence,
+                                                   kmer,
+                                                   NULL);
+    Sequence *SsY = sequence_construct(lY, sY, sequence_getEvent, event, NULL);
 
     DpMatrix *dpMatrixForward = dpMatrix_construct(lX + lY, sM->stateNumber, sM->kmerLength);
     DpMatrix *dpMatrixBackward = dpMatrix_construct(lX + lY, sM->stateNumber, sM->kmerLength);
@@ -594,9 +596,13 @@ static void test_sm3_5merDiagonalDPCalculations(CuTest *testCase) {
 
     // make Sequence objects
     //Sequence *SsX = makeKmerSequence(sX);
-    Sequence *SsX = sequence_constructKmerSequence(lX, sX, sequence_getKmer, sequence_sliceNucleotideSequence,
-                                                   THREE_CYTOSINES, NB_CYTOSINE_OPTIONS, kmer);
-    Sequence *SsY = sequence_construct(lY, sY, sequence_getEvent, event);
+    Sequence *SsX = sequence_constructKmerSequence(lX,
+                                                   sX,
+                                                   sequence_getKmer,
+                                                   sequence_sliceNucleotideSequence,
+                                                   kmer,
+                                                   NULL);
+    Sequence *SsY = sequence_construct(lY, sY, sequence_getEvent, event, NULL);
 
     DpMatrix *dpMatrixForward = dpMatrix_construct(lX + lY, sM->stateNumber, sM->kmerLength);
     DpMatrix *dpMatrixBackward = dpMatrix_construct(lX + lY, sM->stateNumber, sM->kmerLength);
@@ -701,7 +707,7 @@ static inline void test_stateMachine(CuTest *testCase, StateMachine *sM, Nanopor
 
     // make the event sequence object
     Sequence *eventSequence = sequence_construct2(npRead->nbTemplateEvents, npRead->templateEvents, sequence_getEvent,
-                                                  sequence_sliceEventSequence, event);
+                                                  sequence_sliceEventSequence, event, NULL);
 
     // do alignment with scaled stateMachine
     stList *alignedPairs = getAlignedPairsUsingAnchors(sM, refSeq, eventSequence, filteredRemappedAnchors, p,
@@ -730,7 +736,7 @@ static void test_r9StateMachineWithBanding(CuTest *testCase) {
 //    test_stateMachine(testCase, sM, npRead, refSeq, 3435, 0.01);
 
     // test noise scaling
-    for (int64_t i = 0; i < NUM_OF_KMERS; i++) {
+    for (int64_t i = 0; i < sM->parameterSetSize; i++) {
         int64_t noiseMeanIndex = (i * MODEL_PARAMS + 2);
         int64_t noiseLambdaIndex = (i * MODEL_PARAMS + 4);
         CuAssertTrue(testCase,
@@ -761,7 +767,7 @@ static void test_r94StateMachineWithBanding(CuTest *testCase) {
     stList *filteredRemappedAnchors = get1dRemappedAnchors(refSeq, npRead, p);
     // make the event sequence object
     Sequence *eventSequence = sequence_construct2(npRead->nbTemplateEvents, npRead->templateEvents, sequence_getEvent,
-                                                  sequence_sliceEventSequence, event);
+                                                  sequence_sliceEventSequence, event, NULL);
 
     // do alignment with scaled stateMachine
     stList *alignedPairs = getAlignedPairsUsingAnchors(sM, refSeq, eventSequence, filteredRemappedAnchors, p,
@@ -795,7 +801,7 @@ static void test_r94FivemerStateMachineWithBanding(CuTest *testCase) {
     stList *filteredRemappedAnchors = get1dRemappedAnchors(refSeq, npRead, p);
     // make the event sequence object
     Sequence *eventSequence = sequence_construct2(npRead->nbTemplateEvents, npRead->templateEvents, sequence_getEvent,
-                                                  sequence_sliceEventSequence, event);
+                                                  sequence_sliceEventSequence, event, NULL);
 
     // do alignment with scaled stateMachine
     stList *alignedPairs = getAlignedPairsUsingAnchors(sM, refSeq, eventSequence, filteredRemappedAnchors, p,
@@ -923,7 +929,7 @@ static void test_DegenerateNucleotides(CuTest *testCase) {
 
     // make Sequences for reference and template events
     Sequence *eventSequence = sequence_construct2(npRead->nbTemplateEvents, npRead->templateEvents, sequence_getEvent,
-                                                  sequence_sliceEventSequence, event);
+                                                  sequence_sliceEventSequence, event, NULL);
 
     // do alignment of template events
     stList *alignedPairs = getAlignedPairsUsingAnchors(sM, refSeq, eventSequence, filteredRemappedAnchors, p,
@@ -953,7 +959,7 @@ static void test_DegenerateNucleotides(CuTest *testCase) {
 
 
     sequence_destruct(degenerateSequence);
-    degenerateSequence = replaceBasesInSequence(refSeq, "C", "X");
+    degenerateSequence = replaceBasesInSequence(refSeq, "C", "L");
     stList *alignedPairs_degenerate = getAlignedPairsUsingAnchors(sM, degenerateSequence,
                                                                   eventSequence, filteredRemappedAnchors, p,
                                                                   diagonalCalculationPosteriorMatchProbs,
@@ -961,7 +967,7 @@ static void test_DegenerateNucleotides(CuTest *testCase) {
     checkAlignedPairsWithOverlap(testCase, alignedPairs_degenerate,
                                  degenerateSequence->length, npRead->nbTemplateEvents);
     //st_uglyf("got %lld degenerate alignedPairs with anchors\n", stList_length(alignedPairs_degenerate));
-    CuAssertTrue(testCase, stList_length(alignedPairs_degenerate) == 7349);
+    CuAssertIntEquals(testCase, 7349, stList_length(alignedPairs_degenerate));
 
     // clean
     pairwiseAlignmentBandingParameters_destruct(p);
@@ -1236,7 +1242,7 @@ static void test_continuousPairHmm_em(CuTest *testCase) {
 
     Sequence *eventSequence = sequence_construct2(npRead->nbTemplateEvents,
                                                   npRead->templateEvents, sequence_getEvent,
-                                                  sequence_sliceEventSequence, event);
+                                                  sequence_sliceEventSequence, event, NULL);
 
     for (int64_t iter = 0; iter < 10; iter++) {
         // load the table into the HMM emissions
@@ -1288,7 +1294,7 @@ static void test_hdpHmm_emTransitions(CuTest *testCase) {
 
     stList *filteredRemappedAnchors = getRemappedAnchors(refSeq, npRead, p);
     Sequence *templateSeq = sequence_construct2(npRead->nbTemplateEvents, npRead->templateEvents, sequence_getEvent,
-                                                sequence_sliceEventSequence, event);
+                                                sequence_sliceEventSequence, event, NULL);
 
     for (int64_t iter = 0; iter < 10; iter++) {
         //Hmm *hmmExpectations = hdpHmm_constructEmpty(0.0001, 3, threeStateHdp, p->threshold);
@@ -1330,7 +1336,7 @@ CuSuite *stateMachineAlignmentTestSuite(void) {
     CuSuite *suite = CuSuiteNew();
 
     SUITE_ADD_TEST(suite, test_checkTestNanoporeReads);
-    SUITE_ADD_TEST(suite, test_nanoporeScaleParamsFromAnchorPairs);
+//    SUITE_ADD_TEST(suite, test_nanoporeScaleParamsFromAnchorPairs);
     SUITE_ADD_TEST(suite, test_nanoporeScaleParamsFromOneDAssignments);
     SUITE_ADD_TEST(suite, test_nanoporeScaleParamsFromStrandRead);
     SUITE_ADD_TEST(suite, test_adjustForDrift);
