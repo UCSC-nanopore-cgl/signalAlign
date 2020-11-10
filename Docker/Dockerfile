@@ -8,9 +8,8 @@ ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 RUN python3.7 -m pip -q install wheel
 
 ENV BUILD_SHARED_LIBS="OFF"
-RUN git clone --recursive https://github.com/adbailey4/embed_fast5.git && \
+RUN git clone --recursive --single-branch --branch bailey-dev  https://github.com/adbailey4/embed_fast5.git && \
     cd /root/embed_fast5 && \
-#    git checkout e4ad9b495bbf41cc2369eeaddf22bf9e2f3b6a62 && \
     python3.7 -m pip install .
 
 # install bwa
