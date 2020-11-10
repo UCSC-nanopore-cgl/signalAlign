@@ -313,8 +313,7 @@ def main():
         print("\n#  signalAlign - finished alignments\n", file=sys.stdout)
     else:
         print("Must specify run or run2: 'runSignalAlign.py run' ")
-        stop = timer()
-        sys.exit(1)
+        sys.exit()
 
     print("[signalAlign] Complete")
     print("Running Time = {} seconds".format(stop - start))
