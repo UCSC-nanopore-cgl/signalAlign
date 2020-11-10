@@ -173,18 +173,24 @@ class SignalAlignment(object):
             self.in_complementHdp = in_complementHdp
         else:
             self.in_complementHdp = None
-        assert os.path.isdir(self.destination), "Destination path does not exist: {}".format(self.destination)
+        self.check(os.path.isdir(self.destination), "Destination path does not exist: {}".format(self.destination))
 
     def print(self, msg, file=sys.stdout, end="\n"):
         if self.debug:
             print(msg, file=file, end=end)
 
+    def check(self, statement, message=""):
+        if self.read_label is not None:
+            assert statement, f"KEY:FAILED:{self.read_label}: {message}"
+        else:
+            assert statement, f"KEY:FAILED:{self.in_fast5}: {message}"
+
     def run(self):
         self.print("[SignalAlignment.run] INFO: Starting on {read}".format(read=self.in_fast5))
         if self.get_expectations:
-            assert self.in_templateHmm is not None, "Need template HMM files for model training"
+            self.check(self.in_templateHmm is not None, "Need template HMM files for model training")
             if self.twoD_chemistry:
-                assert self.in_complementHmm is not None, "Need complement HMM files for model training"
+                self.check(self.in_complementHmm is not None, "Need complement HMM files for model training")
         if not os.path.isfile(self.in_fast5):
             self.print("[SignalAlignment.run] ERROR: Did not find fast5 at {file}".format(file=self.in_fast5),
                        file=sys.stderr)
@@ -229,7 +235,7 @@ class SignalAlignment(object):
                                                             pop1_complement=pop1_complement)
             self.print("[SignalAlignment.run] Inferred complement HMM {} from np read version {}".format(
                 self.in_complementHmm, npRead.version))
-        assert self.in_templateHmm is not None
+        self.check(self.in_templateHmm is not None, f"self.in_templateHmm is {self.in_templateHmm}")
         if self.twoD_chemistry:
             if self.in_complementHmm is None:
                 self.failStop("[SignalAlignment.run] ERROR Need to have complement HMM for 2D analysis", npRead)
@@ -310,9 +316,10 @@ class SignalAlignment(object):
             model_label = ".sm3Hdp"
             stateMachineType_flag = "--sm3Hdp "
             if self.twoD_chemistry:
-                assert (self.in_templateHdp is not None) and (self.in_complementHdp is not None), "Need to provide HDPs"
+                self.check((self.in_templateHdp is not None) and (self.in_complementHdp is not None),
+                           "Need to provide HDPs")
             else:
-                assert self.in_templateHdp is not None, "Need to provide Template HDP"
+                self.check(self.in_templateHdp is not None, "Need to provide Template HDP")
         else:  # make invalid stateMachine control?
             model_label = ".sm"
             stateMachineType_flag = ""
@@ -360,10 +367,10 @@ class SignalAlignment(object):
                    "".format(t=self.in_templateHmm, c=self.in_complementHmm))
 
         # reference sequences
-        assert os.path.isfile(self.forward_reference)
+        self.check(os.path.isfile(self.forward_reference), f"os.path.isfile({self.forward_reference})")
         forward_ref_flag = "-f {f_ref} ".format(f_ref=self.forward_reference)
         if self.backward_reference:
-            assert os.path.isfile(self.backward_reference)
+            self.check(os.path.isfile(self.backward_reference), f"os.path.isfile({self.backward_reference})")
             backward_ref_flag = "-b {b_ref} ".format(b_ref=self.backward_reference)
         else:
             backward_ref_flag = ""
@@ -516,7 +523,7 @@ class SignalAlignment(object):
                                               complement_event_detections=complement_events)
 
         signal_align_path = npRead.fastFive.get_analysis_new("SignalAlign")
-        assert signal_align_path, "There is no path in Fast5 file with identifier: SignalAlign"
+        self.check(signal_align_path, "There is no path in Fast5 file with identifier: SignalAlign")
 
         if self.output_format == "both":
             output_path = npRead._join_path(signal_align_path, "full")

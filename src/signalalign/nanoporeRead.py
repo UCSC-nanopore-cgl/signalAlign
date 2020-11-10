@@ -1,13 +1,14 @@
-import sys
 import os
 import re
-import numpy as np
+import sys
 from itertools import islice
+
+import numpy as np
+from Bio import SeqIO
+from py3helpers.utils import check_numpy_table
+from signalalign.event_detection import load_from_raw2
 from signalalign.fast5 import Fast5
 from signalalign.utils.sequenceTools import get_full_nucleotide_read_from_alignment
-from signalalign.event_detection import load_from_raw, load_from_raw2
-from py3helpers.utils import check_numpy_table
-from Bio import SeqIO
 
 try:
     from StringIO import StringIO
@@ -91,7 +92,7 @@ class NanoporeRead(object):
         self.rna = False
         if self.is_read_rna() or rna:
             self.rna = True
-            assert self.twoD is False, "Cannot perform 2D analysis when using RNA data"
+            self.check(self.twoD is False, "Cannot perform 2D analysis when using RNA data")
         self.print(f"[NanoporeRead:open] is this an rna read?: {self.rna}")
         # initialize if appropriate
         if initialize:
@@ -100,6 +101,12 @@ class NanoporeRead(object):
     def print(self, msg, file=sys.stdout, end="\n"):
         if self.debug:
             print(msg, file=file, end=end)
+
+    def check(self, statement, message=""):
+        if self.read_label is not None:
+            assert statement, f"KEY:FAILED:{self.read_label}: {message}"
+        else:
+            assert statement, f"KEY:FAILED:{self.filename}: {message}"
 
     def open(self):
         if self.is_open: return True
@@ -332,9 +339,9 @@ class NanoporeRead(object):
         """
 
         self.template_strand_event_map = self.make_event_map(self.template_events, self.kmer_length)
-        assert len(self.template_strand_event_map) == len(self.template_read), \
-            "Read and event map lengths do not match {} != {}".format(len(self.template_read),
-                                                                      len(self.template_strand_event_map))
+        self.check(len(self.template_strand_event_map) == len(self.template_read),
+                   "Read and event map lengths do not match {} != {}".format(len(self.template_read),
+                                                                             len(self.template_strand_event_map)))
 
         return True
 
@@ -817,8 +824,10 @@ class NanoporeRead2D(NanoporeRead):
             nb_template_gaps = 0
 
         # check that we have mapped all of the bases in the 2D read
-        assert (len(self.template_event_map) == len(self.alignment_table_sequence))
-        assert (len(self.complement_event_map) == len(self.alignment_table_sequence))
+        self.check(len(self.template_event_map) == len(self.alignment_table_sequence),
+                   "len(self.template_event_map) != len(self.alignment_table_sequence)")
+        self.check(len(self.complement_event_map) == len(self.alignment_table_sequence),
+                   "len(self.template_event_map) != len(self.alignment_table_sequence)")
         return True
 
     def init_event_map(self):
@@ -829,13 +838,13 @@ class NanoporeRead2D(NanoporeRead):
 
         super(NanoporeRead2D, self).init_event_map()
 
-        assert self.get_complement_events(), "Complement event table not present at {} in {}".format(
-            self.complement_event_table_address, self.filename)
+        self.check(self.get_complement_events(),
+                   f"Complement event table not present at {self.complement_event_table_address} in {self.filename}")
 
         self.complement_strand_event_map = self.make_event_map(self.complement_events, self.kmer_length)
-        assert len(self.complement_strand_event_map) == len(self.complement_read), \
-            "Complement read and event map lengths do not match {} != {}".format(len(self.complement_read),
-                                                                                 len(self.complement_strand_event_map))
+        self.check(len(self.complement_strand_event_map) == len(self.complement_read),
+                   f"Complement read and event map lengths do not match "
+                   f"{len(self.complement_read)} != {len(self.complement_strand_event_map)}")
         return True
 
     def get_complement_events(self):
