@@ -1035,12 +1035,14 @@ def multithread_signal_alignment_samples(samples, signal_align_arguments, worker
             "Sample {} does not have a filter read generator. " \
             "Must pass in alignment_file and readdb and quality_threshold".format(sample.name)
         if not debug:
-            # with captured_output() as (_, _):
-            output_files = multithread_signal_alignment(signal_align_arguments, [], worker_count, debug=debug,
-                                                        filter_reads_to_string_wrapper_funct=sample.filter_read_generator)
+            with captured_output() as (_, _):
+                output_files = multithread_signal_alignment(signal_align_arguments, [], worker_count, debug=debug,
+                                                            filter_reads_to_string_wrapper_funct=
+                                                            sample.filter_read_generator)
         else:
             output_files = multithread_signal_alignment(signal_align_arguments, [], worker_count, debug=debug,
-                                                        filter_reads_to_string_wrapper_funct=sample.filter_read_generator)
+                                                        filter_reads_to_string_wrapper_funct=
+                                                        sample.filter_read_generator)
 
         print("[multithread_signal_alignment_samples] {} generated {} output_files".format(sample.name,
                                                                                            len(output_files)),

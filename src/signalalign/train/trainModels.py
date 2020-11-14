@@ -30,7 +30,7 @@ def make_master_assignment_table(list_of_assignment_paths, min_probability=0.0, 
 
     :param full: if assignment table is "full"
     :param list_of_assignment_paths: list of all paths to assignment.tsv files to concat
-    :param min_probability: minimum probabilty to keep
+    :param min_probability: minimum probability to keep
     :return: pandas DataFrame of all assignments
     """
     assignment_dfs = []
@@ -46,7 +46,7 @@ def multiprocess_make_master_assignment_table(list_of_assignment_paths, min_prob
     :param worker_count: number of workers
     :param full: if assignment table is "full"
     :param list_of_assignment_paths: list of all paths to assignment.tsv files to concat
-    :param min_probability: minimum probabilty to keep
+    :param min_probability: minimum probability to keep
     :return: pandas DataFrame of all assignments
     """
     extra_args = {"min_probability": min_probability,
@@ -77,7 +77,7 @@ def multiprocess_make_kmer_assignment_tables(list_of_assignment_paths, kmers, st
     :param max_assignments:
     :param worker_count:
     :param list_of_assignment_paths: list of all paths to assignment.tsv files to concat
-    :param min_probability: minimum probabilty to keep
+    :param min_probability: minimum probability to keep
     :return: pandas DataFrame of all assignments
     """
     # just in case we get a set
@@ -179,7 +179,7 @@ def write_and_generate_build_alignments_positions(full_alignments_dirs, position
     :param max_assignments: maximum number of kmer assignments
     :param verbose: boolean option for print statements
     :param outpath: where to write the output file
-    :return: all kmer assignemnts with at least the min probability and no more than max assignments
+    :return: all kmer assignments with at least the min probability and no more than max assignments
     """
     data = generate_build_alignments_positions(full_alignments_dirs, positions_file, min_probability=min_probability,
                                                max_assignments=max_assignments, verbose=verbose)
@@ -199,7 +199,7 @@ def generate_build_alignments_positions(full_alignments_dirs, positions_file, mi
     :param min_probability: minimum probability for kmer assignments
     :param max_assignments: maximum number of kmer assignments
     :param verbose: boolean option for print statements
-    :return: all kmer assignemnts with at least the min probability and no more than max assignments
+    :return: all kmer assignments with at least the min probability and no more than max assignments
     """
     all_data = []
     positions_data = CustomAmbiguityPositions.parseAmbiguityFile(positions_file)
@@ -392,7 +392,7 @@ class CreateHdpTrainingData(object):
         Control how each kmer/event assignment is processed given a set of samples and the parameters associated with
         each sample
 
-        :param out_file_path: path to ouptut file
+        :param out_file_path: path to output file
         :param jobs: number of jobs to multiprocess with
         :param samples: SignalAlignSamples
         :param template: generate kmers for template read strand: default: True
@@ -537,7 +537,7 @@ class CreateHdpTrainingData(object):
     #         self.set_kmer_len(len(sample_assignment_table.iloc[0]['kmer']))
     #         # get kmers associated with each sample
     #         kmers = self.get_sample_kmers(sample)
-    #         # write correctly formated output
+    #         # write correctly formatted output
     #         final_output.append(generate_build_alignments(sample_assignment_table, kmers,
     #                                                      max_assignments=sample.number_of_kmer_assignments,
     #                                                      strands=self.strands, verbose=verbose))
