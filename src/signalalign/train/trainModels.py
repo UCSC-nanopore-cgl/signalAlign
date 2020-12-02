@@ -693,6 +693,8 @@ class TrainSignalAlign(object):
         self._check_config()
         self.og_model_weight = 100
         self.mod_only = self.args.mod_only
+        self.use_median = self.args.use_median
+        self.min_sd = self.args.min_sd
 
     def _create_samples(self):
         """Create SignalAlignSample for each sample"""
@@ -708,7 +710,7 @@ class TrainSignalAlign(object):
         self.working_path = self.working_folder.open_folder(os.path.join(self.args.output_dir,
                                                                          "tempFiles_trainModels_" + str(append)))
 
-    def train_normal_emmissions(self, iteration="", mod_only=False):
+    def train_normal_emmissions(self, iteration="", mod_only=False, use_median=False, min_sd=0):
         """Generate a gaussian model from signalalign output"""
         if self.args.built_alignments:
             assert os.path.isfile(self.args.built_alignments), \
@@ -747,13 +749,19 @@ class TrainSignalAlign(object):
                     continue
             kmer_data = t_data[t_data["kmer"] == kmer]["level_mean"]
             n_data = len(kmer_data)
-            med = np.median(kmer_data) * n_data
-            mad = median_abs_deviation(kmer_data, scale='normal') * n_data
+            if use_median:
+                mean = np.median(kmer_data) * n_data
+                sd = median_abs_deviation(kmer_data, scale='normal') * n_data
+            else:
+                mean = np.mean(kmer_data) * n_data
+                sd = np.std(kmer_data) * n_data
+
             normal_mean, normal_sd = template_model.get_event_mean_gaussian_parameters(kmer)
             normal_mean *= self.og_model_weight
             normal_sd *= self.og_model_weight
-            template_model.set_kmer_event_mean_params(kmer, (med + normal_mean) / (n_data + self.og_model_weight),
-                                                      (mad + normal_sd) / (n_data + self.og_model_weight))
+            template_model.set_kmer_event_mean_params(kmer, (mean + normal_mean) / (n_data + self.og_model_weight),
+                                                      np.max([(sd + normal_sd) / (n_data + self.og_model_weight),
+                                                              min_sd]))
 
         template_model.normalized = True
         template_model.write(template_hmm_model_path)
@@ -769,13 +777,21 @@ class TrainSignalAlign(object):
                         continue
                 kmer_data = c_data[c_data["kmer"] == kmer]["level_mean"]
                 n_data = len(kmer_data)
-                med = np.median(kmer_data) * n_data
-                mad = median_abs_deviation(kmer_data, scale='normal') * n_data
+                if use_median:
+                    mean = np.median(kmer_data) * n_data
+                    sd = median_abs_deviation(kmer_data, scale='normal') * n_data
+                else:
+                    mean = np.mean(kmer_data) * n_data
+                    sd = np.std(kmer_data) * n_data
+
                 normal_mean, normal_sd = complement_model.get_event_mean_gaussian_parameters(kmer)
                 normal_mean *= self.og_model_weight
                 normal_sd *= self.og_model_weight
-                complement_model.set_kmer_event_mean_params(kmer, (med + normal_mean) / (n_data + self.og_model_weight),
-                                                            (mad + normal_sd) / (n_data + self.og_model_weight))
+                complement_model.set_kmer_event_mean_params(kmer,
+                                                            (mean + normal_mean) / (n_data + self.og_model_weight),
+                                                            np.max([(sd + normal_sd) / (n_data + self.og_model_weight),
+                                                                    min_sd]))
+
             complement_model.normalized = True
             complement_model.write(complement_hmm_model_path)
 
@@ -961,7 +977,7 @@ class TrainSignalAlign(object):
                     self.train_hdp(iteration=str(i))
                 else:
                     print("[trainModels] Training HMM emission distributions. iteration: {}".format(i))
-                    self.train_normal_emmissions(iteration=str(i), mod_only=self.mod_only)
+                    self.train_normal_emmissions(iteration=str(i), mod_only=self.mod_only, use_median=True, min_sd=0)
                 print(self.template_hdp_model_path)
                 print(self.template_hmm_model_path)
                 print(self.complement_hmm_model_path)
@@ -973,7 +989,7 @@ class TrainSignalAlign(object):
                 print("[trainModels] Training HMM emission distributions.")
                 if not self.args.built_alignments:
                     self.run_signal_align(check_samples=True)
-                self.train_normal_emmissions(iteration="", mod_only=self.mod_only)
+                self.train_normal_emmissions(iteration="", mod_only=self.mod_only, use_median=True, min_sd=0)
             if self.args.training.transitions:
                 print("[trainModels] Training HMM transition distributions.")
                 self.train_transitions(iteration="")
