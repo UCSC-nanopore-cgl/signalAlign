@@ -1,4 +1,8 @@
-sudo: required
+language:
+  python
+os: linux
+dist: bionic
+
 services:
 - docker
 env:
