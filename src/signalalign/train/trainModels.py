@@ -977,7 +977,8 @@ class TrainSignalAlign(object):
                     self.train_hdp(iteration=str(i))
                 else:
                     print("[trainModels] Training HMM emission distributions. iteration: {}".format(i))
-                    self.train_normal_emmissions(iteration=str(i), mod_only=self.mod_only, use_median=True, min_sd=0)
+                    self.train_normal_emmissions(iteration=str(i), mod_only=self.mod_only, use_median=self.use_median,
+                                                 min_sd=self.min_sd)
                 print(self.template_hdp_model_path)
                 print(self.template_hmm_model_path)
                 print(self.complement_hmm_model_path)
@@ -989,7 +990,8 @@ class TrainSignalAlign(object):
                 print("[trainModels] Training HMM emission distributions.")
                 if not self.args.built_alignments:
                     self.run_signal_align(check_samples=True)
-                self.train_normal_emmissions(iteration="", mod_only=self.mod_only, use_median=True, min_sd=0)
+                self.train_normal_emmissions(iteration="", mod_only=self.mod_only, use_median=self.use_median,
+                                             min_sd=self.min_sd)
             if self.args.training.transitions:
                 print("[trainModels] Training HMM transition distributions.")
                 self.train_transitions(iteration="")
