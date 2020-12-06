@@ -695,6 +695,25 @@ class TrainSignalAlign(object):
         self.mod_only = self.args.mod_only
         self.use_median = self.args.use_median
         self.min_sd = self.args.min_sd
+        self.training_kmers = self.load_training_kmers(self.args.training_kmers)
+
+    @staticmethod
+    def load_training_kmers(training_kmers_path):
+        """Load a file with new lines separating the kmers to train
+        :param training_kmers_path: path to training kmer file
+        """
+        if training_kmers_path:
+            assert os.path.exists(training_kmers_path), f"training_kmers_path does not exist: {training_kmers_path}"
+            kmers = []
+            with open(training_kmers_path, 'r') as fh:
+                for line in fh:
+                    kmers.append(line.rstrip())
+            output_kmers = set(kmers)
+            assert len(output_kmers) == len(kmers), f"check training_kmers file. len(output_kmers) != len(kmers): " \
+                                                    f"{len(output_kmers)} != {len(kmers)}"
+            return output_kmers
+        else:
+            return False
 
     def _create_samples(self):
         """Create SignalAlignSample for each sample"""
@@ -747,6 +766,9 @@ class TrainSignalAlign(object):
             if mod_only:
                 if len(set(kmer) - {"A", "T", "G", "C"}) == 0:
                     continue
+            if self.training_kmers:
+                if kmer not in self.training_kmers:
+                    continue
             kmer_data = t_data[t_data["kmer"] == kmer]["level_mean"]
             n_data = len(kmer_data)
             if use_median:
@@ -774,6 +796,9 @@ class TrainSignalAlign(object):
             for kmer in set(c_data["kmer"]):
                 if mod_only:
                     if len(set(kmer) - {"A", "T", "G", "C"}) == 0:
+                        continue
+                if self.training_kmers:
+                    if kmer not in self.training_kmers:
                         continue
                 kmer_data = c_data[c_data["kmer"] == kmer]["level_mean"]
                 n_data = len(kmer_data)
