@@ -5,7 +5,8 @@ MAINTAINER Andrew Bailey, andbaile@ucsc.edu
 ENV VIRTUAL_ENV=/opt/venv
 RUN python3.7 -m venv $VIRTUAL_ENV
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
-RUN python3.7 -m pip -q install wheel
+# cryptography needed for moto[s3] but new versions need rust installed
+RUN python3.7 -m pip -q install wheel cryptography==2.3.0
 
 ENV BUILD_SHARED_LIBS="OFF"
 RUN git clone --recursive --single-branch --branch bailey-dev  https://github.com/adbailey4/embed_fast5.git && \
