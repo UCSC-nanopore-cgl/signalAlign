@@ -11,7 +11,7 @@ from argparse import ArgumentParser
 from shutil import copyfile
 from subprocess import check_call
 import shutil
-from scipy.stats import median_abs_deviation
+from scipy.stats import median_absolute_deviation
 from py3helpers.utils import create_dot_dict, merge_lists, all_string_permutations, load_json, \
     count_lines_in_file, merge_dicts, list_dir, captured_output
 from py3helpers.multiprocess import *
@@ -595,7 +595,9 @@ def get_hdp_type(requested_type):
         "singleLevelFixedCanonical": 14,
         "singleLevelFixedM6A": 15,
         "singleLevelFixedrRNA": 16,
-        "singleLevelAll16SrRNA": 17
+        "singleLevelAll16SrRNA": 17,
+        "singleLevelYeast": 18,
+        "singleLevelYeastAltC": 19
     }
     assert (requested_type in list(hdp_types.keys())), "Requested HDP type is invalid, got {}".format(requested_type)
     return hdp_types[requested_type]
@@ -773,7 +775,7 @@ class TrainSignalAlign(object):
             n_data = len(kmer_data)
             if use_median:
                 mean = np.median(kmer_data) * n_data
-                sd = median_abs_deviation(kmer_data, scale='normal') * n_data
+                sd = median_absolute_deviation(kmer_data, scale='normal') * n_data
             else:
                 mean = np.mean(kmer_data) * n_data
                 sd = np.std(kmer_data) * n_data
@@ -804,7 +806,7 @@ class TrainSignalAlign(object):
                 n_data = len(kmer_data)
                 if use_median:
                     mean = np.median(kmer_data) * n_data
-                    sd = median_abs_deviation(kmer_data, scale='normal') * n_data
+                    sd = median_absolute_deviation(kmer_data, scale='normal') * n_data
                 else:
                     mean = np.mean(kmer_data) * n_data
                     sd = np.std(kmer_data) * n_data
