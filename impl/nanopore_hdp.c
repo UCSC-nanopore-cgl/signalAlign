@@ -1196,6 +1196,18 @@ static NanoporeHDP *loadNanoporeHdpFromScratch(NanoporeHdpType nHdpType,
 
         return nHdp;
     }
+    if (nHdpType == singleLevelYeastSmall5mer) {
+      if ((baseGamma == NULL_HYPERPARAMETER) || (leafGamma == NULL_HYPERPARAMETER)) {
+        st_errAbort("loadNanoporeHdpFromScratch: You need to provide a base gamma and leaf gamma "
+                    "for this NanoporeHdpType\n");
+      }
+
+      NanoporeHDP *nHdp = flat_hdp_model(ALL_YEAST_SMALL_5MER, 7, kmerLength,
+                                         baseGamma, leafGamma,
+                                         samplingGridStart, samplingGridEnd, samplingGridLength, modelFile);
+
+      return nHdp;
+    }
     if (nHdpType == singleLevelAll16SrRNA) {
       if ((baseGamma == NULL_HYPERPARAMETER) || (leafGamma == NULL_HYPERPARAMETER)) {
         st_errAbort("loadNanoporeHdpFromScratch: You need to provide a base gamma and leaf gamma "

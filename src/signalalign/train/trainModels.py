@@ -597,7 +597,8 @@ def get_hdp_type(requested_type):
         "singleLevelFixedrRNA": 16,
         "singleLevelAll16SrRNA": 17,
         "singleLevelYeast": 18,
-        "singleLevelYeastAltC": 19
+        "singleLevelYeastAltC": 19,
+        "singleLevelYeastSmall5mer": 20
     }
     assert (requested_type in list(hdp_types.keys())), "Requested HDP type is invalid, got {}".format(requested_type)
     return hdp_types[requested_type]

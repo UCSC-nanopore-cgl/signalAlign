@@ -27,6 +27,7 @@
 #define ALL_16SRRNA "ACEGTbdehip"
 #define ALL_YEAST "ACGTabcdefghijklm"
 #define ALL_YEAST_ALTC "ACGTabcdefghijklmnopq"
+#define ALL_YEAST_SMALL_5MER "ACGTabc"
 
 #define PURINES "AG"
 #define PYRIMIDINES "CEOT"
