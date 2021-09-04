@@ -11,7 +11,7 @@ from argparse import ArgumentParser
 from shutil import copyfile
 from subprocess import check_call
 import shutil
-from scipy.stats import median_absolute_deviation
+from scipy.stats import median_abs_deviation
 from py3helpers.utils import create_dot_dict, merge_lists, all_string_permutations, load_json, \
     count_lines_in_file, merge_dicts, list_dir, captured_output
 from py3helpers.multiprocess import *
@@ -30,7 +30,7 @@ def make_master_assignment_table(list_of_assignment_paths, min_probability=0.0, 
 
     :param full: if assignment table is "full"
     :param list_of_assignment_paths: list of all paths to assignment.tsv files to concat
-    :param min_probability: minimum probabilty to keep
+    :param min_probability: minimum probability to keep
     :return: pandas DataFrame of all assignments
     """
     assignment_dfs = []
@@ -46,7 +46,7 @@ def multiprocess_make_master_assignment_table(list_of_assignment_paths, min_prob
     :param worker_count: number of workers
     :param full: if assignment table is "full"
     :param list_of_assignment_paths: list of all paths to assignment.tsv files to concat
-    :param min_probability: minimum probabilty to keep
+    :param min_probability: minimum probability to keep
     :return: pandas DataFrame of all assignments
     """
     extra_args = {"min_probability": min_probability,
@@ -77,7 +77,7 @@ def multiprocess_make_kmer_assignment_tables(list_of_assignment_paths, kmers, st
     :param max_assignments:
     :param worker_count:
     :param list_of_assignment_paths: list of all paths to assignment.tsv files to concat
-    :param min_probability: minimum probabilty to keep
+    :param min_probability: minimum probability to keep
     :return: pandas DataFrame of all assignments
     """
     # just in case we get a set
@@ -179,7 +179,7 @@ def write_and_generate_build_alignments_positions(full_alignments_dirs, position
     :param max_assignments: maximum number of kmer assignments
     :param verbose: boolean option for print statements
     :param outpath: where to write the output file
-    :return: all kmer assignemnts with at least the min probability and no more than max assignments
+    :return: all kmer assignments with at least the min probability and no more than max assignments
     """
     data = generate_build_alignments_positions(full_alignments_dirs, positions_file, min_probability=min_probability,
                                                max_assignments=max_assignments, verbose=verbose)
@@ -199,7 +199,7 @@ def generate_build_alignments_positions(full_alignments_dirs, positions_file, mi
     :param min_probability: minimum probability for kmer assignments
     :param max_assignments: maximum number of kmer assignments
     :param verbose: boolean option for print statements
-    :return: all kmer assignemnts with at least the min probability and no more than max assignments
+    :return: all kmer assignments with at least the min probability and no more than max assignments
     """
     all_data = []
     positions_data = CustomAmbiguityPositions.parseAmbiguityFile(positions_file)
@@ -392,7 +392,7 @@ class CreateHdpTrainingData(object):
         Control how each kmer/event assignment is processed given a set of samples and the parameters associated with
         each sample
 
-        :param out_file_path: path to ouptut file
+        :param out_file_path: path to output file
         :param jobs: number of jobs to multiprocess with
         :param samples: SignalAlignSamples
         :param template: generate kmers for template read strand: default: True
@@ -537,7 +537,7 @@ class CreateHdpTrainingData(object):
     #         self.set_kmer_len(len(sample_assignment_table.iloc[0]['kmer']))
     #         # get kmers associated with each sample
     #         kmers = self.get_sample_kmers(sample)
-    #         # write correctly formated output
+    #         # write correctly formatted output
     #         final_output.append(generate_build_alignments(sample_assignment_table, kmers,
     #                                                      max_assignments=sample.number_of_kmer_assignments,
     #                                                      strands=self.strands, verbose=verbose))
@@ -595,7 +595,10 @@ def get_hdp_type(requested_type):
         "singleLevelFixedCanonical": 14,
         "singleLevelFixedM6A": 15,
         "singleLevelFixedrRNA": 16,
-        "singleLevelAll16SrRNA": 17
+        "singleLevelAll16SrRNA": 17,
+        "singleLevelYeast": 18,
+        "singleLevelYeastAltC": 19,
+        "singleLevelYeastSmall5mer": 20
     }
     assert (requested_type in list(hdp_types.keys())), "Requested HDP type is invalid, got {}".format(requested_type)
     return hdp_types[requested_type]
@@ -693,6 +696,27 @@ class TrainSignalAlign(object):
         self._check_config()
         self.og_model_weight = 100
         self.mod_only = self.args.mod_only
+        self.use_median = self.args.use_median
+        self.min_sd = self.args.min_sd
+        self.training_kmers = self.load_training_kmers(self.args.training_kmers)
+
+    @staticmethod
+    def load_training_kmers(training_kmers_path):
+        """Load a file with new lines separating the kmers to train
+        :param training_kmers_path: path to training kmer file
+        """
+        if training_kmers_path:
+            assert os.path.exists(training_kmers_path), f"training_kmers_path does not exist: {training_kmers_path}"
+            kmers = []
+            with open(training_kmers_path, 'r') as fh:
+                for line in fh:
+                    kmers.append(line.rstrip())
+            output_kmers = set(kmers)
+            assert len(output_kmers) == len(kmers), f"check training_kmers file. len(output_kmers) != len(kmers): " \
+                                                    f"{len(output_kmers)} != {len(kmers)}"
+            return output_kmers
+        else:
+            return False
 
     def _create_samples(self):
         """Create SignalAlignSample for each sample"""
@@ -708,7 +732,7 @@ class TrainSignalAlign(object):
         self.working_path = self.working_folder.open_folder(os.path.join(self.args.output_dir,
                                                                          "tempFiles_trainModels_" + str(append)))
 
-    def train_normal_emmissions(self, iteration="", mod_only=False):
+    def train_normal_emmissions(self, iteration="", mod_only=False, use_median=False, min_sd=0):
         """Generate a gaussian model from signalalign output"""
         if self.args.built_alignments:
             assert os.path.isfile(self.args.built_alignments), \
@@ -745,15 +769,24 @@ class TrainSignalAlign(object):
             if mod_only:
                 if len(set(kmer) - {"A", "T", "G", "C"}) == 0:
                     continue
+            if self.training_kmers:
+                if kmer not in self.training_kmers:
+                    continue
             kmer_data = t_data[t_data["kmer"] == kmer]["level_mean"]
             n_data = len(kmer_data)
-            med = np.median(kmer_data) * n_data
-            mad = median_absolute_deviation(kmer_data) * n_data
+            if use_median:
+                mean = np.median(kmer_data) * n_data
+                sd = median_abs_deviation(kmer_data, scale='normal') * n_data
+            else:
+                mean = np.mean(kmer_data) * n_data
+                sd = np.std(kmer_data) * n_data
+
             normal_mean, normal_sd = template_model.get_event_mean_gaussian_parameters(kmer)
             normal_mean *= self.og_model_weight
             normal_sd *= self.og_model_weight
-            template_model.set_kmer_event_mean_params(kmer, (med + normal_mean) / (n_data + self.og_model_weight),
-                                                      (mad + normal_sd) / (n_data + self.og_model_weight))
+            template_model.set_kmer_event_mean_params(kmer, (mean + normal_mean) / (n_data + self.og_model_weight),
+                                                      np.max([(sd + normal_sd) / (n_data + self.og_model_weight),
+                                                              min_sd]))
 
         template_model.normalized = True
         template_model.write(template_hmm_model_path)
@@ -767,15 +800,26 @@ class TrainSignalAlign(object):
                 if mod_only:
                     if len(set(kmer) - {"A", "T", "G", "C"}) == 0:
                         continue
+                if self.training_kmers:
+                    if kmer not in self.training_kmers:
+                        continue
                 kmer_data = c_data[c_data["kmer"] == kmer]["level_mean"]
                 n_data = len(kmer_data)
-                med = np.median(kmer_data) * n_data
-                mad = median_absolute_deviation(kmer_data) * n_data
+                if use_median:
+                    mean = np.median(kmer_data) * n_data
+                    sd = median_abs_deviation(kmer_data, scale='normal') * n_data
+                else:
+                    mean = np.mean(kmer_data) * n_data
+                    sd = np.std(kmer_data) * n_data
+
                 normal_mean, normal_sd = complement_model.get_event_mean_gaussian_parameters(kmer)
                 normal_mean *= self.og_model_weight
                 normal_sd *= self.og_model_weight
-                complement_model.set_kmer_event_mean_params(kmer, (med + normal_mean) / (n_data + self.og_model_weight),
-                                                            (mad + normal_sd) / (n_data + self.og_model_weight))
+                complement_model.set_kmer_event_mean_params(kmer,
+                                                            (mean + normal_mean) / (n_data + self.og_model_weight),
+                                                            np.max([(sd + normal_sd) / (n_data + self.og_model_weight),
+                                                                    min_sd]))
+
             complement_model.normalized = True
             complement_model.write(complement_hmm_model_path)
 
@@ -961,7 +1005,8 @@ class TrainSignalAlign(object):
                     self.train_hdp(iteration=str(i))
                 else:
                     print("[trainModels] Training HMM emission distributions. iteration: {}".format(i))
-                    self.train_normal_emmissions(iteration=str(i), mod_only=self.mod_only)
+                    self.train_normal_emmissions(iteration=str(i), mod_only=self.mod_only, use_median=self.use_median,
+                                                 min_sd=self.min_sd)
                 print(self.template_hdp_model_path)
                 print(self.template_hmm_model_path)
                 print(self.complement_hmm_model_path)
@@ -973,7 +1018,8 @@ class TrainSignalAlign(object):
                 print("[trainModels] Training HMM emission distributions.")
                 if not self.args.built_alignments:
                     self.run_signal_align(check_samples=True)
-                self.train_normal_emmissions(iteration="", mod_only=self.mod_only)
+                self.train_normal_emmissions(iteration="", mod_only=self.mod_only, use_median=self.use_median,
+                                             min_sd=self.min_sd)
             if self.args.training.transitions:
                 print("[trainModels] Training HMM transition distributions.")
                 self.train_transitions(iteration="")

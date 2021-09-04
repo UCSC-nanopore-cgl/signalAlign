@@ -75,5 +75,9 @@
   "traceBackDiagonals": 100,
   "filter_reads": 0,
   "rna": false,
-  "mod_only": false
+  "mod_only": false,
+  "delete_alignments": false,
+  "use_median": false,
+  "min_sd": 0,
+  "training_kmers": null
 }

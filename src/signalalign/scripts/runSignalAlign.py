@@ -38,7 +38,7 @@ def parse_args():
 
     # parsers for running the full pipeline
     run_parser = subparsers.add_parser("run", help="runs full workflow ")
-    run_parser.add_argument('--config', default='trainModels-config.yaml', type=str,
+    run_parser.add_argument('--config', default='trainModels-config.json', type=str,
                             help='Path to the (filled in) config file, generated with "generate".')
 
     run_parser2 = subparsers.add_parser("run2", help="runs full workflow ")
@@ -194,7 +194,7 @@ def main():
         print("\n#  signalAlign - finished alignments\n", file=sys.stderr)
         print("\n#  signalAlign - finished alignments\n", file=sys.stdout)
         stop = timer()
-    if args.command == "run2":
+    elif args.command == "run2":
         command_line = " ".join(sys.argv[:])
         print(os.getcwd())
 
@@ -313,7 +313,6 @@ def main():
         print("\n#  signalAlign - finished alignments\n", file=sys.stdout)
     else:
         print("Must specify run or run2: 'runSignalAlign.py run' ")
-        stop = timer()
         sys.exit()
 
     print("[signalAlign] Complete")

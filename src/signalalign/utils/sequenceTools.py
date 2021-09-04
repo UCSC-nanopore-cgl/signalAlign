@@ -597,7 +597,7 @@ class CustomAmbiguityPositions(object):
                                     "position": np.int,
                                     "strand": np.str,
                                     "change_from": np.str,
-                                    "change_to": np.str})
+                                    "change_to": np.str}).sort_values(by=['contig', 'strand', 'position'])
 
     def getForwardSequence(self, contig, raw_sequence):
         """Edit 'raw_sequence' given a ambiguity positions file. Assumes raw_sequence is forward direction( 5'-3')

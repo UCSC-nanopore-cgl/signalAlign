@@ -89,6 +89,7 @@ class TrainSignalAlignTest(unittest.TestCase):
 
         cls.default_args.complement_hmm_model = cls.r9_complement_model_file_acgt
         cls.default_args.template_hmm_model = cls.r9_template_model_file_acgt
+        cls.training_kmers = os.path.join(cls.HOME, "tests/train_kmers.txt")
 
     def test_parse_assignment_file(self):
         with captured_output() as (_, _):
@@ -456,6 +457,15 @@ class TrainSignalAlignTest(unittest.TestCase):
                     self.assertTrue("CCAGG" in seq or "CCTGG" in seq)
                 else:
                     self.assertTrue("CCAGG" in rc.reverse_complement(seq) or "CCTGG" in rc.reverse_complement(seq))
+
+    def test_load_training_kmers(self):
+        # with captured_output() as (_, _):
+        fake_args = create_dot_dict(self.default_args.copy())
+        self.assertTrue(os.path.exists(self.training_kmers))
+        fake_args.training_kmers = self.training_kmers
+        self.assertFalse(TrainSignalAlign.load_training_kmers(False))
+        self.assertFalse(TrainSignalAlign.load_training_kmers(None))
+        self.assertSetEqual({"ATGCC"}, TrainSignalAlign.load_training_kmers(self.training_kmers))
 
 
 if __name__ == '__main__':
