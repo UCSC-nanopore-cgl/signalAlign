@@ -38,7 +38,7 @@ def parse_args():
 
     # parsers for running the full pipeline
     run_parser = subparsers.add_parser("run", help="runs full workflow ")
-    run_parser.add_argument('--config', default='trainModels-config.yaml', type=str,
+    run_parser.add_argument('--config', default='trainModels-config.json', type=str,
                             help='Path to the (filled in) config file, generated with "generate".')
 
     run_parser2 = subparsers.add_parser("run2", help="runs full workflow ")
