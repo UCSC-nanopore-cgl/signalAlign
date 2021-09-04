@@ -11,7 +11,7 @@ RUN python3.7 -m pip -q install wheel
 #RUN python3.7 -m pip -q install wheel cryptography==2.3.0 moto[s3]==1.3.14
 
 ENV BUILD_SHARED_LIBS="OFF"
-RUN git clone --recursive --single-branch --branch bailey-dev  https://github.com/adbailey4/embed_fast5.git && \
+RUN git clone --recursive --single-branch https://github.com/adbailey4/embed_fast5.git && \
     cd /root/embed_fast5 && \
     python3.7 -m pip install .
 
