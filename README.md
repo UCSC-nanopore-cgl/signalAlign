@@ -143,7 +143,7 @@ finally, `assignments` has the following tab-separated format:
 
 
 
-####Positions File Specification
+#### Positions File Specification
 
 Tsv file with the columns seen below. Used to change the `bwa_reference` characters to ambiguous characters defined
 in both the [ambig model](#ambiguous-model-specification) and hmm/hdp model. see [Example](tests/test_position_files/CCWGG_ecoli_k12_mg1655.positions)
@@ -152,7 +152,7 @@ in both the [ambig model](#ambiguous-model-specification) and hmm/hdp model. see
 |--- | --- | --- | --- | --- |
 
 
-####Ambiguous Model Specification
+#### Ambiguous Model Specification
 
 Tsv file with the columns seen below. If a character in the `find` column is found in the reference, the model
 will create branch points for each of the `replace` characters. This model allows you to specify a set of arbitrary characters
