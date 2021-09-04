@@ -1,6 +1,9 @@
 [![Build Status](https://travis-ci.org/UCSC-nanopore-cgl/signalAlign.svg?branch=master)](https://github.com/UCSC-nanopore-cgl/signalAlign)
+
 # SignalAlign
+
 ## Introduction
+
 Nanopore sequencing is based on the principal of isolating a nanopore in a membrane separating buffered salt solutions, 
 then applying a voltage across the membrane and monitoring the ionic current through the nanopore. 
 The Oxford Nanopore Technologies (ONT) MinION sequences DNA by recording the ionic current as DNA strands are 
@@ -11,6 +14,7 @@ hierarchical Dirichlet process (HDP) mixture of normal distributions.
 The HDP models enable mapping of methylated bases to your reference sequence. 
 
 ###### Description of programs
+
 * runSignalAlign
   * Aligns ionic current events from a directory of basecalled MinION reads (.fast5) to a reference sequence. With appropriate inputs, characters in the reference sequence can be flagged as _ambiguous_, meaning multiple bases will be probabilistically aligned to a position. Right now, the program the program supports aligning cytosine variants (5-mC and 5-hmC) and adenine variants (6-mA) to a position.
 * trainModels
@@ -18,15 +22,19 @@ The HDP models enable mapping of methylated bases to your reference sequence.
 
 
 ## Installation:
+
 Given the installation is often long, tedious and somewhat fragile we recommend using Docker to run signalAlign.
 
 #### Docker image
+
 ucscbailey/signalalign:latest
 
 ### Installation:
+
 There is an installation script which works and has been tested on a clean ubuntu18.08 server from aws. 
 
 #### Requirements
+
   * Cmake v3.17.0
   * htslib v1.9
   * boost v1.69.0
@@ -58,11 +66,12 @@ python3.7 -m pytest
 ```
 
 ### Recommened Workflow
+
 1. Install
 2. Generate a BAM file, preferably with MD field. We have a filtering steps which removes secondary and supplementary reads as well as reads with a mean phred quality score of less than 7. NOTE: Use minimap2 for RNA mapping so BAM format is correct. If you are interested in specific regions of the genome or some other subsets of reads, I would recommend filtering your BAM to specified regions.
 3. Split Multi-fast5's into single fast5s. Yes I know this is tedious and disk intensive but we have no plans on supporting multi-fast5s. [ONT's](https://github.com/nanoporetech/ont_fast5_api) software is recommended.
 4. Generate an index file with mapping between read_id and fast5 file. We use nanopolish's index and can be accessed via 'embed_main index'.
-5. Generate positions file (see [Positions File Specification](####Positions File Specification))
+5. Generate positions file (see [Positions File Specification](#positions-file-specification))
 6. Create a config file. An example config file is located in [tests](tests/runSignalAlign-config.json).
 ```
 runSignalAlign.py run --config tests/runSignalAlign-config.json &> log_file.txt
@@ -79,11 +88,11 @@ runSignalAlign.py run --config tests/runSignalAlign-config.json &> log_file.txt
 `"event_table": null,` specify location of event table in fast5 (deprecated)  
 `"embed": false,` embed signalalign data into fast5 (not recommened)  
 `"delete_tmp": true,` delete temorary folders (highly recommened)  
-`"output_format": "full"` specify output format "full", "assignments", "variantCaller" (see [Output Formats](####Output Formats))  
+`"output_format": "full"` specify output format "full", "assignments", "variantCaller" (see [Output Formats](#output-formats))  
 `},`  
 `"samples": [`  
 `{`  
-`"positions_file": "path/to/file.positions",` locations to call mods (see [Positions File Specification](####Positions File Specification))  
+`"positions_file": "path/to/file.positions",` locations to call mods (see [Positions File Specification](#positions-file-specification))  
 `"fast5_dirs": ["/path/to/fast5/"],`path to fast5 files  
 `"bwa_reference": "/path/to/reference.fa",` path to reference   
 `"fofns": [],` deprecated  
@@ -109,7 +118,7 @@ runSignalAlign.py run --config tests/runSignalAlign-config.json &> log_file.txt
 `"perform_kmer_event_alignment": true,` force pre alignment between kmers and events   
 `"overwrite": true,` overwrite previous runs  
 `"rna": true,` set to true if rna  
-`"ambig_model": path/to/ambig.model",` ambiguous model (see [Ambiguous Model Specification](####Ambiguous Model Specification)   
+`"ambig_model": path/to/ambig.model",` ambiguous model (see [Ambiguous Model Specification](#ambiguous-model-specification)   
 `"built_alignments": null,` deprecated  
 `}`  
 
@@ -135,14 +144,16 @@ finally, `assignments` has the following tab-separated format:
 
 
 ####Positions File Specification
+
 Tsv file with the columns seen below. Used to change the `bwa_reference` characters to ambiguous characters defined
-in both the [ambig model](####Ambiguous Model Specification) and hmm/hdp model. see [Example](tests/test_position_files/CCWGG_ecoli_k12_mg1655.positions)
+in both the [ambig model](#ambiguous-model-specification) and hmm/hdp model. see [Example](tests/test_position_files/CCWGG_ecoli_k12_mg1655.positions)
 
 | contig (str) | 0_based_ref_index (int)| strand (str)| ref_char (str)| replacement_char (str)|
 |--- | --- | --- | --- | --- |
 
 
 ####Ambiguous Model Specification
+
 Tsv file with the columns seen below. If a character in the `find` column is found in the reference, the model
 will create branch points for each of the `replace` characters. This model allows you to specify a set of arbitrary characters
 to represent a set of arbitrary modifications or variants. Note: Must be consistent with a HMM model.
@@ -152,10 +163,14 @@ to represent a set of arbitrary modifications or variants. Note: Must be consist
 
 
 ## trainModels Config Specifications
+
 #### Input
+
 _Required_
 * A config file. The default/test model can be found at `tests/trainModels-config.json`
+
 #### Options
+
 `{  `  
 `"signal_alignment_args": {` SignalAlign arguments to be used for each sample  
 `"target_regions": null,` If you want to specify regions of the genome to process
@@ -232,6 +247,7 @@ _Required_
 }
 
 ##### HDP_TYPES_ACEGOT
+
     ("singleLevelFixed", 0),
     ("singleLevelPrior", 1),
     ("multisetFixed", 2),
@@ -245,6 +261,7 @@ _Required_
 
 
 ##### HDP_TYPES_1D
+
     ("singleLevelPrior2", 10),
     ("multisetPrior2", 11),
     ("singleLevelFixedCanonical", 14),
@@ -252,22 +269,27 @@ _Required_
 
 
 ##### HDP_TYPES_ACEGT
+
     ("singleLevelPrior2", 10),
     ("multisetPrior2", 11),
 
 
 ##### HDP_TYPES_ACGT
+
     ("singleLevelFixedCanonical", 14)
 
 ##### HDP_TYPES_ACEGIT
+
     ("multisetPriorEcoli", 12),
     ("singleLevelPriorEcoli", 13),
 
 ##### HDP_TYPES_ACFGT
+
     F = m6A
     ("singleLevelFixedM6A", 15),
 
 #### Output
+
 * `template_trained.hmm` template HMM with trained parameters
 * `complement_trained.hmm` complement HMM with trained parameters if 2D
   If HDPs were used, a copy of the input HDP will also be here, they have `.nhdp` suffix.
