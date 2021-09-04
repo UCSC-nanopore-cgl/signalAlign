@@ -10,9 +10,15 @@ The emissions model for the HMM can either be the table of parametric normal dis
 hierarchical Dirichlet process (HDP) mixture of normal distributions. 
 The HDP models enable mapping of methylated bases to your reference sequence. 
 
+###### Description of programs
+* runSignalAlign
+  * Aligns ionic current events from a directory of basecalled MinION reads (.fast5) to a reference sequence. With appropriate inputs, characters in the reference sequence can be flagged as _ambiguous_, meaning multiple bases will be probabilistically aligned to a position. Right now, the program the program supports aligning cytosine variants (5-mC and 5-hmC) and adenine variants (6-mA) to a position.
+* trainModels
+  * Trains the transitions and/or emissions of the HMM. Uses a directory of basecalled reads and a reference sequence to learn transition parameters to the model. Once enough assignments have been accumulated it will (optionally) rebuild a hierarchical Dirichlet process (HDP) from these assignments.
+
 
 ## Installation:
-Given the installation is tedious and long we recommend using Docker to run signalAlign.
+Given the installation is often long, tedious and somewhat fragile we recommend using Docker to run signalAlign.
 
 #### Docker image
 ucscbailey/signalalign:latest
@@ -53,56 +59,61 @@ python3.7 -m pytest
 
 ### Recommened Workflow
 1. Install
-2. Extract fastq's and generate a readdb file with mapping between read_id and fast5 file. Note: A sequencing summary file can be passed in as a `readdb` file.
-3. Generate BAM file, preferably with MD field. We have a filtering steps which removes secondary and supplementary reads as well as reads with a mean phred quality score of less than 7. NOTE: Use minimap2 for RNA mapping so BAM format is correct.
-4. If you are interested in specific regions of the genome or some other other subsets of reads, I would recommend filtering your BAM to specified regions.
-5. A config file is setup in tests/ to run from the signalAlign home directory
+2. Generate a BAM file, preferably with MD field. We have a filtering steps which removes secondary and supplementary reads as well as reads with a mean phred quality score of less than 7. NOTE: Use minimap2 for RNA mapping so BAM format is correct. If you are interested in specific regions of the genome or some other subsets of reads, I would recommend filtering your BAM to specified regions.
+3. Split Multi-fast5's into single fast5s. Yes I know this is tedious and disk intensive but we have no plans on supporting multi-fast5s. [ONT's](https://github.com/nanoporetech/ont_fast5_api) software is recommended.
+4. Generate an index file with mapping between read_id and fast5 file. We use nanopolish's index and can be accessed via 'embed_main index'.
+5. Generate positions file (see [Positions File Specification](####Positions File Specification))
+6. Create a config file. An example config file is located in [tests](tests/runSignalAlign-config.json).
 ```
 runSignalAlign.py run --config tests/runSignalAlign-config.json &> log_file.txt
 ```
+7. Run signalAlign 
 
-### Description of programs
-* runSignalAlign
-    * Aligns ionic current events from a directory of basecalled MinION reads (.fast5) to a reference sequence. With appropriate inputs, characters in the reference sequence can be flagged as _ambiguous_, meaning multiple bases will be probabilistically aligned to a position. Right now, the program the program supports aligning cytosine variants (5-mC and 5-hmC) and adenine variants (6-mA) to a position.
-* trainModels
-    * Trains the transitions and/or emissions of the HMM. Uses a directory of basecalled reads and a reference sequence to learn transition parameters to the model. Once enough assignments have been accumulated it will (optionally) rebuild a hierarchical Dirichlet process (HDP) from these assignments.
+## Signalalign Config Specifications
 
+`{`  
+`"signal_alignment_args": {`  
+`"target_regions": null, `deprecated  
+`"track_memory_usage": false,`deprecated   
+`"threshold": 0.01,` probablity threshold for outputing an alignment between kmer and event  
+`"event_table": null,` specify location of event table in fast5 (deprecated)  
+`"embed": false,` embed signalalign data into fast5 (not recommened)  
+`"delete_tmp": true,` delete temorary folders (highly recommened)  
+`"output_format": "full"` specify output format "full", "assignments", "variantCaller" (see [Output Formats](####Output Formats))  
+`},`  
+`"samples": [`  
+`{`  
+`"positions_file": "path/to/file.positions",` locations to call mods (see [Positions File Specification](####Positions File Specification))  
+`"fast5_dirs": ["/path/to/fast5/"],`path to fast5 files  
+`"bwa_reference": "/path/to/reference.fa",` path to reference   
+`"fofns": [],` deprecated  
+`"readdb": "/path/to/index.readdb",` path to readdb/index file  
+`"fw_reference": null,` deprecated    
+`"bw_reference": null,` deprecated   
+`"kmers_from_reference": false,` deprecated  
+`"motifs": null,` deprecated  
+`"name": "wild_type",` name of sample  
+`"alignment_file": "/path/to/alignment.bam",` path to alignment file  
+`"recursive": false,` deprecated  
+`},`
+`],`  
+`"path_to_bin": "/path/to/signalalign/bin",` path to signalAlign bin where executables are stored  
+`"complement_hdp_model": null,` path to complement_hdp_model   
+`"template_hdp_model": null,` path to template_hdp_model   
+`"complement_hmm_model": null,` path to complement_hmm_model  
+`"template_hmm_model": "path/to/model.model",` path to template_hmm_model  
+`"job_count": 96,` number of threads / jobs to use  
+`"debug": false,` if things are failing set this to true  
+`"two_d": false,` if 2d reads set to true  
+`"output_dir": "/path/to/output",` path to output directory   
+`"perform_kmer_event_alignment": true,` force pre alignment between kmers and events   
+`"overwrite": true,` overwrite previous runs  
+`"rna": true,` set to true if rna  
+`"ambig_model": path/to/ambig.model",` ambiguous model (see [Ambiguous Model Specification](####Ambiguous Model Specification)   
+`"built_alignments": null,` deprecated  
+`}`  
 
-#### Options and flags
-* `--file_directory`, `-d` directory with MinION fast5 reads to align
-* `--in_tempalte_hmm`, `-T` template HMM parameters file
-* `--in_complement_hmm`, `-C` complement HMM parameters file
-* `--template_hdp`, `-tH` template HDP model file
-* `--complement_hdp`, `-cH` complement HDP model file
-* `--degenerate`, `-x` nucleotide options for degenerate or _ambiguous_ positions. `m6a` = {AF}, `variant` = {A,C,G,T} `cytosine2` = {CE} `cytosine3` = {CEO} `adenosine` = {AI}. **n.b.** E = 5-methylcytosine, O = 5-hydroxymethylcytosine, I = 6-methyladenine
-* `--stateMachineType`, `-smt` HMM to use. Options: `threeState` and `threeStateHdp`. Default: `threeState`.
-* `--file_of_files`, `-fofn` a file containing the absolute path to files to align with, one file path per line
-* `--threshold`, `-t`. Minimum posterior match probability threshold (matches below this threshold will not be tabulated). Default: 0.01.
-* `--diagonalExpansion`, `-e` Mumber of diagonals to expand around each anchor, Default: 50.
-* `--constraintTrim`, `-m` Amount to remove from an anchor constraint. Default: 14.
-* `--target_regions`, `-q` File containing target regions to align to, if the read doesn't get mapped to a region in this file the signal-level alignment will not precede. The format is `start \t end \t kmer` where `start` and `end` are the genomic coordinates and the `kmer` is the sequence at those coordinates. The `kmer` is mostly historical, so it doesn't have to be perfect. See below for details.
-* `--ambiguity_positions`, `p` file containing positions to flag as ambiguous see below for details.
-* `--jobs, -j` Number of jobs to run concurrently, Default: 4.
-* `--nb_files`, `-n` Maximum number of files to align, will randomly select if you point to a directory/fofn with more files than this so if you want to make sure you use all of the files set a large number (or count the lines in your fofn). Default: 500.
-* `--ambig_char`, `-X` in development, will be for specifying specific subsets of ambiguous positions **leave as default**
-* `--output_format`, `-f` format of output (this is different than the summary that goes to `stdout`). Options are: `full`, `variantValler`, and `assignments`, see below for description.
-* `--output_location`, `-o` place to put results, it will make a new working directory in this location
-* `--forward_ref` forward reference sequence for SignalAlignment align to, in FASTA
-* `--backward_ref` backward reference sequence for SignalAlignment align to, in FASTA
-* `--alignment_file` BAM file of alignments if FAST5s do not have fasta info or events
-* `--bwa_reference`, `-r` Reference sequence required for generating guide alignment
-* `--motifs` Motif find and replace must be in specific list within a list format. eg: [['CCAGG', 'CEAGG'], ['CCTGG', 'CETGG']]
-* `--embed`   Embed full output into fast5 file
-* `--event_table` Specify path withing Fast5 event table
-* `--force_kmer_event_alignment` If passed, force SignalAlign to infer kmer to event alignment. Must include alignment_file
-* `--allow_unsupported_nanopore_read_versions` Will attempt to complete execution with unsupported nanopore read versions
-* `--filter_reads`        Will filter reads out if average fastq quality scores are below 7.
-* `--path_to_bin` Path to bin to find signalMachine
-* `--readdb`        Path to readdb file or sequencing summary file for easy filtering
-* `--keep_tmp_folder`     Keep the temporary folder with files fed into SignalMachine
-* `--recursive`           Recursively search top directory for fast5 files
-
-#### Output
+#### Output Formats
 
 There are three output formats. `full`, `variantCaller`, and `assignments`. Each read that aligns to the target regions (if you specified that option) will come as a separate file.
 
@@ -121,7 +132,26 @@ finally, `assignments` has the following tab-separated format:
 | k-mer | Read File | Descaled Event Mean | Posterior Probability | 
 |--- | --- | --- | --- |
 
-### trainModels
+
+
+####Positions File Specification
+Tsv file with the columns seen below. Used to change the `bwa_reference` characters to ambiguous characters defined
+in both the [ambig model](####Ambiguous Model Specification) and hmm/hdp model. see [Example](tests/test_position_files/CCWGG_ecoli_k12_mg1655.positions)
+
+| contig (str) | 0_based_ref_index (int)| strand (str)| ref_char (str)| replacement_char (str)|
+|--- | --- | --- | --- | --- |
+
+
+####Ambiguous Model Specification
+Tsv file with the columns seen below. If a character in the `find` column is found in the reference, the model
+will create branch points for each of the `replace` characters. This model allows you to specify a set of arbitrary characters
+to represent a set of arbitrary modifications or variants. Note: Must be consistent with a HMM model.
+
+| find (str) | replace (str) |
+|--- | --- |
+
+
+## trainModels Config Specifications
 #### Input
 _Required_
 * A config file. The default/test model can be found at `tests/trainModels-config.json`
