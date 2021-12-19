@@ -26,6 +26,10 @@ The HDP models enable mapping of methylated bases to your reference sequence.
 Given the installation is often long, tedious and somewhat fragile. So, we recommend using Docker to run signalAlign.
 
 #### Docker image
+`ucscbailey/signalalign:latest`
+
+We do not store any test data within the docker image so, in order to test the docker image, clone the repo and run the following command from within
+the signalAlign home directory. 
 
 `docker run -it -v "$(pwd)":/data ucscbailey/signalalign:latest run --config tests/docker_runSignalAlign-config.json`
 
