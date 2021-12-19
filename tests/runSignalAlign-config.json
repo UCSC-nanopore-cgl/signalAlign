@@ -24,8 +24,7 @@
       "number_of_kmer_assignments": 10,
       "alignment_file": "./tests/minion_test_reads/canonical_ecoli_R9/canonical_ecoli.bam",
       "recursive": false,
-      "assignments_dir": null,
-      "degenerate": "variant"
+      "assignments_dir": null
     }
   ],
   "path_to_bin": "./bin",
