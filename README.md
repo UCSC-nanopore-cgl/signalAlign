@@ -23,11 +23,15 @@ The HDP models enable mapping of methylated bases to your reference sequence.
 
 ## Installation:
 
-Given the installation is often long, tedious and somewhat fragile we recommend using Docker to run signalAlign.
+Given the installation is often long, tedious and somewhat fragile. So, we recommend using Docker to run signalAlign.
 
 #### Docker image
+`ucscbailey/signalalign:latest`
 
-ucscbailey/signalalign:latest
+We do not store any test data within the docker image so, in order to test the docker image, clone the repo and run the following command from within
+the signalAlign home directory. 
+
+`docker run -it -v "$(pwd)":/data ucscbailey/signalalign:latest run --config tests/docker_runSignalAlign-config.json`
 
 ### Installation:
 
@@ -74,7 +78,7 @@ python3.7 -m pytest
 5. Generate positions file (see [Positions File Specification](#positions-file-specification))
 6. Create a config file. An example config file is located in [tests](tests/runSignalAlign-config.json).
 ```
-runSignalAlign.py run --config tests/runSignalAlign-config.json &> log_file.txt
+runSignalAlign.py run --config tests/runSignalAlign-config.json
 ```
 7. Run signalAlign 
 

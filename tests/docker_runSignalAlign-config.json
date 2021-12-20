@@ -27,7 +27,7 @@
       "assignments_dir": null
     }
   ],
-  "path_to_bin": "./bin",
+  "path_to_bin": "/bin",
   "complement_hdp_model": null,
   "template_hdp_model": null,
   "complement_hmm_model": "./models/testModelR9_5mer_acgt_complement.model",
