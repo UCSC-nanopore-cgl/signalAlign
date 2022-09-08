@@ -45,7 +45,7 @@ setup(name="signalAlign",
                         "Cython>=0.26",
                         "scikit-learn>=0.19.0,<=0.20.3",
                         "matplotlib>=2.0.2",
-                        "pathos==0.2.1",
+                        "pathos==0.2.9",
                         "scipy>=1.5.0"
                         "py3helpers[seq_tools]>=0.5.0",
                         'embed>=0.0.5']
